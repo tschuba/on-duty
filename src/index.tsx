@@ -25,7 +25,7 @@ app.route("/", loginRoutes);
 // Better Auth handler
 app.on(["POST", "GET"], "/auth/*", async (c) => {
   const response = await auth.handler(c.req.raw);
-  if (c.req.path.startsWith("/auth/callback/") && !response.ok) {
+  if (c.req.path.startsWith("/auth/callback/") && response.status >= 400) {
     return c.redirect("/login?error=unknown_user");
   }
   return response;

@@ -2,7 +2,7 @@ import { boolean, date, integer, pgTable, text, uuid } from "drizzle-orm/pg-core
 import { members } from "./members";
 
 export const memberRoles = pgTable("member_roles", {
-  id: text("id").primaryKey(), // slug, stable identifier
+  id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   grantsActiveStatus: boolean("grants_active_status").notNull().default(false),
 });
@@ -12,7 +12,7 @@ export const memberRoleAssignments = pgTable("member_role_assignments", {
   memberId: uuid("member_id")
     .notNull()
     .references(() => members.id, { onDelete: "cascade" }),
-  memberRoleId: text("member_role_id")
+  memberRoleId: uuid("member_role_id")
     .notNull()
     .references(() => memberRoles.id),
   from: date("from").notNull(),
