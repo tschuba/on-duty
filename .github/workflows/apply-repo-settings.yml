@@ -1,0 +1,55 @@
+name: Apply repo settings
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/repo-settings.yml]
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml -q
+      - name: Apply settings
+        env:
+          GH_TOKEN: ${{ secrets.REPO_SETTINGS_TOKEN }}
+        run: |
+          python3 << 'EOF'
+          import yaml, json, os, urllib.request
+
+          token = os.environ["GH_TOKEN"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+
+          def gh(method, path, data=None):
+              url = f"https://api.github.com{path}"
+              body = json.dumps(data).encode() if data else None
+              req = urllib.request.Request(url, data=body, method=method)
+              req.add_header("Authorization", f"Bearer {token}")
+              req.add_header("Accept", "application/vnd.github+json")
+              req.add_header("X-GitHub-Api-Version", "2022-11-28")
+              if body:
+                  req.add_header("Content-Type", "application/json")
+              with urllib.request.urlopen(req) as r:
+                  return json.loads(r.read())
+
+          with open(".github/repo-settings.yml") as f:
+              config = yaml.safe_load(f)
+
+          if ms := config.get("merge_strategy"):
+              gh("PATCH", f"/repos/{repo}", ms)
+              print("✓ merge strategy")
+
+          existing = {r["name"]: r["id"] for r in gh("GET", f"/repos/{repo}/rulesets")}
+          for rs in config.get("rulesets", []):
+              rs.setdefault("conditions", {}).setdefault("ref_name", {}).setdefault("exclude", [])
+              name = rs["name"]
+              if name in existing:
+                  gh("PUT", f"/repos/{repo}/rulesets/{existing[name]}", rs)
+                  print(f"✓ ruleset '{name}' updated")
+              else:
+                  gh("POST", f"/repos/{repo}/rulesets", rs)
+                  print(f"✓ ruleset '{name}' created")
+          EOF

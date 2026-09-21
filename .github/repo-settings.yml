@@ -1,0 +1,15 @@
+rulesets:
+  - name: protect-main
+    target: branch
+    enforcement: active
+    conditions:
+      ref_name:
+        include: ["~DEFAULT_BRANCH"]
+    rules:
+      - type: non_fast_forward
+
+merge_strategy:
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
