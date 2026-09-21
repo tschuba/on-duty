@@ -6,6 +6,10 @@ Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer.
 
 ---
 
+## Konfiguration
+
+- [OIDC-Provider konfigurieren](docs/oidc.md)
+
 ## Lokale Entwicklung
 
 **Voraussetzungen:** Node.js 22, pnpm, Docker
@@ -21,8 +25,8 @@ cp .env.example .env
 # 3. Datenbank starten
 docker compose up -d
 
-# 4. Schema migrieren + Seed-Daten einspielen
-pnpm db:migrate
+# 4. Schema migrieren + Admin-Account anlegen
+pnpm db:setup
 
 # 5. Entwicklungsserver starten
 pnpm dev
@@ -37,6 +41,8 @@ pnpm dev
 | `pnpm build` | TypeScript kompilieren + CSS minifizieren |
 | `pnpm db:generate` | Drizzle-Migration aus Schema generieren |
 | `pnpm db:migrate` | Migrationen ausführen |
+| `pnpm db:seed` | Admin-Account anlegen (idempotent) |
+| `pnpm db:setup` | Migrate + Seed (Ersteinrichtung) |
 | `pnpm db:studio` | Drizzle Studio öffnen |
 
 ## Umgebungsvariablen
