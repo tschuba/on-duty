@@ -16,6 +16,9 @@ const app = new Hono<{ Variables: Variables }>();
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
 
+// Auth + password routes (registered first so /auth/oidc-start isn't swallowed by the wildcard below)
+app.route("/", loginRoutes);
+
 // Better Auth handler — intercept callback errors for unknown OIDC users
 app.on(["POST", "GET"], "/auth/*", async (c) => {
   const response = await auth.handler(c.req.raw);
@@ -24,9 +27,6 @@ app.on(["POST", "GET"], "/auth/*", async (c) => {
   }
   return response;
 });
-
-// Auth + password routes
-app.route("/", loginRoutes);
 
 // Protected home — handles returnTo redirect after OIDC login
 app.get("/", requireAuth(), (c) => {

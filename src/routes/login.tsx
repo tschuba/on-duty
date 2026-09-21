@@ -53,10 +53,10 @@ loginRoutes.get("/auth/oidc-start", async (c) => {
 
   const callbackURL = returnTo && returnTo.startsWith("/") ? returnTo : "/";
 
-  const req = new Request(new URL("/auth/sign-in/generic-oauth", env.OIDC_APP_URL), {
+  const req = new Request(new URL("/auth/sign-in/social", env.OIDC_APP_URL), {
     method: "POST",
     headers: { "content-type": "application/json", origin: env.OIDC_APP_URL },
-    body: JSON.stringify({ providerId: "oidc", callbackURL }),
+    body: JSON.stringify({ provider: "oidc", callbackURL }),
   });
 
   const response = await auth.handler(req);
@@ -65,12 +65,13 @@ loginRoutes.get("/auth/oidc-start", async (c) => {
   const location = response.headers.get("location");
   if (location) return c.redirect(location);
 
-  // Fallback: try JSON body with url field
+  // Better Auth returns { url: "..." } for social sign-in
   try {
     const data = (await response.json()) as { url?: string };
     if (data.url) return c.redirect(data.url);
-  } catch {
-    // ignore
+    console.error("[oidc-start] unexpected json from Better Auth:", data);
+  } catch (e) {
+    console.error("[oidc-start] status:", response.status, "error:", e);
   }
 
   return c.redirect("/login?error=oidc_failed");
