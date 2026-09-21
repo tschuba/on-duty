@@ -20,7 +20,7 @@ pnpm install
 
 # 2. Umgebungsvariablen anlegen
 cp .env.example .env
-# .env öffnen und zumindest ADMIN_PASSWORD setzen
+# .env öffnen: ADMIN_PASSWORD und BETTER_AUTH_SECRET setzen (+ OIDC-Vars für Login)
 
 # 3. Datenbank starten
 docker compose up -d
@@ -54,6 +54,7 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `DATABASE_URL` | ✓ | — | PostgreSQL-Verbindungs-URL |
 | `ORG_NAME` | ✓ | — | Organisationsname (z. B. für Export-Dateinamen) |
 | `ADMIN_PASSWORD` | ✓ | — | Passwort des lokalen Admin-Accounts |
+| `BETTER_AUTH_SECRET` | ✓ | — | Zufälliger Secret für Session-Signaturen (`openssl rand -hex 32`) |
 | `OIDC_PROVIDER` | ✓ | — | OIDC-Issuer-URL (HTTPS) |
 | `OIDC_CLIENT_ID` | ✓ | — | OAuth2-Client-ID |
 | `OIDC_CLIENT_SECRET` | ✓ | — | OAuth2-Client-Secret |

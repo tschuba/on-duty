@@ -22,13 +22,28 @@ export const Layout: FC<Props> = ({ title, children, user }) => (
           </a>
         </div>
         {user && (
-          <div class="flex-none items-center gap-3 flex">
-            <span class="text-sm opacity-60 hidden sm:inline">{user.name}</span>
-            <form action="/logout" method="post">
-              <button type="submit" class="btn btn-ghost btn-sm">
-                Abmelden
-              </button>
-            </form>
+          <div class="flex-none">
+            <div class="dropdown dropdown-end">
+              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
+                <span>{user.name}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-60" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
+                {user.email === "admin@local" && (
+                  <li><a href="/admin/password">Passwort ändern</a></li>
+                )}
+                {user.appRole === "admin" && (
+                  <li><a href="/admin">Admin</a></li>
+                )}
+                <li>
+                  <form action="/logout" method="post" class="p-0">
+                    <button type="submit" class="w-full text-left px-4 py-2">Abmelden</button>
+                  </form>
+                </li>
+              </ul>
+            </div>
           </div>
         )}
       </nav>
