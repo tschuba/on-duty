@@ -4,7 +4,6 @@ export const genderEnum = pgEnum("gender", ["male", "female"]);
 
 export const members = pgTable("members", {
   id: uuid("id").primaryKey().defaultRandom(),
-  slug: text("slug").notNull().unique(),
   lastName: text("last_name").notNull(),
   firstName: text("first_name").notNull(),
   street: text("street"),

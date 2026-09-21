@@ -15,6 +15,13 @@
       "when": 1789980908169,
       "tag": "0001_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789996787061,
+      "tag": "0002_red_thanos",
+      "breakpoints": true
     }
   ]
 }
