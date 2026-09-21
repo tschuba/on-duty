@@ -1,0 +1,36 @@
+@import "tailwindcss";
+@import "daisyui";
+
+@font-face {
+  font-family: "Oswald";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/oswald-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/inter-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/inter-500.woff2") format("woff2");
+}
+
+@theme {
+  --color-primary: #cc0000;
+  --color-primary-dark: #990000;
+  --color-gold: #f0a500;
+  --color-dark: #1c1c1c;
+  --color-surface: #f8f8f8;
+  --font-heading: "Oswald", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
