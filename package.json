@@ -3,16 +3,20 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"node --env-file=.env --import=tsx/esm --watch src/index.ts\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
+    "dev": "concurrently \"node --env-file=.env --import=tsx/esm --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
     "build": "tsc && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --env-file=.env --import=tsx/esm scripts/seed.ts",
+    "db:setup": "pnpm db:migrate && pnpm db:seed",
     "db:studio": "drizzle-kit studio",
     "postinstall": "node scripts/copy-fonts.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
+    "bcryptjs": "^3.0.3",
+    "better-auth": "^1.7.5",
     "drizzle-orm": "^0.39.0",
     "hono": "^4.7.0",
     "postgres": "^3.4.5"
@@ -21,6 +25,7 @@
     "@fontsource/inter": "^5.1.0",
     "@fontsource/oswald": "^5.1.0",
     "@tailwindcss/cli": "^4.1.0",
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.0.0",
     "concurrently": "^9.1.0",
     "daisyui": "^5.0.0",
