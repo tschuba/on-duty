@@ -8,8 +8,6 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "node --env-file=.env --import=tsx/esm src/db/seed.ts",
-    "db:setup": "pnpm db:migrate && pnpm db:seed",
     "db:studio": "drizzle-kit studio",
     "postinstall": "node scripts/copy-fonts.mjs"
   },
