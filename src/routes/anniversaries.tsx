@@ -153,7 +153,7 @@ function AnniversariesExportModal() {
           fields.forEach(function(f){
             var el=document.getElementById('exp-ann-'+f);
             var s=localStorage.getItem('ann_export_'+f);
-            el.checked=s===null?true:s==='1';
+            el.checked=s===null?false:s==='1';
             el.addEventListener('change',function(){localStorage.setItem('ann_export_'+f,el.checked?'1':'0');});
           });
           document.getElementById('ann-export-download').addEventListener('click',function(){
@@ -250,8 +250,8 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
             <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>Nur Geburtstage</a>
           </div>
 
-          <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ann-export-modal').showModal()">
-            Export
+          <button class="btn btn-sm btn-neutral" onclick="document.getElementById('ann-export-modal').showModal()">
+            ⬇ Export
           </button>
         </div>
       </div>
@@ -316,11 +316,11 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), "Jubiläen");
 
-  const buf = XLSX.write(wb, { type: "array", bookType: "ods" }) as Uint8Array;
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const exportDate = today.replace(/-/g, "");
-  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_jubilaeuen_${exportDate}_${start.replace(/-/g, "")}_${end.replace(/-/g, "")}.ods`;
+  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_jubilaeen_${exportDate}_${start.replace(/-/g, "")}_${end.replace(/-/g, "")}.xlsx`;
 
-  c.header("Content-Type", "application/vnd.oasis.opendocument.spreadsheet");
+  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="${filename}"`);
-  return c.body(buf.buffer as ArrayBuffer);
+  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 });

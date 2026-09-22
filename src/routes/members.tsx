@@ -578,7 +578,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
             </a>
           ))}
         </div>
-        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('members-export-modal').showModal()">
+        <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
           Export
         </button>
       </div>
@@ -890,21 +890,21 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
       return cmp2 !== 0 ? cmp2 : (a.from ?? "").localeCompare(b.from ?? "");
     });
 
-    const asgHeader = ["Mitglied-ID", "Nachname", "Vorname", "Funktion", "Von", "Bis"];
+    const asgHeader = ["Nachname", "Vorname", "Funktion", "Von", "Bis"];
     const asgRows = asgns.map((a) => {
       const m = nameMap.get(a.memberId);
-      return [a.memberId, m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
+      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), "Funktionszuweisungen");
   }
 
-  const buf = XLSX.write(wb, { type: "array", bookType: "ods" }) as Uint8Array;
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_mitglieder_${today}.ods`;
+  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_mitglieder_${today}.xlsx`;
 
-  c.header("Content-Type", "application/vnd.oasis.opendocument.spreadsheet");
+  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="${filename}"`);
-  return c.body(buf.buffer as ArrayBuffer);
+  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 });
 
 // GET /members/:id — view or edit
