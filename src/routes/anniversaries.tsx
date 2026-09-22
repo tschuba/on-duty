@@ -53,27 +53,28 @@ const STATUS_LABEL: Record<MemberStatus, string> = {
 
 // ── Components ────────────────────────────────────────────────────────────────
 
-function EventRow({ event: e, past }: { event: AnniversaryEvent; past: boolean }) {
+function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: boolean; divider: boolean }) {
   const yearsCol = e.kind === "birthday"
     ? `${e.years} Jahre`
     : e.title ? `${e.title} · ${e.years} Jahre` : `${e.years} Jahre`;
+  const border = divider ? " border-t border-base-300" : "";
 
   return (
     <tr class={past ? "opacity-40" : ""}>
-      <td class="whitespace-nowrap text-sm">{formatDate(e.date)}</td>
-      <td>
+      <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(e.date)}</td>
+      <td class={border}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">
           {e.lastName}, {e.firstName}
         </a>
       </td>
-      <td><span class={STATUS_BADGE[e.status]}>{STATUS_LABEL[e.status]}</span></td>
-      <td>
+      <td class={border}><span class={STATUS_BADGE[e.status]}>{STATUS_LABEL[e.status]}</span></td>
+      <td class={border}>
         {e.kind === "birthday"
           ? <span class="badge badge-outline badge-sm">Geburtstag</span>
           : <span class="badge badge-warning badge-outline badge-sm">Jubiläum</span>
         }
       </td>
-      <td class="text-right text-sm tabular-nums">{yearsCol}</td>
+      <td class={`text-right text-sm tabular-nums${border}`}>{yearsCol}</td>
     </tr>
   );
 }
@@ -99,7 +100,7 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
 
   return (
     <div class="overflow-x-auto">
-      <table class="table table-sm w-full">
+      <table class="table table-sm w-full [&_tbody_td]:border-b-0">
         <tbody>
           {[...groups.entries()].map(([month, evs], i) => (
             <>
@@ -108,8 +109,8 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
                   {formatMonth(month)}
                 </td>
               </tr>
-              {evs.map((e) => (
-                <EventRow event={e} past={e.date < today} />
+              {evs.map((e, i) => (
+                <EventRow event={e} past={e.date < today} divider={i > 0} />
               ))}
             </>
           ))}
