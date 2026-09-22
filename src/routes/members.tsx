@@ -199,7 +199,7 @@ function MembersTable({
 
   return (
     <div id="members-results">
-      <div class="overflow-x-auto">
+      <div>
         <table class="table table-zebra w-full">
           <thead>
             <tr>
@@ -229,17 +229,18 @@ function MembersTable({
                     const roles = openRoles(m);
                     return (
                       <div class="flex flex-nowrap gap-1 items-center">
-                        {roles.slice(0, 1).map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
-                        {roles.length > 1 && (
-                          <div class="dropdown dropdown-end" onclick="event.stopPropagation()">
-                            <div tabindex="0" role="button" class="badge badge-outline badge-sm cursor-pointer whitespace-nowrap">+{roles.length - 1}</div>
-                            <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
-                              <div class="flex flex-wrap gap-1 max-w-48">
-                                {roles.slice(1).map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+                        {roles.length === 1
+                          ? <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>
+                          : roles.length > 1 && (
+                            <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
+                              <div tabindex="0" role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{roles.length} Rollen</div>
+                              <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
+                                <div class="flex flex-wrap gap-1 max-w-48">
+                                  {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          )}
                       </div>
                     );
                   })()}
