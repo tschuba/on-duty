@@ -24,3 +24,4 @@ merge_strategy:
   allow_merge_commit: false
   allow_rebase_merge: false
   delete_branch_on_merge: true
+  pull_request_creation_policy: collaborators_only
