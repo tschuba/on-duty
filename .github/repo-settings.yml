@@ -5,6 +5,10 @@ rulesets:
     conditions:
       ref_name:
         include: ["~DEFAULT_BRANCH"]
+    bypass_actors:
+      - actor_type: RepositoryRole
+        actor_id: 5  # admin role
+        bypass_mode: always
     rules:
       - type: non_fast_forward
       - type: pull_request
