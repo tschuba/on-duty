@@ -11,8 +11,8 @@ function age(years: number, daysOffset = 0): string {
   return d.toISOString().slice(0, 10);
 }
 
-const activeRole = { id: "aktives_mitglied", title: "Aktives Mitglied", grantsActiveStatus: true };
-const passiveRole = { id: "passives_mitglied", title: "Passives Mitglied", grantsActiveStatus: false };
+const activeRole = { id: "aktives_mitglied", title: "Aktives Mitglied", grantsActiveStatus: true, isProtected: false };
+const passiveRole = { id: "passives_mitglied", title: "Passives Mitglied", grantsActiveStatus: false, isProtected: false };
 
 function assignment(role: typeof activeRole, to: string | null = null) {
   return {

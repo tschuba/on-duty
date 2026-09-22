@@ -5,6 +5,7 @@ export const memberRoles = pgTable("member_roles", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   grantsActiveStatus: boolean("grants_active_status").notNull().default(false),
+  isProtected: boolean("is_protected").notNull().default(false),
 });
 
 export const memberRoleAssignments = pgTable("member_role_assignments", {

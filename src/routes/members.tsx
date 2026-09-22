@@ -6,6 +6,7 @@ import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
+import { PASSIVE_MEMBER_ROLE_ID } from "../lib/constants.js";
 import { env } from "../env.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
@@ -562,7 +563,7 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
             <thead>
               <tr>
                 <th>Funktion</th>
-                <th>Von</th>
+                <th>Von <span class="text-error">*</span></th>
                 <th>Bis</th>
                 <th></th>
               </tr>
@@ -583,15 +584,44 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">Speichern</button>
+          <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">Speichern &amp; Neu</button>
           <a href="/members" class="btn btn-ghost">Abbrechen</a>
         </div>
       </form>
       <script dangerouslySetInnerHTML={{ __html: `
-        // pass roles to role-row endpoint via hx-vals
         document.querySelector('[hx-get="/members/role-row"]').addEventListener('htmx:configRequest', function(e) {
           const rows = document.querySelectorAll('#role-rows tr').length;
           e.detail.parameters['index'] = rows;
         });
+
+        // Auto-insert 'Passives Mitglied' row when entry date is set
+        (function() {
+          const PASSIVE_ID = "${PASSIVE_MEMBER_ROLE_ID}";
+          const entryInput = document.querySelector('input[name="entryDate"]');
+          function getRoles() {
+            try { return JSON.parse(document.getElementById('roles-json').value); } catch { return []; }
+          }
+          function hasPassiveRow() {
+            return [...document.querySelectorAll('#role-rows select[name="assignment_role[]"]')].some(s => s.value === PASSIVE_ID);
+          }
+          function escape(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+          function buildRow(date, roles) {
+            const index = document.querySelectorAll('#role-rows tr').length;
+            const opts = roles.map(r => '<option value="' + r.id + '"' + (r.id === PASSIVE_ID ? ' selected' : '') + '>' + escape(r.title) + '</option>').join('');
+            const tr = document.createElement('tr');
+            tr.id = 'role-row-' + index;
+            tr.dataset.autoPassive = 'true';
+            tr.innerHTML = '<td><input type="hidden" name="assignment_id[]" value=""><select name="assignment_role[]" class="select select-bordered select-sm w-full" required><option value="">— Funktion wählen —</option>' + opts + '</select></td><td><input type="date" name="assignment_from[]" class="input input-bordered input-sm w-full" value="' + date + '" required></td><td><input type="date" name="assignment_to[]" class="input input-bordered input-sm w-full" value=""></td><td><button type="button" class="btn btn-ghost btn-sm text-error" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+            return tr;
+          }
+          entryInput.addEventListener('change', function() {
+            const date = this.value;
+            const autoRow = document.querySelector('#role-rows tr[data-auto-passive]');
+            if (!date) { if (autoRow) autoRow.remove(); return; }
+            if (autoRow) { autoRow.querySelector('input[name="assignment_from[]"]').value = date; return; }
+            if (!hasPassiveRow()) document.getElementById('role-rows').appendChild(buildRow(date, getRoles()));
+          });
+        })();
       ` }} />
     </Layout>
   );
@@ -625,10 +655,15 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
 
+  // Validate that every role assignment has a from date
+  if (assignmentRoles.some((r, i) => r && !assignmentFroms[i])) {
+    errors._assignments = `Feld „Von" ist ein Pflichtfeld.`;
+  }
+
   // Check for duplicate open assignments (same role without to-date)
   const openRoles = assignmentRoles.filter((_, i) => !assignmentTos[i]);
   const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
-  if (dupRole) {
+  if (dupRole && !errors._assignments) {
     const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
     errors._assignments = `Funktion „${role?.title ?? dupRole}" ist mehrfach offen zugewiesen.`;
   }
@@ -664,7 +699,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
           <div class="divider">Funktionszuweisungen</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
-              <thead><tr><th>Funktion</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+              <thead><tr><th>Funktion</th><th>Von <span class="text-error">*</span></th><th>Bis</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -686,6 +721,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
           </button>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">Speichern</button>
+            <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">Speichern &amp; Neu</button>
             <a href="/members" class="btn btn-ghost">Abbrechen</a>
           </div>
         </form>
@@ -720,11 +756,22 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
       });
     }
 
+    // ponytail: safety-net — insert 'Passives Mitglied' if not submitted (e.g. JS disabled)
+    if (!assignmentRoles.includes(PASSIVE_MEMBER_ROLE_ID)) {
+      await tx.insert(memberRoleAssignments).values({
+        memberId: m.id,
+        memberRoleId: PASSIVE_MEMBER_ROLE_ID,
+        from: entryDate,
+        to: null,
+      });
+    }
+
     return [m];
   });
 
   setFlash(c, "Mitglied erfolgreich angelegt.", "success");
-  return c.redirect(`/members/${newMember.id}`);
+  const saveAndNew = String(body._action ?? "") === "save_and_new";
+  return c.redirect(saveAndNew ? "/members/new" : "/members");
 });
 
 // GET /members/:id — view or edit
@@ -871,7 +918,7 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
           <div class="divider">Funktionszuweisungen</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
-              <thead><tr><th>Funktion</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+              <thead><tr><th>Funktion</th><th>Von <span class="text-error">*</span></th><th>Bis</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -942,7 +989,7 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
           <div class="divider">Funktionszuweisungen</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
-              <thead><tr><th>Funktion</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+              <thead><tr><th>Funktion</th><th>Von <span class="text-error">*</span></th><th>Bis</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
