@@ -1020,14 +1020,15 @@ adminRoutes.get("/backup", guard, async (c) => {
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
           Backup-History
         </h1>
-        <button
-          class="btn btn-outline btn-sm"
-          hx-post="/admin/backup/run"
-          hx-swap="none"
-          hx-confirm="Backup jetzt starten?"
-        >
-          Backup jetzt starten
-        </button>
+        <form method="post" action="/admin/backup/run">
+          <button
+            type="submit"
+            class="btn btn-outline btn-sm"
+            onclick="return confirm('Backup jetzt starten?')"
+          >
+            Backup jetzt starten
+          </button>
+        </form>
       </div>
 
       {entries.length === 0 ? (
