@@ -147,5 +147,5 @@ export async function startBackupScheduler(): Promise<void> {
   cron.schedule(env.BACKUP_SCHEDULE, () => {
     runBackup().catch((err) => console.error("[backup] Unbehandelter Fehler:", err));
   });
-  console.log(`[backup] Scheduler gestartet (${env.BACKUP_SCHEDULE})`);
+  console.log(`[backup] Scheduler started (${env.BACKUP_SCHEDULE})`);
 }
