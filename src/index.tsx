@@ -8,6 +8,7 @@ import { env } from "./env.js";
 import { loginRoutes } from "./routes/login.js";
 import { memberRoutes } from "./routes/members.js";
 import { adminRoutes } from "./routes/admin.js";
+import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -44,6 +45,9 @@ app.get("/", requireAuth(), (c) => {
 
 // Member routes
 app.route("/members", memberRoutes);
+
+// Anniversary routes
+app.route("/anniversaries", anniversaryRoutes);
 
 // Admin routes
 app.route("/admin", adminRoutes);
