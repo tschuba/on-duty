@@ -251,7 +251,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
           </div>
 
           <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ann-export-modal').showModal()">
-            Excel-Export
+            Export
           </button>
         </div>
       </div>
@@ -316,11 +316,11 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), "Jubiläen");
 
-  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as Uint8Array;
+  const buf = XLSX.write(wb, { type: "array", bookType: "ods" }) as Uint8Array;
   const exportDate = today.replace(/-/g, "");
-  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_jubilaeuen_${exportDate}_${start.replace(/-/g, "")}_${end.replace(/-/g, "")}.xlsx`;
+  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_jubilaeuen_${exportDate}_${start.replace(/-/g, "")}_${end.replace(/-/g, "")}.ods`;
 
-  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  c.header("Content-Type", "application/vnd.oasis.opendocument.spreadsheet");
   c.header("Content-Disposition", `attachment; filename="${filename}"`);
   return c.body(buf.buffer as ArrayBuffer);
 });

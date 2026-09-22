@@ -579,7 +579,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
           ))}
         </div>
         <button class="btn btn-sm btn-ghost" onclick="document.getElementById('members-export-modal').showModal()">
-          Excel-Export
+          Export
         </button>
       </div>
 
@@ -898,11 +898,11 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), "Funktionszuweisungen");
   }
 
-  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as Uint8Array;
+  const buf = XLSX.write(wb, { type: "array", bookType: "ods" }) as Uint8Array;
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_mitglieder_${today}.xlsx`;
+  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_mitglieder_${today}.ods`;
 
-  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  c.header("Content-Type", "application/vnd.oasis.opendocument.spreadsheet");
   c.header("Content-Disposition", `attachment; filename="${filename}"`);
   return c.body(buf.buffer as ArrayBuffer);
 });
