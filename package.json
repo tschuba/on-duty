@@ -13,7 +13,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs"
+    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",

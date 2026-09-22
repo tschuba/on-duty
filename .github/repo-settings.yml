@@ -7,6 +7,13 @@ rulesets:
         include: ["~DEFAULT_BRANCH"]
     rules:
       - type: non_fast_forward
+      - type: pull_request
+        parameters:
+          required_approving_review_count: 0
+          dismiss_stale_reviews_on_push: true
+          require_code_owner_review: true
+          require_last_push_approval: true
+          required_review_thread_resolution: true
 
 merge_strategy:
   allow_squash_merge: true

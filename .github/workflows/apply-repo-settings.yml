@@ -2,10 +2,11 @@ name: Apply repo settings
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths: [.github/repo-settings.yml]
   schedule:
     - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   apply:
