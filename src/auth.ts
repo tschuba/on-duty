@@ -25,6 +25,12 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false,
   },
+  account: {
+    skipStateCookieCheck: true,
+    accountLinking: {
+      trustedProviders: ["oidc"],
+    },
+  },
   user: {
     additionalFields: {
       appRole: { type: "string", defaultValue: "read", input: false },

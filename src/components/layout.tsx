@@ -4,22 +4,51 @@ import type { AppUser } from "../auth.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AppUser;
+  activeNav?: "members" | "anniversaries" | "admin";
 }>;
 
-export const Layout: FC<Props> = ({ title, children, user }) => (
+export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
   <html lang="de">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>{title ? `${title} · on-duty` : "on-duty"}</title>
       <link rel="stylesheet" href="/css/app.css" />
+      <script src="/js/htmx.min.js" />
     </head>
     <body class="bg-base-100 min-h-screen">
+      {/* Toast container — filled by HX-Trigger: showToast */}
+      <div id="toast-container" class="toast toast-top toast-end z-50" />
+
       <nav class="navbar bg-base-200 shadow-sm px-4">
-        <div class="flex-1">
+        <div class="flex-1 gap-4">
           <a href="/" class="font-bold text-primary text-lg" style="font-family: var(--font-heading)">
             on-duty
           </a>
+          {user && (
+            <div class="hidden sm:flex gap-1">
+              <a
+                href="/members"
+                class={`btn btn-ghost btn-sm${activeNav === "members" ? " btn-active" : ""}`}
+              >
+                Mitglieder
+              </a>
+              <a
+                href="/anniversaries"
+                class={`btn btn-ghost btn-sm${activeNav === "anniversaries" ? " btn-active" : ""}`}
+              >
+                Jubiläen &amp; Geburtstage
+              </a>
+              {user.appRole === "admin" && (
+                <a
+                  href="/admin"
+                  class={`btn btn-ghost btn-sm${activeNav === "admin" ? " btn-active" : ""}`}
+                >
+                  Admin
+                </a>
+              )}
+            </div>
+          )}
         </div>
         {user && (
           <div class="flex-none">
@@ -34,9 +63,6 @@ export const Layout: FC<Props> = ({ title, children, user }) => (
                 {user.email === "admin@local" && (
                   <li><a href="/admin/password">Passwort ändern</a></li>
                 )}
-                {user.appRole === "admin" && (
-                  <li><a href="/admin">Admin</a></li>
-                )}
                 <li>
                   <form action="/logout" method="post" class="p-0">
                     <button type="submit" class="w-full text-left px-4 py-2">Abmelden</button>
@@ -48,6 +74,31 @@ export const Layout: FC<Props> = ({ title, children, user }) => (
         )}
       </nav>
       <main class="container mx-auto px-4 py-6">{children}</main>
+
+      {/* Toast handler + flash cookie reader */}
+      <script dangerouslySetInnerHTML={{ __html: `
+        function showToast(message, type) {
+          const el = document.createElement("div");
+          el.className = "alert " + (type === "error" ? "alert-error" : "alert-success") + " shadow-lg";
+          el.textContent = message;
+          const container = document.getElementById("toast-container");
+          container.appendChild(el);
+          setTimeout(() => el.remove(), 3000);
+        }
+        document.body.addEventListener("showToast", (e) => showToast(e.detail.message, e.detail.type));
+        // flash cookie
+        const flash = document.cookie.split(';').find(c => c.trim().startsWith('flash='));
+        if (flash) {
+          try {
+            const { message, type } = JSON.parse(decodeURIComponent(flash.split('=').slice(1).join('=')));
+            document.cookie = 'flash=; Max-Age=0; path=/';
+            showToast(message, type);
+          } catch(e) {}
+        }
+        // HTMX spinner: add loading class to triggering element
+        document.body.addEventListener("htmx:beforeRequest", (e) => e.detail.elt.classList.add("loading", "loading-spinner"));
+        document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));
+      ` }} />
     </body>
   </html>
 );

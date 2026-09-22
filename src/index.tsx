@@ -2,9 +2,11 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { getCookie, deleteCookie } from "hono/cookie";
-import { validateEnv, env } from "./env.js";
+import { validateEnv } from "./env.js";
 import { auth } from "./auth.js";
+import { env } from "./env.js";
 import { loginRoutes } from "./routes/login.js";
+import { memberRoutes } from "./routes/members.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -15,37 +17,61 @@ const app = new Hono<{ Variables: Variables }>();
 // Static assets
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
+app.use("/js/*", serveStatic({ root: "./public" }));
 
-// Auth + password routes (registered first so /auth/oidc-start isn't swallowed by the wildcard below)
+// Auth + password routes
 app.route("/", loginRoutes);
 
-// Better Auth handler — intercept callback errors for unknown OIDC users
+// Better Auth handler
 app.on(["POST", "GET"], "/auth/*", async (c) => {
   const response = await auth.handler(c.req.raw);
-  if (c.req.path.startsWith("/auth/callback/") && !response.ok) {
+  if (c.req.path.startsWith("/auth/callback/") && response.status >= 400) {
     return c.redirect("/login?error=unknown_user");
   }
   return response;
 });
 
-// Protected home — handles returnTo redirect after OIDC login
+// / → /members (handles returnTo cookie from OIDC redirect)
 app.get("/", requireAuth(), (c) => {
   const returnTo = getCookie(c, "returnTo");
   if (returnTo && returnTo.startsWith("/") && returnTo !== "/") {
     deleteCookie(c, "returnTo", { path: "/" });
     return c.redirect(returnTo);
   }
+  return c.redirect("/members");
+});
 
+// Member routes
+app.route("/members", memberRoutes);
+
+// 404
+app.notFound((c) => {
   const user = c.get("user");
   return c.html(
-    <Layout user={user}>
+    <Layout title="Nicht gefunden" user={user}>
       <div class="text-center mt-16">
-        <h1 class="text-4xl font-bold text-primary" style="font-family: var(--font-heading)">
-          {env.ORG_NAME}
-        </h1>
-        <p class="mt-2 opacity-70">Mitglieder-Datenbank</p>
+        <h1 class="text-3xl font-bold">404 – Seite nicht gefunden</h1>
+        <p class="mt-4 opacity-70">Die angeforderte Seite existiert nicht.</p>
+        <a href="/" class="btn btn-primary mt-6">Zur Startseite</a>
       </div>
-    </Layout>
+    </Layout>,
+    404
+  );
+});
+
+// 500
+app.onError((err, c) => {
+  console.error(err);
+  const user = c.get("user");
+  return c.html(
+    <Layout title="Serverfehler" user={user}>
+      <div class="text-center mt-16">
+        <h1 class="text-3xl font-bold">500 – Serverfehler</h1>
+        <p class="mt-4 opacity-70">Ein unerwarteter Fehler ist aufgetreten.</p>
+        <a href="/" class="btn btn-primary mt-6">Zur Startseite</a>
+      </div>
+    </Layout>,
+    500
   );
 });
 
