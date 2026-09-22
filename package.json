@@ -21,7 +21,8 @@
     "better-auth": "^1.7.5",
     "drizzle-orm": "^0.39.0",
     "hono": "^4.7.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@fontsource/inter": "^5.1.0",

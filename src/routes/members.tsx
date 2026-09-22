@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { eq, or, ilike } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -429,6 +430,65 @@ function ReactivationModal({
   );
 }
 
+// ── Export modal ─────────────────────────────────────────────────────────────
+
+function MembersExportModal() {
+  return (
+    <>
+      <dialog id="members-export-modal" class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg mb-4">Excel-Export</h3>
+          <p class="text-sm opacity-60 mb-4">Nachname und Vorname sind immer enthalten.</p>
+          <div class="space-y-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-addr" class="checkbox checkbox-sm" />
+              <span>Adressdaten <span class="opacity-50 text-xs">(Straße, Hausnummer, PLZ, Ort)</span></span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-contact" class="checkbox checkbox-sm" />
+              <span>Kontaktdaten <span class="opacity-50 text-xs">(Telefon, E-Mail)</span></span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-dates" class="checkbox checkbox-sm" />
+              <span>Datumsangaben <span class="opacity-50 text-xs">(Geburtsdatum, Eintrittsdatum, Austrittsdatum, Sterbedatum)</span></span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-gender" class="checkbox checkbox-sm" />
+              <span>Geschlecht</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-assignments" class="checkbox checkbox-sm" />
+              <span>Funktionszuweisungen <span class="opacity-50 text-xs">(als 2. Tabellenblatt)</span></span>
+            </label>
+          </div>
+          <div class="modal-action">
+            <button id="members-export-download" class="btn btn-primary">Herunterladen</button>
+            <form method="dialog"><button class="btn btn-ghost">Abbrechen</button></form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>×</button></form>
+      </dialog>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function(){
+          var fields=['addr','contact','dates','gender','assignments'];
+          fields.forEach(function(f){
+            var el=document.getElementById('exp-'+f);
+            var s=localStorage.getItem('members_export_'+f);
+            el.checked=s===null?true:s==='1';
+            el.addEventListener('change',function(){localStorage.setItem('members_export_'+f,el.checked?'1':'0');});
+          });
+          document.getElementById('members-export-download').addEventListener('click',function(){
+            var p=new URLSearchParams();
+            fields.forEach(function(f){if(document.getElementById('exp-'+f).checked)p.set(f,'1');});
+            window.location='/members/export?'+p;
+            document.getElementById('members-export-modal').close();
+          });
+        })();
+      ` }} />
+    </>
+  );
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // GET /members — list
@@ -518,14 +578,14 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
             </a>
           ))}
         </div>
-        {isEditor && (
-          <button class="btn btn-sm btn-ghost opacity-50" disabled title="Noch nicht implementiert">
-            Excel-Export
-          </button>
-        )}
+        <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
+          Export
+        </button>
       </div>
 
       {tableEl}
+
+      <MembersExportModal />
 
       {/* Restore pageSize from localStorage on first load */}
       <script dangerouslySetInnerHTML={{ __html: `
@@ -772,6 +832,79 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
   setFlash(c, "Mitglied erfolgreich angelegt.", "success");
   const saveAndNew = String(body._action ?? "") === "save_and_new";
   return c.redirect(saveAndNew ? "/members/new" : "/members");
+});
+
+// GET /members/export — xlsx download
+memberRoutes.get("/export", requireAuth("read"), async (c) => {
+  const q = c.req.query();
+  const opts = {
+    addr: q.addr === "1",
+    contact: q.contact === "1",
+    dates: q.dates === "1",
+    gender: q.gender === "1",
+    assignments: q.assignments === "1",
+  };
+
+  const allMembers = (await db.select().from(members)).sort((a, b) => {
+    const cmp = a.lastName.localeCompare(b.lastName, "de");
+    return cmp !== 0 ? cmp : a.firstName.localeCompare(b.firstName, "de");
+  });
+
+  const header: string[] = ["Nachname", "Vorname"];
+  if (opts.gender) header.push("Geschlecht");
+  if (opts.dates) header.push("Geburtsdatum", "Eintrittsdatum", "Austrittsdatum", "Sterbedatum");
+  if (opts.addr) header.push("Straße", "Hausnummer", "PLZ", "Ort");
+  if (opts.contact) header.push("Telefon", "E-Mail");
+
+  const GENDER: Record<string, string> = { male: "Männlich", female: "Weiblich" };
+  const toDate = (s: string | null) => s ? new Date(s + "T00:00:00") : null;
+
+  const rows = allMembers.map((m) => {
+    const row: (string | Date | null)[] = [m.lastName, m.firstName];
+    if (opts.gender) row.push(GENDER[m.gender ?? ""] ?? "Keine Angabe");
+    if (opts.dates) row.push(toDate(m.birthDate), toDate(m.entryDate), toDate(m.exitDate), toDate(m.deathDate));
+    if (opts.addr) row.push(m.street ?? "", m.houseNumber ?? "", m.zip ?? "", m.city ?? "");
+    if (opts.contact) row.push(m.phone ?? "", m.email ?? "");
+    return row;
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), "Mitglieder");
+
+  if (opts.assignments) {
+    const asgns = await db.select({
+      memberId: memberRoleAssignments.memberId,
+      roleTitle: memberRoles.title,
+      from: memberRoleAssignments.from,
+      to: memberRoleAssignments.to,
+    })
+      .from(memberRoleAssignments)
+      .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId));
+
+    const nameMap = new Map(allMembers.map((m) => [m.id, m]));
+    asgns.sort((a, b) => {
+      const ma = nameMap.get(a.memberId)!, mb = nameMap.get(b.memberId)!;
+      const cmp = ma.lastName.localeCompare(mb.lastName, "de");
+      if (cmp !== 0) return cmp;
+      const cmp2 = ma.firstName.localeCompare(mb.firstName, "de");
+      return cmp2 !== 0 ? cmp2 : (a.from ?? "").localeCompare(b.from ?? "");
+    });
+
+    const asgHeader = ["Nachname", "Vorname", "Funktion", "Von", "Bis"];
+    const asgRows = asgns.map((a) => {
+      const m = nameMap.get(a.memberId);
+      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), "Funktionszuweisungen");
+  }
+
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_mitglieder_${today}.xlsx`;
+
+  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  c.header("Content-Disposition", `attachment; filename="${filename}"`);
+  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 });
 
 // GET /members/:id — view or edit
