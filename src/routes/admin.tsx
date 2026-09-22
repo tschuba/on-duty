@@ -97,6 +97,10 @@ function RoleBadge({ role }: { role: string }) {
   return <span class={`badge badge-sm ${cls}`}>{label}</span>;
 }
 
+function ClickToEditHint() {
+  return <p class="text-sm opacity-50 mb-2">Zeile anklicken zum Bearbeiten</p>;
+}
+
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
 adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 
@@ -126,6 +130,7 @@ adminRoutes.get("/users", guard, async (c) => {
         </button>
       </div>
 
+      <ClickToEditHint />
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
           <thead>
@@ -429,6 +434,7 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
 // ── /admin/roles ──────────────────────────────────────────────────────────────
 adminRoutes.get("/roles", guard, async (c) => {
   const user = c.get("user");
+  const activeFilter = c.req.query("active"); // "1" | "0" | undefined
 
   const [rolesWithCount, warn] = await Promise.all([
     db
@@ -441,6 +447,11 @@ adminRoutes.get("/roles", guard, async (c) => {
       })
       .from(memberRoles)
       .leftJoin(memberRoleAssignments, eq(memberRoleAssignments.memberRoleId, memberRoles.id))
+      .where(
+        activeFilter === "1" ? eq(memberRoles.grantsActiveStatus, true) :
+        activeFilter === "0" ? eq(memberRoles.grantsActiveStatus, false) :
+        undefined
+      )
       .groupBy(memberRoles.id, memberRoles.title, memberRoles.grantsActiveStatus, memberRoles.isProtected)
       .orderBy(asc(memberRoles.title)),
     backupWarnProps(),
@@ -453,9 +464,16 @@ adminRoutes.get("/roles", guard, async (c) => {
 
       <div class="max-w-4xl mx-auto">
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          Funktionen
-        </h1>
+        <div class="flex items-center gap-4">
+          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+            Funktionen
+          </h1>
+          <div class="flex gap-1">
+            <a href="/admin/roles" class={`btn btn-sm${!activeFilter ? " btn-primary" : " btn-ghost"}`}>Alle</a>
+            <a href="/admin/roles?active=1" class={`btn btn-sm${activeFilter === "1" ? " btn-primary" : " btn-ghost"}`}>Aktiv</a>
+            <a href="/admin/roles?active=0" class={`btn btn-sm${activeFilter === "0" ? " btn-primary" : " btn-ghost"}`}>Passiv</a>
+          </div>
+        </div>
         <button
           class="btn btn-primary btn-sm"
           hx-get="/admin/roles/new"
@@ -466,6 +484,7 @@ adminRoutes.get("/roles", guard, async (c) => {
         </button>
       </div>
 
+      <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
           <thead>
@@ -498,9 +517,9 @@ adminRoutes.get("/roles", guard, async (c) => {
                   </td>
                   <td>
                     {r.grantsActiveStatus ? (
-                      <span class="badge badge-success badge-sm">Ja</span>
+                      <span class="badge badge-success badge-sm">Aktiv</span>
                     ) : (
-                      <span class="badge badge-ghost badge-sm">Nein</span>
+                      <span class="badge badge-ghost badge-sm">Passiv</span>
                     )}
                   </td>
                   <td>
@@ -758,6 +777,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         </button>
       </div>
 
+      <ClickToEditHint />
       <div class="overflow-x-auto mb-6">
         <table class="table table-zebra w-full max-w-md">
           <thead>
