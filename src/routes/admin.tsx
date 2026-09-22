@@ -193,7 +193,7 @@ adminRoutes.get("/users", guard, async (c) => {
                             >
                               Deaktivieren
                             </button>
-                            <dialog id={`deactivate-${u.id}`} class="modal">
+                            <dialog id={`deactivate-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
                                 <h3 class="font-bold text-lg">Benutzer deaktivieren?</h3>
                                 <p class="py-2 opacity-70">
@@ -245,13 +245,23 @@ adminRoutes.get("/users/new", guard, (c) => {
           <span class="label-text text-right">E-Mail <span class="text-error">*</span></span>
           <input type="email" name="email" class="input input-bordered w-full" required />
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Benutzerrolle</span>
-          <select name="appRole" class="select select-bordered w-full">
-            <option value="read">Lesend</option>
-            <option value="editor">Bearbeiter</option>
-            <option value="admin">Admin</option>
-          </select>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-3">Benutzerrolle</span>
+          <div class="flex flex-col gap-2">
+            {([
+              { value: "read", label: "Lesend", desc: "Kann Mitglieder und Jubiläen einsehen" },
+              { value: "editor", label: "Bearbeiter", desc: "Kann Mitglieder anlegen, bearbeiten und exportieren" },
+              { value: "admin", label: "Administrator", desc: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration" },
+            ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => (
+              <label key={value} class="flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
+                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={value === "read"} />
+                <div>
+                  <div class="font-medium text-sm">{label}</div>
+                  <div class="text-xs opacity-60">{desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
         <div class="modal-action mt-2">
           <button
@@ -295,19 +305,23 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
             </span>
           </div>
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Benutzerrolle</span>
-          <select name="appRole" class="select select-bordered w-full">
-            <option value="read" selected={u.appRole === "read"}>
-              Lesend
-            </option>
-            <option value="editor" selected={u.appRole === "editor"}>
-              Bearbeiter
-            </option>
-            <option value="admin" selected={u.appRole === "admin"}>
-              Admin
-            </option>
-          </select>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-3">Benutzerrolle</span>
+          <div class="flex flex-col gap-2">
+            {([
+              { value: "read", label: "Lesend", desc: "Kann Mitglieder und Jubiläen einsehen" },
+              { value: "editor", label: "Bearbeiter", desc: "Kann Mitglieder anlegen, bearbeiten und exportieren" },
+              { value: "admin", label: "Administrator", desc: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration" },
+            ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => (
+              <label key={value} class="flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
+                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={u.appRole === value} />
+                <div>
+                  <div class="font-medium text-sm">{label}</div>
+                  <div class="text-xs opacity-60">{desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
         <div class="modal-action mt-2">
           <button
@@ -535,7 +549,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                           >
                             Löschen
                           </button>
-                          <dialog id={`delete-role-${r.id}`} class="modal">
+                          <dialog id={`delete-role-${r.id}`} class="modal" onclick="event.stopPropagation()">
                             <div class="modal-box">
                               <h3 class="font-bold text-lg">Funktion löschen?</h3>
                               <p class="py-2 opacity-70">
@@ -559,12 +573,12 @@ adminRoutes.get("/roles", guard, async (c) => {
                         </>
                       ) : (
                         <button
-                          class="btn btn-ghost btn-xs text-error"
+                          class="btn btn-ghost btn-xs text-base-content/30"
                           disabled
                           title={
                             r.isProtected
                               ? "Systemrolle, kann nicht gelöscht werden"
-                              : "Hat bestehende Zuweisungen"
+                              : `Wird von ${r.assignmentCount} Mitglied${r.assignmentCount === 1 ? "" : "ern"} verwendet`
                           }
                         >
                           Löschen
@@ -817,7 +831,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                         Löschen
                       </button>
                     </div>
-                    <dialog id={`delete-year-${y.year}`} class="modal">
+                    <dialog id={`delete-year-${y.year}`} class="modal" onclick="event.stopPropagation()">
                       <div class="modal-box">
                         <p>
                           Jubiläumsjahr <strong>{y.year}</strong>
