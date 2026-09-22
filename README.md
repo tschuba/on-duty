@@ -9,6 +9,7 @@ Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer.
 ## Konfiguration
 
 - [OIDC-Provider konfigurieren](docs/oidc.md)
+- [Backup konfigurieren](docs/backup.md)
 
 ## Lokale Entwicklung
 
