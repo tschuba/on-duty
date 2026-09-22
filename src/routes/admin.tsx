@@ -12,7 +12,7 @@ import {
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
-import { env } from "../env.js";
+import { env, ENV_META } from "../env.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("admin");
@@ -25,7 +25,7 @@ function setFlash(c: any, msg: string, type: "success" | "error") {
   });
 }
 
-function AdminTabs({ active }: { active: "users" | "roles" | "config" }) {
+function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "config" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -33,6 +33,9 @@ function AdminTabs({ active }: { active: "users" | "roles" | "config" }) {
       </a>
       <a href="/admin/roles" role="tab" class={`tab${active === "roles" ? " tab-active" : ""}`}>
         Funktionen
+      </a>
+      <a href="/admin/anniversaries" role="tab" class={`tab${active === "anniversaries" ? " tab-active" : ""}`}>
+        Jubiläen
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         Konfiguration
@@ -44,7 +47,7 @@ function AdminTabs({ active }: { active: "users" | "roles" | "config" }) {
 function ModalScaffold() {
   return (
     <dialog id="admin-modal" class="modal">
-      <div class="modal-box" id="modal-content" />
+      <div class="modal-box max-w-lg" id="modal-content" />
       <form method="dialog" class="modal-backdrop">
         <button>Schließen</button>
       </form>
@@ -101,14 +104,7 @@ adminRoutes.get("/users", guard, async (c) => {
               const isLocal = u.email === "admin@localhost.invalid";
               return (
                 <tr key={u.id}>
-                  <td class="font-medium">
-                    {u.name}
-                    {isLocal && (
-                      <span class="badge badge-neutral badge-sm ml-2">
-                        Lokaler Admin-Account
-                      </span>
-                    )}
-                  </td>
+                  <td class="font-medium">{u.name}</td>
                   <td class="opacity-70">{isLocal ? "–" : u.email}</td>
                   <td>
                     <RoleBadge role={u.appRole} />
@@ -121,7 +117,9 @@ adminRoutes.get("/users", guard, async (c) => {
                     )}
                   </td>
                   <td>
-                    {!isLocal && (
+                    {isLocal ? (
+                      <span class="badge badge-neutral badge-sm">Lokaler Admin-Account</span>
+                    ) : (
                       <div class="flex gap-2 justify-end">
                         <button
                           class="btn btn-ghost btn-xs"
@@ -189,26 +187,22 @@ adminRoutes.get("/users/new", guard, (c) => {
     <>
       <h3 class="font-bold text-lg mb-4">Neuer Benutzer</h3>
       <form method="post" action="/admin/users" class="flex flex-col gap-3">
-        <label class="form-control">
-          <span class="label-text mb-1">
-            Name <span class="text-error">*</span>
-          </span>
-          <input type="text" name="name" class="input input-bordered" required />
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">
-            E-Mail <span class="text-error">*</span>
-          </span>
-          <input type="email" name="email" class="input input-bordered" required />
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Benutzerrolle</span>
-          <select name="appRole" class="select select-bordered">
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Name <span class="text-error">*</span></span>
+          <input type="text" name="name" class="input input-bordered w-full" required />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">E-Mail <span class="text-error">*</span></span>
+          <input type="email" name="email" class="input input-bordered w-full" required />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Benutzerrolle</span>
+          <select name="appRole" class="select select-bordered w-full">
             <option value="read">Lesend</option>
             <option value="editor">Bearbeiter</option>
             <option value="admin">Admin</option>
           </select>
-        </label>
+        </div>
         <div class="modal-action mt-2">
           <button
             type="button"
@@ -237,31 +231,23 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
     <>
       <h3 class="font-bold text-lg mb-4">Benutzer bearbeiten</h3>
       <form method="post" action={`/admin/users/${id}`} class="flex flex-col gap-3">
-        <label class="form-control">
-          <span class="label-text mb-1">
-            Name <span class="text-error">*</span>
-          </span>
-          <input type="text" name="name" value={u.name} class="input input-bordered" required />
-        </label>
-        <div class="form-control">
-          <span class="label-text mb-1">
-            E-Mail <span class="text-error">*</span>
-          </span>
-          <input
-            type="email"
-            name="email"
-            value={u.email}
-            class="input input-bordered"
-            required
-          />
-          <span class="label-text-alt mt-1 opacity-60">
-            Achtung: E-Mail muss mit der OIDC-Adresse übereinstimmen. Bei Änderung wird die
-            OIDC-Verknüpfung entfernt.
-          </span>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Name <span class="text-error">*</span></span>
+          <input type="text" name="name" value={u.name} class="input input-bordered w-full" required />
         </div>
-        <label class="form-control">
-          <span class="label-text mb-1">Benutzerrolle</span>
-          <select name="appRole" class="select select-bordered">
+        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
+          <span class="label-text text-right pt-2">E-Mail <span class="text-error">*</span></span>
+          <div class="flex flex-col gap-1">
+            <input type="email" name="email" value={u.email} class="input input-bordered w-full" required />
+            <span class="label-text-alt opacity-60">
+              Achtung: E-Mail muss mit der OIDC-Adresse übereinstimmen. Bei Änderung wird die
+              OIDC-Verknüpfung entfernt.
+            </span>
+          </div>
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Benutzerrolle</span>
+          <select name="appRole" class="select select-bordered w-full">
             <option value="read" selected={u.appRole === "read"}>
               Lesend
             </option>
@@ -272,7 +258,7 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
               Admin
             </option>
           </select>
-        </label>
+        </div>
         <div class="modal-action mt-2">
           <button
             type="button"
@@ -423,11 +409,6 @@ adminRoutes.get("/roles", guard, async (c) => {
     )
     .orderBy(asc(memberRoles.title));
 
-  const years = await db
-    .select()
-    .from(anniversaryYears)
-    .orderBy(asc(anniversaryYears.year));
-
   return c.html(
     <Layout title="Funktionen" user={user} activeNav="admin">
       <AdminTabs active="roles" />
@@ -547,99 +528,6 @@ adminRoutes.get("/roles", guard, async (c) => {
         </table>
       </div>
 
-      <div class="divider" />
-
-      <h2 class="text-xl font-bold mb-4" style="font-family: var(--font-heading)">
-        Jubiläumsjahre
-      </h2>
-
-      <div class="overflow-x-auto mb-6">
-        <table class="table table-zebra w-full max-w-md">
-          <thead>
-            <tr>
-              <th>Jahre</th>
-              <th>Titel</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {years.length === 0 ? (
-              <tr>
-                <td colspan={3} class="text-center opacity-50 py-4">
-                  Keine Jubiläumsjahre konfiguriert.
-                </td>
-              </tr>
-            ) : (
-              years.map((y) => (
-                <tr key={y.year}>
-                  <td class="font-medium">{y.year}</td>
-                  <td class="opacity-70">{y.title ?? "–"}</td>
-                  <td>
-                    <button
-                      class="btn btn-ghost btn-xs text-error"
-                      onclick={`document.getElementById('delete-year-${y.year}').showModal()`}
-                    >
-                      Löschen
-                    </button>
-                    <dialog id={`delete-year-${y.year}`} class="modal">
-                      <div class="modal-box">
-                        <p>
-                          Jubiläumsjahr <strong>{y.year}</strong>
-                          {y.title ? ` (${y.title})` : ""} löschen?
-                        </p>
-                        <div class="modal-action">
-                          <form method="dialog">
-                            <button class="btn">Abbrechen</button>
-                          </form>
-                          <form
-                            method="post"
-                            action={`/admin/roles/anniversary/${y.year}/delete`}
-                          >
-                            <button type="submit" class="btn btn-error">
-                              Löschen
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                      <form method="dialog" class="modal-backdrop">
-                        <button>Schließen</button>
-                      </form>
-                    </dialog>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <form method="post" action="/admin/roles/anniversary" class="flex items-end gap-2 flex-wrap">
-        <label class="form-control">
-          <span class="label-text mb-1">Jahr</span>
-          <input
-            type="number"
-            name="year"
-            min="1"
-            max="200"
-            class="input input-bordered input-sm w-28"
-            required
-            placeholder="z.B. 30"
-          />
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Titel (optional)</span>
-          <input
-            type="text"
-            name="title"
-            class="input input-bordered input-sm w-52"
-            placeholder="z.B. 30 Jahre Treue"
-          />
-        </label>
-        <button type="submit" class="btn btn-sm btn-outline mb-px">
-          Hinzufügen
-        </button>
-      </form>
-
       <ModalScaffold />
     </Layout>
   );
@@ -651,18 +539,14 @@ adminRoutes.get("/roles/new", guard, (c) => {
     <>
       <h3 class="font-bold text-lg mb-4">Neue Funktion</h3>
       <form method="post" action="/admin/roles" class="flex flex-col gap-3">
-        <label class="form-control">
-          <span class="label-text mb-1">
-            Anzeigename <span class="text-error">*</span>
-          </span>
-          <input type="text" name="title" class="input input-bordered" required />
-        </label>
-        <div class="form-control">
-          <label class="label cursor-pointer justify-start gap-3">
-            <input type="checkbox" name="grantsActiveStatus" value="1" class="checkbox" />
-            <span class="label-text">Verleiht aktiven Status</span>
-          </label>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Anzeigename <span class="text-error">*</span></span>
+          <input type="text" name="title" class="input input-bordered w-full" required />
         </div>
+        <label class="label cursor-pointer justify-start gap-3">
+          <input type="checkbox" name="grantsActiveStatus" value="1" class="checkbox" />
+          <span class="label-text">Verleiht aktiven Status</span>
+        </label>
         <div class="modal-action mt-2">
           <button
             type="button"
@@ -698,47 +582,30 @@ adminRoutes.get("/roles/:id/edit", guard, async (c) => {
     <>
       <h3 class="font-bold text-lg mb-4">Funktion bearbeiten</h3>
       <form method="post" action={`/admin/roles/${id}`} class="flex flex-col gap-3">
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text">
-              Anzeigename <span class="text-error">*</span>
-            </span>
-          </label>
+        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
+          <span class="label-text text-right pt-2">Anzeigename <span class="text-error">*</span></span>
           {hasAssignments ? (
-            <>
-              <input
-                type="text"
-                value={role.title}
-                class="input input-bordered opacity-50"
-                disabled
-              />
-              <span class="label-text-alt mt-1 opacity-60">
+            <div class="flex flex-col gap-1">
+              <input type="text" value={role.title} class="input input-bordered w-full opacity-50" disabled />
+              <span class="label-text-alt opacity-60">
                 Anzeigename kann nicht mehr geändert werden, da bereits Zuweisungen existieren.
               </span>
               <input type="hidden" name="title" value={role.title} />
-            </>
+            </div>
           ) : (
-            <input
-              type="text"
-              name="title"
-              value={role.title}
-              class="input input-bordered"
-              required
-            />
+            <input type="text" name="title" value={role.title} class="input input-bordered w-full" required />
           )}
         </div>
-        <div class="form-control">
-          <label class="label cursor-pointer justify-start gap-3">
-            <input
-              type="checkbox"
-              name="grantsActiveStatus"
-              value="1"
-              class="checkbox"
-              {...(role.grantsActiveStatus ? { checked: true } : {})}
-            />
-            <span class="label-text">Verleiht aktiven Status</span>
-          </label>
-        </div>
+        <label class="label cursor-pointer justify-start gap-3">
+          <input
+            type="checkbox"
+            name="grantsActiveStatus"
+            value="1"
+            class="checkbox"
+            {...(role.grantsActiveStatus ? { checked: true } : {})}
+          />
+          <span class="label-text">Verleiht aktiven Status</span>
+        </label>
         <div class="modal-action mt-2">
           <button
             type="button"
@@ -776,30 +643,6 @@ adminRoutes.post("/roles", guard, async (c) => {
   });
 
   setFlash(c, `Funktion „${title}" angelegt.`, "success");
-  return c.redirect("/admin/roles");
-});
-
-// POST /admin/roles/anniversary — create anniversary year (before /:id to avoid shadowing)
-adminRoutes.post("/roles/anniversary", guard, async (c) => {
-  const body = await c.req.parseBody();
-  const year = parseInt(String(body.year ?? ""), 10);
-  const title = String(body.title ?? "").trim() || null;
-
-  if (!year || year < 1 || year > 200) {
-    setFlash(c, "Ungültiges Jahr (1–200).", "error");
-    return c.redirect("/admin/roles");
-  }
-
-  await db.insert(anniversaryYears).values({ year, title }).onConflictDoNothing();
-  setFlash(c, `Jubiläumsjahr ${year} hinzugefügt.`, "success");
-  return c.redirect("/admin/roles");
-});
-
-// POST /admin/roles/anniversary/:year/delete
-adminRoutes.post("/roles/anniversary/:year/delete", guard, async (c) => {
-  const year = parseInt(c.req.param("year"), 10);
-  await db.delete(anniversaryYears).where(eq(anniversaryYears.year, year));
-  setFlash(c, `Jubiläumsjahr ${year} gelöscht.`, "success");
   return c.redirect("/admin/roles");
 });
 
@@ -858,7 +701,235 @@ adminRoutes.post("/roles/:id/delete", guard, async (c) => {
   return c.redirect("/admin/roles");
 });
 
+// ── /admin/anniversaries ──────────────────────────────────────────────────────
+adminRoutes.get("/anniversaries", guard, async (c) => {
+  const user = c.get("user");
+  const years = await db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year));
+
+  return c.html(
+    <Layout title="Jubiläen" user={user} activeNav="admin">
+      <AdminTabs active="anniversaries" />
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+          Jubiläen
+        </h1>
+        <button
+          class="btn btn-primary btn-sm"
+          hx-get="/admin/anniversaries/new"
+          hx-target="#modal-content"
+          hx-swap="innerHTML"
+        >
+          + Neues Jubiläumsjahr
+        </button>
+      </div>
+
+      <div class="overflow-x-auto mb-6">
+        <table class="table table-zebra w-full max-w-md">
+          <thead>
+            <tr>
+              <th>Jahre</th>
+              <th>Titel</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {years.length === 0 ? (
+              <tr>
+                <td colspan={3} class="text-center opacity-50 py-4">
+                  Keine Jubiläumsjahre konfiguriert.
+                </td>
+              </tr>
+            ) : (
+              years.map((y) => (
+                <tr key={y.year}>
+                  <td class="font-medium">{y.year}</td>
+                  <td class="opacity-70">{y.title ?? "–"}</td>
+                  <td>
+                    <div class="flex gap-2 justify-end">
+                      <button
+                        class="btn btn-ghost btn-xs"
+                        hx-get={`/admin/anniversaries/${y.year}/edit`}
+                        hx-target="#modal-content"
+                        hx-swap="innerHTML"
+                      >
+                        Bearbeiten
+                      </button>
+                      <button
+                        class="btn btn-ghost btn-xs text-error"
+                        onclick={`document.getElementById('delete-year-${y.year}').showModal()`}
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                    <dialog id={`delete-year-${y.year}`} class="modal">
+                      <div class="modal-box">
+                        <p>
+                          Jubiläumsjahr <strong>{y.year}</strong>
+                          {y.title ? ` (${y.title})` : ""} löschen?
+                        </p>
+                        <div class="modal-action">
+                          <form method="dialog">
+                            <button class="btn">Abbrechen</button>
+                          </form>
+                          <form method="post" action={`/admin/anniversaries/${y.year}/delete`}>
+                            <button type="submit" class="btn btn-error">
+                              Löschen
+                            </button>
+                          </form>
+                        </div>
+                      </div>
+                      <form method="dialog" class="modal-backdrop">
+                        <button>Schließen</button>
+                      </form>
+                    </dialog>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <ModalScaffold />
+    </Layout>
+  );
+});
+
+// HTMX fragment: new anniversary year modal
+adminRoutes.get("/anniversaries/new", guard, (c) => {
+  return c.html(
+    <>
+      <h3 class="font-bold text-lg mb-4">Jubiläumsjahr hinzufügen</h3>
+      <form method="post" action="/admin/anniversaries" class="flex flex-col gap-3">
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Jahr <span class="text-error">*</span></span>
+          <input type="number" name="year" min="1" max="200" class="input input-bordered w-full" required placeholder="z.B. 30" />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Titel (optional)</span>
+          <input type="text" name="title" class="input input-bordered w-full" placeholder="z.B. 30 Jahre Treue" />
+        </div>
+        <div class="modal-action mt-2">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            onclick="document.getElementById('admin-modal').close()"
+          >
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            Hinzufügen
+          </button>
+        </div>
+      </form>
+      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
+    </>
+  );
+});
+
+// HTMX fragment: edit anniversary year modal
+adminRoutes.get("/anniversaries/:year/edit", guard, async (c) => {
+  const year = parseInt(c.req.param("year"), 10);
+  const [y] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, year));
+  if (!y) return c.html("", 404);
+
+  return c.html(
+    <>
+      <h3 class="font-bold text-lg mb-4">Jubiläumsjahr bearbeiten</h3>
+      <form method="post" action={`/admin/anniversaries/${year}`} class="flex flex-col gap-3">
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Jahr <span class="text-error">*</span></span>
+          <input type="number" name="year" value={y.year} min="1" max="200" class="input input-bordered w-full" required />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">Titel (optional)</span>
+          <input type="text" name="title" value={y.title ?? ""} class="input input-bordered w-full" placeholder="z.B. 30 Jahre Treue" />
+        </div>
+        <div class="modal-action mt-2">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            onclick="document.getElementById('admin-modal').close()"
+          >
+            Abbrechen
+          </button>
+          <button type="submit" class="btn btn-primary">
+            Speichern
+          </button>
+        </div>
+      </form>
+      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
+    </>
+  );
+});
+
+// POST /admin/anniversaries — create
+adminRoutes.post("/anniversaries", guard, async (c) => {
+  const body = await c.req.parseBody();
+  const year = parseInt(String(body.year ?? ""), 10);
+  const title = String(body.title ?? "").trim() || null;
+
+  if (!year || year < 1 || year > 200) {
+    setFlash(c, "Ungültiges Jahr (1–200).", "error");
+    return c.redirect("/admin/anniversaries");
+  }
+
+  await db.insert(anniversaryYears).values({ year, title }).onConflictDoNothing();
+  setFlash(c, `Jubiläumsjahr ${year} hinzugefügt.`, "success");
+  return c.redirect("/admin/anniversaries");
+});
+
+// POST /admin/anniversaries/:year — update
+adminRoutes.post("/anniversaries/:year", guard, async (c) => {
+  const oldYear = parseInt(c.req.param("year"), 10);
+  const [existing] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, oldYear));
+  if (!existing) return c.html("", 404);
+
+  const body = await c.req.parseBody();
+  const newYear = parseInt(String(body.year ?? ""), 10);
+  const title = String(body.title ?? "").trim() || null;
+
+  if (!newYear || newYear < 1 || newYear > 200) {
+    setFlash(c, "Ungültiges Jahr (1–200).", "error");
+    return c.redirect("/admin/anniversaries");
+  }
+
+  if (newYear !== oldYear) {
+    const [conflict] = await db
+      .select({ year: anniversaryYears.year })
+      .from(anniversaryYears)
+      .where(eq(anniversaryYears.year, newYear));
+    if (conflict) {
+      setFlash(c, `Jubiläumsjahr ${newYear} existiert bereits.`, "error");
+      return c.redirect("/admin/anniversaries");
+    }
+  }
+
+  await db
+    .update(anniversaryYears)
+    .set({ year: newYear, title })
+    .where(eq(anniversaryYears.year, oldYear));
+  setFlash(c, "Jubiläumsjahr gespeichert.", "success");
+  return c.redirect("/admin/anniversaries");
+});
+
+// POST /admin/anniversaries/:year/delete
+adminRoutes.post("/anniversaries/:year/delete", guard, async (c) => {
+  const year = parseInt(c.req.param("year"), 10);
+  await db.delete(anniversaryYears).where(eq(anniversaryYears.year, year));
+  setFlash(c, `Jubiläumsjahr ${year} gelöscht.`, "success");
+  return c.redirect("/admin/anniversaries");
+});
+
 // ── /admin/config ─────────────────────────────────────────────────────────────
+const CONFIG_DESCRIPTIONS: Record<string, string> = {
+  ORG_NAME: "Name der Organisation, wird in der App angezeigt.",
+  YOUTH_AGE_LIMIT: "Altersgrenze in Jahren für die Jugend-Zuordnung.",
+  ANNIVERSARY_CUTOFF: "Stichtag (MM-TT) für die Jubiläumsberechnung.",
+  SESSION_LIFETIME: "Gültigkeitsdauer einer Anmeldung (z.B. 7d, 24h).",
+  ADMIN_PASSWORD_MIN_LENGTH: "Mindestlänge für Admin-Passwörter.",
+};
+
 adminRoutes.get("/config", guard, (c) => {
   const user = c.get("user");
   return c.html(
@@ -868,7 +939,7 @@ adminRoutes.get("/config", guard, (c) => {
         Konfiguration
       </h1>
       <div class="overflow-x-auto">
-        <table class="table w-full max-w-xl">
+        <table class="table w-full max-w-2xl">
           <thead>
             <tr>
               <th>Variable</th>
@@ -876,18 +947,15 @@ adminRoutes.get("/config", guard, (c) => {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td class="font-mono text-sm">ORG_NAME</td>
-              <td>{env.ORG_NAME}</td>
-            </tr>
-            <tr>
-              <td class="font-mono text-sm">YOUTH_AGE_LIMIT</td>
-              <td>{env.YOUTH_AGE_LIMIT}</td>
-            </tr>
-            <tr>
-              <td class="font-mono text-sm">ANNIVERSARY_CUTOFF</td>
-              <td>{env.ANNIVERSARY_CUTOFF}</td>
-            </tr>
+            {ENV_META.map(({ key, value }) => (
+              <tr>
+                <td>
+                  <span class="font-mono text-sm">{key}</span>
+                  <p class="text-sm text-base-content/50 mt-0.5">{CONFIG_DESCRIPTIONS[key]}</p>
+                </td>
+                <td>{value}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

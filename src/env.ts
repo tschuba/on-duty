@@ -35,3 +35,11 @@ export const env = {
   YOUTH_AGE_LIMIT: Number(process.env.YOUTH_AGE_LIMIT ?? "18"),
   ANNIVERSARY_CUTOFF: process.env.ANNIVERSARY_CUTOFF ?? "01-06",
 };
+
+export const ENV_META: { key: keyof typeof env; value: string | number }[] = [
+  { key: "ORG_NAME",                value: env.ORG_NAME },
+  { key: "YOUTH_AGE_LIMIT",         value: env.YOUTH_AGE_LIMIT },
+  { key: "ANNIVERSARY_CUTOFF",      value: env.ANNIVERSARY_CUTOFF },
+  { key: "SESSION_LIFETIME",        value: env.SESSION_LIFETIME },
+  { key: "ADMIN_PASSWORD_MIN_LENGTH", value: env.ADMIN_PASSWORD_MIN_LENGTH },
+];
