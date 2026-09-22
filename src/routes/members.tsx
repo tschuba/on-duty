@@ -89,7 +89,7 @@ const STATUS_LABELS: Record<MemberStatus, string> = {
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   aktiv: "badge badge-success",
   passiv: "badge badge-neutral",
-  kinder: "badge badge-accent",
+  kinder: "badge badge-warning",
   jugend: "badge badge-info",
   archiviert: "badge badge-ghost opacity-60",
 };
@@ -143,7 +143,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">Kinderfeuerwehr</div>
-        <div class="stat-value text-accent">{counts.kinder}</div>
+        <div class="stat-value text-warning">{counts.kinder}</div>
         <div class="stat-desc">{kinder.m} m / {kinder.w} w / {kinder.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">

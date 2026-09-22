@@ -44,7 +44,7 @@ function formatMonth(yyyymm: string): string {
 
 const STATUS_BADGE: Record<MemberStatus, string> = {
   aktiv: "badge badge-success badge-sm",
-  kinder: "badge badge-accent badge-sm",
+  kinder: "badge badge-warning badge-sm",
   jugend: "badge badge-info badge-sm",
   passiv: "badge badge-ghost badge-sm",
   archiviert: "badge badge-neutral badge-sm",
