@@ -155,7 +155,10 @@ adminRoutes.get("/users", guard, async (c) => {
                     "hx-swap": "innerHTML",
                   })}
                 >
-                  <td class="font-medium">{u.name}</td>
+                  <td class="font-medium">
+                    {isLocal && <span class="mr-1">🔒</span>}
+                    {u.name}
+                  </td>
                   <td class="opacity-70">{isLocal ? "–" : u.email}</td>
                   <td>
                     <RoleBadge role={u.appRole} />
