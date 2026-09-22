@@ -14,7 +14,7 @@ const S3_VARS = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"] a
 export function validateEnv(): void {
   const missing = REQUIRED.filter((k) => !process.env[k]);
   if (missing.length) {
-    console.error(`Fehlende Pflicht-Umgebungsvariablen: ${missing.join(", ")}`);
+    console.error(`Missing required environment variables: ${missing.join(", ")}`);
     process.exit(1);
   }
 
@@ -26,14 +26,14 @@ export function validateEnv(): void {
   const childrenLimit = Number(process.env.CHILDREN_AGE_LIMIT ?? "12");
   const youthLimit = Number(process.env.YOUTH_AGE_LIMIT ?? "18");
   if (childrenLimit >= youthLimit) {
-    console.error(`CHILDREN_AGE_LIMIT (${childrenLimit}) muss kleiner als YOUTH_AGE_LIMIT (${youthLimit}) sein.`);
+    console.error(`CHILDREN_AGE_LIMIT (${childrenLimit}) must be less than YOUTH_AGE_LIMIT (${youthLimit}).`);
     process.exit(1);
   }
 
   const s3Set = S3_VARS.filter((k) => process.env[k]);
   if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
     const s3Missing = S3_VARS.filter((k) => !process.env[k]);
-    console.error(`Unvollständige S3-Konfiguration. Fehlende Variablen: ${s3Missing.join(", ")}`);
+    console.error(`Incomplete S3 configuration. Missing variables: ${s3Missing.join(", ")}`);
     process.exit(1);
   }
 }
