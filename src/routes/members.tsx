@@ -34,7 +34,7 @@ async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus
   return rows.map((m) => ({
     ...m,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   }));
 }
 
@@ -47,7 +47,7 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
   return {
     ...m,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   };
 }
 
@@ -81,6 +81,7 @@ function setFlash(c: any, message: string, type: "success" | "error") {
 const STATUS_LABELS: Record<MemberStatus, string> = {
   aktiv: "Aktiv",
   passiv: "Passiv",
+  kinder: "Kinder",
   jugend: "Jugend",
   archiviert: "Archiviert",
 };
@@ -88,6 +89,7 @@ const STATUS_LABELS: Record<MemberStatus, string> = {
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   aktiv: "badge badge-success",
   passiv: "badge badge-neutral",
+  kinder: "badge badge-accent",
   jugend: "badge badge-info",
   archiviert: "badge badge-ghost opacity-60",
 };
@@ -108,8 +110,8 @@ function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "a
 }
 
 function StatsCards({ all }: { all: MemberWithStatus[] }) {
-  const counts = { aktiv: 0, passiv: 0, jugend: 0, archiviert: 0 };
-  const genderCount = (status: "aktiv" | "jugend") => {
+  const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, archiviert: 0 };
+  const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
     const subset = all.filter((m) => m.status === status);
     return {
       m: subset.filter((m) => m.gender === "male").length,
@@ -121,9 +123,10 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
   for (const m of all) counts[m.status]++;
   const aktiv = genderCount("aktiv");
   const jugend = genderCount("jugend");
+  const kinder = genderCount("kinder");
 
   return (
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">Aktiv</div>
         <div class="stat-value text-success">{counts.aktiv}</div>
@@ -137,6 +140,11 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">Jugend</div>
         <div class="stat-value text-info">{counts.jugend}</div>
         <div class="stat-desc">{jugend.m} m / {jugend.w} w / {jugend.o} o.A.</div>
+      </div>
+      <div class="stat bg-base-200 rounded-box p-4">
+        <div class="stat-title">Kinderfeuerwehr</div>
+        <div class="stat-value text-accent">{counts.kinder}</div>
+        <div class="stat-desc">{kinder.m} m / {kinder.w} w / {kinder.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">Archiviert</div>
@@ -499,7 +507,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
   const statusFilter: MemberStatus[] =
-    (c.req.queries("status") as MemberStatus[]) || (["aktiv", "passiv", "jugend"] as MemberStatus[]);
+    (c.req.queries("status") as MemberStatus[]) || (["aktiv", "passiv", "kinder", "jugend"] as MemberStatus[]);
   const page = Math.max(1, Number(q.page) || 1);
   const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
 
@@ -568,7 +576,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), page: 1, pageSize })}
         />
         <div class="flex gap-1">
-          {(["aktiv", "passiv", "jugend", "archiviert"] as MemberStatus[]).map((s) => (
+          {(["aktiv", "passiv", "jugend", "kinder", "archiviert"] as MemberStatus[]).map((s) => (
             <a
               key={s}
               href={filterToggleUrl(s)}

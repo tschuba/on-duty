@@ -23,6 +23,13 @@ export function validateEnv(): void {
     console.warn(`⚠️  ADMIN_PASSWORD is shorter than ${minLen} characters (set ADMIN_PASSWORD_MIN_LENGTH to override).`);
   }
 
+  const childrenLimit = Number(process.env.CHILDREN_AGE_LIMIT ?? "12");
+  const youthLimit = Number(process.env.YOUTH_AGE_LIMIT ?? "18");
+  if (childrenLimit >= youthLimit) {
+    console.error(`CHILDREN_AGE_LIMIT (${childrenLimit}) muss kleiner als YOUTH_AGE_LIMIT (${youthLimit}) sein.`);
+    process.exit(1);
+  }
+
   const s3Set = S3_VARS.filter((k) => process.env[k]);
   if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
     const s3Missing = S3_VARS.filter((k) => !process.env[k]);
@@ -41,6 +48,7 @@ export const env = {
   OIDC_APP_URL: process.env.OIDC_APP_URL!,
   ADMIN_PASSWORD_MIN_LENGTH: Number(process.env.ADMIN_PASSWORD_MIN_LENGTH ?? "12"),
   SESSION_LIFETIME: process.env.SESSION_LIFETIME ?? "7d",
+  CHILDREN_AGE_LIMIT: Number(process.env.CHILDREN_AGE_LIMIT ?? "12"),
   YOUTH_AGE_LIMIT: Number(process.env.YOUTH_AGE_LIMIT ?? "18"),
   ANNIVERSARY_CUTOFF: process.env.ANNIVERSARY_CUTOFF ?? "01-06",
   BACKUP_SCHEDULE: process.env.BACKUP_SCHEDULE ?? "0 2 * * 0",
@@ -56,6 +64,7 @@ export const env = {
 
 export const ENV_META: { key: keyof typeof env; value: string | number | undefined }[] = [
   { key: "ORG_NAME",                  value: env.ORG_NAME },
+  { key: "CHILDREN_AGE_LIMIT",        value: env.CHILDREN_AGE_LIMIT },
   { key: "YOUTH_AGE_LIMIT",           value: env.YOUTH_AGE_LIMIT },
   { key: "ANNIVERSARY_CUTOFF",        value: env.ANNIVERSARY_CUTOFF },
   { key: "SESSION_LIFETIME",          value: env.SESSION_LIFETIME },

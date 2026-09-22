@@ -5,11 +5,12 @@ type Assignment = typeof memberRoleAssignments.$inferSelect & {
   role: typeof memberRoles.$inferSelect;
 };
 
-export type MemberStatus = "archiviert" | "jugend" | "aktiv" | "passiv";
+export type MemberStatus = "archiviert" | "kinder" | "jugend" | "aktiv" | "passiv";
 
 export function deriveMemberStatus(
   member: Pick<Member, "exitDate" | "deathDate" | "birthDate">,
   assignments: Assignment[],
+  childrenAgeLimit: number,
   youthAgeLimit: number
 ): MemberStatus {
   if (member.exitDate || member.deathDate) return "archiviert";
@@ -27,6 +28,7 @@ export function deriveMemberStatus(
       (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
     if (beforeBirthday) age--;
 
+    if (age < childrenAgeLimit) return "kinder";
     return age < youthAgeLimit ? "jugend" : "aktiv";
   }
 
