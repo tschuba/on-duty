@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { asc } from "drizzle-orm";
+import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -105,7 +106,7 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
           {[...groups.entries()].map(([month, evs], i) => (
             <>
               <tr>
-                <td colspan="5" class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
+                <td colspan={5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
                   {formatMonth(month)}
                 </td>
               </tr>
@@ -117,6 +118,59 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ── Export modal ─────────────────────────────────────────────────────────────
+
+function AnniversariesExportModal() {
+  return (
+    <>
+      <dialog id="ann-export-modal" class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg mb-4">Excel-Export</h3>
+          <p class="text-sm opacity-60 mb-4">Datum, Name, Status, Ereignistyp, Jahre und Jubiläumstitel sind immer enthalten.</p>
+          <div class="space-y-3">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-ann-contact" class="checkbox checkbox-sm" />
+              <span>Kontaktdaten <span class="opacity-50 text-xs">(Telefon, E-Mail)</span></span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="exp-ann-addr" class="checkbox checkbox-sm" />
+              <span>Adressdaten <span class="opacity-50 text-xs">(Straße, Hausnummer, PLZ, Ort)</span></span>
+            </label>
+          </div>
+          <div class="modal-action">
+            <button id="ann-export-download" class="btn btn-primary">Herunterladen</button>
+            <form method="dialog"><button class="btn btn-ghost">Abbrechen</button></form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>×</button></form>
+      </dialog>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function(){
+          var fields=['contact','addr'];
+          fields.forEach(function(f){
+            var el=document.getElementById('exp-ann-'+f);
+            var s=localStorage.getItem('ann_export_'+f);
+            el.checked=s===null?true:s==='1';
+            el.addEventListener('change',function(){localStorage.setItem('ann_export_'+f,el.checked?'1':'0');});
+          });
+          document.getElementById('ann-export-download').addEventListener('click',function(){
+            var url=new URL(window.location.href);
+            var p=new URLSearchParams({
+              start:url.searchParams.get('start')||'',
+              end:url.searchParams.get('end')||'',
+              filter:url.searchParams.get('filter')||'all',
+            });
+            if(document.getElementById('exp-ann-contact').checked)p.set('contact','1');
+            if(document.getElementById('exp-ann-addr').checked)p.set('addr','1');
+            window.location='/anniversaries/export?'+p;
+            document.getElementById('ann-export-modal').close();
+          });
+        })();
+      ` }} />
+    </>
   );
 }
 
@@ -195,11 +249,78 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
             <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>Nur Jubiläen</a>
             <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>Nur Geburtstage</a>
           </div>
+
+          <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ann-export-modal').showModal()">
+            Excel-Export
+          </button>
         </div>
       </div>
 
       <EventList events={events} today={today} filter={filter} />
+      <AnniversariesExportModal />
       </div>
     </Layout>
   );
+});
+
+// GET /anniversaries/export — xlsx download
+anniversaryRoutes.get("/export", requireAuth(), async (c) => {
+  const q = c.req.query();
+  const today = todayStr();
+  const start = q.start || today;
+  const end = q.end || addMonths(today, 12);
+  const filter = q.filter || "all";
+  const inclContact = q.contact === "1";
+  const inclAddr = q.addr === "1";
+
+  const [memberRows, ayRows] = await Promise.all([
+    db.query.members.findMany({ with: { assignments: { with: { role: true } } } }),
+    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
+  ]);
+
+  const membersWithStatus = memberRows.map((m) => ({
+    ...m,
+    status: deriveMemberStatus(m, m.assignments as Assignment[], env.YOUTH_AGE_LIMIT),
+  }));
+
+  let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
+  if (filter === "anniversaries") events = events.filter((e) => e.kind === "anniversary");
+  else if (filter === "birthdays") events = events.filter((e) => e.kind === "birthday");
+
+  const memberMap = new Map(memberRows.map((m) => [m.id, m]));
+
+  const STATUS_LABEL: Record<string, string> = {
+    aktiv: "Aktiv", passiv: "Passiv", jugend: "Jugend", archiviert: "Archiviert",
+  };
+
+  const header: string[] = ["Datum", "Nachname", "Vorname", "Status", "Ereignistyp", "Jahre", "Jubiläumstitel"];
+  if (inclContact) header.push("Telefon", "E-Mail");
+  if (inclAddr) header.push("Straße", "Hausnummer", "PLZ", "Ort");
+
+  const rows = events.map((e) => {
+    const row: (string | Date | number | null)[] = [
+      new Date(e.date + "T00:00:00"),
+      e.lastName,
+      e.firstName,
+      STATUS_LABEL[e.status] ?? e.status,
+      e.kind === "birthday" ? "Geburtstag" : "Jubiläum",
+      e.years,
+      e.title ?? "",
+    ];
+    const m = memberMap.get(e.memberId);
+    if (inclContact) row.push(m?.phone ?? "", m?.email ?? "");
+    if (inclAddr) row.push(m?.street ?? "", m?.houseNumber ?? "", m?.zip ?? "", m?.city ?? "");
+    return row;
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), "Jubiläen");
+
+  const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as Uint8Array;
+  const exportDate = today.replace(/-/g, "");
+  const filename = `${env.ORG_NAME.replace(/\s+/g, "_")}_jubilaeuen_${exportDate}_${start.replace(/-/g, "")}_${end.replace(/-/g, "")}.xlsx`;
+
+  c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  c.header("Content-Disposition", `attachment; filename="${filename}"`);
+  return c.body(buf.buffer as ArrayBuffer);
 });
