@@ -89,6 +89,8 @@ function ModalScaffold() {
   );
 }
 
+const ROLE_RANK: Record<string, number> = { read: 0, editor: 1, admin: 2 };
+
 function RoleBadge({ role }: { role: string }) {
   const cls =
     role === "admin" ? "badge-error" : role === "editor" ? "badge-warning" : "badge-ghost";
@@ -176,20 +178,51 @@ adminRoutes.get("/users", guard, async (c) => {
                     ) : (
                       <div class="flex gap-2 justify-end">
                         {u.disabled ? (
-                          <form method="post" action={`/admin/users/${u.id}/activate`}>
+                          <>
+                            <form method="post" action={`/admin/users/${u.id}/activate`}>
+                              <button
+                                type="submit"
+                                class="btn btn-ghost btn-xs text-success"
+                                onclick="event.stopPropagation()"
+                              >
+                                Aktivieren
+                              </button>
+                            </form>
                             <button
-                              type="submit"
-                              class="btn btn-ghost btn-xs text-success"
-                              onclick="event.stopPropagation()"
+                              class="btn btn-ghost btn-xs text-error"
+                              onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
                             >
-                              Aktivieren
+                              Löschen
                             </button>
-                          </form>
+                            <dialog id={`delete-${u.id}`} class="modal" onclick="event.stopPropagation()">
+                              <div class="modal-box">
+                                <h3 class="font-bold text-lg">Benutzer löschen?</h3>
+                                <p class="py-2 opacity-70">
+                                  <strong>{u.name}</strong> ({u.email}) wird unwiderruflich gelöscht.
+                                </p>
+                                <div class="modal-action">
+                                  <form method="dialog">
+                                    <button class="btn">Abbrechen</button>
+                                  </form>
+                                  <form method="post" action={`/admin/users/${u.id}/delete`}>
+                                    <button type="submit" class="btn btn-error">
+                                      Löschen
+                                    </button>
+                                  </form>
+                                </div>
+                              </div>
+                              <form method="dialog" class="modal-backdrop">
+                                <button>Schließen</button>
+                              </form>
+                            </dialog>
+                          </>
                         ) : (
                           <>
                             <button
                               class="btn btn-ghost btn-xs text-error"
-                              onclick={`event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
+                              onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
+                              disabled={u.id === user.id}
+                              title={u.id === user.id ? "Du kannst deinen eigenen Account nicht deaktivieren" : undefined}
                             >
                               Deaktivieren
                             </button>
@@ -284,8 +317,10 @@ adminRoutes.get("/users/new", guard, (c) => {
 // HTMX fragment: edit user modal
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
+  const currentUser = c.get("user");
   const [u] = await db.select().from(users).where(eq(users.id, id));
   if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  const isSelf = u.id === currentUser.id;
 
   return c.html(
     <>
@@ -312,15 +347,17 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
               { value: "read", label: "Lesend", desc: "Kann Mitglieder und Jubiläen einsehen" },
               { value: "editor", label: "Bearbeiter", desc: "Kann Mitglieder anlegen, bearbeiten und exportieren" },
               { value: "admin", label: "Administrator", desc: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration" },
-            ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => (
-              <label key={value} class="flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
-                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={u.appRole === value} />
+            ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => {
+              const isDowngrade = isSelf && ROLE_RANK[value] < ROLE_RANK[currentUser.appRole ?? "read"];
+              return (
+              <label key={value} class={`flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 ${isDowngrade ? "opacity-50 cursor-not-allowed" : "cursor-pointer has-[:checked]:border-primary"}`}>
+                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={u.appRole === value} disabled={isDowngrade} title={isDowngrade ? "Du kannst deine eigene Rolle nicht herabstufen" : undefined} />
                 <div>
                   <div class="font-medium text-sm">{label}</div>
                   <div class="text-xs opacity-60">{desc}</div>
                 </div>
               </label>
-            ))}
+            );})}
           </div>
         </div>
         <div class="modal-action mt-2">
@@ -402,6 +439,12 @@ adminRoutes.post("/users/:id", guard, async (c) => {
     return c.redirect("/admin/users");
   }
 
+  const currentUser = c.get("user");
+  if (id === currentUser.id && ROLE_RANK[appRole] < ROLE_RANK[existing.appRole ?? "read"]) {
+    setFlash(c, "Du kannst deine eigene Rolle nicht herabstufen.", "error");
+    return c.redirect("/admin/users");
+  }
+
   if (email !== existing.email) {
     const dupe = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (dupe.length > 0) {
@@ -445,6 +488,22 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
   await db.update(users).set({ disabled: false, updatedAt: new Date() }).where(eq(users.id, id));
 
   setFlash(c, "Benutzer aktiviert.", "success");
+  return c.redirect("/admin/users");
+});
+
+// POST /admin/users/:id/delete
+adminRoutes.post("/users/:id/delete", guard, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+  if (currentUser.id === id) return c.html("", 403);
+
+  const [u] = await db.select({ email: users.email, disabled: users.disabled }).from(users).where(eq(users.id, id));
+  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u.disabled) return c.html("", 400);
+
+  await db.delete(users).where(eq(users.id, id));
+
+  setFlash(c, "Benutzer gelöscht.", "success");
   return c.redirect("/admin/users");
 });
 
