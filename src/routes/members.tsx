@@ -225,14 +225,14 @@ function MembersTable({
                   {(() => {
                     const roles = openRoles(m);
                     return (
-                      <div class="flex flex-wrap gap-1">
-                        {roles.slice(0, 2).map((r) => <span class="badge badge-outline badge-sm">{r}</span>)}
-                        {roles.length > 2 && (
+                      <div class="flex flex-nowrap gap-1 items-center">
+                        {roles.slice(0, 1).map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+                        {roles.length > 1 && (
                           <div class="dropdown dropdown-end" onclick="event.stopPropagation()">
-                            <div tabindex="0" role="button" class="badge badge-outline badge-sm cursor-pointer">+{roles.length - 2}</div>
+                            <div tabindex="0" role="button" class="badge badge-outline badge-sm cursor-pointer whitespace-nowrap">+{roles.length - 1}</div>
                             <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
                               <div class="flex flex-wrap gap-1 max-w-48">
-                                {roles.slice(2).map((r) => <span class="badge badge-outline badge-sm">{r}</span>)}
+                                {roles.slice(1).map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
                               </div>
                             </div>
                           </div>
