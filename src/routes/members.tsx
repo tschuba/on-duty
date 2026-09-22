@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { eq, or, ilike } from "drizzle-orm";
+import { eq, or, ilike, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
@@ -155,7 +155,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
 }
 
 function MembersTable({
-  items, sort, dir, page, pageSize, totalPages, search, statusFilter, isEditor,
+  items, sort, dir, page, pageSize, totalPages, search, statusFilter, roleFilter, isEditor,
 }: {
   items: MemberWithStatus[];
   sort: SortKey;
@@ -165,6 +165,7 @@ function MembersTable({
   totalPages: number;
   search: string;
   statusFilter: MemberStatus[];
+  roleFilter: string[];
   isEditor: boolean;
 }) {
   function sortUrl(col: SortKey) {
@@ -173,6 +174,7 @@ function MembersTable({
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     for (const s of statusFilter) params.append("status", s);
+    for (const r of roleFilter) params.append("role", r);
     params.set("sort", col);
     params.set("sort_dir", newDir);
     params.set("page", "1");
@@ -184,6 +186,7 @@ function MembersTable({
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     for (const s of statusFilter) params.append("status", s);
+    for (const r of roleFilter) params.append("role", r);
     params.set("sort", sort);
     params.set("sort_dir", dir);
     params.set("page", String(p));
@@ -196,7 +199,7 @@ function MembersTable({
 
   return (
     <div id="members-results">
-      <div class="overflow-x-auto">
+      <div>
         <table class="table table-zebra w-full">
           <thead>
             <tr>
@@ -226,17 +229,18 @@ function MembersTable({
                     const roles = openRoles(m);
                     return (
                       <div class="flex flex-nowrap gap-1 items-center">
-                        {roles.slice(0, 1).map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
-                        {roles.length > 1 && (
-                          <div class="dropdown dropdown-end" onclick="event.stopPropagation()">
-                            <div tabindex="0" role="button" class="badge badge-outline badge-sm cursor-pointer whitespace-nowrap">+{roles.length - 1}</div>
-                            <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
-                              <div class="flex flex-wrap gap-1 max-w-48">
-                                {roles.slice(1).map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+                        {roles.length === 1
+                          ? <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>
+                          : roles.length > 1 && (
+                            <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
+                              <div tabindex="0" role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{roles.length} Rollen</div>
+                              <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
+                                <div class="flex flex-wrap gap-1 max-w-48">
+                                  {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          )}
                       </div>
                     );
                   })()}
@@ -512,6 +516,81 @@ function MembersExportModal() {
   );
 }
 
+// ── Role filter dropdown ──────────────────────────────────────────────────────
+
+function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
+  roles: Role[];
+  roleFilter: string[];
+  activeRoleIds: Set<string>;
+}) {
+  const label = roleFilter.length === 0
+    ? "Alle Rollen"
+    : roleFilter.length === 1
+    ? (roles.find((r) => r.id === roleFilter[0])?.title ?? "1 Rolle")
+    : `${roleFilter.length} Rollen`;
+
+  return (
+    <details id="role-filter-dropdown" class="dropdown" ontoggle="if(!this.open)applyRoleFilter()">
+      <summary class="btn btn-sm btn-ghost m-0">
+        {label} ▾
+      </summary>
+      <div class="dropdown-content z-10 bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 mt-1">
+        <input
+          type="text"
+          placeholder="Suchen…"
+          class="input input-bordered input-xs w-full mb-2"
+          oninput="var v=this.value.toLowerCase();document.querySelectorAll('#role-filter-list li').forEach(function(li){li.hidden=!li.dataset.title.includes(v)})"
+        />
+        <ul id="role-filter-list" class="space-y-0.5 max-h-64 overflow-y-auto">
+          {roles.map((r) => {
+            const hasActive = activeRoleIds.has(r.id);
+            return (
+              <li key={r.id} data-title={r.title.toLowerCase()}>
+                <label class={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-base-200${!hasActive ? " opacity-50" : ""}`}>
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-xs"
+                    value={r.id}
+                    checked={roleFilter.includes(r.id)}
+                  />
+                  <span class="text-sm flex-1">{r.title}</span>
+                  {!hasActive && <span class="text-xs opacity-60">(0)</span>}
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        <div class="flex gap-1 mt-2">
+          <button
+            class="btn btn-xs btn-primary flex-1"
+            onclick="document.getElementById('role-filter-dropdown').removeAttribute('open')"
+          >
+            Anwenden
+          </button>
+          {roleFilter.length > 0 && (
+            <button
+              class="btn btn-xs btn-ghost"
+              onclick="document.querySelectorAll('#role-filter-list input[type=checkbox]').forEach(function(cb){cb.checked=false});document.getElementById('role-filter-dropdown').removeAttribute('open')"
+            >
+              Zurücksetzen
+            </button>
+          )}
+        </div>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: `
+        function applyRoleFilter() {
+          var checked = Array.from(document.querySelectorAll('#role-filter-list input[type=checkbox]:checked')).map(function(el){return el.value});
+          var params = new URLSearchParams(window.location.search);
+          params.delete('role');
+          checked.forEach(function(r){params.append('role',r)});
+          params.set('page','1');
+          window.location.href = '/members?' + params.toString();
+        }
+      ` }} />
+    </details>
+  );
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // GET /members — list
@@ -523,11 +602,24 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
   const statusFilter: MemberStatus[] =
     (c.req.queries("status") as MemberStatus[]) || (["aktiv", "passiv", "kinder", "jugend"] as MemberStatus[]);
+  const roleFilterRaw = c.req.queries("role") ?? [];
+  // ponytail: handle comma-joined value from hx-vals search
+  const roleFilter = roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
+    ? roleFilterRaw[0].split(",").filter(Boolean)
+    : roleFilterRaw;
   const page = Math.max(1, Number(q.page) || 1);
   const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
 
-  const all = await fetchMembersWithStatus(search || undefined);
-  const filtered = all.filter((m) => statusFilter.includes(m.status));
+  const [all, allRoles] = await Promise.all([
+    fetchMembersWithStatus(search || undefined),
+    db.query.memberRoles.findMany({ orderBy: [asc(memberRoles.title)] }),
+  ]);
+  const activeRoleIds = new Set(
+    all.flatMap((m) => m.assignments.filter((a) => !a.to).map((a) => a.memberRoleId))
+  );
+  const filtered = all
+    .filter((m) => statusFilter.includes(m.status))
+    .filter((m) => roleFilter.length === 0 || m.assignments.some((a) => !a.to && roleFilter.includes(a.memberRoleId)));
   const sorted = sortMembers(filtered, sort, dir);
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -545,6 +637,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
       totalPages={totalPages}
       search={search}
       statusFilter={statusFilter}
+      roleFilter={roleFilter}
       isEditor={isEditor}
     />
   );
@@ -558,6 +651,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
       ? statusFilter.filter((x) => x !== s)
       : [...statusFilter, s];
     for (const f of next) params.append("status", f);
+    for (const r of roleFilter) params.append("role", r);
     params.set("sort", sort);
     params.set("sort_dir", dir);
     params.set("page", "1");
@@ -588,7 +682,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
           hx-trigger="input changed delay:300ms"
           hx-target="#members-results"
           hx-include="[name='search']"
-          hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), page: 1, pageSize })}
+          hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
         />
         <div class="flex gap-1">
           {(["aktiv", "passiv", "jugend", "kinder", "archiviert"] as MemberStatus[]).map((s) => (
@@ -601,6 +695,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
             </a>
           ))}
         </div>
+        <RoleFilterDropdown roles={allRoles} roleFilter={roleFilter} activeRoleIds={activeRoleIds} />
         <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
           Export
         </button>
