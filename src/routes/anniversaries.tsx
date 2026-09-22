@@ -251,7 +251,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
           </div>
 
           <button class="btn btn-sm btn-neutral" onclick="document.getElementById('ann-export-modal').showModal()">
-            ⬇ Export
+            Export
           </button>
         </div>
       </div>
