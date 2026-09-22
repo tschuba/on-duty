@@ -112,6 +112,24 @@ export function isBackupConfigured(): boolean {
   return !!(env.BACKUP_LOCAL_PATH || env.S3_ENDPOINT);
 }
 
+export function getCronScheduleTimes(expression: string): { prev: Date | null; next: Date | null } {
+  const task = cron.schedule(expression, () => {});
+  // ponytail: accesses internal timeMatcher — node-cron v4 exposes it as a public property
+  const matcher = (task as any).timeMatcher as { getNextMatch(d: Date): Date | null };
+  const now = new Date();
+  const next = matcher.getNextMatch(now) ?? null;
+  let prev: Date | null = null;
+  let cursor = new Date(now.getTime() - 35 * 24 * 60 * 60 * 1000);
+  for (let i = 0; i < 1000; i++) {
+    const candidate = matcher.getNextMatch(cursor);
+    if (!candidate || candidate >= now) break;
+    prev = candidate;
+    cursor = new Date(candidate.getTime() + 60_000);
+  }
+  task.stop();
+  return { prev, next };
+}
+
 export async function startBackupScheduler(): Promise<void> {
   if (env.BACKUP_LOCAL_PATH) {
     try {

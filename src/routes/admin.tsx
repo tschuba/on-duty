@@ -14,7 +14,7 @@ import {
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
-import { getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
+import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("admin");
@@ -1012,10 +1012,43 @@ adminRoutes.get("/backup", guard, async (c) => {
     backupWarnProps(),
   ]);
 
+  const schedule = isBackupConfigured() ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  const lastBackupAfterSchedule =
+    schedule?.prev && entries[0]?.startedAt
+      ? entries[0].startedAt >= schedule.prev
+      : false;
+
   return c.html(
     <Layout title="Backup" user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="backup" />
+      {schedule && (
+        <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+          <div class={`p-4 rounded-box border ${lastBackupAfterSchedule ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>
+            <div class="text-base-content/50 mb-1">Letzter geplanter Zeitpunkt</div>
+            {schedule.prev ? (
+              <>
+                <div class="font-mono font-medium">{schedule.prev.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+                {lastBackupAfterSchedule ? (
+                  <div class="mt-1 text-success">✓ Backup vorhanden</div>
+                ) : (
+                  <div class="mt-1 text-error">✗ Kein Backup gefunden</div>
+                )}
+              </>
+            ) : (
+              <div class="text-base-content/40">—</div>
+            )}
+          </div>
+          <div class="p-4 rounded-box border bg-base-200 border-base-300">
+            <div class="text-base-content/50 mb-1">Nächster geplanter Zeitpunkt</div>
+            {schedule.next ? (
+              <div class="font-mono font-medium">{schedule.next.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+            ) : (
+              <div class="text-base-content/40">—</div>
+            )}
+          </div>
+        </div>
+      )}
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
           Backup-History
