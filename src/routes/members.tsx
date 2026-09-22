@@ -233,7 +233,7 @@ function MembersTable({
                           ? <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>
                           : roles.length > 1 && (
                             <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
-                              <div tabindex="0" role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{roles.length} Rollen</div>
+                              <div tabindex="0" role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{roles.length} Funktionen</div>
                               <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
                                 <div class="flex flex-wrap gap-1 max-w-48">
                                   {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
@@ -524,10 +524,10 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
   activeRoleIds: Set<string>;
 }) {
   const label = roleFilter.length === 0
-    ? "Alle Rollen"
+    ? "Alle Funktionen"
     : roleFilter.length === 1
-    ? (roles.find((r) => r.id === roleFilter[0])?.title ?? "1 Rolle")
-    : `${roleFilter.length} Rollen`;
+    ? (roles.find((r) => r.id === roleFilter[0])?.title ?? "1 Funktion")
+    : `${roleFilter.length} Funktionen`;
 
   return (
     <details id="role-filter-dropdown" class="dropdown" ontoggle="if(!this.open)applyRoleFilter()">
@@ -581,11 +581,18 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
         function applyRoleFilter() {
           var checked = Array.from(document.querySelectorAll('#role-filter-list input[type=checkbox]:checked')).map(function(el){return el.value});
           var params = new URLSearchParams(window.location.search);
+          var current = params.getAll('role').slice().sort().join(',');
+          var next = checked.slice().sort().join(',');
+          if (current === next) return;
           params.delete('role');
           checked.forEach(function(r){params.append('role',r)});
           params.set('page','1');
           window.location.href = '/members?' + params.toString();
         }
+        document.addEventListener('click', function(e) {
+          var dd = document.getElementById('role-filter-dropdown');
+          if (dd && dd.open && !dd.contains(e.target)) dd.removeAttribute('open');
+        });
       ` }} />
     </details>
   );
@@ -600,13 +607,18 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
-  const statusFilter: MemberStatus[] =
-    (c.req.queries("status") as MemberStatus[]) || (["aktiv", "passiv", "kinder", "jugend"] as MemberStatus[]);
+  const statusRaw = c.req.queries("status") ?? [];
+  const statusParsed = (statusRaw.length === 1 && statusRaw[0]?.includes(",")
+    ? statusRaw[0].split(",")
+    : statusRaw).filter(Boolean);
+  const statusFilter: MemberStatus[] = (statusParsed.length > 0
+    ? statusParsed
+    : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
   const roleFilterRaw = c.req.queries("role") ?? [];
-  // ponytail: handle comma-joined value from hx-vals search
-  const roleFilter = roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
-    ? roleFilterRaw[0].split(",").filter(Boolean)
-    : roleFilterRaw;
+  // ponytail: hx-vals sends comma-joined or empty string; normalise to clean array
+  const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
+    ? roleFilterRaw[0].split(",")
+    : roleFilterRaw).filter(Boolean);
   const page = Math.max(1, Number(q.page) || 1);
   const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
 

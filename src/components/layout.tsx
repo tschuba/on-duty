@@ -21,8 +21,8 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
       <nav class="navbar bg-base-200 shadow-sm px-4">
-        <div class="flex-1 gap-4">
-          <a href="/" class="font-bold text-primary text-lg" style="font-family: var(--font-heading)">
+        <div class="navbar-start">
+          <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-duty
           </a>
           {user && (
@@ -51,7 +51,23 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
           )}
         </div>
         {user && (
-          <div class="flex-none">
+          <div class="navbar-center sm:hidden">
+            <div class="dropdown dropdown-bottom dropdown-center">
+              <button tabindex={0} class="btn btn-ghost btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
+                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>Mitglieder</a></li>
+                <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>Jubiläen &amp; Geburtstage</a></li>
+                {user.appRole === "admin" && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>Admin</a></li>}
+              </ul>
+            </div>
+          </div>
+        )}
+        {user && (
+          <div class="navbar-end">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
                 <span>{user.name}</span>
