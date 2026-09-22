@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, count, asc } from "drizzle-orm";
+import { eq, and, count, asc, desc } from "drizzle-orm";
 import { setCookie } from "hono/cookie";
 import { db } from "../db/index.js";
 import {
@@ -9,10 +9,12 @@ import {
   memberRoles,
   memberRoleAssignments,
   anniversaryYears,
+  backupHistory,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
+import { getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("admin");
@@ -25,7 +27,7 @@ function setFlash(c: any, msg: string, type: "success" | "error") {
   });
 }
 
-function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "config" }) {
+function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -40,8 +42,36 @@ function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         Konfiguration
       </a>
+      <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
+        Backup
+      </a>
     </div>
   );
+}
+
+function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; lastFailed: boolean }) {
+  if (configured && !lastFailed) return null;
+  if (!configured) {
+    return (
+      <div class="alert alert-warning mb-4">
+        <span>Kein Backup konfiguriert. Lege ein Backup-Ziel fest (Env-Vars <code>BACKUP_LOCAL_PATH</code> oder <code>S3_*</code>).</span>
+      </div>
+    );
+  }
+  return (
+    <div class="alert alert-error mb-4">
+      <span>
+        Letztes Backup fehlgeschlagen.{" "}
+        <a href="/admin/backup" class="link">Details ansehen →</a>
+      </span>
+    </div>
+  );
+}
+
+async function backupWarnProps() {
+  const configured = isBackupConfigured();
+  const last = configured ? await getLastBackup() : null;
+  return { configured, lastFailed: last?.status === "failed" };
 }
 
 function ModalScaffold() {
@@ -69,10 +99,14 @@ adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 // ── /admin/users ──────────────────────────────────────────────────────────────
 adminRoutes.get("/users", guard, async (c) => {
   const user = c.get("user");
-  const allUsers = await db.select().from(users).orderBy(asc(users.name));
+  const [allUsers, warn] = await Promise.all([
+    db.select().from(users).orderBy(asc(users.name)),
+    backupWarnProps(),
+  ]);
 
   return c.html(
     <Layout title="Benutzer" user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
       <AdminTabs active="users" />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
@@ -388,29 +422,25 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
 adminRoutes.get("/roles", guard, async (c) => {
   const user = c.get("user");
 
-  const rolesWithCount = await db
-    .select({
-      id: memberRoles.id,
-      title: memberRoles.title,
-      grantsActiveStatus: memberRoles.grantsActiveStatus,
-      isProtected: memberRoles.isProtected,
-      assignmentCount: count(memberRoleAssignments.id),
-    })
-    .from(memberRoles)
-    .leftJoin(
-      memberRoleAssignments,
-      eq(memberRoleAssignments.memberRoleId, memberRoles.id)
-    )
-    .groupBy(
-      memberRoles.id,
-      memberRoles.title,
-      memberRoles.grantsActiveStatus,
-      memberRoles.isProtected
-    )
-    .orderBy(asc(memberRoles.title));
+  const [rolesWithCount, warn] = await Promise.all([
+    db
+      .select({
+        id: memberRoles.id,
+        title: memberRoles.title,
+        grantsActiveStatus: memberRoles.grantsActiveStatus,
+        isProtected: memberRoles.isProtected,
+        assignmentCount: count(memberRoleAssignments.id),
+      })
+      .from(memberRoles)
+      .leftJoin(memberRoleAssignments, eq(memberRoleAssignments.memberRoleId, memberRoles.id))
+      .groupBy(memberRoles.id, memberRoles.title, memberRoles.grantsActiveStatus, memberRoles.isProtected)
+      .orderBy(asc(memberRoles.title)),
+    backupWarnProps(),
+  ]);
 
   return c.html(
     <Layout title="Funktionen" user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
       <AdminTabs active="roles" />
 
       <div class="flex items-center justify-between mb-4">
@@ -704,10 +734,14 @@ adminRoutes.post("/roles/:id/delete", guard, async (c) => {
 // ── /admin/anniversaries ──────────────────────────────────────────────────────
 adminRoutes.get("/anniversaries", guard, async (c) => {
   const user = c.get("user");
-  const years = await db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year));
+  const [years, warn] = await Promise.all([
+    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
+    backupWarnProps(),
+  ]);
 
   return c.html(
     <Layout title="Jubiläen" user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
       <AdminTabs active="anniversaries" />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
@@ -928,12 +962,19 @@ const CONFIG_DESCRIPTIONS: Record<string, string> = {
   ANNIVERSARY_CUTOFF: "Stichtag (MM-TT) für die Jubiläumsberechnung.",
   SESSION_LIFETIME: "Gültigkeitsdauer einer Anmeldung (z.B. 7d, 24h).",
   ADMIN_PASSWORD_MIN_LENGTH: "Mindestlänge für Admin-Passwörter.",
+  BACKUP_SCHEDULE: "Cron-Ausdruck für automatische Backups.",
+  BACKUP_RETENTION_COUNT: "Maximale Anzahl aufbewahrter Backup-Dateien pro Ziel.",
+  BACKUP_LOCAL_PATH: "Lokales Verzeichnis für Backup-Dateien (leer = deaktiviert).",
+  S3_ENDPOINT: "S3-kompatibler Endpunkt (leer = deaktiviert).",
+  S3_BUCKET: "S3-Bucket-Name.",
 };
 
-adminRoutes.get("/config", guard, (c) => {
+adminRoutes.get("/config", guard, async (c) => {
   const user = c.get("user");
+  const warn = await backupWarnProps();
   return c.html(
     <Layout title="Konfiguration" user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
       <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
         Konfiguration
@@ -953,7 +994,7 @@ adminRoutes.get("/config", guard, (c) => {
                   <span class="font-mono text-sm">{key}</span>
                   <p class="text-sm text-base-content/50 mt-0.5">{CONFIG_DESCRIPTIONS[key]}</p>
                 </td>
-                <td>{value}</td>
+                <td class="font-mono text-sm">{value ?? <span class="opacity-40">—</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -961,4 +1002,86 @@ adminRoutes.get("/config", guard, (c) => {
       </div>
     </Layout>
   );
+});
+
+// ── /admin/backup ──────────────────────────────────────────────────────────────
+adminRoutes.get("/backup", guard, async (c) => {
+  const user = c.get("user");
+  const [entries, warn] = await Promise.all([
+    db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50),
+    backupWarnProps(),
+  ]);
+
+  return c.html(
+    <Layout title="Backup" user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
+      <AdminTabs active="backup" />
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+          Backup-History
+        </h1>
+        <button
+          class="btn btn-outline btn-sm"
+          hx-post="/admin/backup/run"
+          hx-swap="none"
+          hx-confirm="Backup jetzt starten?"
+        >
+          Backup jetzt starten
+        </button>
+      </div>
+
+      {entries.length === 0 ? (
+        <p class="text-base-content/60">Noch keine Backup-Läufe aufgezeichnet.</p>
+      ) : (
+        <div class="overflow-x-auto">
+          <table class="table w-full">
+            <thead>
+              <tr>
+                <th>Zeitstempel</th>
+                <th>Ziele</th>
+                <th>Status</th>
+                <th>Fehlermeldung</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e) => {
+                const targets: { type: string; status: string; error?: string }[] = JSON.parse(e.targets);
+                return (
+                  <tr>
+                    <td class="font-mono text-sm whitespace-nowrap">
+                      {e.startedAt.toLocaleString("de-DE")}
+                    </td>
+                    <td>
+                      <div class="flex gap-1 flex-wrap">
+                        {targets.map((t) => (
+                          <span
+                            class={`badge badge-sm ${t.status === "success" ? "badge-success" : "badge-error"}`}
+                          >
+                            {t.type === "local" ? "Lokal" : "S3"}
+                          </span>
+                        ))}
+                        {targets.length === 0 && <span class="text-base-content/40 text-sm">—</span>}
+                      </div>
+                    </td>
+                    <td>
+                      <span class={`badge ${e.status === "success" ? "badge-success" : "badge-error"}`}>
+                        {e.status === "success" ? "Erfolg" : "Fehlgeschlagen"}
+                      </span>
+                    </td>
+                    <td class="text-sm text-error max-w-xs truncate">{e.errorMessage ?? ""}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Layout>
+  );
+});
+
+adminRoutes.post("/backup/run", guard, async (c) => {
+  runBackup().catch((err) => console.error("[backup] manual run failed:", err));
+  setFlash(c, "Backup gestartet.", "success");
+  return c.redirect("/admin/backup");
 });
