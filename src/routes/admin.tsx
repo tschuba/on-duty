@@ -71,7 +71,11 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
 async function backupWarnProps() {
   const configured = isBackupConfigured();
   const last = configured ? await getLastBackup() : null;
-  return { configured, lastFailed: last?.status === "failed" };
+  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  const lastFailed = schedule?.prev
+    ? !(last?.startedAt && last.startedAt >= schedule.prev && last.status === "success")
+    : last?.status === "failed";
+  return { configured, lastFailed: lastFailed ?? false };
 }
 
 function ModalScaffold() {
@@ -1014,9 +1018,9 @@ adminRoutes.get("/backup", guard, async (c) => {
 
   const schedule = isBackupConfigured() ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
   const lastBackupAfterSchedule =
-    schedule?.prev && entries[0]?.startedAt
-      ? entries[0].startedAt >= schedule.prev
-      : false;
+    schedule?.prev && entries[0]?.startedAt && entries[0].startedAt >= schedule.prev
+      ? entries[0].status
+      : null;
 
   return c.html(
     <Layout title="Backup" user={user} activeNav="admin">
@@ -1024,13 +1028,15 @@ adminRoutes.get("/backup", guard, async (c) => {
       <AdminTabs active="backup" />
       {schedule && (
         <div class="grid grid-cols-2 gap-4 text-sm mb-6">
-          <div class={`p-4 rounded-box border ${lastBackupAfterSchedule ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>
+          <div class={`p-4 rounded-box border ${lastBackupAfterSchedule === "success" ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>
             <div class="text-base-content/50 mb-1">Letzter geplanter Zeitpunkt</div>
             {schedule.prev ? (
               <>
                 <div class="font-mono font-medium">{schedule.prev.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-                {lastBackupAfterSchedule ? (
+                {lastBackupAfterSchedule === "success" ? (
                   <div class="mt-1 text-success">✓ Backup vorhanden</div>
+                ) : lastBackupAfterSchedule === "failed" ? (
+                  <div class="mt-1 text-error">✗ Backup fehlgeschlagen</div>
                 ) : (
                   <div class="mt-1 text-error">✗ Kein Backup gefunden</div>
                 )}

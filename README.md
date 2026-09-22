@@ -15,6 +15,11 @@ Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer.
 
 **Voraussetzungen:** Node.js 22, pnpm, Docker
 
+> **macOS:** Für Backups wird `pg_dump` benötigt. Da `libpq` bei Homebrew keg-only ist, muss es explizit verlinkt werden:
+> ```bash
+> brew install libpq && brew link --force libpq
+> ```
+
 ```bash
 # 1. Abhängigkeiten installieren (kopiert auch Fonts nach public/fonts/)
 pnpm install
