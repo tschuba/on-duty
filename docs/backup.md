@@ -2,6 +2,15 @@
 
 on-duty sichert die Postgres-DB per `pg_dump` (custom format `-Fc`). Der Scheduler läuft im App-Prozess via `node-cron`. Zwei Ziele unabhängig voneinander konfigurierbar, Fan-out möglich.
 
+- [Lokales Ziel (Entwicklung / Test)](#lokales-ziel-entwicklung--test)
+- [S3-Ziel (Produktion) — MinIO auf Ugreen NAS DXP 2800](#s3-ziel-produktion--minio-auf-ugreen-nas-dxp-2800)
+  - [MinIO einrichten (einmalig)](#minio-einrichten-einmalig)
+  - [on-duty konfigurieren (Coolify Env-Vars)](#on-duty-konfigurieren-coolify-env-vars)
+- [Retention](#retention)
+- [Zeitplan](#zeitplan)
+- [Startup-Validierungen](#startup-validierungen)
+- [Restore](#restore)
+
 ---
 
 ## Lokales Ziel (Entwicklung / Test)
