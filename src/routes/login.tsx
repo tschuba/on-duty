@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import { hashPassword } from "better-auth/crypto";
 import { eq, and } from "drizzle-orm";
 import { Hono } from "hono";
 import { getCookie, deleteCookie } from "hono/cookie";
@@ -149,7 +149,7 @@ loginRoutes.post("/admin/login", async (c) => {
   // Master override: if ADMIN_PASSWORD matches directly, re-sync hash so Better Auth accepts it
   const isMasterOverride = password === env.ADMIN_PASSWORD;
   if (isMasterOverride) {
-    const hash = await bcrypt.hash(env.ADMIN_PASSWORD, 10);
+    const hash = await hashPassword(env.ADMIN_PASSWORD);
     await db
       .update(accounts)
       .set({ password: hash, updatedAt: new Date() })
@@ -160,7 +160,7 @@ loginRoutes.post("/admin/login", async (c) => {
   const signInReq = new Request(new URL("/auth/sign-in/email", env.OIDC_APP_URL), {
     method: "POST",
     headers: { "content-type": "application/json", origin: env.OIDC_APP_URL },
-    body: JSON.stringify({ email: "admin@local", password }),
+    body: JSON.stringify({ email: "admin@localhost.invalid", password }),
   });
 
   const response = await auth.handler(signInReq);
@@ -176,81 +176,6 @@ loginRoutes.post("/admin/login", async (c) => {
   response.headers.getSetCookie().forEach((cookie) => {
     c.header("set-cookie", cookie, { append: true });
   });
-
-  return c.redirect("/");
-});
-
-// ── /admin/password — forced / voluntary password change ─────────────────────
-
-function passwordPage(error?: string) {
-  return (
-    <Layout title="Passwort ändern">
-      <div class="flex min-h-[60vh] items-center justify-center">
-        <div class="card bg-base-200 w-full max-w-sm shadow">
-          <div class="card-body gap-4">
-            <h1 class="card-title text-2xl" style="font-family: var(--font-heading)">
-              Passwort ändern
-            </h1>
-            {error && (
-              <div class="alert alert-error text-sm">
-                <span>{error}</span>
-              </div>
-            )}
-            <form action="/admin/password" method="post" class="flex flex-col gap-3">
-              <label class="form-control">
-                <span class="label-text mb-1">Neues Passwort</span>
-                <input
-                  type="password"
-                  name="password"
-                  class="input input-bordered"
-                  autocomplete="new-password"
-                  minlength={8}
-                  required
-                />
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Bestätigen</span>
-                <input
-                  type="password"
-                  name="confirm"
-                  class="input input-bordered"
-                  autocomplete="new-password"
-                  required
-                />
-              </label>
-              <button type="submit" class="btn btn-primary mt-2">
-                Speichern
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </Layout>
-  );
-}
-
-loginRoutes.get("/admin/password", requireAuth("admin"), (c) => c.html(passwordPage()));
-
-loginRoutes.post("/admin/password", requireAuth("admin"), async (c) => {
-  const user = c.get("user");
-  if (user.email !== "admin@local") return c.html("<h1>403</h1>", 403);
-
-  const body = await c.req.parseBody();
-  const password = String(body.password ?? "");
-  const confirm = String(body.confirm ?? "");
-
-  if (password.length < 8) {
-    return c.html(passwordPage("Das Passwort muss mindestens 8 Zeichen lang sein."));
-  }
-  if (password !== confirm) {
-    return c.html(passwordPage("Die Passwörter stimmen nicht überein."));
-  }
-
-  const hash = await bcrypt.hash(password, 10);
-  await db
-    .update(accounts)
-    .set({ password: hash, updatedAt: new Date() })
-    .where(and(eq(accounts.accountId, "admin"), eq(accounts.providerId, "credential")));
 
   return c.redirect("/");
 });
