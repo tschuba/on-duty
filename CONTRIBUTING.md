@@ -50,6 +50,29 @@ Neue UI-Texte müssen in beiden Sprachdateien ergänzt werden:
 - `src/i18n/de.ts` — Deutsch
 - `src/i18n/en.ts` — Englisch
 
+## Konstanten statt Magic Values
+
+Zahlen und Strings dürfen nicht direkt im Code stehen — sie erhalten einen benannten Bezeichner.
+
+**Neuer Code** darf keine Magic Values enthalten. **Bestehender Code** wird bereinigt, sobald eine Datei angefasst wird.
+
+Wo Konstanten ablegen:
+
+- Modullokal: als `const` exportieren in derselben Datei
+- Projektübergreifend: in `src/lib/constants.ts`
+
+```ts
+// ❌
+if (member.age >= 18) { ... }
+if (member.status === "active") { ... }
+
+// ✅
+const MIN_ADULT_AGE = 18;
+const ACTIVE_STATUS = "active";
+if (member.age >= MIN_ADULT_AGE) { ... }
+if (member.status === ACTIVE_STATUS) { ... }
+```
+
 ## Lokale Entwicklung
 
 Siehe [README](README.md).

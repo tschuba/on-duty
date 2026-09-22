@@ -66,6 +66,7 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `OIDC_CLIENT_SECRET` | ✓ | — | OAuth2-Client-Secret |
 | `OIDC_APP_URL` | ✓ | — | Eigene App-URL für Redirect-URI (HTTPS) |
 | `SESSION_LIFETIME` | — | `7d` | Session-Dauer (z. B. `7d`, `8h`, `30m`) |
+| `CHILDREN_AGE_LIMIT` | — | `12` | Altersgrenze Kinderfeuerwehr (Jahre, muss < `YOUTH_AGE_LIMIT`) |
 | `YOUTH_AGE_LIMIT` | — | `18` | Altersgrenze Jugendfeuerwehr (Jahre) |
 | `ANNIVERSARY_CUTOFF` | — | `01-06` | Jubiläumsstichtag (MM-DD) |
 | `BACKUP_SCHEDULE` | — | `0 2 * * 0` | Backup-Intervall (Cron-Ausdruck) |

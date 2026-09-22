@@ -44,12 +44,13 @@ function formatMonth(yyyymm: string): string {
 
 const STATUS_BADGE: Record<MemberStatus, string> = {
   aktiv: "badge badge-success badge-sm",
+  kinder: "badge badge-warning badge-sm",
   jugend: "badge badge-info badge-sm",
   passiv: "badge badge-ghost badge-sm",
   archiviert: "badge badge-neutral badge-sm",
 };
 const STATUS_LABEL: Record<MemberStatus, string> = {
-  aktiv: "Aktiv", jugend: "Jugend", passiv: "Passiv", archiviert: "Archiviert",
+  aktiv: "Aktiv", kinder: "Kinder", jugend: "Jugend", passiv: "Passiv", archiviert: "Archiviert",
 };
 
 // ── Components ────────────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 
   const membersWithStatus = memberRows.map((m) => ({
     ...m,
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   }));
 
   const events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
@@ -280,7 +281,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
 
   const membersWithStatus = memberRows.map((m) => ({
     ...m,
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   }));
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
@@ -290,7 +291,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const memberMap = new Map(memberRows.map((m) => [m.id, m]));
 
   const STATUS_LABEL: Record<string, string> = {
-    aktiv: "Aktiv", passiv: "Passiv", jugend: "Jugend", archiviert: "Archiviert",
+    aktiv: "Aktiv", passiv: "Passiv", kinder: "Kinder", jugend: "Jugend", archiviert: "Archiviert",
   };
 
   const header: string[] = ["Datum", "Nachname", "Vorname", "Status", "Ereignistyp", "Jahre", "Jubiläumstitel"];

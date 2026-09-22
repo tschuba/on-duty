@@ -962,6 +962,7 @@ adminRoutes.post("/anniversaries/:year/delete", guard, async (c) => {
 // ── /admin/config ─────────────────────────────────────────────────────────────
 const CONFIG_DESCRIPTIONS: Record<string, string> = {
   ORG_NAME: "Name der Organisation, wird in der App angezeigt.",
+  CHILDREN_AGE_LIMIT: "Altersgrenze in Jahren für die Kinderfeuerwehr-Zuordnung (muss < YOUTH_AGE_LIMIT).",
   YOUTH_AGE_LIMIT: "Altersgrenze in Jahren für die Jugend-Zuordnung.",
   ANNIVERSARY_CUTOFF: "Stichtag (MM-TT) für die Jubiläumsberechnung.",
   SESSION_LIFETIME: "Gültigkeitsdauer einer Anmeldung (z.B. 7d, 24h).",
