@@ -176,15 +176,44 @@ adminRoutes.get("/users", guard, async (c) => {
                     ) : (
                       <div class="flex gap-2 justify-end">
                         {u.disabled ? (
-                          <form method="post" action={`/admin/users/${u.id}/activate`}>
+                          <>
+                            <form method="post" action={`/admin/users/${u.id}/activate`}>
+                              <button
+                                type="submit"
+                                class="btn btn-ghost btn-xs text-success"
+                                onclick="event.stopPropagation()"
+                              >
+                                Aktivieren
+                              </button>
+                            </form>
                             <button
-                              type="submit"
-                              class="btn btn-ghost btn-xs text-success"
-                              onclick="event.stopPropagation()"
+                              class="btn btn-ghost btn-xs text-error"
+                              onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
                             >
-                              Aktivieren
+                              Löschen
                             </button>
-                          </form>
+                            <dialog id={`delete-${u.id}`} class="modal" onclick="event.stopPropagation()">
+                              <div class="modal-box">
+                                <h3 class="font-bold text-lg">Benutzer löschen?</h3>
+                                <p class="py-2 opacity-70">
+                                  <strong>{u.name}</strong> ({u.email}) wird unwiderruflich gelöscht.
+                                </p>
+                                <div class="modal-action">
+                                  <form method="dialog">
+                                    <button class="btn">Abbrechen</button>
+                                  </form>
+                                  <form method="post" action={`/admin/users/${u.id}/delete`}>
+                                    <button type="submit" class="btn btn-error">
+                                      Löschen
+                                    </button>
+                                  </form>
+                                </div>
+                              </div>
+                              <form method="dialog" class="modal-backdrop">
+                                <button>Schließen</button>
+                              </form>
+                            </dialog>
+                          </>
                         ) : (
                           <>
                             <button
@@ -445,6 +474,22 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
   await db.update(users).set({ disabled: false, updatedAt: new Date() }).where(eq(users.id, id));
 
   setFlash(c, "Benutzer aktiviert.", "success");
+  return c.redirect("/admin/users");
+});
+
+// POST /admin/users/:id/delete
+adminRoutes.post("/users/:id/delete", guard, async (c) => {
+  const id = c.req.param("id");
+  const currentUser = c.get("user");
+  if (currentUser.id === id) return c.html("", 403);
+
+  const [u] = await db.select({ email: users.email, disabled: users.disabled }).from(users).where(eq(users.id, id));
+  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u.disabled) return c.html("", 400);
+
+  await db.delete(users).where(eq(users.id, id));
+
+  setFlash(c, "Benutzer gelöscht.", "success");
   return c.redirect("/admin/users");
 });
 
