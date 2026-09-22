@@ -7,6 +7,7 @@ import { auth } from "./auth.js";
 import { env } from "./env.js";
 import { loginRoutes } from "./routes/login.js";
 import { memberRoutes } from "./routes/members.js";
+import { adminRoutes } from "./routes/admin.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -43,6 +44,9 @@ app.get("/", requireAuth(), (c) => {
 
 // Member routes
 app.route("/members", memberRoutes);
+
+// Admin routes
+app.route("/admin", adminRoutes);
 
 // 404
 app.notFound((c) => {

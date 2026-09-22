@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import { hashPassword } from "better-auth/crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and } from "drizzle-orm";
@@ -14,7 +14,7 @@ const client = postgres(DATABASE_URL);
 const db = drizzle(client);
 
 const now = new Date();
-const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+const hash = await hashPassword(ADMIN_PASSWORD);
 
 // Upsert admin user — preserve existing data, only set fields on first insert
 await db
@@ -22,7 +22,7 @@ await db
   .values({
     id: "admin",
     name: "Administrator",
-    email: "admin@local",
+    email: "admin@localhost.invalid",
     emailVerified: true,
     appRole: "admin",
     disabled: false,

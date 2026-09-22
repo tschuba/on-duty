@@ -60,9 +60,6 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                 </svg>
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
-                {user.email === "admin@local" && (
-                  <li><a href="/admin/password">Passwort ändern</a></li>
-                )}
                 <li>
                   <form action="/logout" method="post" class="p-0">
                     <button type="submit" class="w-full text-left px-4 py-2">Abmelden</button>
