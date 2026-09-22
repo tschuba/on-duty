@@ -97,6 +97,10 @@ function RoleBadge({ role }: { role: string }) {
   return <span class={`badge badge-sm ${cls}`}>{label}</span>;
 }
 
+function ClickToEditHint() {
+  return <p class="text-sm opacity-50 mb-2">Zeile anklicken zum Bearbeiten</p>;
+}
+
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
 adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 
@@ -126,6 +130,7 @@ adminRoutes.get("/users", guard, async (c) => {
         </button>
       </div>
 
+      <ClickToEditHint />
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
           <thead>
@@ -141,8 +146,19 @@ adminRoutes.get("/users", guard, async (c) => {
             {allUsers.map((u) => {
               const isLocal = u.email === "admin@localhost.invalid";
               return (
-                <tr key={u.id}>
-                  <td class="font-medium">{u.name}</td>
+                <tr
+                  key={u.id}
+                  {...(!isLocal && {
+                    class: "cursor-pointer hover",
+                    "hx-get": `/admin/users/${u.id}/edit`,
+                    "hx-target": "#modal-content",
+                    "hx-swap": "innerHTML",
+                  })}
+                >
+                  <td class="font-medium">
+                    {isLocal && <span class="mr-1">🔒</span>}
+                    {u.name}
+                  </td>
                   <td class="opacity-70">{isLocal ? "–" : u.email}</td>
                   <td>
                     <RoleBadge role={u.appRole} />
@@ -159,17 +175,13 @@ adminRoutes.get("/users", guard, async (c) => {
                       <span class="badge badge-neutral badge-sm">Lokaler Admin-Account</span>
                     ) : (
                       <div class="flex gap-2 justify-end">
-                        <button
-                          class="btn btn-ghost btn-xs"
-                          hx-get={`/admin/users/${u.id}/edit`}
-                          hx-target="#modal-content"
-                          hx-swap="innerHTML"
-                        >
-                          Bearbeiten
-                        </button>
                         {u.disabled ? (
                           <form method="post" action={`/admin/users/${u.id}/activate`}>
-                            <button type="submit" class="btn btn-ghost btn-xs text-success">
+                            <button
+                              type="submit"
+                              class="btn btn-ghost btn-xs text-success"
+                              onclick="event.stopPropagation()"
+                            >
                               Aktivieren
                             </button>
                           </form>
@@ -177,7 +189,7 @@ adminRoutes.get("/users", guard, async (c) => {
                           <>
                             <button
                               class="btn btn-ghost btn-xs text-error"
-                              onclick={`document.getElementById('deactivate-${u.id}').showModal()`}
+                              onclick={`event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
                             >
                               Deaktivieren
                             </button>
@@ -425,6 +437,7 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
 // ── /admin/roles ──────────────────────────────────────────────────────────────
 adminRoutes.get("/roles", guard, async (c) => {
   const user = c.get("user");
+  const activeFilter = c.req.query("active"); // "1" | "0" | undefined
 
   const [rolesWithCount, warn] = await Promise.all([
     db
@@ -437,6 +450,11 @@ adminRoutes.get("/roles", guard, async (c) => {
       })
       .from(memberRoles)
       .leftJoin(memberRoleAssignments, eq(memberRoleAssignments.memberRoleId, memberRoles.id))
+      .where(
+        activeFilter === "1" ? eq(memberRoles.grantsActiveStatus, true) :
+        activeFilter === "0" ? eq(memberRoles.grantsActiveStatus, false) :
+        undefined
+      )
       .groupBy(memberRoles.id, memberRoles.title, memberRoles.grantsActiveStatus, memberRoles.isProtected)
       .orderBy(asc(memberRoles.title)),
     backupWarnProps(),
@@ -447,10 +465,18 @@ adminRoutes.get("/roles", guard, async (c) => {
       <BackupWarnBanner {...warn} />
       <AdminTabs active="roles" />
 
+      <div class="max-w-4xl mx-auto">
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          Funktionen
-        </h1>
+        <div class="flex items-center gap-4">
+          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+            Funktionen
+          </h1>
+          <div class="flex gap-1">
+            <a href="/admin/roles" class={`btn btn-sm${!activeFilter ? " btn-primary" : " btn-ghost"}`}>Alle</a>
+            <a href="/admin/roles?active=1" class={`btn btn-sm${activeFilter === "1" ? " btn-primary" : " btn-ghost"}`}>Aktiv</a>
+            <a href="/admin/roles?active=0" class={`btn btn-sm${activeFilter === "0" ? " btn-primary" : " btn-ghost"}`}>Passiv</a>
+          </div>
+        </div>
         <button
           class="btn btn-primary btn-sm"
           hx-get="/admin/roles/new"
@@ -461,6 +487,7 @@ adminRoutes.get("/roles", guard, async (c) => {
         </button>
       </div>
 
+      <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
           <thead>
@@ -474,7 +501,15 @@ adminRoutes.get("/roles", guard, async (c) => {
             {rolesWithCount.map((r) => {
               const canDelete = !r.isProtected && r.assignmentCount === 0;
               return (
-                <tr key={r.id}>
+                <tr
+                  key={r.id}
+                  {...(!r.isProtected && {
+                    class: "cursor-pointer hover",
+                    "hx-get": `/admin/roles/${r.id}/edit`,
+                    "hx-target": "#modal-content",
+                    "hx-swap": "innerHTML",
+                  })}
+                >
                   <td class="font-medium">
                     {r.isProtected && (
                       <span class="mr-1" title="Systemrolle">
@@ -485,36 +520,18 @@ adminRoutes.get("/roles", guard, async (c) => {
                   </td>
                   <td>
                     {r.grantsActiveStatus ? (
-                      <span class="badge badge-success badge-sm">Ja</span>
+                      <span class="badge badge-success badge-sm">Aktiv</span>
                     ) : (
-                      <span class="badge badge-ghost badge-sm">Nein</span>
+                      <span class="badge badge-ghost badge-sm">Passiv</span>
                     )}
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end">
-                      {r.isProtected ? (
-                        <button
-                          class="btn btn-ghost btn-xs"
-                          disabled
-                          title="Systemrolle, kann nicht bearbeitet werden"
-                        >
-                          Bearbeiten
-                        </button>
-                      ) : (
-                        <button
-                          class="btn btn-ghost btn-xs"
-                          hx-get={`/admin/roles/${r.id}/edit`}
-                          hx-target="#modal-content"
-                          hx-swap="innerHTML"
-                        >
-                          Bearbeiten
-                        </button>
-                      )}
                       {canDelete ? (
                         <>
                           <button
                             class="btn btn-ghost btn-xs text-error"
-                            onclick={`document.getElementById('delete-role-${r.id}').showModal()`}
+                            onclick={`event.stopPropagation(); document.getElementById('delete-role-${r.id}').showModal()`}
                           >
                             Löschen
                           </button>
@@ -560,6 +577,7 @@ adminRoutes.get("/roles", guard, async (c) => {
             })}
           </tbody>
         </table>
+      </div>
       </div>
 
       <ModalScaffold />
@@ -747,6 +765,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
     <Layout title="Jubiläen" user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="anniversaries" />
+      <div class="max-w-4xl mx-auto">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
           Jubiläen
@@ -761,6 +780,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         </button>
       </div>
 
+      <ClickToEditHint />
       <div class="overflow-x-auto mb-6">
         <table class="table table-zebra w-full max-w-md">
           <thead>
@@ -779,22 +799,20 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
               </tr>
             ) : (
               years.map((y) => (
-                <tr key={y.year}>
+                <tr
+                  key={y.year}
+                  class="cursor-pointer hover"
+                  hx-get={`/admin/anniversaries/${y.year}/edit`}
+                  hx-target="#modal-content"
+                  hx-swap="innerHTML"
+                >
                   <td class="font-medium">{y.year}</td>
                   <td class="opacity-70">{y.title ?? "–"}</td>
                   <td>
                     <div class="flex gap-2 justify-end">
                       <button
-                        class="btn btn-ghost btn-xs"
-                        hx-get={`/admin/anniversaries/${y.year}/edit`}
-                        hx-target="#modal-content"
-                        hx-swap="innerHTML"
-                      >
-                        Bearbeiten
-                      </button>
-                      <button
                         class="btn btn-ghost btn-xs text-error"
-                        onclick={`document.getElementById('delete-year-${y.year}').showModal()`}
+                        onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.year}').showModal()`}
                       >
                         Löschen
                       </button>
@@ -826,6 +844,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       <ModalScaffold />
@@ -981,6 +1000,7 @@ adminRoutes.get("/config", guard, async (c) => {
     <Layout title="Konfiguration" user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
+      <div class="max-w-4xl mx-auto">
       <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
         Konfiguration
       </h1>
@@ -1004,6 +1024,7 @@ adminRoutes.get("/config", guard, async (c) => {
             ))}
           </tbody>
         </table>
+      </div>
       </div>
     </Layout>
   );
