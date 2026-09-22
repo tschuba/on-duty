@@ -34,3 +34,12 @@
   --font-heading: "Oswald", sans-serif;
   --font-body: "Inter", sans-serif;
 }
+
+/* ponytail: @layer theme < @layer base — daisyUI overwrites color tokens; unlayered :root wins */
+:root {
+  --color-primary: #cc0000;
+  --color-primary-dark: #990000;
+  --color-gold: #f0a500;
+  --color-dark: #1c1c1c;
+  --color-surface: #f8f8f8;
+}
