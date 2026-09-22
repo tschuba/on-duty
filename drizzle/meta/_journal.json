@@ -36,6 +36,13 @@
       "when": 1790100000000,
       "tag": "0004_member_roles_protected",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790200000000,
+      "tag": "0005_backup_history",
+      "breakpoints": true
     }
   ]
 }

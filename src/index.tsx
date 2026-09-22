@@ -5,6 +5,7 @@ import { getCookie, deleteCookie } from "hono/cookie";
 import { validateEnv } from "./env.js";
 import { auth } from "./auth.js";
 import { env } from "./env.js";
+import { startBackupScheduler } from "./lib/backup.js";
 import { loginRoutes } from "./routes/login.js";
 import { memberRoutes } from "./routes/members.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -83,6 +84,7 @@ app.onError((err, c) => {
   );
 });
 
-serve({ fetch: app.fetch, port: 3000 }, () =>
-  console.log(`${env.ORG_NAME} · http://localhost:3000`)
-);
+serve({ fetch: app.fetch, port: 3000 }, () => {
+  console.log(`${env.ORG_NAME} · http://localhost:3000`);
+  startBackupScheduler().catch((err) => console.error("[backup] Scheduler-Start fehlgeschlagen:", err));
+});
