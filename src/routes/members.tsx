@@ -155,7 +155,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
 }
 
 function MembersTable({
-  items, sort, dir, page, pageSize, totalPages, search, statusFilter, roleFilter, isEditor,
+  items, sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, isEditor,
 }: {
   items: MemberWithStatus[];
   sort: SortKey;
@@ -163,6 +163,7 @@ function MembersTable({
   page: number;
   pageSize: number;
   totalPages: number;
+  totalCount: number;
   search: string;
   statusFilter: MemberStatus[];
   roleFilter: string[];
@@ -253,23 +254,10 @@ function MembersTable({
       </div>
 
       {/* Pagination + page size */}
-      <div class="flex flex-wrap items-center justify-between gap-4 mt-4">
-        <div class="join">
-          {page > 1 && <a href={pageUrl(page - 1)} class="join-item btn btn-sm">«</a>}
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <a
-              key={p}
-              href={pageUrl(p)}
-              class={`join-item btn btn-sm${p === page ? " btn-active" : ""}`}
-            >
-              {p}
-            </a>
-          ))}
-          {page < totalPages && <a href={pageUrl(page + 1)} class="join-item btn btn-sm">»</a>}
-        </div>
-
+      <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
+        <span class="text-sm opacity-70 mr-auto">{totalCount} Mitglieder</span>
         <div class="flex items-center gap-2 text-sm opacity-70">
-          <span>Einträge pro Seite:</span>
+          <span class="whitespace-nowrap">Einträge pro Seite:</span>
           <select
             class="select select-bordered select-sm"
             onchange={`
@@ -285,6 +273,20 @@ function MembersTable({
               <option key={n} value={n} selected={n === pageSize}>{n}</option>
             ))}
           </select>
+        </div>
+
+        <div class="join">
+          {page > 1 && <a href={pageUrl(page - 1)} class="join-item btn btn-sm">«</a>}
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <a
+              key={p}
+              href={pageUrl(p)}
+              class={`join-item btn btn-sm${p === page ? " btn-active" : ""}`}
+            >
+              {p}
+            </a>
+          ))}
+          {page < totalPages && <a href={pageUrl(page + 1)} class="join-item btn btn-sm">»</a>}
         </div>
       </div>
     </div>
@@ -647,6 +649,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
       page={page}
       pageSize={pageSize}
       totalPages={totalPages}
+      totalCount={sorted.length}
       search={search}
       statusFilter={statusFilter}
       roleFilter={roleFilter}
