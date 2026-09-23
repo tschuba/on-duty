@@ -202,7 +202,8 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   if (gte > 0) events = events.filter((e) => e.years >= gte);
-  if (mod === "5" || mod === "10") events = events.filter((e) => e.years % parseInt(mod, 10) === 0);
+  if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
+  else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
 
   const qs = (extra: Record<string, string>) => {
     const p: Record<string, string> = { start, end, filter };
@@ -343,7 +344,8 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   if (filter === "anniversaries") events = events.filter((e) => e.kind === "anniversary");
   else if (filter === "birthdays") events = events.filter((e) => e.kind === "birthday");
   if (gte > 0) events = events.filter((e) => e.years >= gte);
-  if (mod === "5" || mod === "10") events = events.filter((e) => e.years % parseInt(mod, 10) === 0);
+  if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
+  else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
 
   const memberMap = new Map(memberRows.map((m) => [m.id, m]));
 
