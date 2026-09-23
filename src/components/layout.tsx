@@ -1,5 +1,6 @@
 import type { FC, PropsWithChildren } from "hono/jsx";
 import type { AppUser } from "../auth.js";
+import { t } from "../i18n/index.js";
 
 type Props = PropsWithChildren<{
   title?: string;
@@ -31,20 +32,20 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                 href="/members"
                 class={`btn btn-ghost btn-sm${activeNav === "members" ? " btn-active" : ""}`}
               >
-                Mitglieder
+                {t("common.nav.members")}
               </a>
               <a
                 href="/anniversaries"
                 class={`btn btn-ghost btn-sm${activeNav === "anniversaries" ? " btn-active" : ""}`}
               >
-                Jubiläen &amp; Geburtstage
+                {t("common.nav.anniversaries")}
               </a>
               {user.appRole === "admin" && (
                 <a
                   href="/admin"
                   class={`btn btn-ghost btn-sm${activeNav === "admin" ? " btn-active" : ""}`}
                 >
-                  Admin
+                  {t("common.nav.admin")}
                 </a>
               )}
             </div>
@@ -59,9 +60,9 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                 </svg>
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
-                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>Mitglieder</a></li>
-                <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>Jubiläen &amp; Geburtstage</a></li>
-                {user.appRole === "admin" && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>Admin</a></li>}
+                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
+                <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
+                {user.appRole === "admin" && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
           </div>
@@ -78,7 +79,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
                 <li>
                   <form action="/logout" method="post" class="p-0">
-                    <button type="submit" class="w-full text-left px-4 py-2">Abmelden</button>
+                    <button type="submit" class="w-full text-left px-4 py-2">{t("common.logout")}</button>
                   </form>
                 </li>
               </ul>

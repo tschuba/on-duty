@@ -9,6 +9,7 @@ import { Layout } from "../components/layout.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { env } from "../env.js";
 import { checkRateLimit, recordFailedAttempt, resetRateLimit } from "../lib/ratelimit.js";
+import { t } from "../i18n/index.js";
 
 export const loginRoutes = new Hono<{ Variables: Variables }>();
 
@@ -18,18 +19,18 @@ loginRoutes.get("/login", (c) => {
   const error = c.req.query("error");
   const errorMsg =
     error === "unknown_user"
-      ? "Ihr Konto ist nicht für die Anmeldung freigeschaltet. Bitte wenden Sie sich an einen Administrator."
+      ? t("login.error.unknownUser")
       : error === "disabled"
-        ? "Ihr Konto wurde deaktiviert."
+        ? t("login.error.disabled")
         : null;
 
   return c.html(
-    <Layout title="Anmelden">
+    <Layout title={t("login.title")}>
       <div class="flex min-h-[60vh] items-center justify-center">
         <div class="card bg-base-200 w-full max-w-sm shadow">
           <div class="card-body gap-4">
             <h1 class="card-title text-2xl" style="font-family: var(--font-heading)">
-              Anmelden
+              {t("login.title")}
             </h1>
             {errorMsg && (
               <div class="alert alert-error text-sm">
@@ -37,7 +38,7 @@ loginRoutes.get("/login", (c) => {
               </div>
             )}
             <a href="/auth/oidc-start" class="btn btn-primary w-full">
-              Mit OIDC anmelden
+              {t("login.oidcButton")}
             </a>
           </div>
         </div>
@@ -81,12 +82,12 @@ loginRoutes.get("/auth/oidc-start", async (c) => {
 
 function adminLoginPage(error?: string) {
   return (
-    <Layout title="Admin-Anmeldung">
+    <Layout title={t("login.admin.title")}>
       <div class="flex min-h-[60vh] items-center justify-center">
         <div class="card bg-base-200 w-full max-w-sm shadow">
           <div class="card-body gap-4">
             <h1 class="card-title text-2xl" style="font-family: var(--font-heading)">
-              Admin-Anmeldung
+              {t("login.admin.title")}
             </h1>
             {error && (
               <div class="alert alert-error text-sm">
@@ -95,7 +96,7 @@ function adminLoginPage(error?: string) {
             )}
             <form action="/admin/login" method="post" class="flex flex-col gap-3">
               <label class="form-control">
-                <span class="label-text mb-1">Benutzername</span>
+                <span class="label-text mb-1">{t("login.admin.username")}</span>
                 <input
                   type="text"
                   name="username"
@@ -105,7 +106,7 @@ function adminLoginPage(error?: string) {
                 />
               </label>
               <label class="form-control">
-                <span class="label-text mb-1">Passwort</span>
+                <span class="label-text mb-1">{t("login.admin.password")}</span>
                 <input
                   type="password"
                   name="password"
@@ -115,7 +116,7 @@ function adminLoginPage(error?: string) {
                 />
               </label>
               <button type="submit" class="btn btn-primary mt-2">
-                Anmelden
+                {t("login.admin.submit")}
               </button>
             </form>
           </div>
@@ -132,7 +133,7 @@ loginRoutes.post("/admin/login", async (c) => {
 
   if (!checkRateLimit(ip).allowed) {
     return c.html(
-      adminLoginPage("Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen."),
+      adminLoginPage(t("login.admin.error.tooManyAttempts")),
       429
     );
   }
@@ -143,7 +144,7 @@ loginRoutes.post("/admin/login", async (c) => {
 
   if (username !== "admin") {
     recordFailedAttempt(ip);
-    return c.html(adminLoginPage("Ungültige Anmeldedaten."), 401);
+    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), 401);
   }
 
   // Master override: if ADMIN_PASSWORD matches directly, re-sync hash so Better Auth accepts it
@@ -167,7 +168,7 @@ loginRoutes.post("/admin/login", async (c) => {
 
   if (!response.ok) {
     recordFailedAttempt(ip);
-    return c.html(adminLoginPage("Ungültige Anmeldedaten."), 401);
+    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), 401);
   }
 
   resetRateLimit(ip);

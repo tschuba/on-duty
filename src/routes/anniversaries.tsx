@@ -8,6 +8,7 @@ import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { env } from "../env.js";
+import { t } from "../i18n/index.js";
 
 export const anniversaryRoutes = new Hono<{ Variables: Variables }>();
 
@@ -50,15 +51,17 @@ const STATUS_BADGE: Record<MemberStatus, string> = {
   archiviert: "badge badge-neutral badge-sm",
 };
 const STATUS_LABEL: Record<MemberStatus, string> = {
-  aktiv: "Aktiv", kinder: "Kinder", jugend: "Jugend", passiv: "Passiv", archiviert: "Archiviert",
+  aktiv: t("status.aktiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), passiv: t("status.passiv"), archiviert: t("status.archiviert"),
 };
 
 // ── Components ────────────────────────────────────────────────────────────────
 
 function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: boolean; divider: boolean }) {
   const yearsCol = e.kind === "birthday"
-    ? `${e.years} Jahre`
-    : e.title ? `${e.title} · ${e.years} Jahre` : `${e.years} Jahre`;
+    ? t("anniversaries.event.yearsDisplay", { years: e.years })
+    : e.title
+      ? t("anniversaries.event.yearsWithTitle", { title: e.title, years: e.years })
+      : t("anniversaries.event.yearsDisplay", { years: e.years });
   const border = divider ? " border-t border-base-300" : "";
 
   return (
@@ -72,8 +75,8 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
       <td class={border}><span class={STATUS_BADGE[e.status]}>{STATUS_LABEL[e.status]}</span></td>
       <td class={border}>
         {e.kind === "birthday"
-          ? <span class="badge badge-outline badge-sm">Geburtstag</span>
-          : <span class="badge badge-warning badge-outline badge-sm">Jubiläum</span>
+          ? <span class="badge badge-outline badge-sm">{t("anniversaries.event.birthday")}</span>
+          : <span class="badge badge-warning badge-outline badge-sm">{t("anniversaries.event.anniversary")}</span>
         }
       </td>
       <td class={`text-right text-sm tabular-nums${border}`}>{yearsCol}</td>
@@ -89,7 +92,7 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
     : events;
 
   if (!filtered.length) {
-    return <p class="text-base-content/60 py-8">Keine Ereignisse im gewählten Zeitraum.</p>;
+    return <p class="text-base-content/60 py-8">{t("anniversaries.empty")}</p>;
   }
 
   const groups = new Map<string, AnniversaryEvent[]>();
@@ -129,21 +132,21 @@ function AnniversariesExportModal() {
     <>
       <dialog id="ann-export-modal" class="modal">
         <div class="modal-box">
-          <h3 class="font-bold text-lg mb-4">Excel-Export</h3>
-          <p class="text-sm opacity-60 mb-4">Datum, Name, Status, Ereignistyp, Jahre und Jubiläumstitel sind immer enthalten.</p>
+          <h3 class="font-bold text-lg mb-4">{t("common.excelExport")}</h3>
+          <p class="text-sm opacity-60 mb-4">{t("anniversaries.export.subtitle")}</p>
           <div class="space-y-3">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-ann-contact" class="checkbox checkbox-sm" />
-              <span>Kontaktdaten <span class="opacity-50 text-xs">(Telefon, E-Mail)</span></span>
+              <span>{t("anniversaries.export.contact")} <span class="opacity-50 text-xs">{t("anniversaries.export.contactHint")}</span></span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-ann-addr" class="checkbox checkbox-sm" />
-              <span>Adressdaten <span class="opacity-50 text-xs">(Straße, Hausnummer, PLZ, Ort)</span></span>
+              <span>{t("anniversaries.export.address")} <span class="opacity-50 text-xs">{t("anniversaries.export.addressHint")}</span></span>
             </label>
           </div>
           <div class="modal-action">
-            <button id="ann-export-download" class="btn btn-primary">Herunterladen</button>
-            <form method="dialog"><button class="btn btn-ghost">Abbrechen</button></form>
+            <button id="ann-export-download" class="btn btn-primary">{t("common.download")}</button>
+            <form method="dialog"><button class="btn btn-ghost">{t("common.cancel")}</button></form>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>×</button></form>
@@ -243,15 +246,15 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   const isNextYear = start === `${nextYear}-01-01` && end === `${nextYear}-12-31`;
 
   return c.html(
-    <Layout title="Jubiläen & Geburtstage" user={user} activeNav="anniversaries">
+    <Layout title={t("anniversaries.title")} user={user} activeNav="anniversaries">
       <div class="max-w-4xl mx-auto">
       <div class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            Jubiläen &amp; Geburtstage
+            {t("anniversaries.title")}
           </h1>
           <button class="btn btn-sm btn-neutral" onclick="document.getElementById('ann-export-modal').showModal()">
-            Export
+            {t("common.export")}
           </button>
         </div>
 
@@ -259,11 +262,11 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
         <div class="flex flex-wrap gap-3 items-end">
           {/* Quick buttons */}
           <div class="flex gap-1">
-            <a href={quickLink(3)} class={`btn btn-sm${is3m ? " btn-primary" : " btn-ghost"}`}>3 Monate</a>
-            <a href={quickLink(6)} class={`btn btn-sm${is6m ? " btn-primary" : " btn-ghost"}`}>6 Monate</a>
-            <a href={quickLink(12)} class={`btn btn-sm${isDefault ? " btn-primary" : " btn-ghost"}`}>12 Monate</a>
-            <a href={yearLink(thisYear)} class={`btn btn-sm${isThisYear ? " btn-primary" : " btn-ghost"}`}>Dieses Jahr</a>
-            <a href={yearLink(nextYear)} class={`btn btn-sm${isNextYear ? " btn-primary" : " btn-ghost"}`}>Nächstes Jahr</a>
+            <a href={quickLink(3)} class={`btn btn-sm${is3m ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
+            <a href={quickLink(6)} class={`btn btn-sm${is6m ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
+            <a href={quickLink(12)} class={`btn btn-sm${isDefault ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
+            <a href={yearLink(thisYear)} class={`btn btn-sm${isThisYear ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
+            <a href={yearLink(nextYear)} class={`btn btn-sm${isNextYear ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
           </div>
 
           {/* Manual date range */}
@@ -274,14 +277,14 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
             <input type="hidden" name="filter" value={filter} />
             {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
-            <button type="submit" class="btn btn-sm">Anzeigen</button>
+            <button type="submit" class="btn btn-sm">{t("common.show")}</button>
           </form>
 
           {/* Typ-Filter */}
           <div class="join">
-            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-active" : ""}`}>Alle</a>
-            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>Nur Jubiläen</a>
-            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>Nur Geburtstage</a>
+            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-active" : ""}`}>{t("anniversaries.filter.all")}</a>
+            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
+            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
           </div>
 
           {/* Jahre + Mod */}
@@ -291,7 +294,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
               <input type="hidden" name="end" value={end} />
               <input type="hidden" name="filter" value={filter} />
               {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
-              <label class="text-sm text-base-content/70" for="gte-input">Mind. Jahre:</label>
+              <label class="text-sm text-base-content/70" for="gte-input">{t("anniversaries.minYears.label")}</label>
               <input
                 id="gte-input"
                 type="number"
@@ -303,9 +306,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
               />
             </form>
             <div class="join">
-              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-active" : ""}`}>Alle</a>
-              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-active" : ""}`}>Halbrunde</a>
-              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-active" : ""}`}>Runde</a>
+              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-active" : ""}`}>{t("anniversaries.filter.all")}</a>
+              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-active" : ""}`}>{t("anniversaries.filter.halfRoundYears")}</a>
+              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-active" : ""}`}>{t("anniversaries.filter.roundYears")}</a>
             </div>
           </div>
         </div>
@@ -365,12 +368,15 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const memberMap = new Map(memberRows.map((m) => [m.id, m]));
 
   const STATUS_LABEL: Record<string, string> = {
-    aktiv: "Aktiv", passiv: "Passiv", kinder: "Kinder", jugend: "Jugend", archiviert: "Archiviert",
+    aktiv: t("status.aktiv"), passiv: t("status.passiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), archiviert: t("status.archiviert"),
   };
 
-  const header: string[] = ["Datum", "Nachname", "Vorname", "Status", "Ereignistyp", "Jahre", "Jubiläumstitel"];
-  if (inclContact) header.push("Telefon", "E-Mail");
-  if (inclAddr) header.push("Straße", "Hausnummer", "PLZ", "Ort");
+  const header: string[] = [
+    t("anniversaries.export.colDate"), t("members.form.lastName"), t("members.form.firstName"),
+    t("members.table.status"), t("anniversaries.export.colEventType"), t("anniversaries.export.colYears"), t("anniversaries.export.colTitle"),
+  ];
+  if (inclContact) header.push(t("members.form.phone"), t("members.form.email"));
+  if (inclAddr) header.push(t("members.form.street"), t("members.form.houseNumber"), t("members.form.zip"), t("members.form.city"));
 
   const rows = events.map((e) => {
     const row: (string | Date | number | null)[] = [
@@ -378,7 +384,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
       e.lastName,
       e.firstName,
       STATUS_LABEL[e.status] ?? e.status,
-      e.kind === "birthday" ? "Geburtstag" : "Jubiläum",
+      e.kind === "birthday" ? t("anniversaries.event.birthday") : t("anniversaries.event.anniversary"),
       e.years,
       e.title ?? "",
     ];
@@ -389,7 +395,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   });
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), "Jubiläen");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), t("anniversaries.export.sheetName"));
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const exportDate = today.replace(/-/g, "");
@@ -397,5 +403,5 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
 
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="${filename}"`);
-  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
 });
