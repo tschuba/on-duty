@@ -240,38 +240,36 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
         </div>
 
         {/* Controls */}
-        <div class="flex flex-col gap-3">
-          <div class="flex flex-wrap gap-3 items-end">
-            {/* Quick buttons */}
-            <div class="flex gap-1">
-              <a href={quickLink(3)} class={`btn btn-sm${is3m ? " btn-primary" : " btn-ghost"}`}>3 Monate</a>
-              <a href={quickLink(6)} class={`btn btn-sm${is6m ? " btn-primary" : " btn-ghost"}`}>6 Monate</a>
-              <a href={quickLink(12)} class={`btn btn-sm${isDefault ? " btn-primary" : " btn-ghost"}`}>12 Monate</a>
-              <a href={yearLink(thisYear)} class={`btn btn-sm${isThisYear ? " btn-primary" : " btn-ghost"}`}>Dieses Jahr</a>
-              <a href={yearLink(nextYear)} class={`btn btn-sm${isNextYear ? " btn-primary" : " btn-ghost"}`}>Nächstes Jahr</a>
-            </div>
-
-            {/* Manual date range */}
-            <form method="get" action="/anniversaries" class="flex gap-2 items-center flex-wrap">
-              <input type="date" name="start" value={start} class="input input-sm input-bordered w-36" />
-              <span class="text-base-content/50">–</span>
-              <input type="date" name="end" value={end} class="input input-sm input-bordered w-36" />
-              <input type="hidden" name="filter" value={filter} />
-              <input type="hidden" name="mod" value={mod} />
-              {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
-              <button type="submit" class="btn btn-sm">Anzeigen</button>
-            </form>
-
-            {/* Filter toggle */}
-            <div class="join">
-              <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-active" : ""}`}>Alle</a>
-              <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>Nur Jubiläen</a>
-              <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>Nur Geburtstage</a>
-            </div>
+        <div class="flex flex-wrap gap-3 items-end">
+          {/* Quick buttons */}
+          <div class="flex gap-1">
+            <a href={quickLink(3)} class={`btn btn-sm${is3m ? " btn-primary" : " btn-ghost"}`}>3 Monate</a>
+            <a href={quickLink(6)} class={`btn btn-sm${is6m ? " btn-primary" : " btn-ghost"}`}>6 Monate</a>
+            <a href={quickLink(12)} class={`btn btn-sm${isDefault ? " btn-primary" : " btn-ghost"}`}>12 Monate</a>
+            <a href={yearLink(thisYear)} class={`btn btn-sm${isThisYear ? " btn-primary" : " btn-ghost"}`}>Dieses Jahr</a>
+            <a href={yearLink(nextYear)} class={`btn btn-sm${isNextYear ? " btn-primary" : " btn-ghost"}`}>Nächstes Jahr</a>
           </div>
 
-          {/* Year/age filter row */}
-          <div class="flex flex-wrap gap-3 items-center">
+          {/* Manual date range */}
+          <form method="get" action="/anniversaries" class="flex gap-2 items-center flex-wrap">
+            <input type="date" name="start" value={start} class="input input-sm input-bordered w-36" />
+            <span class="text-base-content/50">–</span>
+            <input type="date" name="end" value={end} class="input input-sm input-bordered w-36" />
+            <input type="hidden" name="filter" value={filter} />
+            <input type="hidden" name="mod" value={mod} />
+            {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
+            <button type="submit" class="btn btn-sm">Anzeigen</button>
+          </form>
+
+          {/* Typ-Filter */}
+          <div class="join">
+            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-active" : ""}`}>Alle</a>
+            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>Nur Jubiläen</a>
+            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>Nur Geburtstage</a>
+          </div>
+
+          {/* Jahre + Mod */}
+          <div class="flex gap-3 items-center">
             <form method="get" action="/anniversaries" id="gte-form" class="flex items-center gap-2">
               <input type="hidden" name="start" value={start} />
               <input type="hidden" name="end" value={end} />
@@ -288,12 +286,10 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
                 placeholder="–"
               />
             </form>
-
-            {/* Mod toggle */}
             <div class="join">
               <a href={modLink("")} class={`join-item btn btn-sm${!mod ? " btn-active" : ""}`}>Alle</a>
-              <a href={modLink("5")} class={`join-item btn btn-sm${mod === "5" ? " btn-active" : ""}`}>×5</a>
-              <a href={modLink("10")} class={`join-item btn btn-sm${mod === "10" ? " btn-active" : ""}`}>×10</a>
+              <a href={modLink("5")} class={`join-item btn btn-sm${mod === "5" ? " btn-active" : ""}`}>Halbrunde</a>
+              <a href={modLink("10")} class={`join-item btn btn-sm${mod === "10" ? " btn-active" : ""}`}>Runde</a>
             </div>
           </div>
         </div>
