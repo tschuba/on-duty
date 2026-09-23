@@ -11,6 +11,37 @@ Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer.
 - [OIDC-Provider konfigurieren](docs/oidc.md)
 - [Backup konfigurieren](docs/backup.md)
 
+## Deployment (Docker)
+
+**Voraussetzungen:** Docker + Docker Compose
+
+```bash
+# 1. Repository klonen
+git clone <repo-url> on-duty && cd on-duty
+
+# 2. Umgebungsvariablen anlegen
+cp .env.example .env
+# .env öffnen und alle Pflichtfelder setzen (siehe Tabelle unten)
+# Wichtig: DATABASE_URL muss den Hostnamen "db" verwenden:
+#   DATABASE_URL=postgresql://onduty:<password>@db:5432/onduty
+# POSTGRES_PASSWORD in .env ergänzen (für den DB-Container)
+
+# 3. Image bauen und Container starten
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 4. Migrationen ausführen (einmalig nach erstem Start)
+docker compose -f docker-compose.prod.yml exec app node -e \
+  "import('./dist/index.js')" 2>/dev/null || true
+docker compose -f docker-compose.prod.yml exec app \
+  sh -c "node --import=tsx/esm node_modules/.bin/drizzle-kit migrate"
+```
+
+> **Migrationen:** Da `drizzle-kit` ein Dev-Tool ist, empfiehlt sich das einmalige Ausführen von `pnpm db:migrate` lokal gegen die Produktionsdatenbank (via `DATABASE_URL`) oder ein separater Init-Container.
+
+> **Lokales Backup-Volume:** `BACKUP_LOCAL_PATH=/app/backups` in `.env` setzen und das Volume in `docker-compose.prod.yml` einkommentieren.
+
+---
+
 ## Lokale Entwicklung
 
 **Voraussetzungen:** Node.js 22, pnpm, Docker
