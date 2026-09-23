@@ -165,7 +165,7 @@ function AnniversariesExportModal() {
               filter:url.searchParams.get('filter')||'all',
             });
             var gte=url.searchParams.get('gte');if(gte)p.set('gte',gte);
-            var mod=url.searchParams.get('mod');if(mod)p.set('mod',mod);
+            url.searchParams.getAll('mod').forEach(function(m){p.append('mod',m)});
             if(document.getElementById('exp-ann-contact').checked)p.set('contact','1');
             if(document.getElementById('exp-ann-addr').checked)p.set('addr','1');
             window.location='/anniversaries/export?'+p;
@@ -188,7 +188,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   const filter = c.req.query("filter") || "all";
   const gteRaw = c.req.query("gte") || "";
   const gte = parseInt(gteRaw, 10) || 0;
-  const mod = c.req.query("mod") || "";
+  const mods = c.req.queries("mod") ?? [];
 
   const [memberRows, ayRows] = await Promise.all([
     db.query.members.findMany({ with: { assignments: { with: { role: true } } } }),
@@ -202,21 +202,36 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   if (gte > 0) events = events.filter((e) => e.years >= gte);
-  if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
-  else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
+  if (mods.length > 0) {
+    const want10 = mods.includes("10");
+    const want5 = mods.includes("5");
+    events = events.filter((e) =>
+      (want10 && e.years % 10 === 0) ||
+      (want5 && e.years % 5 === 0 && e.years % 10 !== 0)
+    );
+  }
 
-  const qs = (extra: Record<string, string>) => {
-    const p: Record<string, string> = { start, end, filter };
-    if (gte > 0) p.gte = String(gte);
-    if (mod) p.mod = mod;
-    Object.assign(p, extra);
-    return "/anniversaries?" + new URLSearchParams(p).toString();
+  const qs = (extra: Record<string, string | string[]>) => {
+    const p = new URLSearchParams({ start, end, filter });
+    if (gte > 0) p.set("gte", String(gte));
+    for (const m of mods) p.append("mod", m);
+    for (const [k, v] of Object.entries(extra)) {
+      p.delete(k);
+      if (Array.isArray(v)) { for (const x of v) p.append(k, x); }
+      else if (v) p.set(k, v);
+    }
+    return "/anniversaries?" + p.toString();
   };
 
   const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
   const filterLink = (f: string) => qs({ filter: f });
   const yearLink = (y: string) => qs({ start: `${y}-01-01`, end: `${y}-12-31` });
-  const modLink = (m: string) => qs({ mod: m });
+  // toggle a mod value in/out of the active set
+  const modToggle = (m: string) => {
+    const next = mods.includes(m) ? mods.filter((x) => x !== m) : [...mods, m];
+    return qs({ mod: next });
+  };
+  const modReset = () => qs({ mod: [] });
 
   const isDefault = start === today && end === addMonths(today, 12);
   const is3m = start === today && end === addMonths(today, 3);
@@ -257,7 +272,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
             <span class="text-base-content/50">–</span>
             <input type="date" name="end" value={end} class="input input-sm input-bordered w-36" />
             <input type="hidden" name="filter" value={filter} />
-            <input type="hidden" name="mod" value={mod} />
+            {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
             <button type="submit" class="btn btn-sm">Anzeigen</button>
           </form>
@@ -275,7 +290,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
               <input type="hidden" name="start" value={start} />
               <input type="hidden" name="end" value={end} />
               <input type="hidden" name="filter" value={filter} />
-              <input type="hidden" name="mod" value={mod} />
+              {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
               <label class="text-sm text-base-content/70" for="gte-input">Mind. Jahre:</label>
               <input
                 id="gte-input"
@@ -288,9 +303,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
               />
             </form>
             <div class="join">
-              <a href={modLink("")} class={`join-item btn btn-sm${!mod ? " btn-active" : ""}`}>Alle</a>
-              <a href={modLink("5")} class={`join-item btn btn-sm${mod === "5" ? " btn-active" : ""}`}>Halbrunde</a>
-              <a href={modLink("10")} class={`join-item btn btn-sm${mod === "10" ? " btn-active" : ""}`}>Runde</a>
+              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-active" : ""}`}>Alle</a>
+              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-active" : ""}`}>Halbrunde</a>
+              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-active" : ""}`}>Runde</a>
             </div>
           </div>
         </div>
