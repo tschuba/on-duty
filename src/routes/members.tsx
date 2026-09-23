@@ -675,9 +675,14 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
     <Layout title="Mitglieder" user={user} activeNav="members">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">Mitglieder</h1>
-        {isEditor && (
-          <a href="/members/new" class="btn btn-primary btn-sm">+ Neues Mitglied</a>
-        )}
+        <div class="flex items-center gap-2">
+          <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
+            Export
+          </button>
+          {isEditor && (
+            <a href="/members/new" class="btn btn-primary btn-sm">+ Neues Mitglied</a>
+          )}
+        </div>
       </div>
 
       <StatsCards all={all} />
@@ -708,9 +713,6 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
           ))}
         </div>
         <RoleFilterDropdown roles={allRoles} roleFilter={roleFilter} activeRoleIds={activeRoleIds} />
-        <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
-          Export
-        </button>
       </div>
 
       {tableEl}
