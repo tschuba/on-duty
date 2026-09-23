@@ -49,7 +49,7 @@ describe("getCeremonyYear", () => {
 describe("generateEvents scope filtering", () => {
   const ay = [{ year: 25, title: null }];
 
-  const mkMember = (status: "aktiv" | "jugend" | "passiv" | "archiviert") => ({
+  const mkMember = (status: "aktiv" | "jugend" | "kinder" | "passiv" | "archiviert") => ({
     id: status,
     firstName: "Max",
     lastName: "Muster",
@@ -77,6 +77,12 @@ describe("generateEvents scope filtering", () => {
 
   it("jugend: birthday + anniversary in range", () => {
     const evs = generateEvents([mkMember("jugend")], ay, CUTOFF, "2025-01-01", "2027-12-31");
+    expect(evs.some(e => e.kind === "birthday")).toBe(true);
+    expect(evs.some(e => e.kind === "anniversary")).toBe(true);
+  });
+
+  it("kinder: birthday + anniversary in range", () => {
+    const evs = generateEvents([mkMember("kinder")], ay, CUTOFF, "2025-01-01", "2027-12-31");
     expect(evs.some(e => e.kind === "birthday")).toBe(true);
     expect(evs.some(e => e.kind === "anniversary")).toBe(true);
   });

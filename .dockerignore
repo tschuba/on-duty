@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+.git
+.githooks
+graft/
+backups/
+public/css
+public/fonts
+public/js
