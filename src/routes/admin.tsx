@@ -15,6 +15,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
+import { t } from "../i18n/index.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("admin");
@@ -31,19 +32,19 @@ function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
-        Benutzer
+        {t("admin.tabs.users")}
       </a>
       <a href="/admin/roles" role="tab" class={`tab${active === "roles" ? " tab-active" : ""}`}>
-        Funktionen
+        {t("admin.tabs.roles")}
       </a>
       <a href="/admin/anniversaries" role="tab" class={`tab${active === "anniversaries" ? " tab-active" : ""}`}>
-        Jubiläen
+        {t("admin.tabs.anniversaries")}
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
-        Konfiguration
+        {t("admin.tabs.config")}
       </a>
       <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
-        Backup
+        {t("admin.tabs.backup")}
       </a>
     </div>
   );
@@ -54,15 +55,15 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
   if (!configured) {
     return (
       <div class="alert alert-warning mb-4">
-        <span>Kein Backup konfiguriert. Lege ein Backup-Ziel fest (Env-Vars <code>BACKUP_LOCAL_PATH</code> oder <code>S3_*</code>).</span>
+        <span>{t("admin.backup.warnNotConfigured")}</span>
       </div>
     );
   }
   return (
     <div class="alert alert-error mb-4">
       <span>
-        Letztes Backup fehlgeschlagen.{" "}
-        <a href="/admin/backup" class="link">Details ansehen →</a>
+        {t("admin.backup.warnLastFailed")}{" "}
+        <a href="/admin/backup" class="link">{t("admin.backup.warnDetails")}</a>
       </span>
     </div>
   );
@@ -83,7 +84,7 @@ function ModalScaffold() {
     <dialog id="admin-modal" class="modal">
       <div class="modal-box max-w-lg" id="modal-content" />
       <form method="dialog" class="modal-backdrop">
-        <button>Schließen</button>
+        <button>{t("common.close")}</button>
       </form>
     </dialog>
   );
@@ -95,12 +96,12 @@ function RoleBadge({ role }: { role: string }) {
   const cls =
     role === "admin" ? "badge-error" : role === "editor" ? "badge-warning" : "badge-ghost";
   const label =
-    role === "admin" ? "Admin" : role === "editor" ? "Bearbeiter" : "Lesend";
+    role === "admin" ? t("admin.users.role.adminBadge") : role === "editor" ? t("admin.users.role.editor") : t("admin.users.role.read");
   return <span class={`badge badge-sm ${cls}`}>{label}</span>;
 }
 
 function ClickToEditHint() {
-  return <p class="text-sm opacity-50 mb-2">Zeile anklicken zum Bearbeiten</p>;
+  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
 }
 
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
@@ -115,12 +116,12 @@ adminRoutes.get("/users", guard, async (c) => {
   ]);
 
   return c.html(
-    <Layout title="Benutzer" user={user} activeNav="admin">
+    <Layout title={t("admin.users.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="users" />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          Benutzer
+          {t("admin.users.title")}
         </h1>
         <button
           class="btn btn-primary btn-sm"
@@ -128,7 +129,7 @@ adminRoutes.get("/users", guard, async (c) => {
           hx-target="#modal-content"
           hx-swap="innerHTML"
         >
-          + Neuer Benutzer
+          {t("admin.users.newUser")}
         </button>
       </div>
 
@@ -137,10 +138,10 @@ adminRoutes.get("/users", guard, async (c) => {
         <table class="table table-zebra w-full">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>E-Mail</th>
-              <th>Benutzerrolle</th>
-              <th>Status</th>
+              <th>{t("admin.users.table.name")}</th>
+              <th>{t("admin.users.table.email")}</th>
+              <th>{t("admin.users.table.role")}</th>
+              <th>{t("admin.users.table.status")}</th>
               <th />
             </tr>
           </thead>
@@ -167,14 +168,14 @@ adminRoutes.get("/users", guard, async (c) => {
                   </td>
                   <td>
                     {u.disabled ? (
-                      <span class="badge badge-error badge-sm">Deaktiviert</span>
+                      <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
                     ) : (
-                      <span class="badge badge-success badge-sm">Aktiv</span>
+                      <span class="badge badge-success badge-sm">{t("admin.users.statusActive")}</span>
                     )}
                   </td>
                   <td>
                     {isLocal ? (
-                      <span class="badge badge-neutral badge-sm">Lokaler Admin-Account</span>
+                      <span class="badge badge-neutral badge-sm">{t("admin.users.localAdminBadge")}</span>
                     ) : (
                       <div class="flex gap-2 justify-end">
                         {u.disabled ? (
@@ -185,34 +186,34 @@ adminRoutes.get("/users", guard, async (c) => {
                                 class="btn btn-ghost btn-xs text-success"
                                 onclick="event.stopPropagation()"
                               >
-                                Aktivieren
+                                {t("admin.users.activate")}
                               </button>
                             </form>
                             <button
                               class="btn btn-ghost btn-xs text-error"
                               onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
                             >
-                              Löschen
+                              {t("common.delete")}
                             </button>
                             <dialog id={`delete-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
-                                <h3 class="font-bold text-lg">Benutzer löschen?</h3>
+                                <h3 class="font-bold text-lg">{t("admin.users.confirmDelete.title")}</h3>
                                 <p class="py-2 opacity-70">
                                   <strong>{u.name}</strong> ({u.email}) wird unwiderruflich gelöscht.
                                 </p>
                                 <div class="modal-action">
                                   <form method="dialog">
-                                    <button class="btn">Abbrechen</button>
+                                    <button class="btn">{t("common.cancel")}</button>
                                   </form>
                                   <form method="post" action={`/admin/users/${u.id}/delete`}>
                                     <button type="submit" class="btn btn-error">
-                                      Löschen
+                                      {t("common.delete")}
                                     </button>
                                   </form>
                                 </div>
                               </div>
                               <form method="dialog" class="modal-backdrop">
-                                <button>Schließen</button>
+                                <button>{t("common.close")}</button>
                               </form>
                             </dialog>
                           </>
@@ -222,30 +223,30 @@ adminRoutes.get("/users", guard, async (c) => {
                               class="btn btn-ghost btn-xs text-error"
                               onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
                               disabled={u.id === user.id}
-                              title={u.id === user.id ? "Du kannst deinen eigenen Account nicht deaktivieren" : undefined}
+                              title={u.id === user.id ? t("admin.users.cannotDeactivateSelf") : undefined}
                             >
-                              Deaktivieren
+                              {t("admin.users.deactivate")}
                             </button>
                             <dialog id={`deactivate-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
-                                <h3 class="font-bold text-lg">Benutzer deaktivieren?</h3>
+                                <h3 class="font-bold text-lg">{t("admin.users.confirmDeactivate.title")}</h3>
                                 <p class="py-2 opacity-70">
                                   <strong>{u.name}</strong> wird deaktiviert. Aktive Sitzungen
                                   werden sofort beendet.
                                 </p>
                                 <div class="modal-action">
                                   <form method="dialog">
-                                    <button class="btn">Abbrechen</button>
+                                    <button class="btn">{t("common.cancel")}</button>
                                   </form>
                                   <form method="post" action={`/admin/users/${u.id}/deactivate`}>
                                     <button type="submit" class="btn btn-error">
-                                      Deaktivieren
+                                      {t("admin.users.deactivate")}
                                     </button>
                                   </form>
                                 </div>
                               </div>
                               <form method="dialog" class="modal-backdrop">
-                                <button>Schließen</button>
+                                <button>{t("common.close")}</button>
                               </form>
                             </dialog>
                           </>
@@ -268,23 +269,23 @@ adminRoutes.get("/users", guard, async (c) => {
 adminRoutes.get("/users/new", guard, (c) => {
   return c.html(
     <>
-      <h3 class="font-bold text-lg mb-4">Neuer Benutzer</h3>
+      <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.create")}</h3>
       <form method="post" action="/admin/users" class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Name <span class="text-error">*</span></span>
+          <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" class="input input-bordered w-full" required />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">E-Mail <span class="text-error">*</span></span>
+          <span class="label-text text-right">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
           <input type="email" name="email" class="input input-bordered w-full" required />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-          <span class="label-text text-right pt-3">Benutzerrolle</span>
+          <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <div class="flex flex-col gap-2">
             {([
-              { value: "read", label: "Lesend", desc: "Kann Mitglieder und Jubiläen einsehen" },
-              { value: "editor", label: "Bearbeiter", desc: "Kann Mitglieder anlegen, bearbeiten und exportieren" },
-              { value: "admin", label: "Administrator", desc: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration" },
+              { value: "read", label: t("admin.users.role.read"), desc: t("admin.users.role.readDesc") },
+              { value: "editor", label: t("admin.users.role.editor"), desc: t("admin.users.role.editorDesc") },
+              { value: "admin", label: t("admin.users.role.admin"), desc: t("admin.users.role.adminDesc") },
             ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => (
               <label key={value} class="flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
                 <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={value === "read"} />
@@ -302,10 +303,10 @@ adminRoutes.get("/users/new", guard, (c) => {
             class="btn btn-ghost"
             onclick="document.getElementById('admin-modal').close()"
           >
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            Anlegen
+            {t("common.create")}
           </button>
         </div>
       </form>
@@ -324,34 +325,33 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
 
   return c.html(
     <>
-      <h3 class="font-bold text-lg mb-4">Benutzer bearbeiten</h3>
+      <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.edit")}</h3>
       <form method="post" action={`/admin/users/${id}`} class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Name <span class="text-error">*</span></span>
+          <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" value={u.name} class="input input-bordered w-full" required />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">E-Mail <span class="text-error">*</span></span>
+          <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
           <div class="flex flex-col gap-1">
             <input type="email" name="email" value={u.email} class="input input-bordered w-full" required />
             <span class="label-text-alt opacity-60">
-              Achtung: E-Mail muss mit der OIDC-Adresse übereinstimmen. Bei Änderung wird die
-              OIDC-Verknüpfung entfernt.
+              {t("admin.users.modal.emailWarning")}
             </span>
           </div>
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-          <span class="label-text text-right pt-3">Benutzerrolle</span>
+          <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <div class="flex flex-col gap-2">
             {([
-              { value: "read", label: "Lesend", desc: "Kann Mitglieder und Jubiläen einsehen" },
-              { value: "editor", label: "Bearbeiter", desc: "Kann Mitglieder anlegen, bearbeiten und exportieren" },
-              { value: "admin", label: "Administrator", desc: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration" },
+              { value: "read", label: t("admin.users.role.read"), desc: t("admin.users.role.readDesc") },
+              { value: "editor", label: t("admin.users.role.editor"), desc: t("admin.users.role.editorDesc") },
+              { value: "admin", label: t("admin.users.role.admin"), desc: t("admin.users.role.adminDesc") },
             ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => {
               const isDowngrade = isSelf && ROLE_RANK[value] < ROLE_RANK[currentUser.appRole ?? "read"];
               return (
               <label key={value} class={`flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 ${isDowngrade ? "opacity-50 cursor-not-allowed" : "cursor-pointer has-[:checked]:border-primary"}`}>
-                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={u.appRole === value} disabled={isDowngrade} title={isDowngrade ? "Du kannst deine eigene Rolle nicht herabstufen" : undefined} />
+                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={u.appRole === value} disabled={isDowngrade} title={isDowngrade ? t("admin.users.cannotDowngradeRole") : undefined} />
                 <div>
                   <div class="font-medium text-sm">{label}</div>
                   <div class="text-xs opacity-60">{desc}</div>
@@ -366,10 +366,10 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
             class="btn btn-ghost"
             onclick="document.getElementById('admin-modal').close()"
           >
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            Speichern
+            {t("common.save")}
           </button>
         </div>
       </form>
@@ -386,11 +386,11 @@ adminRoutes.post("/users", guard, async (c) => {
   const appRole = String(body.appRole ?? "read");
 
   if (!name || !email) {
-    setFlash(c, "Name und E-Mail sind Pflichtfelder.", "error");
+    setFlash(c, t("admin.users.flash.missingFields"), "error");
     return c.redirect("/admin/users");
   }
   if (!["read", "editor", "admin"].includes(appRole)) {
-    setFlash(c, "Ungültige Benutzerrolle.", "error");
+    setFlash(c, t("admin.users.flash.invalidRole"), "error");
     return c.redirect("/admin/users");
   }
 
@@ -399,7 +399,7 @@ adminRoutes.post("/users", guard, async (c) => {
     .from(users)
     .where(eq(users.email, email));
   if (existing.length > 0) {
-    setFlash(c, "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.", "error");
+    setFlash(c, t("admin.users.flash.emailExists"), "error");
     return c.redirect("/admin/users");
   }
 
@@ -415,7 +415,7 @@ adminRoutes.post("/users", guard, async (c) => {
     updatedAt: now,
   });
 
-  setFlash(c, `Benutzer „${name}" angelegt.`, "success");
+  setFlash(c, t("admin.users.flash.created", { name }), "success");
   return c.redirect("/admin/users");
 });
 
@@ -431,24 +431,24 @@ adminRoutes.post("/users/:id", guard, async (c) => {
   const appRole = String(body.appRole ?? "read");
 
   if (!name || !email) {
-    setFlash(c, "Name und E-Mail sind Pflichtfelder.", "error");
+    setFlash(c, t("admin.users.flash.missingFields"), "error");
     return c.redirect("/admin/users");
   }
   if (!["read", "editor", "admin"].includes(appRole)) {
-    setFlash(c, "Ungültige Benutzerrolle.", "error");
+    setFlash(c, t("admin.users.flash.invalidRole"), "error");
     return c.redirect("/admin/users");
   }
 
   const currentUser = c.get("user");
   if (id === currentUser.id && ROLE_RANK[appRole] < ROLE_RANK[existing.appRole ?? "read"]) {
-    setFlash(c, "Du kannst deine eigene Rolle nicht herabstufen.", "error");
+    setFlash(c, t("admin.users.flash.cannotDowngrade"), "error");
     return c.redirect("/admin/users");
   }
 
   if (email !== existing.email) {
     const dupe = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (dupe.length > 0) {
-      setFlash(c, "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.", "error");
+      setFlash(c, t("admin.users.flash.emailExists"), "error");
       return c.redirect("/admin/users");
     }
     // Remove OIDC account link so Better Auth re-links on next login
@@ -462,7 +462,7 @@ adminRoutes.post("/users/:id", guard, async (c) => {
     .set({ name, email, appRole, updatedAt: new Date() })
     .where(eq(users.id, id));
 
-  setFlash(c, "Benutzer gespeichert.", "success");
+  setFlash(c, t("admin.users.flash.saved"), "success");
   return c.redirect("/admin/users");
 });
 
@@ -475,7 +475,7 @@ adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
   await db.update(users).set({ disabled: true, updatedAt: new Date() }).where(eq(users.id, id));
   await db.delete(sessions).where(eq(sessions.userId, id));
 
-  setFlash(c, "Benutzer deaktiviert.", "success");
+  setFlash(c, t("admin.users.flash.deactivated"), "success");
   return c.redirect("/admin/users");
 });
 
@@ -487,7 +487,7 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
 
   await db.update(users).set({ disabled: false, updatedAt: new Date() }).where(eq(users.id, id));
 
-  setFlash(c, "Benutzer aktiviert.", "success");
+  setFlash(c, t("admin.users.flash.activated"), "success");
   return c.redirect("/admin/users");
 });
 
@@ -503,7 +503,7 @@ adminRoutes.post("/users/:id/delete", guard, async (c) => {
 
   await db.delete(users).where(eq(users.id, id));
 
-  setFlash(c, "Benutzer gelöscht.", "success");
+  setFlash(c, t("admin.users.flash.deleted"), "success");
   return c.redirect("/admin/users");
 });
 
@@ -534,7 +534,7 @@ adminRoutes.get("/roles", guard, async (c) => {
   ]);
 
   return c.html(
-    <Layout title="Funktionen" user={user} activeNav="admin">
+    <Layout title={t("admin.roles.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="roles" />
 
@@ -542,12 +542,12 @@ adminRoutes.get("/roles", guard, async (c) => {
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-4">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            Funktionen
+            {t("admin.roles.title")}
           </h1>
           <div class="flex gap-1">
-            <a href="/admin/roles" class={`btn btn-sm${!activeFilter ? " btn-primary" : " btn-ghost"}`}>Alle</a>
-            <a href="/admin/roles?active=1" class={`btn btn-sm${activeFilter === "1" ? " btn-primary" : " btn-ghost"}`}>Aktiv</a>
-            <a href="/admin/roles?active=0" class={`btn btn-sm${activeFilter === "0" ? " btn-primary" : " btn-ghost"}`}>Passiv</a>
+            <a href="/admin/roles" class={`btn btn-sm${!activeFilter ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
+            <a href="/admin/roles?active=1" class={`btn btn-sm${activeFilter === "1" ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
+            <a href="/admin/roles?active=0" class={`btn btn-sm${activeFilter === "0" ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
           </div>
         </div>
         <button
@@ -556,7 +556,7 @@ adminRoutes.get("/roles", guard, async (c) => {
           hx-target="#modal-content"
           hx-swap="innerHTML"
         >
-          + Neue Funktion
+          {t("admin.roles.newRole")}
         </button>
       </div>
 
@@ -565,8 +565,8 @@ adminRoutes.get("/roles", guard, async (c) => {
         <table class="table table-zebra w-full">
           <thead>
             <tr>
-              <th>Anzeigename</th>
-              <th>Aktiv-Status</th>
+              <th>{t("admin.roles.table.name")}</th>
+              <th>{t("admin.roles.table.activeStatus")}</th>
               <th />
             </tr>
           </thead>
@@ -585,7 +585,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                 >
                   <td class="font-medium">
                     {r.isProtected && (
-                      <span class="mr-1" title="Systemrolle">
+                      <span class="mr-1" title={t("admin.roles.systemRole")}>
                         🔒
                       </span>
                     )}
@@ -593,9 +593,9 @@ adminRoutes.get("/roles", guard, async (c) => {
                   </td>
                   <td>
                     {r.grantsActiveStatus ? (
-                      <span class="badge badge-success badge-sm">Aktiv</span>
+                      <span class="badge badge-success badge-sm">{t("admin.roles.filterActive")}</span>
                     ) : (
-                      <span class="badge badge-ghost badge-sm">Passiv</span>
+                      <span class="badge badge-ghost badge-sm">{t("admin.roles.filterPassive")}</span>
                     )}
                   </td>
                   <td>
@@ -606,27 +606,27 @@ adminRoutes.get("/roles", guard, async (c) => {
                             class="btn btn-ghost btn-xs text-error"
                             onclick={`event.stopPropagation(); document.getElementById('delete-role-${r.id}').showModal()`}
                           >
-                            Löschen
+                            {t("common.delete")}
                           </button>
                           <dialog id={`delete-role-${r.id}`} class="modal" onclick="event.stopPropagation()">
                             <div class="modal-box">
-                              <h3 class="font-bold text-lg">Funktion löschen?</h3>
+                              <h3 class="font-bold text-lg">{t("admin.roles.confirmDelete.title")}</h3>
                               <p class="py-2 opacity-70">
                                 <strong>{r.title}</strong> wird dauerhaft gelöscht.
                               </p>
                               <div class="modal-action">
                                 <form method="dialog">
-                                  <button class="btn">Abbrechen</button>
+                                  <button class="btn">{t("common.cancel")}</button>
                                 </form>
                                 <form method="post" action={`/admin/roles/${r.id}/delete`}>
                                   <button type="submit" class="btn btn-error">
-                                    Löschen
+                                    {t("common.delete")}
                                   </button>
                                 </form>
                               </div>
                             </div>
                             <form method="dialog" class="modal-backdrop">
-                              <button>Schließen</button>
+                              <button>{t("common.close")}</button>
                             </form>
                           </dialog>
                         </>
@@ -636,11 +636,13 @@ adminRoutes.get("/roles", guard, async (c) => {
                           disabled
                           title={
                             r.isProtected
-                              ? "Systemrolle, kann nicht gelöscht werden"
-                              : `Wird von ${r.assignmentCount} Mitglied${r.assignmentCount === 1 ? "" : "ern"} verwendet`
+                              ? t("admin.roles.cannotDelete.protected")
+                              : r.assignmentCount === 1
+                                ? t("admin.roles.cannotDelete.usedBySingle", { count: r.assignmentCount })
+                                : t("admin.roles.cannotDelete.usedByMultiple", { count: r.assignmentCount })
                           }
                         >
-                          Löschen
+                          {t("common.delete")}
                         </button>
                       )}
                     </div>
@@ -662,15 +664,15 @@ adminRoutes.get("/roles", guard, async (c) => {
 adminRoutes.get("/roles/new", guard, (c) => {
   return c.html(
     <>
-      <h3 class="font-bold text-lg mb-4">Neue Funktion</h3>
+      <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.create")}</h3>
       <form method="post" action="/admin/roles" class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Anzeigename <span class="text-error">*</span></span>
+          <span class="label-text text-right">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="title" class="input input-bordered w-full" required />
         </div>
         <label class="label cursor-pointer justify-start gap-3">
           <input type="checkbox" name="grantsActiveStatus" value="1" class="checkbox" />
-          <span class="label-text">Verleiht aktiven Status</span>
+          <span class="label-text">{t("admin.roles.modal.grantsActive")}</span>
         </label>
         <div class="modal-action mt-2">
           <button
@@ -678,10 +680,10 @@ adminRoutes.get("/roles/new", guard, (c) => {
             class="btn btn-ghost"
             onclick="document.getElementById('admin-modal').close()"
           >
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            Anlegen
+            {t("common.create")}
           </button>
         </div>
       </form>
@@ -705,15 +707,15 @@ adminRoutes.get("/roles/:id/edit", guard, async (c) => {
 
   return c.html(
     <>
-      <h3 class="font-bold text-lg mb-4">Funktion bearbeiten</h3>
+      <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.edit")}</h3>
       <form method="post" action={`/admin/roles/${id}`} class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">Anzeigename <span class="text-error">*</span></span>
+          <span class="label-text text-right pt-2">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
           {hasAssignments ? (
             <div class="flex flex-col gap-1">
               <input type="text" value={role.title} class="input input-bordered w-full opacity-50" disabled />
               <span class="label-text-alt opacity-60">
-                Anzeigename kann nicht mehr geändert werden, da bereits Zuweisungen existieren.
+                {t("admin.roles.modal.nameLocked")}
               </span>
               <input type="hidden" name="title" value={role.title} />
             </div>
@@ -729,7 +731,7 @@ adminRoutes.get("/roles/:id/edit", guard, async (c) => {
             class="checkbox"
             {...(role.grantsActiveStatus ? { checked: true } : {})}
           />
-          <span class="label-text">Verleiht aktiven Status</span>
+          <span class="label-text">{t("admin.roles.modal.grantsActive")}</span>
         </label>
         <div class="modal-action mt-2">
           <button
@@ -737,10 +739,10 @@ adminRoutes.get("/roles/:id/edit", guard, async (c) => {
             class="btn btn-ghost"
             onclick="document.getElementById('admin-modal').close()"
           >
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            Speichern
+            {t("common.save")}
           </button>
         </div>
       </form>
@@ -756,7 +758,7 @@ adminRoutes.post("/roles", guard, async (c) => {
   const grantsActiveStatus = body.grantsActiveStatus === "1";
 
   if (!title) {
-    setFlash(c, "Anzeigename ist Pflichtfeld.", "error");
+    setFlash(c, t("admin.roles.flash.requiredTitle"), "error");
     return c.redirect("/admin/roles");
   }
 
@@ -767,7 +769,7 @@ adminRoutes.post("/roles", guard, async (c) => {
     isProtected: false,
   });
 
-  setFlash(c, `Funktion „${title}" angelegt.`, "success");
+  setFlash(c, t("admin.roles.flash.created", { title }), "success");
   return c.redirect("/admin/roles");
 });
 
@@ -788,7 +790,7 @@ adminRoutes.post("/roles/:id", guard, async (c) => {
   if (cnt === 0) {
     const title = String(body.title ?? "").trim();
     if (!title) {
-      setFlash(c, "Anzeigename ist Pflichtfeld.", "error");
+      setFlash(c, t("admin.roles.flash.requiredTitle"), "error");
       return c.redirect("/admin/roles");
     }
     await db.update(memberRoles).set({ title, grantsActiveStatus }).where(eq(memberRoles.id, id));
@@ -796,7 +798,7 @@ adminRoutes.post("/roles/:id", guard, async (c) => {
     await db.update(memberRoles).set({ grantsActiveStatus }).where(eq(memberRoles.id, id));
   }
 
-  setFlash(c, "Funktion gespeichert.", "success");
+  setFlash(c, t("admin.roles.flash.saved"), "success");
   return c.redirect("/admin/roles");
 });
 
@@ -807,7 +809,7 @@ adminRoutes.post("/roles/:id/delete", guard, async (c) => {
   if (!role) return c.redirect("/admin/roles");
 
   if (role.isProtected) {
-    setFlash(c, "Systemrollen können nicht gelöscht werden.", "error");
+    setFlash(c, t("admin.roles.flash.protected"), "error");
     return c.redirect("/admin/roles");
   }
 
@@ -817,12 +819,12 @@ adminRoutes.post("/roles/:id/delete", guard, async (c) => {
     .where(eq(memberRoleAssignments.memberRoleId, id));
 
   if (cnt > 0) {
-    setFlash(c, "Funktion hat bestehende Zuweisungen und kann nicht gelöscht werden.", "error");
+    setFlash(c, t("admin.roles.flash.hasAssignments"), "error");
     return c.redirect("/admin/roles");
   }
 
   await db.delete(memberRoles).where(eq(memberRoles.id, id));
-  setFlash(c, `Funktion „${role.title}" gelöscht.`, "success");
+  setFlash(c, t("admin.roles.flash.deleted", { title: role.title }), "success");
   return c.redirect("/admin/roles");
 });
 
@@ -835,13 +837,13 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
   ]);
 
   return c.html(
-    <Layout title="Jubiläen" user={user} activeNav="admin">
+    <Layout title={t("admin.anniversaries.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="anniversaries" />
       <div class="max-w-4xl mx-auto">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          Jubiläen
+          {t("admin.anniversaries.title")}
         </h1>
         <button
           class="btn btn-primary btn-sm"
@@ -849,7 +851,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
           hx-target="#modal-content"
           hx-swap="innerHTML"
         >
-          + Neues Jubiläumsjahr
+          {t("admin.anniversaries.newYear")}
         </button>
       </div>
 
@@ -858,8 +860,8 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         <table class="table table-zebra w-full max-w-md">
           <thead>
             <tr>
-              <th>Jahre</th>
-              <th>Titel</th>
+              <th>{t("admin.anniversaries.table.years")}</th>
+              <th>{t("admin.anniversaries.table.title")}</th>
               <th />
             </tr>
           </thead>
@@ -867,7 +869,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
             {years.length === 0 ? (
               <tr>
                 <td colspan={3} class="text-center opacity-50 py-4">
-                  Keine Jubiläumsjahre konfiguriert.
+                  {t("admin.anniversaries.empty")}
                 </td>
               </tr>
             ) : (
@@ -887,7 +889,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                         class="btn btn-ghost btn-xs text-error"
                         onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.year}').showModal()`}
                       >
-                        Löschen
+                        {t("common.delete")}
                       </button>
                     </div>
                     <dialog id={`delete-year-${y.year}`} class="modal" onclick="event.stopPropagation()">
@@ -898,17 +900,17 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                         </p>
                         <div class="modal-action">
                           <form method="dialog">
-                            <button class="btn">Abbrechen</button>
+                            <button class="btn">{t("common.cancel")}</button>
                           </form>
                           <form method="post" action={`/admin/anniversaries/${y.year}/delete`}>
                             <button type="submit" class="btn btn-error">
-                              Löschen
+                              {t("common.delete")}
                             </button>
                           </form>
                         </div>
                       </div>
                       <form method="dialog" class="modal-backdrop">
-                        <button>Schließen</button>
+                        <button>{t("common.close")}</button>
                       </form>
                     </dialog>
                   </td>
@@ -929,15 +931,15 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
 adminRoutes.get("/anniversaries/new", guard, (c) => {
   return c.html(
     <>
-      <h3 class="font-bold text-lg mb-4">Jubiläumsjahr hinzufügen</h3>
+      <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.create")}</h3>
       <form method="post" action="/admin/anniversaries" class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Jahr <span class="text-error">*</span></span>
-          <input type="number" name="year" min="1" max="200" class="input input-bordered w-full" required placeholder="z.B. 30" />
+          <span class="label-text text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
+          <input type="number" name="year" min="1" max="200" class="input input-bordered w-full" required placeholder={t("admin.anniversaries.modal.yearPlaceholder")} />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Titel (optional)</span>
-          <input type="text" name="title" class="input input-bordered w-full" placeholder="z.B. 30 Jahre Treue" />
+          <span class="label-text text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
+          <input type="text" name="title" class="input input-bordered w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -945,10 +947,10 @@ adminRoutes.get("/anniversaries/new", guard, (c) => {
             class="btn btn-ghost"
             onclick="document.getElementById('admin-modal').close()"
           >
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            Hinzufügen
+            {t("common.add")}
           </button>
         </div>
       </form>
@@ -965,15 +967,15 @@ adminRoutes.get("/anniversaries/:year/edit", guard, async (c) => {
 
   return c.html(
     <>
-      <h3 class="font-bold text-lg mb-4">Jubiläumsjahr bearbeiten</h3>
+      <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.edit")}</h3>
       <form method="post" action={`/admin/anniversaries/${year}`} class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Jahr <span class="text-error">*</span></span>
+          <span class="label-text text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
           <input type="number" name="year" value={y.year} min="1" max="200" class="input input-bordered w-full" required />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">Titel (optional)</span>
-          <input type="text" name="title" value={y.title ?? ""} class="input input-bordered w-full" placeholder="z.B. 30 Jahre Treue" />
+          <span class="label-text text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
+          <input type="text" name="title" value={y.title ?? ""} class="input input-bordered w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -981,10 +983,10 @@ adminRoutes.get("/anniversaries/:year/edit", guard, async (c) => {
             class="btn btn-ghost"
             onclick="document.getElementById('admin-modal').close()"
           >
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="submit" class="btn btn-primary">
-            Speichern
+            {t("common.save")}
           </button>
         </div>
       </form>
@@ -1000,12 +1002,12 @@ adminRoutes.post("/anniversaries", guard, async (c) => {
   const title = String(body.title ?? "").trim() || null;
 
   if (!year || year < 1 || year > 200) {
-    setFlash(c, "Ungültiges Jahr (1–200).", "error");
+    setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
     return c.redirect("/admin/anniversaries");
   }
 
   await db.insert(anniversaryYears).values({ year, title }).onConflictDoNothing();
-  setFlash(c, `Jubiläumsjahr ${year} hinzugefügt.`, "success");
+  setFlash(c, t("admin.anniversaries.flash.added", { year }), "success");
   return c.redirect("/admin/anniversaries");
 });
 
@@ -1020,7 +1022,7 @@ adminRoutes.post("/anniversaries/:year", guard, async (c) => {
   const title = String(body.title ?? "").trim() || null;
 
   if (!newYear || newYear < 1 || newYear > 200) {
-    setFlash(c, "Ungültiges Jahr (1–200).", "error");
+    setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
     return c.redirect("/admin/anniversaries");
   }
 
@@ -1030,7 +1032,7 @@ adminRoutes.post("/anniversaries/:year", guard, async (c) => {
       .from(anniversaryYears)
       .where(eq(anniversaryYears.year, newYear));
     if (conflict) {
-      setFlash(c, `Jubiläumsjahr ${newYear} existiert bereits.`, "error");
+      setFlash(c, t("admin.anniversaries.flash.yearExists", { year: newYear }), "error");
       return c.redirect("/admin/anniversaries");
     }
   }
@@ -1039,7 +1041,7 @@ adminRoutes.post("/anniversaries/:year", guard, async (c) => {
     .update(anniversaryYears)
     .set({ year: newYear, title })
     .where(eq(anniversaryYears.year, oldYear));
-  setFlash(c, "Jubiläumsjahr gespeichert.", "success");
+  setFlash(c, t("admin.anniversaries.flash.saved"), "success");
   return c.redirect("/admin/anniversaries");
 });
 
@@ -1047,42 +1049,42 @@ adminRoutes.post("/anniversaries/:year", guard, async (c) => {
 adminRoutes.post("/anniversaries/:year/delete", guard, async (c) => {
   const year = parseInt(c.req.param("year"), 10);
   await db.delete(anniversaryYears).where(eq(anniversaryYears.year, year));
-  setFlash(c, `Jubiläumsjahr ${year} gelöscht.`, "success");
+  setFlash(c, t("admin.anniversaries.flash.deleted", { year }), "success");
   return c.redirect("/admin/anniversaries");
 });
 
 // ── /admin/config ─────────────────────────────────────────────────────────────
 const CONFIG_DESCRIPTIONS: Record<string, string> = {
-  ORG_NAME: "Name der Organisation, wird in der App angezeigt.",
-  CHILDREN_AGE_LIMIT: "Altersgrenze in Jahren für die Kinderfeuerwehr-Zuordnung (muss < YOUTH_AGE_LIMIT).",
-  YOUTH_AGE_LIMIT: "Altersgrenze in Jahren für die Jugend-Zuordnung.",
-  ANNIVERSARY_CUTOFF: "Stichtag (MM-TT) für die Jubiläumsberechnung.",
-  SESSION_LIFETIME: "Gültigkeitsdauer einer Anmeldung (z.B. 7d, 24h).",
-  ADMIN_PASSWORD_MIN_LENGTH: "Mindestlänge für Admin-Passwörter.",
-  BACKUP_SCHEDULE: "Cron-Ausdruck für automatische Backups.",
-  BACKUP_RETENTION_COUNT: "Maximale Anzahl aufbewahrter Backup-Dateien pro Ziel.",
-  BACKUP_LOCAL_PATH: "Lokales Verzeichnis für Backup-Dateien (leer = deaktiviert).",
-  S3_ENDPOINT: "S3-kompatibler Endpunkt (leer = deaktiviert).",
-  S3_BUCKET: "S3-Bucket-Name.",
+  ORG_NAME: t("admin.config.desc.ORG_NAME"),
+  CHILDREN_AGE_LIMIT: t("admin.config.desc.CHILDREN_AGE_LIMIT"),
+  YOUTH_AGE_LIMIT: t("admin.config.desc.YOUTH_AGE_LIMIT"),
+  ANNIVERSARY_CUTOFF: t("admin.config.desc.ANNIVERSARY_CUTOFF"),
+  SESSION_LIFETIME: t("admin.config.desc.SESSION_LIFETIME"),
+  ADMIN_PASSWORD_MIN_LENGTH: t("admin.config.desc.ADMIN_PASSWORD_MIN_LENGTH"),
+  BACKUP_SCHEDULE: t("admin.config.desc.BACKUP_SCHEDULE"),
+  BACKUP_RETENTION_COUNT: t("admin.config.desc.BACKUP_RETENTION_COUNT"),
+  BACKUP_LOCAL_PATH: t("admin.config.desc.BACKUP_LOCAL_PATH"),
+  S3_ENDPOINT: t("admin.config.desc.S3_ENDPOINT"),
+  S3_BUCKET: t("admin.config.desc.S3_BUCKET"),
 };
 
 adminRoutes.get("/config", guard, async (c) => {
   const user = c.get("user");
   const warn = await backupWarnProps();
   return c.html(
-    <Layout title="Konfiguration" user={user} activeNav="admin">
+    <Layout title={t("admin.config.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
       <div class="max-w-4xl mx-auto">
       <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
-        Konfiguration
+        {t("admin.config.title")}
       </h1>
       <div class="overflow-x-auto">
         <table class="table w-full max-w-2xl">
           <thead>
             <tr>
-              <th>Variable</th>
-              <th>Wert</th>
+              <th>{t("admin.config.table.variable")}</th>
+              <th>{t("admin.config.table.value")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1124,16 +1126,16 @@ adminRoutes.get("/backup", guard, async (c) => {
       {schedule && (
         <div class="grid grid-cols-2 gap-4 text-sm mb-6">
           <div class={`p-4 rounded-box border ${lastBackupAfterSchedule === "success" ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>
-            <div class="text-base-content/50 mb-1">Letzter geplanter Zeitpunkt</div>
+            <div class="text-base-content/50 mb-1">{t("admin.backup.scheduleLastTime")}</div>
             {schedule.prev ? (
               <>
                 <div class="font-mono font-medium">{schedule.prev.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
                 {lastBackupAfterSchedule === "success" ? (
-                  <div class="mt-1 text-success">✓ Backup vorhanden</div>
+                  <div class="mt-1 text-success">{t("admin.backup.backupAvailable")}</div>
                 ) : lastBackupAfterSchedule === "failed" ? (
-                  <div class="mt-1 text-error">✗ Backup fehlgeschlagen</div>
+                  <div class="mt-1 text-error">{t("admin.backup.backupFailed")}</div>
                 ) : (
-                  <div class="mt-1 text-error">✗ Kein Backup gefunden</div>
+                  <div class="mt-1 text-error">{t("admin.backup.backupMissing")}</div>
                 )}
               </>
             ) : (
@@ -1141,7 +1143,7 @@ adminRoutes.get("/backup", guard, async (c) => {
             )}
           </div>
           <div class="p-4 rounded-box border bg-base-200 border-base-300">
-            <div class="text-base-content/50 mb-1">Nächster geplanter Zeitpunkt</div>
+            <div class="text-base-content/50 mb-1">{t("admin.backup.scheduleNextTime")}</div>
             {schedule.next ? (
               <div class="font-mono font-medium">{schedule.next.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
             ) : (
@@ -1152,30 +1154,30 @@ adminRoutes.get("/backup", guard, async (c) => {
       )}
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          Backup-History
+          {t("admin.backup.title")}
         </h1>
         <form method="post" action="/admin/backup/run">
           <button
             type="submit"
             class="btn btn-outline btn-sm"
-            onclick="return confirm('Backup jetzt starten?')"
+            onclick={`return confirm('${t("admin.backup.confirmStart")}')`}
           >
-            Backup jetzt starten
+            {t("admin.backup.startNow")}
           </button>
         </form>
       </div>
 
       {entries.length === 0 ? (
-        <p class="text-base-content/60">Noch keine Backup-Läufe aufgezeichnet.</p>
+        <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>
       ) : (
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
               <tr>
-                <th>Zeitstempel</th>
-                <th>Ziele</th>
-                <th>Status</th>
-                <th>Fehlermeldung</th>
+                <th>{t("admin.backup.table.timestamp")}</th>
+                <th>{t("admin.backup.table.targets")}</th>
+                <th>{t("admin.backup.table.status")}</th>
+                <th>{t("admin.backup.table.error")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1188,11 +1190,11 @@ adminRoutes.get("/backup", guard, async (c) => {
                     </td>
                     <td>
                       <div class="flex gap-1 flex-wrap">
-                        {targets.map((t) => (
+                        {targets.map((tgt) => (
                           <span
-                            class={`badge badge-sm ${t.status === "success" ? "badge-success" : "badge-error"}`}
+                            class={`badge badge-sm ${tgt.status === "success" ? "badge-success" : "badge-error"}`}
                           >
-                            {t.type === "local" ? "Lokal" : "S3"}
+                            {tgt.type === "local" ? t("admin.backup.targetLocal") : "S3"}
                           </span>
                         ))}
                         {targets.length === 0 && <span class="text-base-content/40 text-sm">—</span>}
@@ -1200,7 +1202,7 @@ adminRoutes.get("/backup", guard, async (c) => {
                     </td>
                     <td>
                       <span class={`badge ${e.status === "success" ? "badge-success" : "badge-error"}`}>
-                        {e.status === "success" ? "Erfolg" : "Fehlgeschlagen"}
+                        {e.status === "success" ? t("admin.backup.statusSuccess") : t("admin.backup.statusFailed")}
                       </span>
                     </td>
                     <td class="text-sm text-error max-w-xs truncate">{e.errorMessage ?? ""}</td>
@@ -1217,6 +1219,6 @@ adminRoutes.get("/backup", guard, async (c) => {
 
 adminRoutes.post("/backup/run", guard, async (c) => {
   runBackup().catch((err) => console.error("[backup] manual run failed:", err));
-  setFlash(c, "Backup gestartet.", "success");
+  setFlash(c, t("admin.backup.flash.started"), "success");
   return c.redirect("/admin/backup");
 });

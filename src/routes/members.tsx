@@ -9,6 +9,7 @@ import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { PASSIVE_MEMBER_ROLE_ID } from "../lib/constants.js";
 import { env } from "../env.js";
+import { t } from "../i18n/index.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
@@ -79,11 +80,11 @@ function setFlash(c: any, message: string, type: "success" | "error") {
 // ── JSX components ───────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<MemberStatus, string> = {
-  aktiv: "Aktiv",
-  passiv: "Passiv",
-  kinder: "Kinder",
-  jugend: "Jugend",
-  archiviert: "Archiviert",
+  aktiv: t("status.aktiv"),
+  passiv: t("status.passiv"),
+  kinder: t("status.kinder"),
+  jugend: t("status.jugend"),
+  archiviert: t("status.archiviert"),
 };
 
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
@@ -128,26 +129,26 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
   return (
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">Aktiv</div>
+        <div class="stat-title">{t("members.stats.active")}</div>
         <div class="stat-value text-success">{counts.aktiv}</div>
         <div class="stat-desc">{aktiv.m} m / {aktiv.w} w / {aktiv.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">Passiv</div>
+        <div class="stat-title">{t("members.stats.passive")}</div>
         <div class="stat-value">{counts.passiv}</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">Jugend</div>
+        <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="stat-value text-info">{counts.jugend}</div>
         <div class="stat-desc">{jugend.m} m / {jugend.w} w / {jugend.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">Kinderfeuerwehr</div>
+        <div class="stat-title">{t("members.stats.children")}</div>
         <div class="stat-value text-warning">{counts.kinder}</div>
         <div class="stat-desc">{kinder.m} m / {kinder.w} w / {kinder.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">Archiviert</div>
+        <div class="stat-title">{t("members.stats.archived")}</div>
         <div class="stat-value text-base-content/40">{counts.archiviert}</div>
       </div>
     </div>
@@ -204,17 +205,17 @@ function MembersTable({
         <table class="table table-zebra w-full">
           <thead>
             <tr>
-              <th><a href={sortUrl("lastName")} class="link link-hover">Nachname <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
-              <th>Vorname</th>
-              <th><a href={sortUrl("birthDate")} class="link link-hover">Geburtsdatum <SortIcon col="birthDate" active={sort} dir={dir} /></a></th>
-              <th><a href={sortUrl("entryDate")} class="link link-hover">Eintrittsdatum <SortIcon col="entryDate" active={sort} dir={dir} /></a></th>
-              <th>Funktion(en)</th>
-              <th>Status</th>
+              <th><a href={sortUrl("lastName")} class="link link-hover">{t("members.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
+              <th>{t("members.table.firstName")}</th>
+              <th><a href={sortUrl("birthDate")} class="link link-hover">{t("members.table.birthDate")} <SortIcon col="birthDate" active={sort} dir={dir} /></a></th>
+              <th><a href={sortUrl("entryDate")} class="link link-hover">{t("members.table.entryDate")} <SortIcon col="entryDate" active={sort} dir={dir} /></a></th>
+              <th>{t("members.table.roles")}</th>
+              <th>{t("members.table.status")}</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
-              <tr><td colspan={6} class="text-center opacity-50 py-8">Keine Mitglieder gefunden.</td></tr>
+              <tr><td colspan={6} class="text-center opacity-50 py-8">{t("members.table.empty")}</td></tr>
             ) : items.map((m) => (
               <tr
                 key={m.id}
@@ -234,8 +235,8 @@ function MembersTable({
                           ? <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>
                           : roles.length > 1 && (
                             <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
-                              <div tabindex="0" role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{roles.length} Funktionen</div>
-                              <div tabindex="0" class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
+                              <div tabindex={0} role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{t("members.table.roleCount", { count: roles.length })}</div>
+                              <div tabindex={0} class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
                                 <div class="flex flex-wrap gap-1 max-w-48">
                                   {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
                                 </div>
@@ -255,9 +256,9 @@ function MembersTable({
 
       {/* Pagination + page size */}
       <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
-        <span class="text-sm opacity-70 mr-auto">{totalCount} Mitglieder</span>
+        <span class="text-sm opacity-70 mr-auto">{t("members.table.count", { count: totalCount })}</span>
         <div class="flex items-center gap-2 text-sm opacity-70">
-          <span class="whitespace-nowrap">Einträge pro Seite:</span>
+          <span class="whitespace-nowrap">{t("members.table.pageSize")}</span>
           <select
             class="select select-bordered select-sm"
             onchange={`
@@ -307,7 +308,7 @@ function RoleRow({
       <td>
         <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
         <select name="assignment_role[]" class="select select-bordered select-sm w-full" required>
-          <option value="">— Funktion wählen —</option>
+          <option value="">{t("members.form.roleSelect")}</option>
           {roles.map((r) => (
             <option key={r.id} value={r.id} selected={r.id === assignment?.memberRoleId}>
               {r.title}
@@ -381,37 +382,37 @@ function MemberFormFields({
   return (
     <>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("lastName", "Nachname", "text", true)}
-        {field("firstName", "Vorname", "text", true)}
+        {field("lastName", t("members.form.lastName"), "text", true)}
+        {field("firstName", t("members.form.firstName"), "text", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {field("street", "Straße")}
-        {field("houseNumber", "Hausnummer")}
-        {field("zip", "PLZ")}
+        {field("street", t("members.form.street"))}
+        {field("houseNumber", t("members.form.houseNumber"))}
+        {field("zip", t("members.form.zip"))}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("city", "Ort")}
+        {field("city", t("members.form.city"))}
         <div class="form-control">
-          <label class="label"><span class="label-text">Geschlecht</span></label>
+          <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
           <select name="gender" class={`select select-bordered${genderErr ? " select-error" : ""}`}>
-            <option value="" selected={!m?.gender}>Keine Angabe</option>
-            <option value="male" selected={m?.gender === "male"}>Männlich</option>
-            <option value="female" selected={m?.gender === "female"}>Weiblich</option>
+            <option value="" selected={!m?.gender}>{t("members.form.genderNone")}</option>
+            <option value="male" selected={m?.gender === "male"}>{t("members.form.genderMale")}</option>
+            <option value="female" selected={m?.gender === "female"}>{t("members.form.genderFemale")}</option>
           </select>
           {genderErr && <span class="text-error text-sm mt-1">{genderErr}</span>}
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("birthDate", "Geburtsdatum", "date", true)}
-        {field("entryDate", "Eintrittsdatum", "date", true)}
+        {field("birthDate", t("members.form.birthDate"), "date", true)}
+        {field("entryDate", t("members.form.entryDate"), "date", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("exitDate", "Austrittsdatum", "date")}
-        {field("deathDate", "Sterbedatum", "date")}
+        {field("exitDate", t("members.form.exitDate"), "date")}
+        {field("deathDate", t("members.form.deathDate"), "date")}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("phone", "Telefon")}
-        {field("email", "E-Mail", "email")}
+        {field("phone", t("members.form.phone"))}
+        {field("email", t("members.form.email"), "email")}
       </div>
     </>
   );
@@ -427,11 +428,8 @@ function ReactivationModal({
   return (
     <dialog class="modal modal-open">
       <div class="modal-box">
-        <h3 class="font-bold text-lg">Automatisch geschlossene Funktionszuweisungen wieder öffnen?</h3>
-        <p class="py-4 opacity-70">
-          Dieses Mitglied wird reaktiviert. Es existieren Funktionszuweisungen, die beim Archivieren
-          automatisch geschlossen wurden.
-        </p>
+        <h3 class="font-bold text-lg">{t("members.reactivation.title")}</h3>
+        <p class="py-4 opacity-70">{t("members.reactivation.body")}</p>
         <div class="modal-action flex gap-2">
           <form method="post" action={`/members/${memberId}?reactivate=1`}>
             {Object.entries(formData).flatMap(([k, v]) =>
@@ -439,7 +437,7 @@ function ReactivationModal({
                 ? v.map((val, i) => <input key={`${k}-${i}`} type="hidden" name={k} value={val} />)
                 : [<input key={k} type="hidden" name={k} value={v} />]
             )}
-            <button type="submit" class="btn btn-primary">Ja</button>
+            <button type="submit" class="btn btn-primary">{t("common.yes")}</button>
           </form>
           <form method="post" action={`/members/${memberId}?reactivate=0`}>
             {Object.entries(formData).flatMap(([k, v]) =>
@@ -447,9 +445,9 @@ function ReactivationModal({
                 ? v.map((val, i) => <input key={`${k}-${i}`} type="hidden" name={k} value={val} />)
                 : [<input key={k} type="hidden" name={k} value={v} />]
             )}
-            <button type="submit" class="btn btn-ghost">Nein</button>
+            <button type="submit" class="btn btn-ghost">{t("common.no")}</button>
           </form>
-          <a href={`/members/${memberId}`} class="btn btn-ghost">Abbrechen</a>
+          <a href={`/members/${memberId}`} class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">
@@ -466,33 +464,33 @@ function MembersExportModal() {
     <>
       <dialog id="members-export-modal" class="modal">
         <div class="modal-box">
-          <h3 class="font-bold text-lg mb-4">Excel-Export</h3>
-          <p class="text-sm opacity-60 mb-4">Nachname und Vorname sind immer enthalten.</p>
+          <h3 class="font-bold text-lg mb-4">{t("common.excelExport")}</h3>
+          <p class="text-sm opacity-60 mb-4">{t("members.export.subtitle")}</p>
           <div class="space-y-3">
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-addr" class="checkbox checkbox-sm" />
-              <span>Adressdaten <span class="opacity-50 text-xs">(Straße, Hausnummer, PLZ, Ort)</span></span>
+              <span>{t("members.export.address")} <span class="opacity-50 text-xs">{t("members.export.addressHint")}</span></span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-contact" class="checkbox checkbox-sm" />
-              <span>Kontaktdaten <span class="opacity-50 text-xs">(Telefon, E-Mail)</span></span>
+              <span>{t("members.export.contact")} <span class="opacity-50 text-xs">{t("members.export.contactHint")}</span></span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-dates" class="checkbox checkbox-sm" />
-              <span>Datumsangaben <span class="opacity-50 text-xs">(Geburtsdatum, Eintrittsdatum, Austrittsdatum, Sterbedatum)</span></span>
+              <span>{t("members.export.dates")} <span class="opacity-50 text-xs">{t("members.export.datesHint")}</span></span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-gender" class="checkbox checkbox-sm" />
-              <span>Geschlecht</span>
+              <span>{t("members.export.genderCol")}</span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" id="exp-assignments" class="checkbox checkbox-sm" />
-              <span>Funktionszuweisungen <span class="opacity-50 text-xs">(als 2. Tabellenblatt)</span></span>
+              <span>{t("members.export.assignments")} <span class="opacity-50 text-xs">{t("members.export.assignmentsHint")}</span></span>
             </label>
           </div>
           <div class="modal-action">
-            <button id="members-export-download" class="btn btn-primary">Herunterladen</button>
-            <form method="dialog"><button class="btn btn-ghost">Abbrechen</button></form>
+            <button id="members-export-download" class="btn btn-primary">{t("common.download")}</button>
+            <form method="dialog"><button class="btn btn-ghost">{t("common.cancel")}</button></form>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop"><button>×</button></form>
@@ -526,10 +524,10 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
   activeRoleIds: Set<string>;
 }) {
   const label = roleFilter.length === 0
-    ? "Alle Funktionen"
+    ? t("members.filter.allRoles")
     : roleFilter.length === 1
-    ? (roles.find((r) => r.id === roleFilter[0])?.title ?? "1 Funktion")
-    : `${roleFilter.length} Funktionen`;
+    ? (roles.find((r) => r.id === roleFilter[0])?.title ?? t("members.table.roleCount", { count: 1 }))
+    : t("members.table.roleCount", { count: roleFilter.length });
 
   return (
     <details id="role-filter-dropdown" class="dropdown" ontoggle="if(!this.open)applyRoleFilter()">
@@ -539,7 +537,7 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
       <div class="dropdown-content z-10 bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 mt-1">
         <input
           type="text"
-          placeholder="Suchen…"
+          placeholder={t("common.searchPlaceholder")}
           class="input input-bordered input-xs w-full mb-2"
           oninput="var v=this.value.toLowerCase();document.querySelectorAll('#role-filter-list li').forEach(function(li){li.hidden=!li.dataset.title.includes(v)})"
         />
@@ -567,14 +565,14 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
             class="btn btn-xs btn-primary flex-1"
             onclick="document.getElementById('role-filter-dropdown').removeAttribute('open')"
           >
-            Anwenden
+            {t("common.apply")}
           </button>
           {roleFilter.length > 0 && (
             <button
               class="btn btn-xs btn-ghost"
               onclick="document.querySelectorAll('#role-filter-list input[type=checkbox]').forEach(function(cb){cb.checked=false});document.getElementById('role-filter-dropdown').removeAttribute('open')"
             >
-              Zurücksetzen
+              {t("common.reset")}
             </button>
           )}
         </div>
@@ -675,15 +673,15 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   }
 
   return c.html(
-    <Layout title="Mitglieder" user={user} activeNav="members">
+    <Layout title={t("members.title")} user={user} activeNav="members">
       <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">Mitglieder</h1>
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("members.title")}</h1>
         <div class="flex items-center gap-2">
           <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
-            Export
+            {t("common.export")}
           </button>
           {isEditor && (
-            <a href="/members/new" class="btn btn-primary btn-sm">+ Neues Mitglied</a>
+            <a href="/members/new" class="btn btn-primary btn-sm">{t("members.addMember")}</a>
           )}
         </div>
       </div>
@@ -695,7 +693,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
         <input
           type="search"
           name="search"
-          placeholder="Suchen…"
+          placeholder={t("common.searchPlaceholder")}
           value={search}
           class="input input-bordered input-sm w-64"
           hx-get="/members"
@@ -744,22 +742,22 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
   const user = c.get("user");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   return c.html(
-    <Layout title="Neues Mitglied" user={user} activeNav="members">
+    <Layout title={t("members.newMember")} user={user} activeNav="members">
       <div class="mb-4">
-        <a href="/members" class="link link-hover text-sm opacity-70">← Zurück zur Liste</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">Neues Mitglied</h1>
-        <p class="text-sm opacity-60 mt-1">* Pflichtfeld</p>
+        <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("members.newMember")}</h1>
+        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
         <MemberFormFields />
-        <div class="divider">Funktionszuweisungen</div>
+        <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
             <thead>
               <tr>
-                <th>Funktion</th>
-                <th>Von <span class="text-error">*</span></th>
-                <th>Bis</th>
+                <th>{t("members.form.role")}</th>
+                <th>{t("members.form.from")} <span class="text-error">*</span></th>
+                <th>{t("members.form.to")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -774,13 +772,13 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
           hx-swap="beforeend"
           hx-include="[id='role-rows'] input[name='assignment_id[]']"
         >
-          + Zuweisung hinzufügen
+          {t("members.form.addAssignment")}
         </button>
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
         <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">Speichern</button>
-          <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">Speichern &amp; Neu</button>
-          <a href="/members" class="btn btn-ghost">Abbrechen</a>
+          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+          <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">{t("common.saveAndNew")}</button>
+          <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </form>
       <script dangerouslySetInnerHTML={{ __html: `
@@ -840,10 +838,10 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
   const birthDate = String(body.birthDate ?? "").trim();
   const entryDate = String(body.entryDate ?? "").trim();
 
-  if (!lastName) errors.lastName = "Pflichtfeld";
-  if (!firstName) errors.firstName = "Pflichtfeld";
-  if (!birthDate) errors.birthDate = "Pflichtfeld";
-  if (!entryDate) errors.entryDate = "Pflichtfeld";
+  if (!lastName) errors.lastName = t("common.required");
+  if (!firstName) errors.firstName = t("common.required");
+  if (!birthDate) errors.birthDate = t("common.required");
+  if (!entryDate) errors.entryDate = t("common.required");
 
   // Parse assignments
   const assignmentRoles = [body["assignment_role[]"]].flat().filter(Boolean) as string[];
@@ -852,7 +850,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
 
   // Validate that every role assignment has a from date
   if (assignmentRoles.some((r, i) => r && !assignmentFroms[i])) {
-    errors._assignments = `Feld „Von" ist ein Pflichtfeld.`;
+    errors._assignments = t("members.error.assignmentMissingFrom");
   }
 
   // Check for duplicate open assignments (same role without to-date)
@@ -860,7 +858,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
   const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
   if (dupRole && !errors._assignments) {
     const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
-    errors._assignments = `Funktion „${role?.title ?? dupRole}" ist mehrfach offen zugewiesen.`;
+    errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
   }
 
   if (Object.keys(errors).length > 0) {
@@ -880,21 +878,21 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
       email: body.email as string,
     };
     return c.html(
-      <Layout title="Neues Mitglied" user={user} activeNav="members">
+      <Layout title={t("members.newMember")} user={user} activeNav="members">
         <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">← Zurück zur Liste</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">Neues Mitglied</h1>
-          <p class="text-sm opacity-60 mt-1">* Pflichtfeld</p>
+          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("members.newMember")}</h1>
+          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
           <MemberFormFields m={m} errors={errors} />
-          <div class="divider">Funktionszuweisungen</div>
+          <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
-              <thead><tr><th>Funktion</th><th>Von <span class="text-error">*</span></th><th>Bis</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -912,12 +910,12 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
           </div>
           <button type="button" class="btn btn-ghost btn-sm"
             hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-            + Zuweisung hinzufügen
+            {t("members.form.addAssignment")}
           </button>
           <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">Speichern</button>
-            <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">Speichern &amp; Neu</button>
-            <a href="/members" class="btn btn-ghost">Abbrechen</a>
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+            <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">{t("common.saveAndNew")}</button>
+            <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
           </div>
         </form>
       </Layout>,
@@ -964,7 +962,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
     return [m];
   });
 
-  setFlash(c, "Mitglied erfolgreich angelegt.", "success");
+  setFlash(c, t("members.flash.created"), "success");
   const saveAndNew = String(body._action ?? "") === "save_and_new";
   return c.redirect(saveAndNew ? "/members/new" : "/members");
 });
@@ -985,18 +983,18 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
     return cmp !== 0 ? cmp : a.firstName.localeCompare(b.firstName, "de");
   });
 
-  const header: string[] = ["Nachname", "Vorname"];
-  if (opts.gender) header.push("Geschlecht");
-  if (opts.dates) header.push("Geburtsdatum", "Eintrittsdatum", "Austrittsdatum", "Sterbedatum");
-  if (opts.addr) header.push("Straße", "Hausnummer", "PLZ", "Ort");
-  if (opts.contact) header.push("Telefon", "E-Mail");
+  const header: string[] = [t("members.table.lastName"), t("members.table.firstName")];
+  if (opts.gender) header.push(t("members.export.genderCol"));
+  if (opts.dates) header.push(t("members.form.birthDate"), t("members.form.entryDate"), t("members.form.exitDate"), t("members.form.deathDate"));
+  if (opts.addr) header.push(t("members.form.street"), t("members.form.houseNumber"), t("members.form.zip"), t("members.form.city"));
+  if (opts.contact) header.push(t("members.form.phone"), t("members.form.email"));
 
-  const GENDER: Record<string, string> = { male: "Männlich", female: "Weiblich" };
+  const GENDER: Record<string, string> = { male: t("members.form.genderMale"), female: t("members.form.genderFemale") };
   const toDate = (s: string | null) => s ? new Date(s + "T00:00:00") : null;
 
   const rows = allMembers.map((m) => {
     const row: (string | Date | null)[] = [m.lastName, m.firstName];
-    if (opts.gender) row.push(GENDER[m.gender ?? ""] ?? "Keine Angabe");
+    if (opts.gender) row.push(GENDER[m.gender ?? ""] ?? t("members.form.genderNone"));
     if (opts.dates) row.push(toDate(m.birthDate), toDate(m.entryDate), toDate(m.exitDate), toDate(m.deathDate));
     if (opts.addr) row.push(m.street ?? "", m.houseNumber ?? "", m.zip ?? "", m.city ?? "");
     if (opts.contact) row.push(m.phone ?? "", m.email ?? "");
@@ -1004,7 +1002,7 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
   });
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), "Mitglieder");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), t("members.export.sheetMembers"));
 
   if (opts.assignments) {
     const asgns = await db.select({
@@ -1025,12 +1023,12 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
       return cmp2 !== 0 ? cmp2 : (a.from ?? "").localeCompare(b.from ?? "");
     });
 
-    const asgHeader = ["Nachname", "Vorname", "Funktion", "Von", "Bis"];
+    const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to")];
     const asgRows = asgns.map((a) => {
       const m = nameMap.get(a.memberId);
       return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), "Funktionszuweisungen");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), t("members.export.sheetAssignments"));
   }
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
@@ -1039,7 +1037,7 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
 
   c.header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   c.header("Content-Disposition", `attachment; filename="${filename}"`);
-  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+  return c.body(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
 });
 
 // GET /members/:id — view or edit
@@ -1057,7 +1055,7 @@ memberRoutes.get("/:id", requireAuth("read"), async (c) => {
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
         <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">← Zurück zur Liste</a>
+          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <div class="flex items-center gap-3 mt-1">
             <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
               {m.firstName} {m.lastName}
@@ -1066,24 +1064,24 @@ memberRoutes.get("/:id", requireAuth("read"), async (c) => {
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
-          <ViewField label="Nachname" value={m.lastName} />
-          <ViewField label="Vorname" value={m.firstName} />
-          <ViewField label="Geburtsdatum" value={formatDate(m.birthDate)} />
-          <ViewField label="Eintrittsdatum" value={formatDate(m.entryDate)} />
-          <ViewField label="Geschlecht" value={m.gender === "male" ? "Männlich" : m.gender === "female" ? "Weiblich" : "Keine Angabe"} />
-          <ViewField label="Straße / Nr." value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
-          <ViewField label="PLZ / Ort" value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
-          <ViewField label="Telefon" value={m.phone} />
-          <ViewField label="E-Mail" value={m.email} />
-          {m.exitDate && <ViewField label="Austrittsdatum" value={formatDate(m.exitDate)} />}
-          {m.deathDate && <ViewField label="Sterbedatum" value={formatDate(m.deathDate)} />}
+          <ViewField label={t("members.form.lastName")} value={m.lastName} />
+          <ViewField label={t("members.form.firstName")} value={m.firstName} />
+          <ViewField label={t("members.form.birthDate")} value={formatDate(m.birthDate)} />
+          <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
+          <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
+          <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
+          <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
+          <ViewField label={t("members.form.phone")} value={m.phone} />
+          <ViewField label={t("members.form.email")} value={m.email} />
+          {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
+          {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
         </div>
         {openRoles.length > 0 && (
           <div class="mt-6">
-            <h2 class="font-semibold mb-2">Aktive Funktionen</h2>
+            <h2 class="font-semibold mb-2">{t("members.view.activeFunctions")}</h2>
             <div class="flex flex-wrap gap-2">
               {openRoles.map((a) => (
-                <span class="badge badge-outline">{a.role.title} (seit {formatDate(a.from)})</span>
+                <span class="badge badge-outline">{a.role.title} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
               ))}
             </div>
           </div>
@@ -1095,21 +1093,21 @@ memberRoutes.get("/:id", requireAuth("read"), async (c) => {
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
       <div class="mb-4">
-        <a href="/members" class="link link-hover text-sm opacity-70">← Zurück zur Liste</a>
+        <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <div class="flex items-center gap-3 mt-1">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {m.firstName} {m.lastName}
           </h1>
           <StatusBadge status={m.status} />
         </div>
-        <p class="text-sm opacity-60 mt-1">* Pflichtfeld</p>
+        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
         <MemberFormFields m={m} />
-        <div class="divider">Funktionszuweisungen</div>
+        <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
-            <thead><tr><th>Funktion</th><th>Von</th><th>Bis</th><th></th></tr></thead>
+            <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
                 <RoleRow key={a.id} index={i} roles={roles} assignment={a} />
@@ -1119,11 +1117,11 @@ memberRoutes.get("/:id", requireAuth("read"), async (c) => {
         </div>
         <button type="button" class="btn btn-ghost btn-sm"
           hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-          + Zuweisung hinzufügen
+          {t("members.form.addAssignment")}
         </button>
         <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">Speichern</button>
-          <a href="/members" class="btn btn-ghost">Abbrechen</a>
+          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+          <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </form>
     </Layout>
@@ -1149,10 +1147,10 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
   const exitDate = (body.exitDate as string) || null;
   const deathDate = (body.deathDate as string) || null;
 
-  if (!lastName) errors.lastName = "Pflichtfeld";
-  if (!firstName) errors.firstName = "Pflichtfeld";
-  if (!birthDate) errors.birthDate = "Pflichtfeld";
-  if (!entryDate) errors.entryDate = "Pflichtfeld";
+  if (!lastName) errors.lastName = t("common.required");
+  if (!firstName) errors.firstName = t("common.required");
+  if (!birthDate) errors.birthDate = t("common.required");
+  if (!entryDate) errors.entryDate = t("common.required");
 
   const assignmentIds = [body["assignment_id[]"]].flat() as string[];
   const assignmentRoles = [body["assignment_role[]"]].flat().filter(Boolean) as string[];
@@ -1163,7 +1161,7 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
   const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
   if (dupRole) {
     const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
-    errors._assignments = `Funktion „${role?.title ?? dupRole}" ist mehrfach offen zugewiesen.`;
+    errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
   }
 
   if (Object.keys(errors).length > 0) {
@@ -1176,17 +1174,17 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">← Zurück zur Liste</a>
+          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
-          <p class="text-sm opacity-60 mt-1">* Pflichtfeld</p>
+          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
           <MemberFormFields m={m} errors={errors} />
-          <div class="divider">Funktionszuweisungen</div>
+          <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
-              <thead><tr><th>Funktion</th><th>Von <span class="text-error">*</span></th><th>Bis</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1204,11 +1202,11 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
           </div>
           <button type="button" class="btn btn-ghost btn-sm"
             hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-            + Zuweisung hinzufügen
+            {t("members.form.addAssignment")}
           </button>
           <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">Speichern</button>
-            <a href={`/members/${id}`} class="btn btn-ghost">Abbrechen</a>
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+            <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
           </div>
         </form>
       </Layout>,
@@ -1245,19 +1243,19 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">← Zurück zur Liste</a>
+          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
-          <p class="text-sm opacity-60 mt-1">* Pflichtfeld</p>
+          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, email: body.email as string }} />
-          <div class="divider">Funktionszuweisungen</div>
+          <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
-              <thead><tr><th>Funktion</th><th>Von <span class="text-error">*</span></th><th>Bis</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1275,11 +1273,11 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
           </div>
           <button type="button" class="btn btn-ghost btn-sm"
             hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-            + Zuweisung hinzufügen
+            {t("members.form.addAssignment")}
           </button>
           <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">Speichern</button>
-            <a href={`/members/${id}`} class="btn btn-ghost">Abbrechen</a>
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+            <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
           </div>
         </form>
         <ReactivationModal memberId={id} formData={formData} />
@@ -1343,7 +1341,7 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
     }
   });
 
-  setFlash(c, "Mitglied gespeichert.", "success");
+  setFlash(c, t("members.flash.saved"), "success");
   return c.redirect(`/members/${id}`);
 });
 
