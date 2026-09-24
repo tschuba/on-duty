@@ -199,7 +199,7 @@ adminRoutes.get("/users", guard, async (c) => {
                               <div class="modal-box">
                                 <h3 class="font-bold text-lg">{t("admin.users.confirmDelete.title")}</h3>
                                 <p class="py-2 opacity-70">
-                                  <strong>{u.name}</strong> ({u.email}) wird unwiderruflich gelöscht.
+                                  {t("admin.users.confirmDelete.body", { name: u.name, email: u.email })}
                                 </p>
                                 <div class="modal-action">
                                   <form method="dialog">
@@ -612,7 +612,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                             <div class="modal-box">
                               <h3 class="font-bold text-lg">{t("admin.roles.confirmDelete.title")}</h3>
                               <p class="py-2 opacity-70">
-                                <strong>{r.title}</strong> wird dauerhaft gelöscht.
+                                {t("admin.roles.confirmDelete.body", { title: r.title })}
                               </p>
                               <div class="modal-action">
                                 <form method="dialog">
@@ -895,8 +895,9 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                     <dialog id={`delete-year-${y.year}`} class="modal" onclick="event.stopPropagation()">
                       <div class="modal-box">
                         <p>
-                          Jubiläumsjahr <strong>{y.year}</strong>
-                          {y.title ? ` (${y.title})` : ""} löschen?
+                          {y.title
+                            ? t("admin.anniversaries.confirmDelete.bodyWithTitle", { year: String(y.year), title: y.title })
+                            : t("admin.anniversaries.confirmDelete.body", { year: String(y.year) })}
                         </p>
                         <div class="modal-action">
                           <form method="dialog">

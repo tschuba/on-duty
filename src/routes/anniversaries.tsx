@@ -35,12 +35,15 @@ function formatDate(d: string): string {
   return `${day}.${m}.${y}`;
 }
 
-const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni",
-  "Juli", "August", "September", "Oktober", "November", "Dezember"];
+const MONTH_KEYS = [
+  "month.january", "month.february", "month.march", "month.april",
+  "month.may", "month.june", "month.july", "month.august",
+  "month.september", "month.october", "month.november", "month.december",
+] as const satisfies ReadonlyArray<Parameters<typeof t>[0]>;
 
 function formatMonth(yyyymm: string): string {
   const [y, m] = yyyymm.split("-");
-  return `${MONTH_NAMES[parseInt(m, 10) - 1]} ${y}`;
+  return `${t(MONTH_KEYS[parseInt(m, 10) - 1])} ${y}`;
 }
 
 const STATUS_BADGE: Record<MemberStatus, string> = {
