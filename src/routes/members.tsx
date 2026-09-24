@@ -708,12 +708,12 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
           hx-include="[name='search']"
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
         />
-        <div class="flex gap-1">
+        <div class="join">
           {(["aktiv", "passiv", "jugend", "kinder", "archiviert"] as MemberStatus[]).map((s) => (
             <a
               key={s}
               href={filterToggleUrl(s)}
-              class={`btn btn-sm${statusFilter.includes(s) ? " btn-primary" : " btn-ghost"}`}
+              class={`btn btn-sm join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
             >
               {STATUS_LABELS[s]}
             </a>
@@ -783,7 +783,7 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">{t("common.saveAndNew")}</button>
+          <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
           <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </form>
@@ -920,7 +920,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
           </button>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">{t("common.saveAndNew")}</button>
+            <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
             <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
           </div>
         </form>
