@@ -220,7 +220,7 @@ adminRoutes.get("/users", guard, async (c) => {
                         ) : (
                           <>
                             <button
-                              class="btn btn-ghost btn-xs text-error"
+                              class={`btn btn-ghost btn-xs ${u.id === user.id ? "text-base-content/30" : "text-error"}`}
                               onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
                               disabled={u.id === user.id}
                               title={u.id === user.id ? t("admin.users.cannotDeactivateSelf") : undefined}

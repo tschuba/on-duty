@@ -131,7 +131,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="stat-value text-success">{counts.aktiv}</div>
-        <div class="stat-desc">{aktiv.m} m / {aktiv.w} w / {aktiv.o} o.A.</div>
+        <div class="stat-desc">{aktiv.m} ♂ / {aktiv.w} ♀ / {aktiv.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.passive")}</div>
@@ -140,12 +140,12 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="stat-value text-info">{counts.jugend}</div>
-        <div class="stat-desc">{jugend.m} m / {jugend.w} w / {jugend.o} o.A.</div>
+        <div class="stat-desc">{jugend.m} ♂ / {jugend.w} ♀ / {jugend.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
         <div class="stat-value text-warning">{counts.kinder}</div>
-        <div class="stat-desc">{kinder.m} m / {kinder.w} w / {kinder.o} o.A.</div>
+        <div class="stat-desc">{kinder.m} ♂ / {kinder.w} ♀ / {kinder.o} o.A.</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.archived")}</div>
