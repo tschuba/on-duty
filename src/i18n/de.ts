@@ -242,7 +242,6 @@ export const de = {
   "month.october": "Oktober",
   "month.november": "November",
   "month.december": "Dezember",
-
   // ── Anniversaries ─────────────────────────────────────────────────────────────
   "anniversaries.title": "Jubiläen & Geburtstage",
   "anniversaries.filter.all": "Alle",
