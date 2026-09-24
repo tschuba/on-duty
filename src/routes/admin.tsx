@@ -544,10 +544,10 @@ adminRoutes.get("/roles", guard, async (c) => {
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {t("admin.roles.title")}
           </h1>
-          <div class="flex gap-1">
-            <a href="/admin/roles" class={`btn btn-sm${!activeFilter ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
-            <a href="/admin/roles?active=1" class={`btn btn-sm${activeFilter === "1" ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
-            <a href="/admin/roles?active=0" class={`btn btn-sm${activeFilter === "0" ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
+          <div class="join">
+            <a href="/admin/roles" class={`btn btn-sm join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
+            <a href="/admin/roles?active=1" class={`btn btn-sm join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
+            <a href="/admin/roles?active=0" class={`btn btn-sm join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
           </div>
         </div>
         <button
