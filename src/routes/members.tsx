@@ -132,7 +132,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-success">{counts.aktiv}</div>
-          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
@@ -143,14 +143,14 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-info">{counts.jugend}</div>
-          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-warning">{counts.kinder}</div>
-          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
