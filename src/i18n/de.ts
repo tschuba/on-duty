@@ -186,6 +186,8 @@ export const de = {
   "admin.anniversaries.modal.titleLabel": "Titel (optional)",
   "admin.anniversaries.modal.yearPlaceholder": "z.B. 30",
   "admin.anniversaries.modal.titlePlaceholder": "z.B. 30 Jahre Treue",
+  "admin.anniversaries.confirmDelete.body": "Jubiläumsjahr {year} löschen?",
+  "admin.anniversaries.confirmDelete.bodyWithTitle": "Jubiläumsjahr {year} ({title}) löschen?",
   "admin.anniversaries.flash.added": "Jubiläumsjahr {year} hinzugefügt.",
   "admin.anniversaries.flash.saved": "Jubiläumsjahr gespeichert.",
   "admin.anniversaries.flash.deleted": "Jubiläumsjahr {year} gelöscht.",
@@ -226,6 +228,20 @@ export const de = {
   "admin.backup.backupFailed": "✗ Backup fehlgeschlagen",
   "admin.backup.backupMissing": "✗ Kein Backup gefunden",
   "admin.backup.flash.started": "Backup gestartet.",
+
+  // ── Months ───────────────────────────────────────────────────────────────────
+  "month.january": "Januar",
+  "month.february": "Februar",
+  "month.march": "März",
+  "month.april": "April",
+  "month.may": "Mai",
+  "month.june": "Juni",
+  "month.july": "Juli",
+  "month.august": "August",
+  "month.september": "September",
+  "month.october": "Oktober",
+  "month.november": "November",
+  "month.december": "Dezember",
 
   // ── Anniversaries ─────────────────────────────────────────────────────────────
   "anniversaries.title": "Jubiläen & Geburtstage",
