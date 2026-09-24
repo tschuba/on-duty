@@ -264,12 +264,12 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
         {/* Controls */}
         <div class="flex flex-wrap gap-3 items-end">
           {/* Quick buttons */}
-          <div class="flex gap-1">
-            <a href={quickLink(3)} class={`btn btn-sm${is3m ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
-            <a href={quickLink(6)} class={`btn btn-sm${is6m ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
-            <a href={quickLink(12)} class={`btn btn-sm${isDefault ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
-            <a href={yearLink(thisYear)} class={`btn btn-sm${isThisYear ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
-            <a href={yearLink(nextYear)} class={`btn btn-sm${isNextYear ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
+          <div class="join">
+            <a href={quickLink(3)} class={`btn btn-sm join-item${is3m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
+            <a href={quickLink(6)} class={`btn btn-sm join-item${is6m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
+            <a href={quickLink(12)} class={`btn btn-sm join-item${isDefault ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
+            <a href={yearLink(thisYear)} class={`btn btn-sm join-item${isThisYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
+            <a href={yearLink(nextYear)} class={`btn btn-sm join-item${isNextYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
           </div>
 
           {/* Manual date range */}
@@ -285,9 +285,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 
           {/* Typ-Filter */}
           <div class="join">
-            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-active" : ""}`}>{t("anniversaries.filter.all")}</a>
-            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
-            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
+            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
+            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
           </div>
 
           {/* Jahre + Mod */}
@@ -309,9 +309,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
               />
             </form>
             <div class="join">
-              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-active" : ""}`}>{t("anniversaries.filter.all")}</a>
-              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-active" : ""}`}>{t("anniversaries.filter.halfRoundYears")}</a>
-              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-active" : ""}`}>{t("anniversaries.filter.roundYears")}</a>
+              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
+              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>
             </div>
           </div>
         </div>
