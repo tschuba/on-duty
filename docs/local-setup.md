@@ -5,6 +5,7 @@ Der lokale Admin-Account ist unabhängig vom OIDC-Login und wird über ein eigen
 ## Login
 
 URL: `/admin/login`  
+Benutzer: `admin`
 E-Mail: `admin@localhost.invalid`  
 Passwort: Wert der Umgebungsvariable `ADMIN_PASSWORD` aus `.env`
 

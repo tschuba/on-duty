@@ -130,8 +130,10 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
-        <div class="stat-value text-success">{counts.aktiv}</div>
-        <div class="stat-desc">{aktiv.m} ♂ / {aktiv.w} ♀ / {aktiv.o} o.A.</div>
+        <div class="flex flex-wrap items-baseline gap-x-3">
+          <div class="stat-value text-success">{counts.aktiv}</div>
+          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
+        </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.passive")}</div>
@@ -139,13 +141,17 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.youth")}</div>
-        <div class="stat-value text-info">{counts.jugend}</div>
-        <div class="stat-desc">{jugend.m} ♂ / {jugend.w} ♀ / {jugend.o} o.A.</div>
+        <div class="flex flex-wrap items-baseline gap-x-3">
+          <div class="stat-value text-info">{counts.jugend}</div>
+          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
+        </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
-        <div class="stat-value text-warning">{counts.kinder}</div>
-        <div class="stat-desc">{kinder.m} ♂ / {kinder.w} ♀ / {kinder.o} o.A.</div>
+        <div class="flex flex-wrap items-baseline gap-x-3">
+          <div class="stat-value text-warning">{counts.kinder}</div>
+          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
+        </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.archived")}</div>
