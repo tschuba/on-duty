@@ -65,9 +65,9 @@ https://<authentik-host>/application/o/<application-slug>
 
 Beispiel: `https://auth.example.com/application/o/on-duty`
 
-Diesen Wert als `OIDC_PROVIDER` in `.env` eintragen — **ohne** abschließenden Schrägstrich.
+Diesen Wert als `OIDC_PROVIDER` in `.env.local` eintragen — **ohne** abschließenden Schrägstrich.
 
-### 4. `.env` befüllen
+### 4. `.env.local` befüllen
 
 ```env
 OIDC_PROVIDER=https://auth.example.com/application/o/on-duty

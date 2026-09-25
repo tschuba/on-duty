@@ -78,7 +78,7 @@ Migrationen und Seed laufen beim Container-Start automatisch.
 #### Ersteinrichtung
 
 1. `docker-compose.prod.yml` aus dem Repo in ein Arbeitsverzeichnis auf dem Server kopieren.
-2. `.env` im selben Verzeichnis anlegen:
+2. `.env.prod` im selben Verzeichnis anlegen (siehe `.env.prod.example` im Repo):
 
 ```env
 # Image
@@ -110,7 +110,7 @@ OIDC_APP_URL=https://on-duty.example.com  # kein trailing /
 3. Starten:
 
 ```bash
-docker compose up -d
+docker compose --env-file .env.prod up -d
 ```
 
 4. Logs prüfen:
@@ -122,16 +122,16 @@ docker compose logs -f app
 #### Upgrade
 
 ```bash
-# APP_VERSION in .env auf neue Version setzen, dann:
-docker compose pull && docker compose up -d
+# APP_VERSION in .env.prod auf neue Version setzen, dann:
+docker compose --env-file .env.prod pull && docker compose --env-file .env.prod up -d
 ```
 
 #### Rollback
 
-`APP_VERSION` in `.env` auf die vorherige Version zurücksetzen:
+`APP_VERSION` in `.env.prod` auf die vorherige Version zurücksetzen:
 
 ```bash
-docker compose pull && docker compose up -d
+docker compose --env-file .env.prod pull && docker compose --env-file .env.prod up -d
 ```
 
 ---
@@ -140,7 +140,7 @@ docker compose pull && docker compose up -d
 
 Zum lokalen Testen des Prod-Stacks im geklonten Repo:
 
-1. `.env` im Repo-Root anlegen (wird von `docker-compose.prod.yml` gelesen):
+1. `.env.prod` im Repo-Root anlegen (Vorlage: `.env.prod.example`):
 
 ```env
 # Staging — einfache Testwerte ausreichend
@@ -163,7 +163,7 @@ OIDC_APP_URL=http://localhost:3000
 2. Starten:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
 3. App läuft auf [http://localhost:3000](http://localhost:3000).

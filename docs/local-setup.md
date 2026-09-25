@@ -7,7 +7,7 @@ Der lokale Admin-Account ist unabhängig vom OIDC-Login und wird über ein eigen
 URL: `/admin/login`  
 Benutzer: `admin`
 E-Mail: `admin@localhost.invalid`  
-Passwort: Wert der Umgebungsvariable `ADMIN_PASSWORD` aus `.env`
+Passwort: Wert der Umgebungsvariable `ADMIN_PASSWORD` aus `.env.local`
 
 ## Account anlegen
 
@@ -17,4 +17,4 @@ Beim ersten Setup oder nach einem Reset:
 pnpm db:seed
 ```
 
-Das Passwort kann jederzeit in `.env` geändert werden — es wird beim nächsten Login automatisch übernommen, ohne Re-Seed.
+Das Passwort kann jederzeit in `.env.local` geändert werden — es wird beim nächsten Login automatisch übernommen, ohne Re-Seed.

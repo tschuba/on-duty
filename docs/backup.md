@@ -19,7 +19,7 @@ on-duty sichert die Postgres-DB per `pg_dump` (custom format `-Fc`). Der Schedul
 mkdir backups
 ```
 
-`.env`:
+`.env.local`:
 
 ```env
 BACKUP_LOCAL_PATH=./backups
