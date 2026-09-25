@@ -9,3 +9,4 @@ backups/
 /graft/
 
 .DS_Store
+coverage/
