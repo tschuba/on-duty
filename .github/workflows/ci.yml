@@ -1,11 +1,17 @@
 name: ci
-on: [pull_request]
+
+on:
+  push:
+    branches: [master]
+  pull_request:
 
 permissions:
   pull-requests: write
+  contents: read
 
 jobs:
-  test:
+  coverage-baseline:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,4 +22,34 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
-      - uses: davelosert/vitest-coverage-report-action@v2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-master
+          path: coverage/coverage-summary.json
+          overwrite: true
+
+  coverage-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: coverage-master
+          path: coverage-master/
+      - run: node scripts/post-coverage.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_REF: ${{ github.base_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}

@@ -13,8 +13,8 @@ rulesets:
       - type: required_status_checks
         parameters:
           required_status_checks:
-            - context: "test"
-          strict_required_status_checks_policy: false
+            - context: "coverage-check"
+          strict_required_status_checks_policy: true
       - type: non_fast_forward
       - type: pull_request
         parameters:

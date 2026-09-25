@@ -6,10 +6,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'json'],
       include: ['src/**'],
-      thresholds: {
-        lines: 4,
-        branches: 3,
-      },
+      // ponytail: thresholds removed — enforcement is in CI via artifact comparison
     },
   },
 })
