@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@12.5.1",
+  "engines": { "node": ">=24" },
   "scripts": {
     "dev": "concurrently \"node --env-file=.env --import=tsx/esm --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
     "build": "tsc && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
