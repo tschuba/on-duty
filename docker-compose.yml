@@ -1,8 +1,7 @@
-env_file: .env.local
-
 services:
   db:
     image: postgres:17-alpine
+    env_file: .env.local
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-onduty}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onduty}
