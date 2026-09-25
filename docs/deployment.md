@@ -78,34 +78,7 @@ Migrationen und Seed laufen beim Container-Start automatisch.
 #### Ersteinrichtung
 
 1. `docker-compose.prod.yml` aus dem Repo in ein Arbeitsverzeichnis auf dem Server kopieren.
-2. `.env.prod` im selben Verzeichnis anlegen (siehe `.env.prod.example` im Repo):
-
-```env
-# Image
-APP_VERSION=1.0.0
-
-# Datenbank
-POSTGRES_USER=onduty
-POSTGRES_DB=onduty
-SERVICE_PASSWORD_POSTGRES=<sicheres-zufalls-passwort>  # openssl rand -hex 32
-
-# App-Secrets
-SERVICE_PASSWORD_BETTERAUTH=<sicheres-zufalls-passwort>  # openssl rand -hex 32
-SERVICE_PASSWORD_ADMIN=<admin-passwort>
-
-# App-Konfiguration
-ORG_NAME=Feuerwehr Musterstadt
-OIDC_PROVIDER=keycloak
-OIDC_CLIENT_ID=on-duty
-OIDC_CLIENT_SECRET=<client-secret>
-OIDC_APP_URL=https://on-duty.example.com  # kein trailing /
-
-# Optional (Defaults gelten wenn nicht gesetzt)
-# SESSION_LIFETIME=7d
-# BACKUP_SCHEDULE=0 2 * * 0
-# BACKUP_RETENTION_COUNT=4
-# ANNIVERSARY_CUTOFF=01-06
-```
+2. `.env.prod` im selben Verzeichnis anlegen — Vorlage: `.env.prod.example` im Repo.
 
 3. Starten:
 
