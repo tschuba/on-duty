@@ -83,20 +83,20 @@ Migrationen und Seed laufen beim Container-Start automatisch.
 3. Starten:
 
 ```bash
-docker compose --env-file .env.prod up -d
+docker compose --file docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
 4. Logs prüfen:
 
 ```bash
-docker compose logs -f app
+docker compose --file docker-compose.prod.yml logs -f app
 ```
 
 #### Upgrade
 
 ```bash
 # APP_VERSION in .env.prod auf neue Version setzen, dann:
-docker compose --env-file .env.prod pull && docker compose --env-file .env.prod up -d
+docker compose --file docker-compose.prod.yml --env-file .env.prod pull && docker compose --file docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
 #### Rollback
@@ -104,7 +104,7 @@ docker compose --env-file .env.prod pull && docker compose --env-file .env.prod 
 `APP_VERSION` in `.env.prod` auf die vorherige Version zurücksetzen:
 
 ```bash
-docker compose --env-file .env.prod pull && docker compose --env-file .env.prod up -d
+docker compose --file docker-compose.prod.yml --env-file .env.prod pull && docker compose --file docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
 ---
