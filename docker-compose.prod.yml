@@ -24,10 +24,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onduty}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onduty} -d ${POSTGRES_DB:-onduty}"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
 
 volumes:
   pgdata:
