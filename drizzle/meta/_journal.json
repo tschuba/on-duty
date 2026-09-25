@@ -43,6 +43,13 @@
       "when": 1790200000000,
       "tag": "0005_backup_history",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790300000000,
+      "tag": "0007_unprotect_passive_role",
+      "breakpoints": true
     }
   ]
 }

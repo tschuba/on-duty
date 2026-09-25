@@ -1,4 +1,6 @@
-# Deployment via Coolify
+# Deployment
+
+## Via Coolify
 
 Coolify konsumiert fertige Docker-Images aus ghcr.io — kein Build auf dem Server.
 `DATABASE_URL`, `BETTER_AUTH_SECRET` und `ADMIN_PASSWORD` werden von Coolify automatisch generiert (Magic Values in `docker-compose.prod.yml`).
@@ -63,3 +65,78 @@ git push --tags
 ## Rollback
 
 `APP_VERSION` auf die vorherige Version zurücksetzen → **Redeploy**.
+
+---
+
+## Via Docker Compose
+
+Direktes Deployment ohne Coolify — Docker und Docker Compose müssen auf dem Server installiert sein.
+Migrationen und Seed laufen beim Container-Start automatisch.
+
+### Prod-Server (direkt)
+
+#### Ersteinrichtung
+
+1. `docker-compose.prod.yml` aus dem Repo in ein Arbeitsverzeichnis auf dem Server kopieren.
+2. `.env.prod` im selben Verzeichnis anlegen — Vorlage: `.env.prod.example` im Repo.
+
+3. Starten:
+
+```bash
+docker compose --env-file .env.prod up -d
+```
+
+4. Logs prüfen:
+
+```bash
+docker compose logs -f app
+```
+
+#### Upgrade
+
+```bash
+# APP_VERSION in .env.prod auf neue Version setzen, dann:
+docker compose --env-file .env.prod pull && docker compose --env-file .env.prod up -d
+```
+
+#### Rollback
+
+`APP_VERSION` in `.env.prod` auf die vorherige Version zurücksetzen:
+
+```bash
+docker compose --env-file .env.prod pull && docker compose --env-file .env.prod up -d
+```
+
+---
+
+### Lokales Staging
+
+Zum lokalen Testen des Prod-Stacks im geklonten Repo:
+
+1. `.env.prod` im Repo-Root anlegen (Vorlage: `.env.prod.example`):
+
+```env
+# Staging — einfache Testwerte ausreichend
+APP_VERSION=latest
+
+POSTGRES_USER=onduty
+POSTGRES_DB=onduty
+SERVICE_PASSWORD_POSTGRES=testpassword       # lokal: beliebiger String
+
+SERVICE_PASSWORD_BETTERAUTH=testpassword     # lokal: beliebiger String
+SERVICE_PASSWORD_ADMIN=admin123
+
+ORG_NAME=Feuerwehr Test
+OIDC_PROVIDER=keycloak
+OIDC_CLIENT_ID=on-duty
+OIDC_CLIENT_SECRET=test
+OIDC_APP_URL=http://localhost:3000
+```
+
+2. Starten:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+```
+
+3. App läuft auf [http://localhost:3000](http://localhost:3000).
