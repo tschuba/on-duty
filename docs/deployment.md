@@ -133,10 +133,16 @@ OIDC_CLIENT_SECRET=test
 OIDC_APP_URL=http://localhost:3000
 ```
 
-2. Starten:
+2. Image lokal bauen:
+
+```bash
+docker build -t ghcr.io/tschuba/on-duty:latest .
+```
+
+3. Starten:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 ```
 
-3. App läuft auf [http://localhost:3000](http://localhost:3000).
+4. App läuft auf [http://localhost:3000](http://localhost:3000).
