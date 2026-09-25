@@ -7,8 +7,8 @@ export default defineConfig({
       reporter: ['text', 'json-summary', 'json'],
       include: ['src/**'],
       thresholds: {
-        lines: 0,
-        branches: 0,
+        lines: 4,
+        branches: 3,
       },
     },
   },
