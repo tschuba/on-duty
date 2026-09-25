@@ -9,18 +9,14 @@ DEFAULT="master"
 [[ $(git branch --show-current) == "$DEFAULT" ]] || { echo "Not on $DEFAULT"; exit 1; }
 [[ -z $(git status --porcelain) ]] || { echo "Dirty working tree"; exit 1; }
 
-# Preview
-OLD=$(node -p "require('./package.json').version")
-NEW=$(npx --yes semver -i "$TYPE" "$OLD")
-echo "  $OLD → $NEW"
-echo "  git commit 'chore: release v$NEW'"
-echo "  git tag v$NEW"
-echo "  git push origin master --tags"
+SCRIPT="$(dirname "$0")/do-release.sh"
+
+bash "$SCRIPT" --dry-run "$TYPE"
 read -rp "Fortfahren? (y/n) " CONFIRM
 [[ $CONFIRM == y ]] || exit 0
 
-bash "$(dirname "$0")/do-release.sh" "$TYPE"
+bash "$SCRIPT" "$TYPE"
 
 # Optional: GitHub Release
 read -rp "GitHub Release anlegen? (y/n) " GH
-[[ $GH == y ]] && gh release create "v$NEW" --generate-notes
+[[ $GH == y ]] && gh release create "v$(node -p "require('./package.json').version")" --generate-notes
