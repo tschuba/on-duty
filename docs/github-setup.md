@@ -15,3 +15,14 @@ Berechtigungen (Repository-spezifisch):
 **Secret hinterlegen:** Repository → Settings → Secrets and variables → Actions → New repository secret → Name: `REPO_SETTINGS_TOKEN`
 
 Danach einmalig den Workflow triggern: Actions → "Apply repo settings" → Run workflow.
+
+## `RELEASE_TOKEN` anlegen
+
+Wird von `.github/workflows/release.yml` benötigt, um nach dem Versions-Bump Commit und Tag zu pushen (triggert den nachgelagerten `docker-publish.yml`).
+
+**Token erstellen:** GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+
+Berechtigungen (Repository-spezifisch):
+- `Contents` → Read and write
+
+**Secret hinterlegen:** Repository → Settings → Secrets and variables → Actions → New repository secret → Name: `RELEASE_TOKEN`
