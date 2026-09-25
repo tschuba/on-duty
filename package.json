@@ -2,6 +2,7 @@
   "name": "on-duty",
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@12.5.1",
   "scripts": {
     "dev": "concurrently \"node --env-file=.env --import=tsx/esm --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
     "build": "tsc && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
@@ -12,6 +13,7 @@
     "db:setup": "pnpm db:migrate && pnpm db:seed",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs",
     "prepare": "git config core.hooksPath .githooks || true"
@@ -34,6 +36,7 @@
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
+    "@vitest/coverage-v8": "^5.0.1",
     "concurrently": "^9.1.0",
     "daisyui": "^5.0.0",
     "drizzle-kit": "^0.30.0",
