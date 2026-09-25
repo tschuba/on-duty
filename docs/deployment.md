@@ -1,4 +1,6 @@
-# Deployment via Coolify
+# Deployment
+
+## Via Coolify
 
 Coolify konsumiert fertige Docker-Images aus ghcr.io — kein Build auf dem Server.
 `DATABASE_URL`, `BETTER_AUTH_SECRET` und `ADMIN_PASSWORD` werden von Coolify automatisch generiert (Magic Values in `docker-compose.prod.yml`).
@@ -63,3 +65,105 @@ git push --tags
 ## Rollback
 
 `APP_VERSION` auf die vorherige Version zurücksetzen → **Redeploy**.
+
+---
+
+## Via Docker Compose
+
+Direktes Deployment ohne Coolify — Docker und Docker Compose müssen auf dem Server installiert sein.
+Migrationen und Seed laufen beim Container-Start automatisch.
+
+### Prod-Server (direkt)
+
+#### Ersteinrichtung
+
+1. `docker-compose.prod.yml` aus dem Repo in ein Arbeitsverzeichnis auf dem Server kopieren.
+2. `.env` im selben Verzeichnis anlegen:
+
+```env
+# Image
+APP_VERSION=1.0.0
+
+# Datenbank
+POSTGRES_USER=onduty
+POSTGRES_DB=onduty
+SERVICE_PASSWORD_POSTGRES=<sicheres-zufalls-passwort>  # openssl rand -hex 32
+
+# App-Secrets
+SERVICE_PASSWORD_BETTERAUTH=<sicheres-zufalls-passwort>  # openssl rand -hex 32
+SERVICE_PASSWORD_ADMIN=<admin-passwort>
+
+# App-Konfiguration
+ORG_NAME=Feuerwehr Musterstadt
+OIDC_PROVIDER=keycloak
+OIDC_CLIENT_ID=on-duty
+OIDC_CLIENT_SECRET=<client-secret>
+OIDC_APP_URL=https://on-duty.example.com  # kein trailing /
+
+# Optional (Defaults gelten wenn nicht gesetzt)
+# SESSION_LIFETIME=7d
+# BACKUP_SCHEDULE=0 2 * * 0
+# BACKUP_RETENTION_COUNT=4
+# ANNIVERSARY_CUTOFF=01-06
+```
+
+3. Starten:
+
+```bash
+docker compose up -d
+```
+
+4. Logs prüfen:
+
+```bash
+docker compose logs -f app
+```
+
+#### Upgrade
+
+```bash
+# APP_VERSION in .env auf neue Version setzen, dann:
+docker compose pull && docker compose up -d
+```
+
+#### Rollback
+
+`APP_VERSION` in `.env` auf die vorherige Version zurücksetzen:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+---
+
+### Lokales Staging
+
+Zum lokalen Testen des Prod-Stacks im geklonten Repo:
+
+1. `.env` im Repo-Root anlegen (wird von `docker-compose.prod.yml` gelesen):
+
+```env
+# Staging — einfache Testwerte ausreichend
+APP_VERSION=latest
+
+POSTGRES_USER=onduty
+POSTGRES_DB=onduty
+SERVICE_PASSWORD_POSTGRES=testpassword       # lokal: beliebiger String
+
+SERVICE_PASSWORD_BETTERAUTH=testpassword     # lokal: beliebiger String
+SERVICE_PASSWORD_ADMIN=admin123
+
+ORG_NAME=Feuerwehr Test
+OIDC_PROVIDER=keycloak
+OIDC_CLIENT_ID=on-duty
+OIDC_CLIENT_SECRET=test
+OIDC_APP_URL=http://localhost:3000
+```
+
+2. Starten:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+3. App läuft auf [http://localhost:3000](http://localhost:3000).
