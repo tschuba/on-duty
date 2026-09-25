@@ -1,7 +1,18 @@
 services:
   app:
     image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
-    restart: unless-stopped
+    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health > /dev/null"]
+      start_period: 20s
+      interval: 10s
+      timeout: 5s
+      retries: 3
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-onduty}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-onduty}
       BETTER_AUTH_SECRET: ${SERVICE_PASSWORD_BETTERAUTH}

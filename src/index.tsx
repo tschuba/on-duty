@@ -17,6 +17,8 @@ validateEnv();
 
 const app = new Hono<{ Variables: Variables }>();
 
+app.get("/health", (c) => c.text("ok"));
+
 // Static assets
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
