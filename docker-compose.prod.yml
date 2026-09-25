@@ -33,7 +33,7 @@ services:
       POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
       POSTGRES_DB: ${POSTGRES_DB:-onduty}
     volumes:
-      - onduty_pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onduty} -d ${POSTGRES_DB:-onduty}"]
       interval: 5s
@@ -42,4 +42,4 @@ services:
       start_period: 10s
 
 volumes:
-  onduty_pgdata:
+  pgdata:
