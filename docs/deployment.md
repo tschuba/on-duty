@@ -1,6 +1,7 @@
 # Deployment via Coolify
 
 Coolify konsumiert fertige Docker-Images aus ghcr.io — kein Build auf dem Server.
+`DATABASE_URL`, `BETTER_AUTH_SECRET` und `ADMIN_PASSWORD` werden von Coolify automatisch generiert (Magic Values in `docker-compose.prod.yml`).
 
 ## Ersteinrichtung
 
@@ -12,26 +13,41 @@ Coolify konsumiert fertige Docker-Images aus ghcr.io — kein Build auf dem Serv
 
 ### 2. Umgebungsvariablen setzen
 
-Unter **Environment Variables** eintragen (kein `.env`-File — alle Vars kommen aus Coolify):
+Coolify generiert automatisch (keine manuelle Eingabe nötig):
 
-| Variable | Beispiel | Pflicht |
+| Variable | Generiert als |
+|---|---|
+| `DATABASE_URL` | aus `SERVICE_PASSWORD_POSTGRES` zusammengesetzt |
+| `BETTER_AUTH_SECRET` | `SERVICE_PASSWORD_BETTERAUTH` |
+| `ADMIN_PASSWORD` | `SERVICE_PASSWORD_ADMIN` |
+| `POSTGRES_PASSWORD` | `SERVICE_PASSWORD_POSTGRES` |
+
+Manuell setzen unter **Environment Variables**:
+
+| Variable | Beispiel | Beschreibung |
 |---|---|---|
-| `APP_VERSION` | `latest` | ja |
-| `APP_URL` | `https://on-duty.example.com` | ja |
-| `SESSION_SECRET` | (langer Zufalls-String) | ja |
-| `ADMIN_PASSWORD` | | ja |
-| `OIDC_CLIENT_ID` | | ja, wenn OIDC aktiv |
-| `OIDC_CLIENT_SECRET` | | ja, wenn OIDC aktiv |
-| `OIDC_ISSUER` | | ja, wenn OIDC aktiv |
-| `POSTGRES_PASSWORD` | | ja |
-| `POSTGRES_USER` | `onduty` | nein (Default) |
-| `POSTGRES_DB` | `onduty` | nein (Default) |
+| `ORG_NAME` | `Feuerwehr Musterstadt` | Anzeigename in der App |
+| `OIDC_PROVIDER` | `keycloak` | OIDC-Provider-Name |
+| `OIDC_CLIENT_ID` | | Client-ID aus dem Provider |
+| `OIDC_CLIENT_SECRET` | | Client-Secret aus dem Provider |
+| `OIDC_APP_URL` | `https://on-duty.example.com` | Öffentliche App-URL (kein trailing `/`) |
+
+Optional (Defaults in der App):
+
+| Variable | Default | Beschreibung |
+|---|---|---|
+| `APP_VERSION` | `latest` | Image-Tag |
+| `POSTGRES_USER` | `onduty` | DB-Benutzername |
+| `POSTGRES_DB` | `onduty` | DB-Name |
+| `SESSION_LIFETIME` | `7d` | Session-Gültigkeitsdauer |
+| `BACKUP_SCHEDULE` | `0 2 * * 0` | Cron-Ausdruck für automatisches Backup |
+| `BACKUP_RETENTION_COUNT` | `4` | Anzahl aufbewahrter Backups |
+| `ANNIVERSARY_CUTOFF` | `01-06` | Stichtag für Jubiläumsberechnung (MM-DD) |
 
 ### 3. Erste Version deployen
 
-1. `APP_VERSION=latest` setzen (oder eine konkrete Version wie `1.0.0`)
-2. **Deploy** klicken
-3. Logs abwarten — Drizzle-Migrationen laufen beim Container-Start automatisch
+1. **Deploy** klicken
+2. Logs abwarten — Drizzle-Migrationen laufen beim Container-Start automatisch
 
 ## Upgrade
 
