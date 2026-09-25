@@ -408,7 +408,7 @@ adminRoutes.post("/users", guard, async (c) => {
     id: crypto.randomUUID(),
     name,
     email,
-    emailVerified: false,
+    emailVerified: true,
     appRole,
     disabled: false,
     createdAt: now,
