@@ -1,13 +1,12 @@
 import { eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
-import { getCookie, setCookie } from "hono/cookie";
+import { setCookie } from "hono/cookie";
 import { auth, type AppUser } from "../auth.js";
 import { db } from "../db/index.js";
 import { sessions } from "../db/schema/index.js";
+import { hasRequiredRole, type AppRole } from "../lib/roles.js";
 
-export type AppRole = "read" | "editor" | "admin";
-const ROLE_ORDER: AppRole[] = ["read", "editor", "admin"];
-
+export type { AppRole };
 export type Variables = { user: AppUser };
 
 export function requireAuth(minRole: AppRole = "read") {
@@ -26,7 +25,7 @@ export function requireAuth(minRole: AppRole = "read") {
       return c.redirect("/login?error=disabled");
     }
 
-    if (ROLE_ORDER.indexOf(user.appRole as AppRole) < ROLE_ORDER.indexOf(minRole)) {
+    if (!hasRequiredRole(user.appRole, minRole)) {
       return c.html("<h1>403 Zugriff verweigert</h1>", 403);
     }
 
