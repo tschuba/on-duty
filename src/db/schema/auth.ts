@@ -1,5 +1,6 @@
 import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+/* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 // Better Auth standard schema — table names match Better Auth's defaults
 export const users = pgTable("user", {
   id: text("id").primaryKey(),
@@ -53,3 +54,4 @@ export const verifications = pgTable("verification", {
   createdAt: timestamp("created_at"),
   updatedAt: timestamp("updated_at"),
 });
+/* v8 ignore stop */

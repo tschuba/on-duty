@@ -1,6 +1,7 @@
 import { boolean, date, integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
+/* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const memberRoles = pgTable("member_roles", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
@@ -25,3 +26,4 @@ export const anniversaryYears = pgTable("anniversary_years", {
   year: integer("year").primaryKey(),
   title: text("title"),
 });
+/* v8 ignore stop */

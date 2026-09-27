@@ -1,5 +1,6 @@
 import { pgEnum, pgTable, text, date, uuid } from "drizzle-orm/pg-core";
 
+/* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const genderEnum = pgEnum("gender", ["male", "female"]);
 
 export const members = pgTable("members", {
@@ -18,3 +19,4 @@ export const members = pgTable("members", {
   phone: text("phone"),
   email: text("email"),
 });
+/* v8 ignore stop */
