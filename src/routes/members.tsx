@@ -56,7 +56,7 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
 type SortKey = "lastName" | "birthDate" | "entryDate";
 const DATE_SORT_KEYS: SortKey[] = ["birthDate", "entryDate"];
 
-function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" | "desc"): MemberWithStatus[] {
+export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" | "desc"): MemberWithStatus[] {
   return [...list].sort((a, b) => {
     let cmp = 0;
     if (sort === "lastName") {
@@ -104,12 +104,12 @@ function formatDate(d: string | null | undefined): string {
   return `${day}.${m}.${y}`;
 }
 
-function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "asc" | "desc" }) {
+export function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
 
-function StatsCards({ all }: { all: MemberWithStatus[] }) {
+export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, archiviert: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
     const subset = all.filter((m) => m.status === status);
@@ -160,7 +160,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
   );
 }
 
-function MembersTable({
+export function MembersTable({
   items, sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, isEditor,
 }: {
   items: MemberWithStatus[];
@@ -603,29 +603,47 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
   );
 }
 
-// ── Routes ───────────────────────────────────────────────────────────────────
+// ── List query parsing ──────────────────────────────────────────────────────
 
-// GET /members — list
-memberRoutes.get("/", requireAuth("read"), async (c) => {
-  const user = c.get("user");
-  const q = c.req.query();
+export type ListQuery = {
+  search: string;
+  sort: SortKey;
+  dir: "asc" | "desc";
+  statusFilter: MemberStatus[];
+  roleFilter: string[];
+  page: number;
+  pageSize: number;
+};
+
+export function parseListQuery(q: Record<string, string>, statusRaw: string[], roleFilterRaw: string[]): ListQuery {
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
-  const statusRaw = c.req.queries("status") ?? [];
   const statusParsed = (statusRaw.length === 1 && statusRaw[0]?.includes(",")
     ? statusRaw[0].split(",")
     : statusRaw).filter(Boolean);
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
     : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
-  const roleFilterRaw = c.req.queries("role") ?? [];
   // ponytail: hx-vals sends comma-joined or empty string; normalise to clean array
   const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
     ? roleFilterRaw[0].split(",")
     : roleFilterRaw).filter(Boolean);
   const page = Math.max(1, Number(q.page) || 1);
   const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+
+  return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
+}
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
+// GET /members — list
+memberRoutes.get("/", requireAuth("read"), async (c) => {
+  const user = c.get("user");
+  const q = c.req.query();
+  const { search, sort, dir, statusFilter, roleFilter, page, pageSize } = parseListQuery(
+    q, c.req.queries("status") ?? [], c.req.queries("role") ?? []
+  );
 
   const [all, allRoles] = await Promise.all([
     fetchMembersWithStatus(search || undefined),
@@ -933,18 +951,18 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
   return c.redirect(saveAndNew ? "/members/new" : "/members");
 });
 
-// GET /members/export — xlsx download
-memberRoutes.get("/export", requireAuth("read"), async (c) => {
-  const q = c.req.query();
-  const opts = {
-    addr: q.addr === "1",
-    contact: q.contact === "1",
-    dates: q.dates === "1",
-    gender: q.gender === "1",
-    assignments: q.assignments === "1",
-  };
+// ── Export sheet building ───────────────────────────────────────────────────
 
-  const allMembers = (await db.select().from(members)).sort((a, b) => {
+export type ExportOptions = { addr: boolean; contact: boolean; dates: boolean; gender: boolean; assignments: boolean };
+export type ExportAssignmentRow = { memberId: string; roleTitle: string; from: string | null; to: string | null };
+export type ExportSheet = { name: string; header: string[]; rows: (string | Date | null)[][] };
+
+export function buildExportSheets(
+  rawMembers: Member[],
+  rawAssignments: ExportAssignmentRow[],
+  opts: ExportOptions
+): ExportSheet[] {
+  const allMembers = [...rawMembers].sort((a, b) => {
     const cmp = a.lastName.localeCompare(b.lastName, "de");
     return cmp !== 0 ? cmp : a.firstName.localeCompare(b.firstName, "de");
   });
@@ -967,21 +985,11 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
     return row;
   });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), t("members.export.sheetMembers"));
+  const sheets: ExportSheet[] = [{ name: t("members.export.sheetMembers"), header, rows }];
 
   if (opts.assignments) {
-    const asgns = await db.select({
-      memberId: memberRoleAssignments.memberId,
-      roleTitle: memberRoles.title,
-      from: memberRoleAssignments.from,
-      to: memberRoleAssignments.to,
-    })
-      .from(memberRoleAssignments)
-      .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId));
-
     const nameMap = new Map(allMembers.map((m) => [m.id, m]));
-    asgns.sort((a, b) => {
+    const asgns = [...rawAssignments].sort((a, b) => {
       const ma = nameMap.get(a.memberId)!, mb = nameMap.get(b.memberId)!;
       const cmp = ma.lastName.localeCompare(mb.lastName, "de");
       if (cmp !== 0) return cmp;
@@ -994,7 +1002,40 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
       const m = nameMap.get(a.memberId);
       return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), t("members.export.sheetAssignments"));
+    sheets.push({ name: t("members.export.sheetAssignments"), header: asgHeader, rows: asgRows });
+  }
+
+  return sheets;
+}
+
+// GET /members/export — xlsx download
+memberRoutes.get("/export", requireAuth("read"), async (c) => {
+  const q = c.req.query();
+  const opts: ExportOptions = {
+    addr: q.addr === "1",
+    contact: q.contact === "1",
+    dates: q.dates === "1",
+    gender: q.gender === "1",
+    assignments: q.assignments === "1",
+  };
+
+  const allMembers = await db.select().from(members);
+  const rawAssignments: ExportAssignmentRow[] = opts.assignments
+    ? await db.select({
+        memberId: memberRoleAssignments.memberId,
+        roleTitle: memberRoles.title,
+        from: memberRoleAssignments.from,
+        to: memberRoleAssignments.to,
+      })
+        .from(memberRoleAssignments)
+        .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId))
+    : [];
+
+  const sheets = buildExportSheets(allMembers, rawAssignments, opts);
+
+  const wb = XLSX.utils.book_new();
+  for (const sheet of sheets) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([sheet.header, ...sheet.rows]), sheet.name);
   }
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
