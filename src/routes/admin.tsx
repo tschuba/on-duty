@@ -19,7 +19,7 @@ import { Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
-import { PERMISSIONS, type Permission } from "../lib/roles.js";
+import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
@@ -32,6 +32,11 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "members:read": t("admin.permissions.key.membersRead"),
   "members:write": t("admin.permissions.key.membersWrite"),
   "system:admin": t("admin.permissions.key.systemAdmin"),
+};
+
+const RESOURCE_LABELS: Record<string, string> = {
+  members: t("admin.permissions.resource.members"),
+  system: t("admin.permissions.resource.system"),
 };
 
 function setFlash(c: any, msg: string, type: "success" | "error") {
@@ -129,9 +134,27 @@ function UserRoleBadges({ roles }: { roles: string[] }) {
 function PermissionBadges({ permissions }: { permissions: Permission[] }) {
   return (
     <div class="flex flex-wrap gap-1">
-      {permissions.map((p) => (
-        <span key={p} class="badge badge-outline badge-sm whitespace-nowrap">{PERMISSION_LABELS[p]}</span>
-      ))}
+      {groupPermissionsForBadges(permissions).map((g) => {
+        if (g.kind === "full") {
+          return (
+            <span key="full" class="badge badge-primary badge-sm whitespace-nowrap">
+              {t("admin.permissions.badge.full")}
+            </span>
+          );
+        }
+        if (g.kind === "resource-full") {
+          return (
+            <span key={g.resource} class="badge badge-outline badge-primary badge-sm whitespace-nowrap">
+              {t("admin.permissions.badge.resourceFull", { resource: RESOURCE_LABELS[g.resource] ?? g.resource })}
+            </span>
+          );
+        }
+        return (
+          <span key={g.permission} class="badge badge-outline badge-sm whitespace-nowrap">
+            {PERMISSION_LABELS[g.permission]}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -309,13 +332,25 @@ adminRoutes.get("/users", guard, async (c) => {
   );
 });
 
-function RoleCheckboxes({ allRoles, checkedIds }: { allRoles: { id: string; name: string }[]; checkedIds: Set<string> }) {
+function RoleCheckboxes({
+  allRoles,
+  permsByRole,
+  checkedIds,
+}: {
+  allRoles: { id: string; name: string; description: string | null }[];
+  permsByRole: Map<string, Permission[]>;
+  checkedIds: Set<string>;
+}) {
   return (
     <div class="flex flex-col gap-2">
       {allRoles.map((r) => (
-        <label key={r.id} class="flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
-          <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm" checked={checkedIds.has(r.id)} />
-          <span class="font-medium text-sm">{r.name}</span>
+        <label key={r.id} class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
+          <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm mt-1" checked={checkedIds.has(r.id)} />
+          <div class="flex flex-col gap-1">
+            <span class="font-medium text-sm">{r.name}</span>
+            {r.description && <span class="text-xs opacity-60">{r.description}</span>}
+            <PermissionBadges permissions={permsByRole.get(r.id) ?? []} />
+          </div>
         </label>
       ))}
     </div>
@@ -324,7 +359,12 @@ function RoleCheckboxes({ allRoles, checkedIds }: { allRoles: { id: string; name
 
 // HTMX fragment: create user modal
 adminRoutes.get("/users/new", guard, async (c) => {
-  const allRoles = await db.select({ id: appRoles.id, name: appRoles.name }).from(appRoles).orderBy(asc(appRoles.name));
+  const [allRoles, permRows] = await Promise.all([
+    db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
+    db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
+  ]);
+  const permsByRole = new Map<string, Permission[]>();
+  for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
 
   return c.html(
     <>
@@ -340,7 +380,7 @@ adminRoutes.get("/users/new", guard, async (c) => {
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
-          <RoleCheckboxes allRoles={allRoles} checkedIds={new Set()} />
+          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={new Set()} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -366,10 +406,13 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const [u] = await db.select().from(users).where(eq(users.id, id));
   if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
 
-  const [allRoles, assigned] = await Promise.all([
-    db.select({ id: appRoles.id, name: appRoles.name }).from(appRoles).orderBy(asc(appRoles.name)),
+  const [allRoles, permRows, assigned] = await Promise.all([
+    db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
+    db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
     db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id)),
   ]);
+  const permsByRole = new Map<string, Permission[]>();
+  for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
   const checkedIds = new Set(assigned.map((a) => a.roleId));
 
   return c.html(
@@ -391,7 +434,7 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
-          <RoleCheckboxes allRoles={allRoles} checkedIds={checkedIds} />
+          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={checkedIds} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -673,13 +716,37 @@ adminRoutes.get("/permissions", guard, async (c) => {
 });
 
 function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
+  const groups = new Map<string, Permission[]>();
+  for (const p of ASSIGNABLE_PERMISSIONS) {
+    const resource = p.split(":")[0];
+    groups.set(resource, [...(groups.get(resource) ?? []), p]);
+  }
+
   return (
-    <div class="grid grid-cols-1 gap-1">
-      {ASSIGNABLE_PERMISSIONS.map((p) => (
-        <label key={p} class="label cursor-pointer justify-start gap-3">
-          <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
-          <span class="label-text">{PERMISSION_LABELS[p]}</span>
-        </label>
+    <div class="flex flex-col gap-3">
+      {[...groups].map(([resource, perms]) => (
+        <div key={resource} class="perm-group">
+          <div class="flex items-center justify-between mb-1">
+            <span class="label-text font-semibold">{RESOURCE_LABELS[resource] ?? resource}</span>
+            {perms.length > 1 && (
+              <button
+                type="button"
+                class="btn btn-outline btn-primary btn-xs"
+                onclick="this.closest('.perm-group').querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=true;})"
+              >
+                {t("admin.permissions.modal.selectAllInGroup")}
+              </button>
+            )}
+          </div>
+          <div class="grid grid-cols-1 gap-1">
+            {perms.map((p) => (
+              <label key={p} class="label cursor-pointer justify-start gap-3">
+                <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
+                <span class="label-text">{PERMISSION_LABELS[p]}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -694,6 +761,10 @@ adminRoutes.get("/permissions/new", guard, (c) => {
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
           <span class="label-text text-right">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" class="input input-bordered w-full" required />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
+          <textarea name="description" rows={2} class="textarea textarea-bordered w-full" />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
@@ -744,6 +815,10 @@ adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
           )}
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
+          <textarea name="description" rows={2} class="textarea textarea-bordered w-full">{role.description ?? ""}</textarea>
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
           <PermissionCheckboxes checked={checked} />
         </div>
@@ -770,6 +845,7 @@ function parsePermissions(body: Record<string, unknown>): Permission[] {
 adminRoutes.post("/permissions", guard, async (c) => {
   const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
+  const description = String(body.description ?? "").trim() || null;
   const permissions = parsePermissions(body);
 
   if (!name) {
@@ -778,7 +854,7 @@ adminRoutes.post("/permissions", guard, async (c) => {
   }
 
   const id = crypto.randomUUID();
-  await db.insert(appRoles).values({ id, name, isProtected: false });
+  await db.insert(appRoles).values({ id, name, description, isProtected: false });
   if (permissions.length > 0) {
     await db.insert(appRolePermissions).values(permissions.map((permission) => ({ roleId: id, permission })));
   }
@@ -795,17 +871,20 @@ adminRoutes.post("/permissions/:id", guard, async (c) => {
 
   const body = await c.req.parseBody({ all: true });
   const permissions = parsePermissions(body);
+  const description = String(body.description ?? "").trim() || null;
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
 
+  const updates: { name?: string; description: string | null } = { description };
   if (cnt === 0) {
     const name = String(body.name ?? "").trim();
     if (!name) {
       setFlash(c, t("admin.permissions.flash.requiredName"), "error");
       return c.redirect("/admin/permissions");
     }
-    await db.update(appRoles).set({ name }).where(eq(appRoles.id, id));
+    updates.name = name;
   }
+  await db.update(appRoles).set(updates).where(eq(appRoles.id, id));
 
   await db.delete(appRolePermissions).where(eq(appRolePermissions.roleId, id));
   if (permissions.length > 0) {

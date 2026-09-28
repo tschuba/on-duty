@@ -155,6 +155,8 @@ export const de = {
   "admin.permissions.modal.nameLabel": "Anzeigename",
   "admin.permissions.modal.nameLocked": "Anzeigename kann nicht mehr geändert werden, da bereits Zuweisungen existieren.",
   "admin.permissions.modal.permissionsLabel": "Berechtigungen",
+  "admin.permissions.modal.descriptionLabel": "Beschreibung",
+  "admin.permissions.modal.selectAllInGroup": "Alle auswählen",
   "admin.permissions.flash.created": "Rolle „{name}“ angelegt.",
   "admin.permissions.flash.saved": "Rolle gespeichert.",
   "admin.permissions.flash.deleted": "Rolle „{name}“ gelöscht.",
@@ -164,6 +166,10 @@ export const de = {
   "admin.permissions.key.membersRead": "Mitglieder ansehen",
   "admin.permissions.key.membersWrite": "Mitglieder anlegen und bearbeiten",
   "admin.permissions.key.systemAdmin": "Systemverwaltung (Benutzer, Rollen, Konfiguration)",
+  "admin.permissions.badge.full": "Unbeschränkter Vollzugriff",
+  "admin.permissions.badge.resourceFull": "{resource}: Vollzugriff",
+  "admin.permissions.resource.members": "Mitglieder",
+  "admin.permissions.resource.system": "Systemverwaltung",
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",

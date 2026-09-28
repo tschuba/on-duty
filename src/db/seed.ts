@@ -13,22 +13,25 @@ import {
 } from "./schema/index.js";
 import type { Permission } from "../lib/roles.js";
 
-const APP_ROLES: { id: string; name: string; isProtected: boolean; permissions: Permission[] }[] = [
+const APP_ROLES: { id: string; name: string; description: string; isProtected: boolean; permissions: Permission[] }[] = [
   {
     id: "9b1f6c2a-4b3a-4b3a-8b3a-1a2b3c4d5e6f",
     name: "Administrator",
+    description: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration",
     isProtected: true,
     permissions: ["members:read", "members:write", "system:admin"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
     name: "Bearbeiter",
+    description: "Kann Mitglieder anlegen und bearbeiten",
     isProtected: true,
     permissions: ["members:read", "members:write"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
     name: "Leser",
+    description: "Kann Mitglieder einsehen",
     isProtected: true,
     permissions: ["members:read"],
   },
@@ -71,7 +74,7 @@ export async function runSeed() {
     ]).onConflictDoNothing();
 
     await db.insert(appRoles).values(
-      APP_ROLES.map(({ id, name, isProtected }) => ({ id, name, isProtected })),
+      APP_ROLES.map(({ id, name, description, isProtected }) => ({ id, name, description, isProtected })),
     ).onConflictDoNothing();
 
     await db.insert(appRolePermissions).values(

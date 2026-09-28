@@ -64,6 +64,13 @@
       "when": 1790604037544,
       "tag": "0008_rbac_role_system",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790605385272,
+      "tag": "0009_add_role_description",
+      "breakpoints": true
     }
   ]
 }

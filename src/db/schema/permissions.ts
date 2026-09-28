@@ -9,6 +9,7 @@ export const permissionEnum = pgEnum("permission", ["members:read", "members:wri
 export const appRoles = pgTable("app_roles", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  description: text("description"),
   isProtected: boolean("is_protected").notNull().default(false),
 });
 
