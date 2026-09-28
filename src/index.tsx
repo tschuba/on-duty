@@ -10,6 +10,8 @@ import { loginRoutes } from "./routes/login.js";
 import { memberRoutes } from "./routes/members.js";
 import { adminRoutes } from "./routes/admin.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
+import { donationRoutes } from "./routes/donations.js";
+import { donorRoutes } from "./routes/donors.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -51,6 +53,10 @@ app.route("/members", memberRoutes);
 
 // Anniversary routes
 app.route("/anniversaries", anniversaryRoutes);
+
+// Donation routes
+app.route("/donations", donationRoutes);
+app.route("/donors", donorRoutes);
 
 // Admin routes
 app.route("/admin", adminRoutes);

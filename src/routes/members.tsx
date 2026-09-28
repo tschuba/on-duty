@@ -16,7 +16,9 @@ export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 type Person = typeof persons.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
-type Member = Omit<Person, "id"> & MemberRow;
+// birthDate is nullable in `persons` (donor-only persons need none) but this route's
+// own form validation always requires it for a member — re-asserted non-null here.
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };

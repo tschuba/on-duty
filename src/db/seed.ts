@@ -19,7 +19,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration",
     isProtected: true,
-    permissions: ["members:read", "members:write", "system:admin"],
+    permissions: ["members:read", "members:write", "system:admin", "donations:manage"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
@@ -35,9 +35,16 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     isProtected: true,
     permissions: ["members:read"],
   },
-  // Vorstand and Führung are seeded again once the feature that gives them a distinct
-  // permission set ships (donations:manage / inventory+training:*) — see backlog docs
-  // 09-11. Seeding them empty now would just duplicate "Leser".
+  {
+    id: "4a2b5c6d-7e8f-4a1b-9c2d-3e4f5a6b7c8d",
+    name: "Vorstand",
+    description: "Kann Spenden erfassen und Zuwendungsbestätigungen ausstellen",
+    isProtected: true,
+    permissions: ["donations:manage"],
+  },
+  // Führung is seeded again once the feature that gives it a distinct permission set
+  // ships (inventory+training:*) — see backlog doc 11. Seeding it empty now would
+  // just duplicate "Leser".
 ];
 
 export async function runSeed() {

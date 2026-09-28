@@ -3,7 +3,7 @@ import { groupPermissionsForBadges } from "../lib/roles.js";
 
 describe("groupPermissionsForBadges", () => {
   it("collapses every permission into one full-access badge", () => {
-    expect(groupPermissionsForBadges(["members:read", "members:write", "system:admin"])).toEqual([
+    expect(groupPermissionsForBadges(["members:read", "members:write", "system:admin", "donations:manage"])).toEqual([
       { kind: "full" },
     ]);
   });

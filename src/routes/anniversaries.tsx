@@ -16,7 +16,9 @@ export const anniversaryRoutes = new Hono<{ Variables: Variables }>();
 
 type Person = typeof persons.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
-type Member = Omit<Person, "id"> & MemberRow;
+// birthDate is nullable in `persons` (donor-only persons need none) but every
+// member is guaranteed one at the app layer (members.tsx form validation).
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 

@@ -1,6 +1,10 @@
-import type { members, memberRoleAssignments, memberRoles, persons } from "../db/schema/index.js";
+import type { members, memberRoleAssignments, memberRoles } from "../db/schema/index.js";
 
-type Member = typeof members.$inferSelect & Pick<typeof persons.$inferSelect, "birthDate">;
+// birthDate is nullable in `persons` (donor-only persons need none) but every
+// `members` row's owning person is required to have one at the app layer
+// (members.tsx form validation) — so it's re-asserted non-null here rather
+// than inherited as `string | null` from the schema type.
+type Member = typeof members.$inferSelect & { birthDate: string };
 type Assignment = typeof memberRoleAssignments.$inferSelect & {
   role: typeof memberRoles.$inferSelect;
 };
