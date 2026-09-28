@@ -340,11 +340,13 @@ export const de = {
   "admin.orgConfig.field.taxExemptionDate": "Datum des Freistellungsbescheids",
   "admin.orgConfig.field.taxExemptionNumber": "Nummer des Freistellungsbescheids",
   "admin.orgConfig.field.taxOffice": "Zuständiges Finanzamt",
-  "admin.orgConfig.field.taxAssessmentPeriod": "Veranlagungszeitraum",
+  "admin.orgConfig.field.taxAssessmentPeriodFrom": "Veranlagungszeitraum von",
+  "admin.orgConfig.field.taxAssessmentPeriodTo": "Veranlagungszeitraum bis",
   "admin.orgConfig.field.charitablePurpose": "Begünstigter Zweck (Satzungszweck)",
   "admin.orgConfig.field.iban": "IBAN",
   "admin.orgConfig.field.bic": "BIC",
   "admin.orgConfig.flash.saved": "Organisationsdaten gespeichert.",
+  "admin.orgConfig.flash.invalidPeriod": "Veranlagungszeitraum bis muss nach Veranlagungszeitraum von liegen.",
 
   // ── Admin – Backup ───────────────────────────────────────────────────────────
   "admin.backup.title": "Backup-History",

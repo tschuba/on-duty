@@ -1532,7 +1532,8 @@ const ORG_CONFIG_FIELDS = [
   { key: "taxExemptionDate", type: "date", section: "tax" },
   { key: "taxExemptionNumber", type: "text", section: "tax" },
   { key: "taxOffice", type: "text", section: "tax" },
-  { key: "taxAssessmentPeriod", type: "text", section: "tax" },
+  { key: "taxAssessmentPeriodFrom", type: "number", section: "tax" },
+  { key: "taxAssessmentPeriodTo", type: "number", section: "tax" },
   { key: "charitablePurpose", type: "text", section: "tax" },
   { key: "iban", type: "text", section: "bank" },
   { key: "bic", type: "text", section: "bank" },
@@ -1553,7 +1554,8 @@ const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
   taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
   taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
   taxOffice: t("admin.orgConfig.field.taxOffice"),
-  taxAssessmentPeriod: t("admin.orgConfig.field.taxAssessmentPeriod"),
+  taxAssessmentPeriodFrom: t("admin.orgConfig.field.taxAssessmentPeriodFrom"),
+  taxAssessmentPeriodTo: t("admin.orgConfig.field.taxAssessmentPeriodTo"),
   charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
   iban: t("admin.orgConfig.field.iban"),
   bic: t("admin.orgConfig.field.bic"),
@@ -1618,9 +1620,10 @@ adminRoutes.get("/org-config", guard, async (c) => {
                 {field("taxExemptionDate", "date")}
                 {field("taxExemptionNumber", "text")}
               </div>
-              <div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
-                {field("taxOffice", "text")}
-                {field("taxAssessmentPeriod", "text")}
+              {field("taxOffice", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("taxAssessmentPeriodFrom", "number")}
+                {field("taxAssessmentPeriodTo", "number")}
               </div>
               {field("charitablePurpose", "text")}
             </div>
@@ -1642,6 +1645,14 @@ adminRoutes.get("/org-config", guard, async (c) => {
 
 adminRoutes.post("/org-config", guard, async (c) => {
   const body = await c.req.parseBody();
+
+  const periodFrom = String(body.taxAssessmentPeriodFrom ?? "").trim();
+  const periodTo = String(body.taxAssessmentPeriodTo ?? "").trim();
+  if (periodFrom && periodTo && Number(periodTo) < Number(periodFrom)) {
+    setFlash(c, t("admin.orgConfig.flash.invalidPeriod"), "error");
+    return c.redirect("/admin/org-config");
+  }
+
   for (const field of ORG_CONFIG_FIELDS) {
     const value = normalizeOrgConfigValue(field.key, String(body[field.key] ?? "").trim());
     if (value) {

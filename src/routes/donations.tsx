@@ -69,6 +69,10 @@ function buildReceiptXml(d: DonationWithDonor, config: Record<string, string>): 
   const datum = `${formatDate(d.date)} 00:00:00`;
   const datum2 = `${formatDate(config.taxExemptionDate)} 00:00:00`;
   const ortDatum = `${config.orgCity}, ${formatDateObj(d.receiptIssuedAt ?? new Date())}`;
+  const zeitraum =
+    config.taxAssessmentPeriodFrom === config.taxAssessmentPeriodTo
+      ? config.taxAssessmentPeriodFrom
+      : `${config.taxAssessmentPeriodFrom} bis ${config.taxAssessmentPeriodTo}`;
 
   const elements = [
     xmlEl("aussteller", aussteller),
@@ -83,7 +87,7 @@ function buildReceiptXml(d: DonationWithDonor, config: Record<string, string>): 
     xmlEl("finamt", config.taxOffice),
     xmlEl("stnr", config.taxExemptionNumber),
     xmlEl("datum2", datum2),
-    xmlEl("zeitraum", config.taxAssessmentPeriod),
+    xmlEl("zeitraum", zeitraum),
     xmlEl("k4", "false"),
     xmlEl("zwecke", config.charitablePurpose),
     xmlEl("k5", "true"),

@@ -7,7 +7,7 @@ import { orgConfig } from "../db/schema/index.js";
 // check completeness before rendering.
 const REQUIRED_RECEIPT_FIELDS = [
   "orgName", "orgStreet", "orgHouseNumber", "orgZip", "orgCity",
-  "taxExemptionDate", "taxExemptionNumber", "taxOffice", "taxAssessmentPeriod", "charitablePurpose",
+  "taxExemptionDate", "taxExemptionNumber", "taxOffice", "taxAssessmentPeriodFrom", "taxAssessmentPeriodTo", "charitablePurpose",
 ] as const;
 
 export async function loadOrgConfig(): Promise<Record<string, string>> {
