@@ -1582,10 +1582,15 @@ adminRoutes.get("/org-config", guard, async (c) => {
       <BackupWarnBanner {...warn} />
       <AdminTabs active="org-config" />
       <div class="max-w-4xl mx-auto">
-        <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
-          {t("admin.orgConfig.title")}
-        </h1>
-        <form method="post" action="/admin/org-config" class="flex flex-col gap-6">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+            {t("admin.orgConfig.title")}
+          </h1>
+          <button type="submit" form="org-config-form" class="btn btn-primary btn-sm">
+            {t("common.save")}
+          </button>
+        </div>
+        <form id="org-config-form" method="post" action="/admin/org-config" class="flex flex-col gap-6">
           <div class="card bg-base-200 shadow">
             <div class="card-body gap-4">
               <h2 class="card-title">{ORG_CONFIG_SECTIONS[0].title}</h2>
@@ -1618,11 +1623,6 @@ adminRoutes.get("/org-config", guard, async (c) => {
                 {field("bic", "text")}
               </div>
             </div>
-          </div>
-          <div>
-            <button type="submit" class="btn btn-primary">
-              {t("common.save")}
-            </button>
           </div>
         </form>
       </div>
