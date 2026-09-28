@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
-import { members } from "./members.js";
-import { memberRoleAssignments, memberRoles } from "./roles.js";
+import { members } from "./members";
+import { memberRoleAssignments, memberRoles } from "./roles";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
 export const membersRelations = relations(members, ({ many }) => ({

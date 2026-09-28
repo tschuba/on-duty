@@ -638,7 +638,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // GET /members — list
-memberRoutes.get("/", requireAuth("read"), async (c) => {
+memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const q = c.req.query();
   const { search, sort, dir, statusFilter, roleFilter, page, pageSize } = parseListQuery(
@@ -659,7 +659,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
 
-  const isEditor = user.appRole === "editor" || user.appRole === "admin";
+  const isEditor = user.permissions.has("members:write");
   const isHtmx = c.req.header("HX-Request") === "true";
 
   const tableEl = (
@@ -761,7 +761,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
 });
 
 // GET /members/new — new member form
-memberRoutes.get("/new", requireAuth("editor"), async (c) => {
+memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   return c.html(
@@ -815,14 +815,14 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
 });
 
 // GET /members/role-row — HTMX fragment: one assignment row
-memberRoutes.get("/role-row", requireAuth("editor"), async (c) => {
+memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   const index = Number(c.req.query("index") ?? 0);
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   return c.html(<RoleRow index={index} roles={roles} />);
 });
 
 // POST /members/new — create member
-memberRoutes.post("/new", requireAuth("editor"), async (c) => {
+memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
@@ -1009,7 +1009,7 @@ export function buildExportSheets(
 }
 
 // GET /members/export — xlsx download
-memberRoutes.get("/export", requireAuth("read"), async (c) => {
+memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const q = c.req.query();
   const opts: ExportOptions = {
     addr: q.addr === "1",
@@ -1048,12 +1048,12 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
 });
 
 // GET /members/:id — view or edit
-memberRoutes.get("/:id", requireAuth("read"), async (c) => {
+memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const m = await fetchMember(c.req.param("id"));
   if (!m) return c.notFound();
 
-  const isEditor = user.appRole === "editor" || user.appRole === "admin";
+  const isEditor = user.permissions.has("members:write");
   const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
 
   if (!isEditor) {
@@ -1136,7 +1136,7 @@ memberRoutes.get("/:id", requireAuth("read"), async (c) => {
 });
 
 // POST /members/:id — update member
-memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
+memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const reactivateParam = c.req.query("reactivate");

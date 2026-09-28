@@ -7,6 +7,9 @@ import {
   memberRoleAssignments,
   anniversaryYears,
   backupHistory,
+  appRoles,
+  appRolePermissions,
+  userAppRoles,
 } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
 
@@ -15,6 +18,11 @@ process.env.ORG_NAME = "Test Feuerwehr";
 // ── DB chain-stub helpers ───────────────────────────────────────────────────
 // Same philosophy as members.test.ts: chains just re-return canned fixture
 // rows regardless of predicate — filtering is Drizzle's job, not app logic.
+// appRoles/appRolePermissions/userAppRoles are each queried with more than one
+// row shape depending on the route (e.g. userAppRoles as a join for the users
+// list vs. a plain {cnt} count for role deletion) — same overloaded-fixture
+// pattern already used for memberRoles/memberRoleAssignments below: each test
+// sets the shared fixture var to whatever shape its route expects.
 
 function chainOf(rows: unknown) {
   const chain: any = Object.assign(Promise.resolve(rows), {
@@ -22,6 +30,7 @@ function chainOf(rows: unknown) {
     where: vi.fn(() => chain),
     orderBy: vi.fn(() => chain),
     leftJoin: vi.fn(() => chain),
+    innerJoin: vi.fn(() => chain),
     groupBy: vi.fn(() => chain),
     limit: vi.fn(() => chain),
   });
@@ -33,6 +42,9 @@ let rolesFixture: any[] = [];
 let assignmentCountFixture: any[] = [{ cnt: 0 }];
 let yearsFixture: any[] = [];
 let backupHistoryFixture: any[] = [];
+let appRolesFixture: any[] = [];
+let appRolePermissionsFixture: any[] = [];
+let userAppRolesFixture: any[] = [];
 
 // Per-table one-shot queues: lets a single request that issues two selects
 // against the same table (e.g. lookup, then a separate email-dupe check)
@@ -58,6 +70,9 @@ const select = vi.fn(() => ({
     if (table === memberRoleAssignments) return chainOf(nextRows(memberRoleAssignments, assignmentCountFixture));
     if (table === anniversaryYears) return chainOf(nextRows(anniversaryYears, yearsFixture));
     if (table === backupHistory) return chainOf(nextRows(backupHistory, backupHistoryFixture));
+    if (table === appRoles) return chainOf(nextRows(appRoles, appRolesFixture));
+    if (table === appRolePermissions) return chainOf(nextRows(appRolePermissions, appRolePermissionsFixture));
+    if (table === userAppRoles) return chainOf(nextRows(userAppRoles, userAppRolesFixture));
     return chainOf([]);
   }),
 }));
@@ -97,7 +112,7 @@ vi.mock("../db/index.js", () => ({
   db: { select, insert, update, delete: del },
 }));
 
-let currentUser: any = { id: "u1", appRole: "admin", disabled: false };
+let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -131,7 +146,10 @@ beforeEach(() => {
   assignmentCountFixture = [{ cnt: 0 }];
   yearsFixture = [];
   backupHistoryFixture = [];
-  currentUser = { id: "u1", appRole: "admin", disabled: false };
+  appRolesFixture = [];
+  appRolePermissionsFixture = [];
+  userAppRolesFixture = [];
+  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
   backupConfigured = false;
   lastBackupResult = null;
   scheduleResult = { prev: null, next: null };
@@ -139,10 +157,10 @@ beforeEach(() => {
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const localAdmin = { id: "local", name: "Lokaler Admin", email: "admin@localhost.invalid", appRole: "admin", disabled: false };
+const localAdmin = { id: "local", name: "Lokaler Admin", email: "admin@localhost.invalid", disabled: false };
 
 function makeUser(overrides: Record<string, unknown> = {}) {
-  return { id: "u2", name: "Ben Bauer", email: "ben@example.com", appRole: "editor", disabled: false, ...overrides };
+  return { id: "u2", name: "Ben Bauer", email: "ben@example.com", disabled: false, ...overrides };
 }
 
 function makeRole(overrides: Record<string, unknown> = {}) {
@@ -151,6 +169,10 @@ function makeRole(overrides: Record<string, unknown> = {}) {
 
 function makeRoleRow(overrides: Record<string, unknown> = {}) {
   return { ...makeRole(), assignmentCount: 0, ...overrides };
+}
+
+function makeAppRole(overrides: Record<string, unknown> = {}) {
+  return { id: "ar1", name: "editor", isProtected: false, ...overrides };
 }
 
 function makeYear(overrides: Record<string, unknown> = {}) {
@@ -253,12 +275,28 @@ describe("GET /users", () => {
     expect(html).toContain(t("admin.users.confirmDeactivate.title"));
   });
 
-  it("renders the correct badge per app role", async () => {
-    usersFixture = [makeUser({ id: "a", appRole: "admin" }), makeUser({ id: "b", appRole: "editor" }), makeUser({ id: "c", appRole: "read" })];
+  it("renders a single badge for a user with one role", async () => {
+    usersFixture = [makeUser({ id: "a" })];
+    userAppRolesFixture = [{ userId: "a", roleName: "editor" }];
     const html = await (await adminRoutes.request("/users")).text();
-    expect(html).toContain(t("admin.users.role.adminBadge"));
-    expect(html).toContain(t("admin.users.role.editor"));
-    expect(html).toContain(t("admin.users.role.read"));
+    expect(html).toContain("editor");
+  });
+
+  it("renders a role-count badge for a user with multiple roles", async () => {
+    usersFixture = [makeUser({ id: "a" })];
+    userAppRolesFixture = [
+      { userId: "a", roleName: "editor" },
+      { userId: "a", roleName: "Vorstand" },
+    ];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.roleCount", { count: 2 }));
+  });
+
+  it("renders an em-dash for a user with no roles", async () => {
+    usersFixture = [makeUser({ id: "a" })];
+    userAppRolesFixture = [];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain("—");
   });
 });
 
@@ -267,6 +305,13 @@ describe("GET /users/new", () => {
     const res = await adminRoutes.request("/users/new");
     expect(res.status).toBe(200);
     expect(await res.text()).toContain(t("admin.users.modal.create"));
+  });
+
+  it("pre-checks no role by default", async () => {
+    appRolesFixture = [makeAppRole({ id: "ar-read", name: "read" }), makeAppRole({ id: "ar-editor", name: "editor" })];
+    const html = await (await adminRoutes.request("/users/new")).text();
+    expect(html).not.toMatch(/value="ar-read"[^>]*checked/);
+    expect(html).not.toMatch(/value="ar-editor"[^>]*checked/);
   });
 });
 
@@ -281,16 +326,12 @@ describe("GET /users/:id/edit", () => {
     expect((await adminRoutes.request(`/users/${localAdmin.id}/edit`)).status).toBe(404);
   });
 
-  it("disables downgrading your own role below its current rank", async () => {
-    usersFixture = [makeUser({ id: "u1", appRole: "admin" })];
-    const html = await (await adminRoutes.request("/users/u1/edit")).text();
-    expect(html).toContain(t("admin.users.cannotDowngradeRole"));
-  });
-
-  it("allows editing another user's role freely", async () => {
-    usersFixture = [makeUser({ id: "u2", appRole: "read" })];
+  it("pre-checks the user's currently assigned roles", async () => {
+    usersFixture = [makeUser({ id: "u2" })];
+    appRolesFixture = [makeAppRole({ id: "ar1", name: "editor" }), makeAppRole({ id: "ar2", name: "read" })];
+    userAppRolesFixture = [{ roleId: "ar1" }];
     const html = await (await adminRoutes.request("/users/u2/edit")).text();
-    expect(html).not.toContain(t("admin.users.cannotDowngradeRole"));
+    expect(html).toMatch(/value="ar1"[^>]*checked/);
   });
 });
 
@@ -301,22 +342,27 @@ describe("POST /users", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("rejects an invalid role", async () => {
-    await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de", appRole: "root" }) });
-    expect(insert).not.toHaveBeenCalled();
-  });
-
   it("rejects a duplicate email", async () => {
     usersFixture = [makeUser({ email: "a@b.de" })];
-    await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de", appRole: "read" }) });
+    await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de" }) });
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("creates the user and redirects", async () => {
-    const res = await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de", appRole: "editor" }) });
+  it("creates the user and assigns the checked roles", async () => {
+    appRolesFixture = [makeAppRole({ id: "ar1", name: "editor" })];
+    const res = await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de", roles: ["ar1"] }) });
     expect(res.status).toBe(302);
-    expect(insertCalls.some((c) => c.table === users && c.values.appRole === "editor")).toBe(true);
+    expect(insertCalls.some((c) => c.table === users && c.values.name === "A")).toBe(true);
+    expect(insertCalls.some((c) => c.table === userAppRoles && c.values.some((v: any) => v.roleId === "ar1"))).toBe(true);
     expect(res.headers.get("set-cookie")).toMatch(/flash=/);
+  });
+
+  it("creates the user with no roles when none are checked", async () => {
+    appRolesFixture = [];
+    const res = await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de" }) });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === users)).toBe(true);
+    expect(insertCalls.some((c) => c.table === userAppRoles)).toBe(false);
   });
 });
 
@@ -338,22 +384,9 @@ describe("POST /users/:id", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("rejects an invalid role", async () => {
-    usersFixture = [makeUser()];
-    await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "a@b.de", appRole: "root" }) });
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("blocks downgrading your own role", async () => {
-    usersFixture = [makeUser({ id: "u1", appRole: "admin", email: "a@b.de" })];
-    const res = await adminRoutes.request("/users/u1", { method: "POST", body: formBody({ name: "A", email: "a@b.de", appRole: "read" }) });
-    expect(res.status).toBe(302);
-    expect(update).not.toHaveBeenCalled();
-  });
-
   it("rejects a duplicate email on change", async () => {
     queue(users, [makeUser({ email: "old@b.de" })], [makeUser({ id: "other", email: "new@b.de" })]);
-    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de", appRole: "read" }) });
+    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de" }) });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === accounts)).toBe(false);
     expect(update).not.toHaveBeenCalled();
@@ -361,7 +394,7 @@ describe("POST /users/:id", () => {
 
   it("unlinks the OIDC account and saves when the email changes without conflict", async () => {
     queue(users, [makeUser({ email: "old@b.de" })], []);
-    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de", appRole: "editor" }) });
+    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de" }) });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === accounts)).toBe(true);
     expect(updateCalls.some((c) => c.table === users && c.set.email === "new@b.de")).toBe(true);
@@ -369,10 +402,19 @@ describe("POST /users/:id", () => {
 
   it("saves without touching the OIDC link when the email is unchanged", async () => {
     usersFixture = [makeUser({ email: "same@b.de" })];
-    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "same@b.de", appRole: "editor" }) });
+    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "same@b.de" }) });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === accounts)).toBe(false);
     expect(updateCalls.some((c) => c.table === users)).toBe(true);
+  });
+
+  it("replaces the user's role assignments", async () => {
+    usersFixture = [makeUser({ email: "same@b.de" })];
+    appRolesFixture = [makeAppRole({ id: "ar1", name: "editor" })];
+    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "same@b.de", roles: ["ar1"] }) });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === userAppRoles)).toBe(true);
+    expect(insertCalls.some((c) => c.table === userAppRoles && c.values.some((v: any) => v.roleId === "ar1"))).toBe(true);
   });
 });
 
@@ -429,6 +471,149 @@ describe("POST /users/:id/delete", () => {
     const res = await adminRoutes.request("/users/u2/delete", { method: "POST" });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === users)).toBe(true);
+  });
+});
+
+describe("GET /permissions", () => {
+  it("locks deletion for a protected role", async () => {
+    appRolesFixture = [makeAppRole({ isProtected: true })];
+    userAppRolesFixture = [];
+    const html = await (await adminRoutes.request("/permissions")).text();
+    expect(html).toContain(t("admin.permissions.cannotDelete.protected"));
+  });
+
+  it("locks deletion with a singular usage message", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ roleId: "ar1", cnt: 1 }];
+    const html = await (await adminRoutes.request("/permissions")).text();
+    expect(html).toContain(t("admin.permissions.cannotDelete.usedBySingle", { count: 1 }));
+  });
+
+  it("allows deletion when unused and unprotected", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [];
+    const html = await (await adminRoutes.request("/permissions")).text();
+    expect(html).toContain(t("admin.permissions.confirmDelete.title"));
+  });
+
+  it("renders permission badges for a role", async () => {
+    appRolesFixture = [makeAppRole()];
+    appRolePermissionsFixture = [{ roleId: "ar1", permission: "members:read" }];
+    userAppRolesFixture = [];
+    const html = await (await adminRoutes.request("/permissions")).text();
+    expect(html).toContain(t("admin.permissions.key.membersRead"));
+  });
+});
+
+describe("GET /permissions/new", () => {
+  it("renders the create-role form without a system:admin checkbox", async () => {
+    const html = await (await adminRoutes.request("/permissions/new")).text();
+    expect(html).toContain(t("admin.permissions.modal.create"));
+    expect(html).not.toContain(t("admin.permissions.key.systemAdmin"));
+  });
+});
+
+describe("GET /permissions/:id/edit", () => {
+  it("404s for an unknown role", async () => {
+    appRolesFixture = [];
+    expect((await adminRoutes.request("/permissions/nope/edit")).status).toBe(404);
+  });
+
+  it("404s for a protected role", async () => {
+    appRolesFixture = [makeAppRole({ isProtected: true })];
+    expect((await adminRoutes.request("/permissions/ar1/edit")).status).toBe(404);
+  });
+
+  it("locks the name field when assignments exist", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 2 }];
+    const html = await (await adminRoutes.request("/permissions/ar1/edit")).text();
+    expect(html).toContain(t("admin.permissions.modal.nameLocked"));
+  });
+
+  it("pre-checks the role's current permissions", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 0 }];
+    appRolePermissionsFixture = [{ permission: "members:read" }];
+    const html = await (await adminRoutes.request("/permissions/ar1/edit")).text();
+    expect(html).toMatch(/value="members:read"[^>]*checked/);
+  });
+});
+
+describe("POST /permissions", () => {
+  it("requires a name", async () => {
+    const res = await adminRoutes.request("/permissions", { method: "POST", body: formBody({ name: "" }) });
+    expect(res.status).toBe(302);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("creates the role with its permissions", async () => {
+    const res = await adminRoutes.request("/permissions", {
+      method: "POST",
+      body: formBody({ name: "Kassier", permissions: ["members:read", "members:write"] }),
+    });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === appRoles && c.values.name === "Kassier")).toBe(true);
+    expect(insertCalls.some((c) => c.table === appRolePermissions)).toBe(true);
+  });
+
+  it("silently drops system:admin even if submitted", async () => {
+    await adminRoutes.request("/permissions", {
+      method: "POST",
+      body: formBody({ name: "Kassier", permissions: ["system:admin"] }),
+    });
+    expect(insertCalls.some((c) => c.table === appRolePermissions)).toBe(false);
+  });
+});
+
+describe("POST /permissions/:id", () => {
+  it("404s for a protected role", async () => {
+    appRolesFixture = [makeAppRole({ isProtected: true })];
+    expect((await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({}) })).status).toBe(404);
+  });
+
+  it("requires a name when there are no assignments yet", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "" }) });
+    expect(res.status).toBe(302);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("updates name and permissions when unused", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const res = await adminRoutes.request("/permissions/ar1", {
+      method: "POST",
+      body: formBody({ name: "Neu", permissions: ["members:read"] }),
+    });
+    expect(res.status).toBe(302);
+    expect(updateCalls.some((c) => c.table === appRoles && c.set.name === "Neu")).toBe(true);
+  });
+});
+
+describe("POST /permissions/:id/delete", () => {
+  it("refuses to delete a protected role", async () => {
+    appRolesFixture = [makeAppRole({ isProtected: true })];
+    const res = await adminRoutes.request("/permissions/ar1/delete", { method: "POST" });
+    expect(res.headers.get("set-cookie")).toMatch(/flash=/);
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete a role with assignments", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 1 }];
+    const res = await adminRoutes.request("/permissions/ar1/delete", { method: "POST" });
+    expect(res.headers.get("set-cookie")).toMatch(/flash=/);
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("deletes an unused role", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const res = await adminRoutes.request("/permissions/ar1/delete", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === appRoles)).toBe(true);
   });
 });
 
