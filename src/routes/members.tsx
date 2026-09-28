@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { eq, or, ilike, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
@@ -14,40 +14,49 @@ export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Member = typeof members.$inferSelect;
+type Person = typeof persons.$inferSelect;
+type MemberRow = typeof members.$inferSelect;
+type Member = Omit<Person, "id"> & MemberRow;
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };
 
 // ── DB helpers ───────────────────────────────────────────────────────────────
 
+// ponytail: search filters in JS, not SQL — Drizzle's relational query API can't
+// filter the base table by a `with` relation's columns, and the full list is
+// already loaded into memory for stats/sort/pagination either way.
 async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus[]> {
   const rows = await db.query.members.findMany({
-    where: search
-      ? or(ilike(members.lastName, `%${search}%`), ilike(members.firstName, `%${search}%`))
-      : undefined,
-    with: {
-      assignments: { with: { role: true } },
-    },
+    with: { person: true, assignments: { with: { role: true } } },
   });
 
-  return rows.map((m) => ({
-    ...m,
-    assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
-  }));
+  const all = rows.map(({ person, ...m }) => {
+    const member = { ...(person as Person), ...m } as Member;
+    return {
+      ...member,
+      assignments: m.assignments as Assignment[],
+      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    };
+  });
+
+  if (!search) return all;
+  const needle = search.toLowerCase();
+  return all.filter((m) => m.lastName.toLowerCase().includes(needle) || m.firstName.toLowerCase().includes(needle));
 }
 
 async function fetchMember(id: string): Promise<MemberWithStatus | null> {
-  const m = await db.query.members.findFirst({
+  const row = await db.query.members.findFirst({
     where: eq(members.id, id),
-    with: { assignments: { with: { role: true } } },
+    with: { person: true, assignments: { with: { role: true } } },
   });
-  if (!m) return null;
+  if (!row) return null;
+  const { person, ...m } = row;
+  const member = { ...(person as Person), ...m } as Member;
   return {
-    ...m,
+    ...member,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   };
 }
 
@@ -918,7 +927,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   }
 
   const [newMember] = await db.transaction(async (tx) => {
-    const [m] = await tx.insert(members).values({
+    const [person] = await tx.insert(persons).values({
       lastName, firstName,
       street: (body.street as string) || null,
       houseNumber: (body.houseNumber as string) || null,
@@ -926,11 +935,15 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       city: (body.city as string) || null,
       gender: (body.gender as any) || null,
       birthDate,
+      phone: (body.phone as string) || null,
+      email: (body.email as string) || null,
+    }).returning();
+
+    const [m] = await tx.insert(members).values({
+      personId: person.id,
       entryDate,
       exitDate: (body.exitDate as string) || null,
       deathDate: (body.deathDate as string) || null,
-      phone: (body.phone as string) || null,
-      email: (body.email as string) || null,
     }).returning();
 
     for (let i = 0; i < assignmentRoles.length; i++) {
@@ -1019,7 +1032,8 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
     assignments: q.assignments === "1",
   };
 
-  const allMembers = await db.select().from(members);
+  const memberRows = await db.query.members.findMany({ with: { person: true } });
+  const allMembers: Member[] = memberRows.map(({ person, ...m }) => ({ ...(person as Person), ...m } as Member));
   const rawAssignments: ExportAssignmentRow[] = opts.assignments
     ? await db.select({
         memberId: memberRoleAssignments.memberId,
@@ -1293,19 +1307,23 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   }
 
   await db.transaction(async (tx) => {
-    // Update member fields
-    await tx.update(members).set({
+    // Update person + member fields
+    await tx.update(persons).set({
       lastName, firstName,
       street: (body.street as string) || null,
       houseNumber: (body.houseNumber as string) || null,
       zip: (body.zip as string) || null,
       city: (body.city as string) || null,
       gender: (body.gender as any) || null,
-      birthDate, entryDate,
-      exitDate: exitDate || null,
-      deathDate: deathDate || null,
+      birthDate,
       phone: (body.phone as string) || null,
       email: (body.email as string) || null,
+    }).where(eq(persons.id, existing.personId));
+
+    await tx.update(members).set({
+      entryDate,
+      exitDate: exitDate || null,
+      deathDate: deathDate || null,
     }).where(eq(members.id, id));
 
     // Archive: close open assignments when exitDate or deathDate set

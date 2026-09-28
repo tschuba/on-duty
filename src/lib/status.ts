@@ -1,6 +1,6 @@
-import type { members, memberRoleAssignments, memberRoles } from "../db/schema/index.js";
+import type { members, memberRoleAssignments, memberRoles, persons } from "../db/schema/index.js";
 
-type Member = typeof members.$inferSelect;
+type Member = typeof members.$inferSelect & Pick<typeof persons.$inferSelect, "birthDate">;
 type Assignment = typeof memberRoleAssignments.$inferSelect & {
   role: typeof memberRoles.$inferSelect;
 };
