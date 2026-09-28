@@ -45,8 +45,8 @@ function diffCoverage() {
       lineNum = m ? parseInt(m[1]) - 1 : 0
     } else if (currentFile) {
       if (line.startsWith('+') && !line.startsWith('+++')) {
-        changedLines[currentFile].add(lineNum)
         lineNum++
+        changedLines[currentFile].add(lineNum)
       } else if (!line.startsWith('-')) {
         lineNum++
       }
@@ -58,24 +58,37 @@ function diffCoverage() {
   const coverage = JSON.parse(readFileSync('coverage/coverage-final.json', 'utf8'))
   const cwd = process.cwd()
 
+  // Only statement lines from statementMap can ever be "covered" — comments,
+  // blank lines, type-only lines, and v8-ignored ranges never appear here, so
+  // they're excluded from the diff-coverage denominator instead of counting
+  // as permanently uncovered.
+  const instrumentedLines = {}
   const coveredLines = {}
   for (const [filePath, data] of Object.entries(coverage)) {
     const rel = filePath.startsWith(cwd) ? filePath.slice(cwd.length + 1) : filePath
+    const instrumented = new Set()
     const covered = new Set()
     for (const [id, count] of Object.entries(data.s)) {
-      if (count > 0) {
-        const stmt = data.statementMap[id]
-        for (let l = stmt.start.line; l <= stmt.end.line; l++) covered.add(l)
+      const stmt = data.statementMap[id]
+      for (let l = stmt.start.line; l <= stmt.end.line; l++) {
+        instrumented.add(l)
+        if (count > 0) covered.add(l)
       }
     }
+    instrumentedLines[rel] = instrumented
     coveredLines[rel] = covered
   }
 
   let total = 0, covered = 0
   for (const [file, addedLines] of Object.entries(changedLines)) {
+    const inst = instrumentedLines[file]
     const cov = coveredLines[file]
-    if (!cov) continue
-    for (const l of addedLines) { total++; if (cov.has(l)) covered++ }
+    if (!inst) continue
+    for (const l of addedLines) {
+      if (!inst.has(l)) continue
+      total++
+      if (cov.has(l)) covered++
+    }
   }
 
   if (total === 0) return { skip: true }
