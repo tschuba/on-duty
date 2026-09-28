@@ -391,6 +391,17 @@ describe("GET /", () => {
     expect(html).not.toContain("Weg");
   });
 
+  it("filters by search term against first/last name, case-insensitively", async () => {
+    findManyResult = [
+      memberWithAssignments({ id: "m1", lastName: "Bauer", firstName: "Anna" }),
+      memberWithAssignments({ id: "m2", lastName: "Adler", firstName: "Ben" }),
+    ];
+    const res = await memberRoutes.request("/?search=bau");
+    const html = await res.text();
+    expect(html).toContain("Bauer");
+    expect(html).not.toContain("Adler");
+  });
+
   it("hides the add-member button for a read-only user", async () => {
     currentUser = { id: "u1", permissions: new Set(), disabled: false };
     findManyResult = [];
