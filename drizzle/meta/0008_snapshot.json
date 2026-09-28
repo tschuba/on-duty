@@ -1,5 +1,5 @@
 {
-  "id": "ee62753e-bc9c-4f86-aca4-b3fb366fcbb7",
+  "id": "5e26451a-6d8e-40e1-ba68-5963a8853952",
   "prevId": "a697dc8a-83bb-4437-a07d-aea8aaa7a1c8",
   "version": "7",
   "dialect": "postgresql",
@@ -804,12 +804,6 @@
       "values": [
         "members:read",
         "members:write",
-        "inventory:read",
-        "inventory:manage",
-        "training:read",
-        "training:manage",
-        "donations:manage",
-        "applications:review",
         "system:admin"
       ]
     }

@@ -4,17 +4,7 @@ import { users } from "./auth";
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 // Keep in sync with PERMISSIONS in src/lib/roles.ts — duplicated here (not imported)
 // because drizzle-kit's config loader can't resolve a cross-directory ../../lib import.
-export const permissionEnum = pgEnum("permission", [
-  "members:read",
-  "members:write",
-  "inventory:read",
-  "inventory:manage",
-  "training:read",
-  "training:manage",
-  "donations:manage",
-  "applications:review",
-  "system:admin",
-]);
+export const permissionEnum = pgEnum("permission", ["members:read", "members:write", "system:admin"]);
 
 export const appRoles = pgTable("app_roles", {
   id: uuid("id").primaryKey().defaultRandom(),

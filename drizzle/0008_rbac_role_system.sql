@@ -1,4 +1,4 @@
-CREATE TYPE "public"."permission" AS ENUM('members:read', 'members:write', 'inventory:read', 'inventory:manage', 'training:read', 'training:manage', 'donations:manage', 'applications:review', 'system:admin');--> statement-breakpoint
+CREATE TYPE "public"."permission" AS ENUM('members:read', 'members:write', 'system:admin');--> statement-breakpoint
 CREATE TABLE "app_role_permissions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"role_id" uuid NOT NULL,

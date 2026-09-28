@@ -163,12 +163,6 @@ export const de = {
   "admin.permissions.flash.hasAssignments": "Rolle hat bestehende Zuweisungen und kann nicht gelöscht werden.",
   "admin.permissions.key.membersRead": "Mitglieder ansehen",
   "admin.permissions.key.membersWrite": "Mitglieder anlegen und bearbeiten",
-  "admin.permissions.key.inventoryRead": "Inventar ansehen",
-  "admin.permissions.key.inventoryManage": "Inventar verwalten",
-  "admin.permissions.key.trainingRead": "Ausbildungsverzeichnis ansehen",
-  "admin.permissions.key.trainingManage": "Ausbildungseinträge pflegen",
-  "admin.permissions.key.donationsManage": "Spenden und Quittungen verwalten",
-  "admin.permissions.key.applicationsReview": "Mitgliedsanträge prüfen und bearbeiten",
   "admin.permissions.key.systemAdmin": "Systemverwaltung (Benutzer, Rollen, Konfiguration)",
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────

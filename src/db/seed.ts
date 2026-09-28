@@ -18,43 +18,23 @@ const APP_ROLES: { id: string; name: string; isProtected: boolean; permissions: 
     id: "9b1f6c2a-4b3a-4b3a-8b3a-1a2b3c4d5e6f",
     name: "Administrator",
     isProtected: true,
-    permissions: [
-      "members:read", "members:write",
-      "inventory:read", "inventory:manage",
-      "training:read", "training:manage",
-      "donations:manage",
-      "applications:review",
-      "system:admin",
-    ],
+    permissions: ["members:read", "members:write", "system:admin"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
     name: "Bearbeiter",
     isProtected: true,
-    permissions: ["members:read", "members:write", "applications:review"],
+    permissions: ["members:read", "members:write"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
     name: "Leser",
     isProtected: true,
-    permissions: ["members:read", "inventory:read", "training:read"],
+    permissions: ["members:read"],
   },
-  {
-    id: "4a5b6c7d-8e9f-4a1b-9c2d-3e4f5a6b7c8d",
-    name: "Vorstand",
-    isProtected: false,
-    permissions: ["members:read", "donations:manage", "applications:review"],
-  },
-  {
-    id: "1e2d3c4b-5a6f-4e7d-8c9b-0a1b2c3d4e5f",
-    name: "Führung",
-    isProtected: false,
-    permissions: [
-      "members:read",
-      "inventory:read", "inventory:manage",
-      "training:read", "training:manage",
-    ],
-  },
+  // Vorstand and Führung are seeded again once the feature that gives them a distinct
+  // permission set ships (donations:manage / inventory+training:*) — see backlog docs
+  // 09-11. Seeding them empty now would just duplicate "Leser".
 ];
 
 export async function runSeed() {

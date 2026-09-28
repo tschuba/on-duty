@@ -550,7 +550,7 @@ describe("POST /permissions", () => {
   it("creates the role with its permissions", async () => {
     const res = await adminRoutes.request("/permissions", {
       method: "POST",
-      body: formBody({ name: "Kassier", permissions: ["members:read", "donations:manage"] }),
+      body: formBody({ name: "Kassier", permissions: ["members:read", "members:write"] }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.some((c) => c.table === appRoles && c.values.name === "Kassier")).toBe(true);
