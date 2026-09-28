@@ -1,9 +1,15 @@
 import { relations } from "drizzle-orm";
 import { members } from "./members";
+import { persons } from "./persons";
 import { memberRoleAssignments, memberRoles } from "./roles";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
-export const membersRelations = relations(members, ({ many }) => ({
+export const personsRelations = relations(persons, ({ one }) => ({
+  member: one(members),
+}));
+
+export const membersRelations = relations(members, ({ one, many }) => ({
+  person: one(persons, { fields: [members.personId], references: [persons.id] }),
   assignments: many(memberRoleAssignments),
 }));
 

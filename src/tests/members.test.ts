@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -21,7 +21,6 @@ function chainOf(rows: unknown) {
   return chain;
 }
 
-let membersFixture: any[] = [];
 let rolesFixture: any[] = [];
 let assignmentRowsFixture: any[] = []; // export: pre-joined {memberId, roleTitle, from, to}
 let findManyResult: any[] = [];
@@ -34,7 +33,6 @@ const deleteCalls: { table: any }[] = [];
 const select = vi.fn(() => ({
   from: vi.fn((table: any) => {
     if (table === memberRoles) return chainOf(rolesFixture);
-    if (table === members) return chainOf(membersFixture);
     if (table === memberRoleAssignments) return chainOf(assignmentRowsFixture);
     return chainOf([]);
   }),
@@ -116,7 +114,6 @@ beforeEach(() => {
   insertCalls.length = 0;
   updateCalls.length = 0;
   deleteCalls.length = 0;
-  membersFixture = [];
   rolesFixture = [];
   assignmentRowsFixture = [];
   findManyResult = [];
@@ -132,6 +129,7 @@ const roleVorstand = { id: "role-vorstand", title: "Vorstand", grantsActiveStatu
 function makeMember(overrides: Record<string, unknown> = {}) {
   return {
     id: "m1",
+    personId: "p1",
     lastName: "Bauer",
     firstName: "Anna",
     street: null,
@@ -472,6 +470,7 @@ describe("POST /new", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/members");
     expect(res.headers.get("set-cookie")).toMatch(/flash=/);
+    expect(insertCalls.some((c) => c.table === persons)).toBe(true);
     expect(insertCalls.some((c) => c.table === members)).toBe(true);
     expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
   });
@@ -487,7 +486,7 @@ describe("POST /new", () => {
 
 describe("GET /export", () => {
   it("returns a single-sheet workbook by default", async () => {
-    membersFixture = [makeMember()];
+    findManyResult = [makeMember()];
     const res = await memberRoutes.request("/export");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("spreadsheetml");
@@ -499,7 +498,7 @@ describe("GET /export", () => {
   });
 
   it("adds the assignments sheet only when requested, and only then queries it", async () => {
-    membersFixture = [makeMember()];
+    findManyResult = [makeMember()];
     assignmentRowsFixture = [{ memberId: "m1", roleTitle: "Vorstand", from: "2020-01-01", to: null }];
 
     const withoutAsg = await memberRoutes.request("/export");
@@ -598,6 +597,8 @@ describe("POST /:id", () => {
       body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01", exitDate: "2024-06-01" }),
     });
     expect(res.status).toBe(302);
+    expect(updateCalls.some((c) => c.table === persons)).toBe(true);
+    expect(updateCalls.some((c) => c.table === members)).toBe(true);
     expect(updateCalls.some((c) => c.table === memberRoleAssignments && c.set.autoClosed === true)).toBe(true);
   });
 
