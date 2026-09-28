@@ -93,6 +93,12 @@ Vor jedem PR:
 pnpm test
 ```
 
+### Coverage
+
+CI blockt PRs, die die Coverage ggü. `master` verschlechtern, sowie neue Zeilen mit <80% Abdeckung (siehe PR-Kommentar).
+
+Beim Nachziehen von Coverage auf Code, der Entscheidungen mit I/O mischt (z. B. Auth-/Berechtigungsprüfungen): nicht die Logik mit `v8 ignore` wegkommentieren oder in eine separate Pure-Function extrahieren, die die echten Verzweigungen nur nachbildet — beides lässt die eigentliche Entscheidung ungetestet und macht die Metrik hohl. Stattdessen an einer dünnen, stabilen Grenze mocken (der eine externe Call, die eine Query) und die echte Funktion end-to-end durchlaufen lassen.
+
 ## Pull Requests
 
 - Kein direktes Pushen auf `main` — ausschließlich per PR
