@@ -1563,6 +1563,18 @@ adminRoutes.get("/org-config", guard, async (c) => {
   const warn = await backupWarnProps();
   const rows = await db.select().from(orgConfig);
   const values = new Map(rows.map((r) => [r.key, r.value]));
+
+  function field(key: (typeof ORG_CONFIG_FIELDS)[number]["key"], type: string) {
+    return (
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">{ORG_CONFIG_FIELD_LABELS[key]}</span>
+        </label>
+        <input type={type} name={key} class="input input-bordered w-full" value={values.get(key) ?? ""} />
+      </div>
+    );
+  }
+
   return c.html(
     <Layout title={t("admin.orgConfig.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
@@ -1571,25 +1583,37 @@ adminRoutes.get("/org-config", guard, async (c) => {
         <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
           {t("admin.orgConfig.title")}
         </h1>
-        <form method="post" action="/admin/org-config" class="flex flex-col gap-8">
-          {ORG_CONFIG_SECTIONS.map((section) => (
-            <div>
-              <h2 class="text-lg font-semibold mb-3">{section.title}</h2>
-              <div class="flex flex-col gap-3 max-w-xl">
-                {ORG_CONFIG_FIELDS.filter((f) => f.section === section.id).map((field) => (
-                  <label class="form-control">
-                    <span class="label-text mb-1">{ORG_CONFIG_FIELD_LABELS[field.key]}</span>
-                    <input
-                      type={field.type}
-                      name={field.key}
-                      class="input input-bordered"
-                      value={values.get(field.key) ?? ""}
-                    />
-                  </label>
-                ))}
+        <form method="post" action="/admin/org-config" class="flex flex-col gap-6">
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[0].title}</h2>
+              {field("orgName", "text")}
+              {field("orgStreet", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("orgZip", "text")}
+                {field("orgCity", "text")}
               </div>
             </div>
-          ))}
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[1].title}</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("taxExemptionDate", "date")}
+                {field("taxExemptionNumber", "text")}
+              </div>
+              {field("taxOffice", "text")}
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[2].title}</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("iban", "text")}
+                {field("bic", "text")}
+              </div>
+            </div>
+          </div>
           <div>
             <button type="submit" class="btn btn-primary">
               {t("common.save")}
