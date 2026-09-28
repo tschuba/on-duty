@@ -1532,6 +1532,8 @@ const ORG_CONFIG_FIELDS = [
   { key: "taxExemptionDate", type: "date", section: "tax" },
   { key: "taxExemptionNumber", type: "text", section: "tax" },
   { key: "taxOffice", type: "text", section: "tax" },
+  { key: "taxAssessmentPeriod", type: "text", section: "tax" },
+  { key: "charitablePurpose", type: "text", section: "tax" },
   { key: "iban", type: "text", section: "bank" },
   { key: "bic", type: "text", section: "bank" },
 ] as const;
@@ -1551,6 +1553,8 @@ const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
   taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
   taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
   taxOffice: t("admin.orgConfig.field.taxOffice"),
+  taxAssessmentPeriod: t("admin.orgConfig.field.taxAssessmentPeriod"),
+  charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
   iban: t("admin.orgConfig.field.iban"),
   bic: t("admin.orgConfig.field.bic"),
 };
@@ -1614,7 +1618,11 @@ adminRoutes.get("/org-config", guard, async (c) => {
                 {field("taxExemptionDate", "date")}
                 {field("taxExemptionNumber", "text")}
               </div>
-              {field("taxOffice", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
+                {field("taxOffice", "text")}
+                {field("taxAssessmentPeriod", "text")}
+              </div>
+              {field("charitablePurpose", "text")}
             </div>
           </div>
           <div class="card bg-base-200 shadow">

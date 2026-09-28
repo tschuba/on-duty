@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
+import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -34,6 +35,62 @@ function formatDate(d: string | null | undefined): string {
 
 function formatAmount(amount: string | number): string {
   return `${Number(amount).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
+}
+
+// Local date components, not toISOString() — avoids the timezone-shift bug
+// already fixed once in lib/status.ts's age() helper.
+function formatDateObj(d: Date): string {
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}.${month}.${d.getFullYear()}`;
+}
+
+function xmlEscape(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function xmlEl(id: string, value: string): string {
+  return `      <element id="${id}">${xmlEscape(value)}</element>`;
+}
+
+// Builds the FFW xml-data import file for the official Muster 034122 form
+// (https://www.formulare-bfinv.de). Field IDs and the k1-k5/Finanzamt-block
+// meaning were reverse-engineered against the live FMS, see the backlog doc's
+// "Nachtrag 2026-09-29 (Fortsetzung)" section. Always uses the Freistellungsbescheid
+// branch (k3) — the alternative §60a-AO branch (k4) is unused, org-config only
+// models the Freistellungsbescheid fields.
+function buildReceiptXml(d: DonationWithDonor, config: Record<string, string>): string {
+  const aussteller = [config.orgName, `${config.orgStreet} ${config.orgHouseNumber}`, `${config.orgZip} ${config.orgCity}`].join("\n");
+  const p = d.donor.person;
+  const name = [`${p.firstName} ${p.lastName}`, `${p.street} ${p.houseNumber}`, `${p.zip} ${p.city}`].join("\n");
+  const wert = Number(d.amount).toFixed(2).replace(".", ",");
+  const amountWords = toCurrency(Number(d.amount));
+  const wert2 = amountWords.charAt(0).toUpperCase() + amountWords.slice(1);
+  const datum = `${formatDate(d.date)} 00:00:00`;
+  const datum2 = `${formatDate(config.taxExemptionDate)} 00:00:00`;
+  const ortDatum = `${config.orgCity}, ${formatDateObj(d.receiptIssuedAt ?? new Date())}`;
+
+  const elements = [
+    xmlEl("aussteller", aussteller),
+    xmlEl("name", name),
+    xmlEl("wert", wert),
+    xmlEl("wert2", wert2),
+    xmlEl("datum", datum),
+    xmlEl("k1", "false"),
+    xmlEl("k2", "true"),
+    xmlEl("k3", "true"),
+    xmlEl("zwecke2b", config.charitablePurpose),
+    xmlEl("finamt", config.taxOffice),
+    xmlEl("stnr", config.taxExemptionNumber),
+    xmlEl("datum2", datum2),
+    xmlEl("zeitraum", config.taxAssessmentPeriod),
+    xmlEl("k4", "false"),
+    xmlEl("zwecke", config.charitablePurpose),
+    xmlEl("k5", "true"),
+    xmlEl("ort_datum", ortDatum),
+  ].join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<xml-data xmlns="http://www.lucom.com/ffw/xml-data-1.0.xsd">\n  <form>catalog://Steuerformulare/gemein/034122</form>\n  <instance>\n    <datarow>\n${elements}\n    </datarow>\n  </instance>\n</xml-data>\n`;
 }
 
 const TYPE_LABELS: Record<DonationType, string> = {
@@ -365,60 +422,49 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:manage"), async (c) =>
     );
   }
 
-  const print = c.req.query("print") === "1";
-
   return c.html(
     <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
-      <div class="mb-4 print:hidden">
+      <div class="mb-4">
         <a href={`/donations/${d.id}/edit`} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.receipt.title")}</h1>
       </div>
 
-      {d.receiptIssuedAt && <div class="alert alert-info max-w-2xl mb-4 print:hidden">{t("donations.warn.receiptIssued")}</div>}
+      {d.receiptIssuedAt && <div class="alert alert-info max-w-2xl mb-4">{t("donations.warn.receiptIssued")}</div>}
 
-      <div class="max-w-2xl border border-base-300 rounded-box p-8 print:border-none print:p-0">
-        <p class="text-xs opacity-60 mb-6">{t("donations.receipt.musterRef")}</p>
+      <div class="max-w-xl border border-base-300 rounded-box p-6">
+        <p class="mb-1"><span class="font-semibold">{t("donations.receipt.summaryDonor")}:</span> {d.donor.person.firstName} {d.donor.person.lastName}</p>
+        <p class="mb-1"><span class="font-semibold">{t("donations.receipt.summaryAmount")}:</span> {formatAmount(d.amount)}</p>
+        <p class="mb-4"><span class="font-semibold">{t("donations.receipt.summaryDate")}:</span> {formatDate(d.date)}</p>
 
-        <p class="mb-1 font-semibold">{t("donations.receipt.recipient")}</p>
-        <p class="mb-1">{config.orgName}</p>
-        <p class="mb-1">{[config.orgStreet, config.orgHouseNumber].filter(Boolean).join(" ")}</p>
-        <p class="mb-6">{[config.orgZip, config.orgCity].filter(Boolean).join(" ")}</p>
-
-        <p class="mb-1 font-semibold">{t("donations.receipt.donor")}</p>
-        <p class="mb-1">{d.donor.person.firstName} {d.donor.person.lastName}</p>
-        <p class="mb-6">{[d.donor.person.street, d.donor.person.houseNumber].filter(Boolean).join(" ")}, {[d.donor.person.zip, d.donor.person.city].filter(Boolean).join(" ")}</p>
-
-        <p class="mb-1 font-semibold">{t("donations.receipt.amountFigures")}</p>
-        <p class="mb-6">{formatAmount(d.amount)}</p>
-
-        <p class="mb-1 font-semibold">{t("donations.receipt.donationDate")}</p>
-        <p class="mb-6">{formatDate(d.date)}</p>
-
-        <p class="mb-4">{t("donations.receipt.donationType")}</p>
-        <p class="mb-4">{t("donations.receipt.confirmText")}</p>
-        <p class="mb-4">{t("donations.receipt.exemptionText", { taxOffice: config.taxOffice, taxExemptionDate: formatDate(config.taxExemptionDate), taxExemptionNumber: config.taxExemptionNumber })}</p>
-        <p class="text-xs mb-8">{t("donations.receipt.liabilityText")}</p>
-
-        <div class="flex justify-between mt-12 pt-2">
-          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donations.receipt.place")}</span>
-          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donations.receipt.signature")}</span>
-        </div>
-
-        <p class="text-xs opacity-50 mt-8 print:hidden">{t("donations.receipt.disclaimer")}</p>
+        <p class="text-sm opacity-80 mb-4">{t("donations.receipt.explanation")}</p>
+        <a href="https://www.formulare-bfinv.de/ffw/action/invoke.do?id=034122" target="_blank" rel="noopener" class="link text-sm">{t("donations.receipt.officialFormLink")}</a>
       </div>
 
-      <form method="post" action={`/donations/${d.id}/mark-issued`} class="mt-4 print:hidden">
-        <button type="submit" class="btn btn-primary">{t("donations.receipt.print")}</button>
+      <form method="post" action={`/donations/${d.id}/mark-issued`} class="mt-4">
+        <button type="submit" class="btn btn-primary">{t("donations.receipt.download")}</button>
       </form>
-
-      {print && <script dangerouslySetInnerHTML={{ __html: "window.print();" }} />}
     </Layout>
   );
 });
 
-// POST /donations/:id/mark-issued — set on every print click (re-issuing stays allowed)
+// GET /donations/:id/receipt.xml — the FFW-schema XML file itself, downloadable
+// standalone (e.g. to re-download after mark-issued already ran once)
+donationRoutes.get("/:id/receipt.xml", requireAuth("donations:manage"), async (c) => {
+  const d = await fetchDonation(c.req.param("id"));
+  if (!d) return c.notFound();
+
+  const config = await loadOrgConfig();
+  if (!isOrgConfigCompleteForReceipts(config)) return c.notFound();
+
+  const xml = buildReceiptXml(d, config);
+  c.header("Content-Type", "application/xml; charset=utf-8");
+  c.header("Content-Disposition", `attachment; filename="Zuwendungsbestaetigung-${d.id}.xml"`);
+  return c.body(xml);
+});
+
+// POST /donations/:id/mark-issued — set on every download click (re-issuing stays allowed)
 donationRoutes.post("/:id/mark-issued", requireAuth("donations:manage"), async (c) => {
   const id = c.req.param("id");
   await db.update(donations).set({ receiptIssuedAt: new Date() }).where(eq(donations.id, id));
-  return c.redirect(`/donations/${id}/receipt?print=1`);
+  return c.redirect(`/donations/${id}/receipt.xml`);
 });

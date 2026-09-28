@@ -118,6 +118,8 @@ function completeOrgConfig(overrides: Record<string, string> = {}) {
     taxExemptionDate: "2020-01-01",
     taxExemptionNumber: "12/345/6789",
     taxOffice: "Finanzamt Musterstadt",
+    taxAssessmentPeriod: "2019",
+    charitablePurpose: "Förderung des Feuerwehrwesens",
     ...overrides,
   }).map(([key, value]) => ({ key, value }));
 }
@@ -233,25 +235,59 @@ describe("GET /:id/receipt", () => {
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
     expect(html).toContain("/admin/org-config");
-    expect(html).not.toContain(t("donations.receipt.liabilityText"));
+    expect(html).not.toContain(t("donations.receipt.explanation"));
   });
 
-  it("renders the receipt with donor, org and legal text when org data is complete", async () => {
+  it("renders the receipt summary and download link when org data is complete", async () => {
     completeOrgConfig();
     donationsFindFirstResult = makeDonation();
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
-    expect(html).toContain("Feuerwehr Musterstadt e.V.");
     expect(html).toContain("Anna Bauer");
-    expect(html).toContain(t("donations.receipt.liabilityText"));
+    expect(html).toContain(t("donations.receipt.explanation"));
+  });
+});
+
+describe("GET /:id/receipt.xml", () => {
+  it("404s when org data is incomplete", async () => {
+    orgConfigFixture = [];
+    donationsFindFirstResult = makeDonation();
+    const res = await donationRoutes.request("/don1/receipt.xml");
+    expect(res.status).toBe(404);
+  });
+
+  it("404s when the donation doesn't exist", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = undefined;
+    const res = await donationRoutes.request("/don1/receipt.xml");
+    expect(res.status).toBe(404);
+  });
+
+  it("builds the FFW xml-data file with donor, org and amount-in-words", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation({ amount: "100.00", date: "2026-03-01" });
+    const res = await donationRoutes.request("/don1/receipt.xml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/xml");
+    expect(res.headers.get("content-disposition")).toContain("Zuwendungsbestaetigung-don1.xml");
+    const xml = await res.text();
+    expect(xml).toContain('<form>catalog://Steuerformulare/gemein/034122</form>');
+    expect(xml).toContain('<element id="name">Anna Bauer\nMusterweg 5\n12345 Musterstadt</element>');
+    expect(xml).toContain('<element id="wert">100,00</element>');
+    expect(xml).toContain('<element id="wert2">Einhundert Euro</element>');
+    expect(xml).toContain('<element id="datum">01.03.2026 00:00:00</element>');
+    expect(xml).toContain('<element id="k1">false</element>');
+    expect(xml).toContain('<element id="k2">true</element>');
+    expect(xml).toContain('<element id="finamt">Finanzamt Musterstadt</element>');
+    expect(xml).toContain('<element id="zeitraum">2019</element>');
   });
 });
 
 describe("POST /:id/mark-issued", () => {
-  it("stamps receiptIssuedAt and redirects to the receipt with print=1", async () => {
+  it("stamps receiptIssuedAt and redirects to the xml download", async () => {
     const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/donations/don1/receipt?print=1");
+    expect(res.headers.get("location")).toBe("/donations/don1/receipt.xml");
     expect(updateCalls.some((c) => c.table === donations && "receiptIssuedAt" in c.set)).toBe(true);
   });
 });

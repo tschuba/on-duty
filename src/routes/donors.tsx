@@ -537,7 +537,7 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
         <p class="mb-1">{[config.orgStreet, config.orgHouseNumber].filter(Boolean).join(" ")}</p>
         <p class="mb-6">{[config.orgZip, config.orgCity].filter(Boolean).join(" ")}</p>
 
-        <p class="mb-1 font-semibold">{t("donations.receipt.donor")}</p>
+        <p class="mb-1 font-semibold">{t("donors.summaryReceipt.donorLabel")}</p>
         <p class="mb-1">{donor.person.firstName} {donor.person.lastName}</p>
         <p class="mb-6">{formatAddress(donor.person)}</p>
 
@@ -574,24 +574,24 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
           </table>
         )}
 
-        <p class="mb-4">{t("donations.receipt.confirmText")}</p>
+        <p class="mb-4">{t("donors.summaryReceipt.confirmText")}</p>
         <p class="mb-4">{t("donors.summaryReceipt.noOtherReceipts")}</p>
-        <p class="mb-4">{t("donations.receipt.exemptionText", { taxOffice: config.taxOffice, taxExemptionDate: formatDate(config.taxExemptionDate), taxExemptionNumber: config.taxExemptionNumber })}</p>
-        <p class="text-xs mb-8">{t("donations.receipt.liabilityText")}</p>
+        <p class="mb-4">{t("donors.summaryReceipt.exemptionText", { taxOffice: config.taxOffice, taxExemptionDate: formatDate(config.taxExemptionDate), taxExemptionNumber: config.taxExemptionNumber })}</p>
+        <p class="text-xs mb-8">{t("donors.summaryReceipt.liabilityText")}</p>
 
         <div class="flex justify-between mt-12 pt-2">
-          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donations.receipt.place")}</span>
-          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donations.receipt.signature")}</span>
+          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donors.summaryReceipt.place")}</span>
+          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donors.summaryReceipt.signature")}</span>
         </div>
 
-        <p class="text-xs opacity-50 mt-8 print:hidden">{t("donations.receipt.disclaimer")}</p>
+        <p class="text-xs opacity-50 mt-8 print:hidden">{t("donors.summaryReceipt.disclaimer")}</p>
       </div>
 
       {included.length > 0 && (
         <form method="post" action={`/donors/${donor.id}/summary-receipt/mark-issued?${qs}`} class="mt-4 print:hidden">
           <input type="hidden" name="from" value={from} />
           <input type="hidden" name="to" value={to} />
-          <button type="submit" class="btn btn-primary">{t("donations.receipt.print")}</button>
+          <button type="submit" class="btn btn-primary">{t("donors.summaryReceipt.print")}</button>
         </form>
       )}
 

@@ -134,6 +134,8 @@ function completeOrgConfig(overrides: Record<string, string> = {}) {
     taxExemptionDate: "2020-01-01",
     taxExemptionNumber: "12/345/6789",
     taxOffice: "Finanzamt Musterstadt",
+    taxAssessmentPeriod: "2019",
+    charitablePurpose: "Förderung des Feuerwehrwesens",
     ...overrides,
   }).map(([key, value]) => ({ key, value }));
 }
