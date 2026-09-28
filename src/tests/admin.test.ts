@@ -909,6 +909,7 @@ describe("GET /org-config", () => {
     expect(html).toContain(t("admin.orgConfig.field.orgName"));
     expect(html).toContain("Feuerwehr Musterstadt e.V.");
     expect(html).toMatch(/name="orgStreet"[^>]*value=""/);
+    expect(html).toMatch(/name="orgHouseNumber"[^>]*value=""/);
   });
 });
 

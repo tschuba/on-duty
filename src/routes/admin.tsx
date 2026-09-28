@@ -1524,6 +1524,7 @@ adminRoutes.get("/config", guard, async (c) => {
 const ORG_CONFIG_FIELDS = [
   { key: "orgName", type: "text", section: "address" },
   { key: "orgStreet", type: "text", section: "address" },
+  { key: "orgHouseNumber", type: "text", section: "address" },
   { key: "orgZip", type: "text", section: "address" },
   { key: "orgCity", type: "text", section: "address" },
   { key: "taxExemptionDate", type: "date", section: "tax" },
@@ -1542,6 +1543,7 @@ const ORG_CONFIG_SECTIONS = [
 const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
   orgName: t("admin.orgConfig.field.orgName"),
   orgStreet: t("admin.orgConfig.field.orgStreet"),
+  orgHouseNumber: t("admin.orgConfig.field.orgHouseNumber"),
   orgZip: t("admin.orgConfig.field.orgZip"),
   orgCity: t("admin.orgConfig.field.orgCity"),
   taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
@@ -1588,8 +1590,11 @@ adminRoutes.get("/org-config", guard, async (c) => {
             <div class="card-body gap-4">
               <h2 class="card-title">{ORG_CONFIG_SECTIONS[0].title}</h2>
               {field("orgName", "text")}
-              {field("orgStreet", "text")}
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-[3fr_1fr] gap-4">
+                {field("orgStreet", "text")}
+                {field("orgHouseNumber", "text")}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_3fr] gap-4">
                 {field("orgZip", "text")}
                 {field("orgCity", "text")}
               </div>
@@ -1598,7 +1603,7 @@ adminRoutes.get("/org-config", guard, async (c) => {
           <div class="card bg-base-200 shadow">
             <div class="card-body gap-4">
               <h2 class="card-title">{ORG_CONFIG_SECTIONS[1].title}</h2>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4">
                 {field("taxExemptionDate", "date")}
                 {field("taxExemptionNumber", "text")}
               </div>
