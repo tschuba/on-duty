@@ -103,6 +103,7 @@ export const de = {
   "admin.tabs.roles": "Funktionen",
   "admin.tabs.anniversaries": "Jubiläen",
   "admin.tabs.config": "Konfiguration",
+  "admin.tabs.orgConfig": "Organisation",
   "admin.tabs.backup": "Backup",
   "admin.backup.warnNotConfigured": "Kein Backup konfiguriert. Lege ein Backup-Ziel fest (Env-Vars BACKUP_LOCAL_PATH oder S3_*).",
   "admin.backup.warnLastFailed": "Letztes Backup fehlgeschlagen.",
@@ -232,6 +233,24 @@ export const de = {
   "admin.config.desc.BACKUP_LOCAL_PATH": "Lokales Verzeichnis für Backup-Dateien (leer = deaktiviert).",
   "admin.config.desc.S3_ENDPOINT": "S3-kompatibler Endpunkt (leer = deaktiviert).",
   "admin.config.desc.S3_BUCKET": "S3-Bucket-Name.",
+
+  // ── Admin – Org-Config ───────────────────────────────────────────────────────
+  "admin.orgConfig.title": "Organisation",
+  "admin.orgConfig.section.address": "Adresse",
+  "admin.orgConfig.section.tax": "Steuerdaten",
+  "admin.orgConfig.section.bank": "Bankverbindung",
+  "admin.orgConfig.field.orgName": "Rechtsname",
+  "admin.orgConfig.field.orgName.desc": "Rechtsname des Vereins für Dokumente (z. B. mit „e.V.“ Suffix).",
+  "admin.orgConfig.field.orgStreet": "Straße",
+  "admin.orgConfig.field.orgHouseNumber": "Hausnummer",
+  "admin.orgConfig.field.orgZip": "Postleitzahl",
+  "admin.orgConfig.field.orgCity": "Ort",
+  "admin.orgConfig.field.taxExemptionDate": "Datum des Freistellungsbescheids",
+  "admin.orgConfig.field.taxExemptionNumber": "Nummer des Freistellungsbescheids",
+  "admin.orgConfig.field.taxOffice": "Zuständiges Finanzamt",
+  "admin.orgConfig.field.iban": "IBAN",
+  "admin.orgConfig.field.bic": "BIC",
+  "admin.orgConfig.flash.saved": "Organisationsdaten gespeichert.",
 
   // ── Admin – Backup ───────────────────────────────────────────────────────────
   "admin.backup.title": "Backup-History",

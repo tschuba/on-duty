@@ -384,7 +384,7 @@ function MemberFormFields({
           type={type}
           name={name as string}
           value={value as string}
-          class={`input input-bordered${err ? " input-error" : ""}`}
+          class={`input input-bordered w-full${err ? " input-error" : ""}`}
           {...(required ? { required: true } : {})}
         />
         {err && <span class="text-error text-sm mt-1">{err}</span>}
@@ -408,7 +408,7 @@ function MemberFormFields({
         {field("city", t("members.form.city"))}
         <div class="form-control">
           <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
-          <select name="gender" class={`select select-bordered${genderErr ? " select-error" : ""}`}>
+          <select name="gender" class={`select select-bordered w-full${genderErr ? " select-error" : ""}`}>
             <option value="" selected={!m?.gender}>{t("members.form.genderNone")}</option>
             <option value="male" selected={m?.gender === "male"}>{t("members.form.genderMale")}</option>
             <option value="female" selected={m?.gender === "female"}>{t("members.form.genderFemale")}</option>
