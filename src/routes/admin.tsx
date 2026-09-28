@@ -69,7 +69,7 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
   );
 }
 
-async function backupWarnProps() {
+export async function backupWarnProps() {
   const configured = isBackupConfigured();
   const last = configured ? await getLastBackup() : null;
   const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;

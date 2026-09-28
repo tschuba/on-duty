@@ -6,6 +6,7 @@ import * as schema from "./db/schema/index.js";
 import { env } from "./env.js";
 import { parseSessionLifetime } from "./lib/session-lifetime.js";
 
+/* v8 ignore start -- better-auth wiring/config, no branching logic to unit-test */
 export const auth = betterAuth({
   baseURL: env.OIDC_APP_URL,
   basePath: "/auth",
@@ -54,5 +55,6 @@ export const auth = betterAuth({
   ],
   trustedOrigins: [env.OIDC_APP_URL],
 });
+/* v8 ignore stop */
 
 export type AppUser = typeof auth.$Infer.Session.user;
