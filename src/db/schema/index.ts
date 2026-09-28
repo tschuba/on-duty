@@ -5,3 +5,4 @@ export * from "./auth";
 export * from "./permissions";
 export * from "./relations";
 export * from "./backup";
+export * from "./org-config";

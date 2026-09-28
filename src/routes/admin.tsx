@@ -13,6 +13,7 @@ import {
   appRoles,
   appRolePermissions,
   userAppRoles,
+  orgConfig,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -47,7 +48,7 @@ function setFlash(c: any, msg: string, type: "success" | "error") {
   });
 }
 
-function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -64,6 +65,9 @@ function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "an
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         {t("admin.tabs.config")}
+      </a>
+      <a href="/admin/org-config" role="tab" class={`tab${active === "org-config" ? " tab-active" : ""}`}>
+        {t("admin.tabs.orgConfig")}
       </a>
       <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
         {t("admin.tabs.backup")}
@@ -1514,6 +1518,104 @@ adminRoutes.get("/config", guard, async (c) => {
       </div>
     </Layout>
   );
+});
+
+// ── /admin/org-config ────────────────────────────────────────────────────────
+const ORG_CONFIG_FIELDS = [
+  { key: "orgName", type: "text", section: "address" },
+  { key: "orgStreet", type: "text", section: "address" },
+  { key: "orgZip", type: "text", section: "address" },
+  { key: "orgCity", type: "text", section: "address" },
+  { key: "taxExemptionDate", type: "date", section: "tax" },
+  { key: "taxExemptionNumber", type: "text", section: "tax" },
+  { key: "taxOffice", type: "text", section: "tax" },
+  { key: "iban", type: "text", section: "bank" },
+  { key: "bic", type: "text", section: "bank" },
+] as const;
+
+const ORG_CONFIG_SECTIONS = [
+  { id: "address", title: t("admin.orgConfig.section.address") },
+  { id: "tax", title: t("admin.orgConfig.section.tax") },
+  { id: "bank", title: t("admin.orgConfig.section.bank") },
+] as const;
+
+const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
+  orgName: t("admin.orgConfig.field.orgName"),
+  orgStreet: t("admin.orgConfig.field.orgStreet"),
+  orgZip: t("admin.orgConfig.field.orgZip"),
+  orgCity: t("admin.orgConfig.field.orgCity"),
+  taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
+  taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
+  taxOffice: t("admin.orgConfig.field.taxOffice"),
+  iban: t("admin.orgConfig.field.iban"),
+  bic: t("admin.orgConfig.field.bic"),
+};
+
+// iban/bic are normalized (no spaces, uppercase) so consuming features don't
+// each have to re-clean what an admin typed as "DE12 3456 ...".
+function normalizeOrgConfigValue(key: string, value: string): string {
+  if (key === "iban" || key === "bic") return value.replace(/\s+/g, "").toUpperCase();
+  return value;
+}
+
+adminRoutes.get("/org-config", guard, async (c) => {
+  const user = c.get("user");
+  const warn = await backupWarnProps();
+  const rows = await db.select().from(orgConfig);
+  const values = new Map(rows.map((r) => [r.key, r.value]));
+  return c.html(
+    <Layout title={t("admin.orgConfig.title")} user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
+      <AdminTabs active="org-config" />
+      <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
+          {t("admin.orgConfig.title")}
+        </h1>
+        <form method="post" action="/admin/org-config" class="flex flex-col gap-8">
+          {ORG_CONFIG_SECTIONS.map((section) => (
+            <div>
+              <h2 class="text-lg font-semibold mb-3">{section.title}</h2>
+              <div class="flex flex-col gap-3 max-w-xl">
+                {ORG_CONFIG_FIELDS.filter((f) => f.section === section.id).map((field) => (
+                  <label class="form-control">
+                    <span class="label-text mb-1">{ORG_CONFIG_FIELD_LABELS[field.key]}</span>
+                    <input
+                      type={field.type}
+                      name={field.key}
+                      class="input input-bordered"
+                      value={values.get(field.key) ?? ""}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div>
+            <button type="submit" class="btn btn-primary">
+              {t("common.save")}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.post("/org-config", guard, async (c) => {
+  const body = await c.req.parseBody();
+  for (const field of ORG_CONFIG_FIELDS) {
+    const value = normalizeOrgConfigValue(field.key, String(body[field.key] ?? "").trim());
+    if (value) {
+      await db
+        .insert(orgConfig)
+        .values({ key: field.key, value })
+        .onConflictDoUpdate({ target: orgConfig.key, set: { value } });
+    } else {
+      await db.delete(orgConfig).where(eq(orgConfig.key, field.key));
+    }
+  }
+  setFlash(c, t("admin.orgConfig.flash.saved"), "success");
+  return c.redirect("/admin/org-config");
 });
 
 // ── /admin/backup ──────────────────────────────────────────────────────────────

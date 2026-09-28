@@ -78,6 +78,13 @@
       "when": 1790625143307,
       "tag": "0010_persons_architektur",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790627077921,
+      "tag": "0011_empty_purple_man",
+      "breakpoints": true
     }
   ]
 }
