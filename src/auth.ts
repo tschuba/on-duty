@@ -34,7 +34,6 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      appRole: { type: "string", defaultValue: "read", input: false },
       disabled: { type: "boolean", defaultValue: false, input: false },
     },
   },

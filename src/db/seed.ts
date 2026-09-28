@@ -2,7 +2,60 @@ import { hashPassword } from "better-auth/crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and } from "drizzle-orm";
-import { users, accounts, memberRoles, anniversaryYears } from "./schema/index.js";
+import {
+  users,
+  accounts,
+  memberRoles,
+  anniversaryYears,
+  appRoles,
+  appRolePermissions,
+  userAppRoles,
+} from "./schema/index.js";
+import type { Permission } from "../lib/roles.js";
+
+const APP_ROLES: { id: string; name: string; isProtected: boolean; permissions: Permission[] }[] = [
+  {
+    id: "9b1f6c2a-4b3a-4b3a-8b3a-1a2b3c4d5e6f",
+    name: "Administrator",
+    isProtected: true,
+    permissions: [
+      "members:read", "members:write",
+      "inventory:read", "inventory:manage",
+      "training:read", "training:manage",
+      "donations:manage",
+      "applications:review",
+      "system:admin",
+    ],
+  },
+  {
+    id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+    name: "Bearbeiter",
+    isProtected: true,
+    permissions: ["members:read", "members:write", "applications:review"],
+  },
+  {
+    id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
+    name: "Leser",
+    isProtected: true,
+    permissions: ["members:read", "inventory:read", "training:read"],
+  },
+  {
+    id: "4a5b6c7d-8e9f-4a1b-9c2d-3e4f5a6b7c8d",
+    name: "Vorstand",
+    isProtected: false,
+    permissions: ["members:read", "donations:manage", "applications:review"],
+  },
+  {
+    id: "1e2d3c4b-5a6f-4e7d-8c9b-0a1b2c3d4e5f",
+    name: "Führung",
+    isProtected: false,
+    permissions: [
+      "members:read",
+      "inventory:read", "inventory:manage",
+      "training:read", "training:manage",
+    ],
+  },
+];
 
 export async function runSeed() {
   if (!process.env.ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD is not set");
@@ -37,6 +90,14 @@ export async function runSeed() {
       { year: 95 }, { year: 100 },
     ]).onConflictDoNothing();
 
+    await db.insert(appRoles).values(
+      APP_ROLES.map(({ id, name, isProtected }) => ({ id, name, isProtected })),
+    ).onConflictDoNothing();
+
+    await db.insert(appRolePermissions).values(
+      APP_ROLES.flatMap((r) => r.permissions.map((permission) => ({ roleId: r.id, permission }))),
+    ).onConflictDoNothing();
+
     const now = new Date();
     const hash = await hashPassword(process.env.ADMIN_PASSWORD);
 
@@ -47,11 +108,17 @@ export async function runSeed() {
         name: "Administrator",
         email: "admin@localhost.invalid",
         emailVerified: true,
-        appRole: "admin",
         disabled: false,
         createdAt: now,
         updatedAt: now,
       })
+      .onConflictDoNothing();
+
+    // ponytail: only re-links the seeded local admin account to its role — any other
+    // pre-existing user's old appRole is not backfilled (dev/seed-only data, no migration needed)
+    await db
+      .insert(userAppRoles)
+      .values({ userId: "admin", roleId: APP_ROLES[0].id })
       .onConflictDoNothing();
 
     const existing = await db

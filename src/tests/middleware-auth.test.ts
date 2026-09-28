@@ -5,26 +5,36 @@ const getSession = vi.fn();
 const dbDeleteWhere = vi.fn().mockResolvedValue(undefined);
 const dbDelete = vi.fn(() => ({ where: dbDeleteWhere }));
 
+let permissionRows: { permission: string }[] = [];
+const selectWhere = vi.fn(() => Promise.resolve(permissionRows));
+const selectInnerJoin = vi.fn(() => ({ where: selectWhere }));
+const selectFrom = vi.fn(() => ({ innerJoin: selectInnerJoin }));
+const dbSelect = vi.fn(() => ({ from: selectFrom }));
+
 vi.mock("../auth.js", () => ({
   auth: { api: { getSession } },
 }));
 
 vi.mock("../db/index.js", () => ({
-  db: { delete: dbDelete },
+  db: { delete: dbDelete, select: dbSelect },
 }));
 
 const { requireAuth } = await import("../middleware/auth.js");
-type Variables = { user: { id: string } };
+type Variables = { user: { id: string; permissions: Set<string> } };
 
-function appWith(minRole?: "read" | "editor" | "admin") {
+function appWith(required?: string) {
   const app = new Hono<{ Variables: Variables }>();
-  app.get("/protected", requireAuth(minRole), (c) => c.text(`ok:${c.get("user").id}`));
+  app.get("/protected", requireAuth(required as any), (c) => {
+    const user = c.get("user");
+    return c.json({ id: user.id, permissions: [...user.permissions] });
+  });
   return app;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   dbDeleteWhere.mockResolvedValue(undefined);
+  permissionRows = [];
 });
 
 describe("requireAuth", () => {
@@ -38,7 +48,7 @@ describe("requireAuth", () => {
   });
 
   it("deletes the session and redirects when the user is disabled", async () => {
-    getSession.mockResolvedValue({ user: { id: "u1", disabled: true, appRole: "admin" } });
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: true } });
     const res = await appWith().request("/protected");
 
     expect(res.status).toBe(302);
@@ -47,19 +57,30 @@ describe("requireAuth", () => {
     expect(dbDeleteWhere).toHaveBeenCalled();
   });
 
-  it("returns 403 when the user's role is below the minimum", async () => {
-    getSession.mockResolvedValue({ user: { id: "u1", disabled: false, appRole: "read" } });
-    const res = await appWith("admin").request("/protected");
+  it("returns 403 when the user lacks the required permission", async () => {
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
+    permissionRows = [{ permission: "members:read" }];
+    const res = await appWith("system:admin").request("/protected");
 
     expect(res.status).toBe(403);
     expect(dbDelete).not.toHaveBeenCalled();
   });
 
-  it("sets the user and calls next when access is granted", async () => {
-    getSession.mockResolvedValue({ user: { id: "u1", disabled: false, appRole: "admin" } });
-    const res = await appWith("admin").request("/protected");
+  it("sets the user's permission set and calls next when access is granted", async () => {
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
+    permissionRows = [{ permission: "system:admin" }, { permission: "members:read" }];
+    const res = await appWith("system:admin").request("/protected");
 
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe("ok:u1");
+    expect(await res.json()).toEqual({ id: "u1", permissions: ["system:admin", "members:read"] });
+  });
+
+  it("bare requireAuth() only requires authentication, no specific permission", async () => {
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
+    permissionRows = [];
+    const res = await appWith().request("/protected");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: "u1", permissions: [] });
   });
 });

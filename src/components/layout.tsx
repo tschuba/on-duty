@@ -1,10 +1,10 @@
 import type { FC, PropsWithChildren } from "hono/jsx";
-import type { AppUser } from "../auth.js";
+import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 
 type Props = PropsWithChildren<{
   title?: string;
-  user?: AppUser;
+  user?: AuthedUser;
   activeNav?: "members" | "anniversaries" | "admin";
 }>;
 
@@ -40,7 +40,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               >
                 {t("common.nav.anniversaries")}
               </a>
-              {user.appRole === "admin" && (
+              {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
                   class={`btn btn-ghost btn-sm${activeNav === "admin" ? " btn-active" : ""}`}
@@ -62,7 +62,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
-                {user.appRole === "admin" && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
+                {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
           </div>

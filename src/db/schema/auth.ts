@@ -10,8 +10,6 @@ export const users = pgTable("user", {
   image: text("image"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
-  // App-level role, separate from Better Auth roles
-  appRole: text("app_role").notNull().default("read"), // "read" | "editor" | "admin"
   disabled: boolean("disabled").notNull().default(false),
 });
 

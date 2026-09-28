@@ -92,7 +92,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", appRole: "editor", disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -121,7 +121,7 @@ beforeEach(() => {
   assignmentRowsFixture = [];
   findManyResult = [];
   findFirstResult = undefined;
-  currentUser = { id: "u1", appRole: "editor", disabled: false };
+  currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -394,7 +394,7 @@ describe("GET /", () => {
   });
 
   it("hides the add-member button for a read-only user", async () => {
-    currentUser = { id: "u1", appRole: "read", disabled: false };
+    currentUser = { id: "u1", permissions: new Set(), disabled: false };
     findManyResult = [];
     const res = await memberRoutes.request("/");
     expect(await res.text()).not.toContain("/members/new");
@@ -519,7 +519,7 @@ describe("GET /:id", () => {
   });
 
   it("renders a read-only view without a form for non-editors", async () => {
-    currentUser = { id: "u1", appRole: "read", disabled: false };
+    currentUser = { id: "u1", permissions: new Set(), disabled: false };
     findFirstResult = memberWithAssignments();
     const res = await memberRoutes.request("/m1");
     const html = await res.text();
