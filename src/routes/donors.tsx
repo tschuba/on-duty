@@ -283,7 +283,7 @@ donorRoutes.get("/", requireAuth("donations:manage"), async (c) => {
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return c.html(
-    <Layout title={t("donors.title")} user={user} activeNav="donations">
+    <Layout title={t("donors.title")} user={user} activeNav="donors">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donors.title")}</h1>
         <a href="/donors/new" class="btn btn-primary btn-sm">{t("donors.addDonor")}</a>
@@ -344,7 +344,7 @@ donorRoutes.get("/", requireAuth("donations:manage"), async (c) => {
 donorRoutes.get("/new", requireAuth("donations:manage"), async (c) => {
   const user = c.get("user");
   return c.html(
-    <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
+    <Layout title={t("donors.newDonor")} user={user} activeNav="donors">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.newDonor")}</h1>
@@ -370,7 +370,7 @@ donorRoutes.post("/new", requireAuth("donations:manage"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
+      <Layout title={t("donors.newDonor")} user={user} activeNav="donors">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.newDonor")}</h1>
@@ -410,7 +410,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
   if (!donor) return c.notFound();
 
   return c.html(
-    <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
+    <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}</h1>
@@ -438,7 +438,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:manage"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
+      <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}</h1>
@@ -483,7 +483,7 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
   const config = await loadOrgConfig();
   if (!isOrgConfigCompleteForReceipts(config)) {
     return c.html(
-      <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donations">
+      <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donors">
         <div class="alert alert-warning">
           <div>
             <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
@@ -506,7 +506,7 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
   const print = c.req.query("print") === "1";
 
   return c.html(
-    <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donations">
+    <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donors">
       <div class="mb-4 print:hidden">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.summaryReceipt.title")}</h1>

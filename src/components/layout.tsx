@@ -5,7 +5,7 @@ import { t } from "../i18n/index.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "admin";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin";
 }>;
 
 export function ClickToEditHint() {
@@ -52,6 +52,14 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                   {t("common.nav.donations")}
                 </a>
               )}
+              {user.permissions.has("donations:manage") && (
+                <a
+                  href="/donors"
+                  class={`btn btn-ghost btn-sm${activeNav === "donors" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.donors")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -75,6 +83,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
                 {user.permissions.has("donations:manage") && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
+                {user.permissions.has("donations:manage") && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>

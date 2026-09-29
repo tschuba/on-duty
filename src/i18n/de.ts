@@ -25,6 +25,7 @@ export const de = {
   "common.nav.members": "Mitglieder",
   "common.nav.anniversaries": "Jubiläen & Geburtstage",
   "common.nav.donations": "Spenden",
+  "common.nav.donors": "Spender",
   "common.nav.admin": "Admin",
 
   // ── Status ───────────────────────────────────────────────────────────────────
