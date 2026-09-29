@@ -127,7 +127,7 @@ function parseDonationFields(body: Record<string, any>): { values: DonationField
   return { values, errors };
 }
 
-function DonationFormFields({ values, errors }: { values?: Partial<DonationFieldValues>; errors?: Record<string, string> }) {
+function DonationFormFields({ values, errors, showTodayButton }: { values?: Partial<DonationFieldValues>; errors?: Record<string, string>; showTodayButton?: boolean }) {
   return (
     <>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -144,12 +144,23 @@ function DonationFormFields({ values, errors }: { values?: Partial<DonationField
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">{t("donations.form.date")}<span class="text-error ml-1">*</span></span></label>
-          <input
-            type="date"
-            name="date"
-            value={values?.date ?? ""}
-            class={`input input-bordered w-full${errors?.date ? " input-error" : ""}`}
-          />
+          <div class="join w-full">
+            <input
+              type="date"
+              name="date"
+              value={values?.date ?? ""}
+              class={`input input-bordered join-item w-full${errors?.date ? " input-error" : ""}`}
+            />
+            {showTodayButton && (
+              <button
+                type="button"
+                class="btn btn-outline join-item"
+                onclick="const d=new Date();this.previousElementSibling.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')"
+              >
+                {t("common.today")}
+              </button>
+            )}
+          </div>
           {errors?.date && <span class="text-error text-sm mt-1">{errors.date}</span>}
         </div>
       </div>
@@ -285,7 +296,7 @@ donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
       <form method="post" action="/donations" class="space-y-4 max-w-xl">
         <DonorPickerFields />
         <div class="divider" />
-        <DonationFormFields />
+        <DonationFormFields showTodayButton />
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
@@ -315,7 +326,7 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
         <form method="post" action="/donations" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={donorFields.values} errors={errors} />
           <div class="divider" />
-          <DonationFormFields values={donationFields.values} errors={errors} />
+          <DonationFormFields values={donationFields.values} errors={errors} showTodayButton />
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>

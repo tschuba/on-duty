@@ -18,6 +18,7 @@ export const de = {
   "common.export": "Export",
   "common.apply": "Anwenden",
   "common.reset": "Zurücksetzen",
+"common.today": "Heute",
   "common.show": "Anzeigen",
   "common.searchPlaceholder": "Suchen…",
   "common.excelExport": "Excel-Export",
