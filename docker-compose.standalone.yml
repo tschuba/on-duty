@@ -47,7 +47,7 @@ services:
       ZITADEL_DB_PASSWORD: ${SERVICE_PASSWORD_ZITADEL_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./postgres-init-standalone.sh:/docker-entrypoint-initdb.d/init-zitadel-db.sh:ro
+      - ./scripts/postgres-init-standalone.sh:/docker-entrypoint-initdb.d/init-zitadel-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onduty} -d ${POSTGRES_DB:-onduty}"]
       interval: 5s
@@ -68,7 +68,7 @@ services:
       # Caddy terminiert TLS extern und spricht Zitadel intern per h2c
       # (Klartext-HTTP/2) an — siehe Caddyfile.standalone.
       ZITADEL_TLS_ENABLED: "false"
-      # Eigener, nicht-privilegierter DB-User (siehe postgres-init-standalone.sh)
+      # Eigener, nicht-privilegierter DB-User (siehe scripts/postgres-init-standalone.sh)
       # statt des onduty-Superusers — bei gesetztem DSN legt Zitadel keinen
       # eigenen User an, sondern nutzt exakt den hier angegebenen.
       ZITADEL_DATABASE_POSTGRES_DSN: postgresql://${ZITADEL_DB_USER:-zitadel}:${SERVICE_PASSWORD_ZITADEL_DB}@db:5432/${ZITADEL_DB_NAME:-zitadel}?sslmode=disable

@@ -12,13 +12,13 @@ Generische `OIDC_*`-Variablen sind in [docs/oidc.md](oidc.md) dokumentiert — d
 
 ## Benötigte Dateien
 
-Anders als beim reinen `docker-compose.prod.yml`-Deployment werden hier zusätzlich zwei Dateien aus dem Repo als Bind-Mounts eingebunden — alle vier gehören ins selbe Arbeitsverzeichnis auf dem Server:
+Anders als beim reinen `docker-compose.prod.yml`-Deployment werden hier zusätzlich zwei Dateien aus dem Repo als Bind-Mounts eingebunden — alle vier gehören ins selbe Arbeitsverzeichnis auf dem Server, `postgres-init-standalone.sh` darin in einem `scripts/`-Unterordner:
 
 ```
 docker-compose.standalone.yml
 .env.standalone         # aus .env.standalone.example, siehe unten
 Caddyfile.standalone
-postgres-init-standalone.sh
+scripts/postgres-init-standalone.sh
 ```
 
 ## Ersteinrichtung
