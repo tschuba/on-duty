@@ -7,6 +7,7 @@ import { auth } from "./auth.js";
 import { env } from "./env.js";
 import { startBackupScheduler } from "./lib/backup.js";
 import { loginRoutes } from "./routes/login.js";
+import { applyRoutes } from "./routes/apply.js";
 import { memberRoutes } from "./routes/members.js";
 import { adminRoutes } from "./routes/admin.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
@@ -28,6 +29,9 @@ app.use("/js/*", serveStatic({ root: "./public" }));
 
 // Auth + password routes
 app.route("/", loginRoutes);
+
+// Public application forms — no auth guard, see backlog "Digitale Anträge"
+app.route("/apply", applyRoutes);
 
 // Better Auth handler
 app.on(["POST", "GET"], "/auth/*", async (c) => {
