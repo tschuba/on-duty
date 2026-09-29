@@ -484,7 +484,7 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
   if (!isOrgConfigCompleteForReceipts(config)) {
     return c.html(
       <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donations">
-        <div class="alert alert-warning max-w-xl">
+        <div class="alert alert-warning">
           <div>
             <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
             <p>{t("donations.receipt.blockedBody")}</p>
@@ -508,7 +508,7 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
   return c.html(
     <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donations">
       <div class="mb-4 print:hidden">
-        <a href={`/donors/${donor.id}/edit`} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+        <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.summaryReceipt.title")}</h1>
       </div>
 

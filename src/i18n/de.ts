@@ -136,7 +136,7 @@ export const de = {
   "donations.receipt.title": "Zuwendungsbestätigung",
   "donations.receipt.download": "XML herunterladen",
   "donations.receipt.blockedTitle": "Organisationsdaten unvollständig",
-  "donations.receipt.blockedBody": "Für Zuwendungsbestätigungen müssen Vereinsname, Anschrift, Freistellungsbescheid-Daten, Finanzamt, Veranlagungszeitraum und der begünstigte Zweck hinterlegt sein.",
+  "donations.receipt.blockedBody": "Bitte ergänzen Sie die Organisationsdaten, um Zuwendungsbestätigungen ausstellen zu können.",
   "donations.receipt.blockedLink": "Zu den Organisationsdaten →",
   "donations.receipt.summaryDonor": "Spender",
   "donations.receipt.summaryAmount": "Betrag",

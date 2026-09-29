@@ -203,7 +203,7 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
       {orgConfigIncomplete && (
-        <div class="alert alert-warning max-w-xl mb-4">
+        <div class="alert alert-warning mb-4">
           <div>
             <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
             <p>{t("donations.receipt.blockedBody")}</p>
@@ -260,7 +260,9 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
                   : <span class="badge badge-ghost badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
               <td class="whitespace-nowrap">
-                <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>
+                {orgConfigIncomplete
+                  ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
+                  : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
               </td>
             </tr>
           ))}
@@ -433,7 +435,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:manage"), async (c) =>
   if (!isOrgConfigCompleteForReceipts(config)) {
     return c.html(
       <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
-        <div class="alert alert-warning max-w-xl">
+        <div class="alert alert-warning">
           <div>
             <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
             <p>{t("donations.receipt.blockedBody")}</p>
@@ -447,7 +449,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:manage"), async (c) =>
   return c.html(
     <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
       <div class="mb-4">
-        <a href={`/donations/${d.id}/edit`} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+        <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.receipt.title")}</h1>
       </div>
 
