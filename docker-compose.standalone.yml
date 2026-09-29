@@ -1,6 +1,10 @@
 services:
   app:
     image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
+    # node läuft hier als PID 1 ohne eigenen SIGTERM-Handler — ohne init
+    # ignoriert PID 1 das Signal (Linux-Sonderfall), `stop`/`down` müsste den
+    # vollen Grace-Timeout abwarten und dann SIGKILL schicken (Exit 137).
+    init: true
     restart: on-failure
     deploy:
       restart_policy:
