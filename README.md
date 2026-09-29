@@ -10,6 +10,7 @@ Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer.
 
 - [OIDC-Provider konfigurieren](docs/oidc.md)
 - [Backup konfigurieren](docs/backup.md)
+- [Standalone-Deployment (App + DB + OIDC, ohne Coolify)](docs/standalone-deployment.md)
 - [GitHub-Repository konfigurieren](docs/github-setup.md)
 
 ## Deployment (Docker)

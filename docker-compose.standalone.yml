@@ -1,0 +1,164 @@
+services:
+  app:
+    image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
+    # node läuft hier als PID 1 ohne eigenen SIGTERM-Handler — ohne init
+    # ignoriert PID 1 das Signal (Linux-Sonderfall), `stop`/`down` müsste den
+    # vollen Grace-Timeout abwarten und dann SIGKILL schicken (Exit 137).
+    init: true
+    restart: on-failure
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+        delay: 10s
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health > /dev/null"]
+      start_period: 20s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-onduty}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-onduty}
+      BETTER_AUTH_SECRET: ${SERVICE_PASSWORD_BETTERAUTH}
+      ADMIN_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
+      ORG_NAME: ${ORG_NAME}
+      OIDC_PROVIDER: https://${ZITADEL_DOMAIN}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      OIDC_APP_URL: https://${APP_DOMAIN}
+      # Eingebauter Backup-Mechanismus ist im Standalone-Stack deaktiviert — der
+      # dedizierte `backup`-Service unten sichert stattdessen beide Datenbanken.
+      # Siehe 17_Backup-Status-Flag (unabhängiger Task): fest verdrahtet, kein
+      # Platzhalter in .env.standalone, da es hier nie sinnvoll umzuschalten wäre.
+      BACKUP_DISABLED: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-onduty}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: ${POSTGRES_DB:-onduty}
+      ZITADEL_DB_NAME: ${ZITADEL_DB_NAME:-zitadel}
+      ZITADEL_DB_USER: ${ZITADEL_DB_USER:-zitadel}
+      ZITADEL_DB_PASSWORD: ${SERVICE_PASSWORD_ZITADEL_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/postgres-init-standalone.sh:/docker-entrypoint-initdb.d/init-zitadel-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onduty} -d ${POSTGRES_DB:-onduty}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  zitadel:
+    image: ghcr.io/zitadel/zitadel:v4.19.2
+    restart: unless-stopped
+    user: "0"
+    command: start-from-init --masterkey "${ZITADEL_MASTERKEY}"
+    environment:
+      ZITADEL_PORT: 8080
+      ZITADEL_EXTERNALDOMAIN: ${ZITADEL_DOMAIN}
+      ZITADEL_EXTERNALPORT: 443
+      ZITADEL_EXTERNALSECURE: "true"
+      # Caddy terminiert TLS extern und spricht Zitadel intern per h2c
+      # (Klartext-HTTP/2) an — siehe Caddyfile.standalone.
+      ZITADEL_TLS_ENABLED: "false"
+      # Eigener, nicht-privilegierter DB-User (siehe scripts/postgres-init-standalone.sh)
+      # statt des onduty-Superusers — bei gesetztem DSN legt Zitadel keinen
+      # eigenen User an, sondern nutzt exakt den hier angegebenen.
+      ZITADEL_DATABASE_POSTGRES_DSN: postgresql://${ZITADEL_DB_USER:-zitadel}:${SERVICE_PASSWORD_ZITADEL_DB}@db:5432/${ZITADEL_DB_NAME:-zitadel}?sslmode=disable
+      # Erstinstanz-Bootstrap: nur Org + Admin-User. Projekt/OIDC-Application
+      # entstehen NICHT automatisch — siehe docs/standalone-deployment.md.
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ORG_NAME}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_ADMIN_USERNAME:-zitadel-admin}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORD_ZITADEL_ADMIN}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "true"
+      # Login V2 (eigener zitadel-login-Container) braucht einen Machine-User
+      # mit PAT, den Zitadel beim Bootstrap selbst anlegt und über das
+      # gemeinsame zitadel-bootstrap-Volume mit zitadel-login teilt.
+      ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: Automatically Initialized IAM_LOGIN_CLIENT
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE: "2099-01-01T00:00:00Z"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "true"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: https://${ZITADEL_DOMAIN}/ui/v2/login/
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: https://${ZITADEL_DOMAIN}/ui/v2/login/login?authRequest=
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: https://${ZITADEL_DOMAIN}/ui/v2/login/logout?post_logout_redirect=
+    healthcheck:
+      test: ["CMD", "/app/zitadel", "ready"]
+      interval: 10s
+      timeout: 30s
+      retries: 12
+      start_period: 20s
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:rw
+    depends_on:
+      db:
+        condition: service_healthy
+
+  zitadel-login:
+    image: ghcr.io/zitadel/zitadel-login:v4.19.2
+    restart: unless-stopped
+    user: "0"
+    environment:
+      ZITADEL_API_URL: http://zitadel:8080
+      NEXT_PUBLIC_BASE_PATH: /ui/v2/login
+      ZITADEL_SERVICE_USER_TOKEN_FILE: /zitadel/bootstrap/login-client.pat
+      ZITADEL_SESSION_COOKIE_SECRET: ${ZITADEL_SESSION_COOKIE_SECRET}
+      CUSTOM_REQUEST_HEADERS: Host:${ZITADEL_DOMAIN},X-Forwarded-Proto:https
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:ro
+    depends_on:
+      zitadel:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      ZITADEL_DOMAIN: ${ZITADEL_DOMAIN}
+    volumes:
+      - ./Caddyfile.standalone:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+      - zitadel
+      - zitadel-login
+
+  backup:
+    image: prodrigestivill/postgres-backup-local:17-alpine-d257e5d
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      # onduty ist der Postgres-Superuser (Bootstrap-User des offiziellen
+      # Images) und hat damit Lesezugriff auf beide Datenbanken — der
+      # Backup-Container braucht eine einzelne Rolle mit Zugriff auf alle
+      # in POSTGRES_DB gelisteten DBs, nicht den eingeschränkten Zitadel-User.
+      POSTGRES_USER: ${POSTGRES_USER:-onduty}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: ${POSTGRES_DB:-onduty},${ZITADEL_DB_NAME:-zitadel}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - ./data/backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  zitadel-bootstrap:
+  caddy_data:
+  caddy_config:
