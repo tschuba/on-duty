@@ -361,7 +361,7 @@ donationRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{d.donor.person.firstName} {d.donor.person.lastName}</h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
-      {d.receiptIssuedAt && <div class="alert alert-warning max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
+      {d.receiptIssuedAt && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
       </form>
