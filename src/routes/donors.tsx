@@ -4,7 +4,7 @@ import { eq, or, ilike, asc, gte, lte, isNull, and } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
 
@@ -305,6 +305,7 @@ donorRoutes.get("/", requireAuth("donations:manage"), async (c) => {
         </form>
       </div>
 
+      <ClickToEditHint />
       <table class="table table-zebra w-full">
         <thead>
           <tr>

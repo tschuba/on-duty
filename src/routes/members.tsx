@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
@@ -218,6 +218,7 @@ export function MembersTable({
   return (
     <div id="members-results">
       <div>
+        <ClickToEditHint />
         <table class="table table-zebra w-full">
           <thead>
             <tr>
