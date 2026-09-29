@@ -57,6 +57,15 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               >
                 {t("common.nav.anniversaries")}
               </a>
+              {canReviewApplications && (
+                <a
+                  href="/applications"
+                  class={`btn btn-ghost btn-sm${activeNav === "applications" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.applications")}
+                  <ApplicationsBadge count={openApplicationsCount} />
+                </a>
+              )}
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
@@ -79,15 +88,6 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={`btn btn-ghost btn-sm${activeNav === "admin" ? " btn-active" : ""}`}
                 >
                   {t("common.nav.admin")}
-                </a>
-              )}
-              {canReviewApplications && (
-                <a
-                  href="/applications"
-                  class={`btn btn-ghost btn-sm${activeNav === "applications" ? " btn-active" : ""}`}
-                >
-                  {t("common.nav.applications")}
-                  <ApplicationsBadge count={openApplicationsCount} />
                 </a>
               )}
             </div>
