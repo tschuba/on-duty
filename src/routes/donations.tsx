@@ -343,16 +343,15 @@ donationRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       {d.receiptIssuedAt && <div class="alert alert-warning max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
-      <form method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
+      <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
-        <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </form>
-      <form method="post" action={`/donations/${d.id}/delete`} class="mt-4" onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}>
-        <button type="submit" class="btn btn-outline btn-error btn-sm">{t("common.delete")}</button>
-      </form>
+      <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}></form>
+      <div class="flex gap-2 pt-4 max-w-xl">
+        <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
+        <button type="submit" form="donation-delete-form" class="btn btn-primary btn-outline">{t("common.delete")}</button>
+        <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
+      </div>
     </Layout>
   );
 });
@@ -374,13 +373,15 @@ donationRoutes.post("/:id/edit", requireAuth("donations:manage"), async (c) => {
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{d.donor.person.firstName} {d.donor.person.lastName}</h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
-        <form method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
+        <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
           <DonationFormFields values={values} errors={errors} />
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
+        <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}></form>
+        <div class="flex gap-2 pt-4 max-w-xl">
+          <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
+          <button type="submit" form="donation-delete-form" class="btn btn-primary btn-outline">{t("common.delete")}</button>
+          <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
+        </div>
       </Layout>,
       422
     );
