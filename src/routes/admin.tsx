@@ -16,7 +16,7 @@ import {
   orgConfig,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
@@ -163,10 +163,6 @@ function PermissionBadges({ permissions }: { permissions: Permission[] }) {
       })}
     </div>
   );
-}
-
-function ClickToEditHint() {
-  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
 }
 
 // ── /admin → /admin/users ─────────────────────────────────────────────────────

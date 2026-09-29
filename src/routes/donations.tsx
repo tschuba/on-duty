@@ -5,7 +5,7 @@ import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
@@ -214,6 +214,7 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
         <button type="submit" class="btn btn-sm">{t("common.show")}</button>
       </form>
 
+      <ClickToEditHint />
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -230,7 +231,7 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
           {sorted.length === 0 ? (
             <tr><td colspan={7} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
-            <tr key={d.id}>
+            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}/edit'`}>
               <td>{formatDate(d.date)}</td>
               <td>{d.donor.person.firstName} {d.donor.person.lastName}</td>
               <td class="text-right">{formatAmount(d.amount)}</td>
@@ -242,8 +243,7 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
                   : <span class="badge badge-ghost badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
               <td class="whitespace-nowrap">
-                <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm mr-2">{t("donations.receipt.title")}</a>
-                <a href={`/donations/${d.id}/edit`} class="link link-hover text-sm">{t("common.edit")}</a>
+                <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>
               </td>
             </tr>
           ))}

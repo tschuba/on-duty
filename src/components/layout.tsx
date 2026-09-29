@@ -8,6 +8,10 @@ type Props = PropsWithChildren<{
   activeNav?: "members" | "anniversaries" | "donations" | "admin";
 }>;
 
+export function ClickToEditHint() {
+  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
+}
+
 export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
   <html lang="de">
     <head>
