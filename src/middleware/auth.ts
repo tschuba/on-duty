@@ -10,7 +10,7 @@ export type { Permission };
 export type AuthedUser = AppUser & { permissions: Set<Permission> };
 export type Variables = { user: AuthedUser };
 
-export function requireAuth(required?: Permission) {
+export function requireAuth(required?: Permission | Permission[]) {
   return createMiddleware<{ Variables: Variables }>(async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
@@ -33,7 +33,8 @@ export function requireAuth(required?: Permission) {
       .where(eq(userAppRoles.userId, user.id));
     const permissions = new Set(rows.map((r) => r.permission));
 
-    if (required && !permissions.has(required)) {
+    const requiredList = required ? ([] as Permission[]).concat(required) : [];
+    if (requiredList.length > 0 && !requiredList.some((p) => permissions.has(p))) {
       return c.html("<h1>403 Zugriff verweigert</h1>", 403);
     }
 

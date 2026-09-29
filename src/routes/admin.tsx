@@ -16,7 +16,7 @@ import {
   orgConfig,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
@@ -33,11 +33,14 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "members:read": t("admin.permissions.key.membersRead"),
   "members:write": t("admin.permissions.key.membersWrite"),
   "system:admin": t("admin.permissions.key.systemAdmin"),
+  "donations:record": t("admin.permissions.key.donationsRecord"),
+  "donations:issue-receipts": t("admin.permissions.key.donationsIssueReceipts"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
   members: t("admin.permissions.resource.members"),
   system: t("admin.permissions.resource.system"),
+  donations: t("admin.permissions.resource.donations"),
 };
 
 function setFlash(c: any, msg: string, type: "success" | "error") {
@@ -161,10 +164,6 @@ function PermissionBadges({ permissions }: { permissions: Permission[] }) {
       })}
     </div>
   );
-}
-
-function ClickToEditHint() {
-  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
 }
 
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
@@ -1530,6 +1529,9 @@ const ORG_CONFIG_FIELDS = [
   { key: "taxExemptionDate", type: "date", section: "tax" },
   { key: "taxExemptionNumber", type: "text", section: "tax" },
   { key: "taxOffice", type: "text", section: "tax" },
+  { key: "taxAssessmentPeriodFrom", type: "number", section: "tax" },
+  { key: "taxAssessmentPeriodTo", type: "number", section: "tax" },
+  { key: "charitablePurpose", type: "text", section: "tax" },
   { key: "iban", type: "text", section: "bank" },
   { key: "bic", type: "text", section: "bank" },
 ] as const;
@@ -1549,6 +1551,9 @@ const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
   taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
   taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
   taxOffice: t("admin.orgConfig.field.taxOffice"),
+  taxAssessmentPeriodFrom: t("admin.orgConfig.field.taxAssessmentPeriodFrom"),
+  taxAssessmentPeriodTo: t("admin.orgConfig.field.taxAssessmentPeriodTo"),
+  charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
   iban: t("admin.orgConfig.field.iban"),
   bic: t("admin.orgConfig.field.bic"),
 };
@@ -1613,6 +1618,11 @@ adminRoutes.get("/org-config", guard, async (c) => {
                 {field("taxExemptionNumber", "text")}
               </div>
               {field("taxOffice", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("taxAssessmentPeriodFrom", "number")}
+                {field("taxAssessmentPeriodTo", "number")}
+              </div>
+              {field("charitablePurpose", "text")}
             </div>
           </div>
           <div class="card bg-base-200 shadow">
@@ -1632,6 +1642,14 @@ adminRoutes.get("/org-config", guard, async (c) => {
 
 adminRoutes.post("/org-config", guard, async (c) => {
   const body = await c.req.parseBody();
+
+  const periodFrom = String(body.taxAssessmentPeriodFrom ?? "").trim();
+  const periodTo = String(body.taxAssessmentPeriodTo ?? "").trim();
+  if (periodFrom && periodTo && Number(periodTo) < Number(periodFrom)) {
+    setFlash(c, t("admin.orgConfig.flash.invalidPeriod"), "error");
+    return c.redirect("/admin/org-config");
+  }
+
   for (const field of ORG_CONFIG_FIELDS) {
     const value = normalizeOrgConfigValue(field.key, String(body[field.key] ?? "").trim());
     if (value) {

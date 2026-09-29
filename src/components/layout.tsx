@@ -5,8 +5,12 @@ import { t } from "../i18n/index.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "admin";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin";
 }>;
+
+export function ClickToEditHint() {
+  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
+}
 
 export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
   <html lang="de">
@@ -22,12 +26,12 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
       <nav class="navbar bg-base-200 shadow-sm px-4">
-        <div class="navbar-start">
+        <div class="navbar-start flex-1">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-duty
           </a>
           {user && (
-            <div class="hidden sm:flex gap-1">
+            <div class="hidden lg:flex gap-1">
               <a
                 href="/members"
                 class={`btn btn-ghost btn-sm${activeNav === "members" ? " btn-active" : ""}`}
@@ -40,6 +44,22 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               >
                 {t("common.nav.anniversaries")}
               </a>
+              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
+                <a
+                  href="/donations"
+                  class={`btn btn-ghost btn-sm${activeNav === "donations" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.donations")}
+                </a>
+              )}
+              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
+                <a
+                  href="/donors"
+                  class={`btn btn-ghost btn-sm${activeNav === "donors" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.donors")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -52,7 +72,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
           )}
         </div>
         {user && (
-          <div class="navbar-center sm:hidden">
+          <div class="navbar-center lg:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -62,13 +82,15 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
           </div>
         )}
         {user && (
-          <div class="navbar-end">
+          <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
                 <span>{user.name}</span>

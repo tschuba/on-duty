@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
@@ -16,7 +16,9 @@ export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 type Person = typeof persons.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
-type Member = Omit<Person, "id"> & MemberRow;
+// birthDate is nullable in `persons` (donor-only persons need none) but this route's
+// own form validation always requires it for a member — re-asserted non-null here.
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };
@@ -113,7 +115,7 @@ function formatDate(d: string | null | undefined): string {
   return `${day}.${m}.${y}`;
 }
 
-export function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "asc" | "desc" }) {
+export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
@@ -216,6 +218,7 @@ export function MembersTable({
   return (
     <div id="members-results">
       <div>
+        <ClickToEditHint />
         <table class="table table-zebra w-full">
           <thead>
             <tr>

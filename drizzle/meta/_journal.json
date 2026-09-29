@@ -85,6 +85,27 @@
       "when": 1790627077921,
       "tag": "0011_empty_purple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790634224220,
+      "tag": "0012_wide_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790666499998,
+      "tag": "0013_exotic_corsair",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790676521373,
+      "tag": "0014_unknown_scream",
+      "breakpoints": true
     }
   ]
 }

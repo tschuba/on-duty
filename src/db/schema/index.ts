@@ -6,3 +6,4 @@ export * from "./permissions";
 export * from "./relations";
 export * from "./backup";
 export * from "./org-config";
+export * from "./donations";

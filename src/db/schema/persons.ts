@@ -12,7 +12,9 @@ export const persons = pgTable("persons", {
   zip: text("zip"),
   city: text("city"),
   gender: genderEnum("gender"),
-  birthDate: date("birth_date").notNull(),
+  // Nullable: a donor-only person has no reason to supply one. Members still
+  // require it, enforced app-side in members.tsx (not here).
+  birthDate: date("birth_date"),
   phone: text("phone"),
   email: text("email"),
 });
