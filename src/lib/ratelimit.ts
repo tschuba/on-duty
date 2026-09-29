@@ -14,7 +14,11 @@ export function checkRateLimit(ip: string): { allowed: boolean } {
 export function recordFailedAttempt(ip: string): void {
   const now = Date.now();
   const entry = store.get(ip) ?? { count: 0, lockedUntil: 0 };
-  if (entry.lockedUntil < now) entry.count = 0; // reset after lock expired
+  // Only reset after an actual, previously-set lockout has expired — not for a fresh
+  // entry, where lockedUntil defaults to 0 and is always "in the past" relative to
+  // now, which used to reset count on every single call and made the lockout
+  // (entry.count >= MAX_ATTEMPTS below) unreachable.
+  if (entry.lockedUntil > 0 && entry.lockedUntil < now) entry.count = 0;
   entry.count++;
   if (entry.count >= MAX_ATTEMPTS) entry.lockedUntil = now + LOCKOUT_MS;
   store.set(ip, entry);
