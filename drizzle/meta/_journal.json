@@ -92,6 +92,13 @@
       "when": 1790634224220,
       "tag": "0012_wide_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790666499998,
+      "tag": "0013_exotic_corsair",
+      "breakpoints": true
     }
   ]
 }

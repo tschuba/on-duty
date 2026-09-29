@@ -17,7 +17,7 @@ type Person = typeof persons.$inferSelect;
 type DonorRow = typeof donors.$inferSelect;
 type DonorWithPerson = DonorRow & { person: Person };
 
-// Narrow field set the donations:manage permission is allowed to see/edit on a
+// Narrow field set the donations:record permission is allowed to see/edit on a
 // person — never gender/birthDate/phone/email, which belong to the members
 // feature (members:read/write). Kept separate from members.tsx's own field
 // helpers for the same reason the routes are separate: different permission gate.
@@ -192,7 +192,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
 // GET /donors/search-persons — debounced live search for the donor picker.
 // Own route (not /members' search) so the field/permission boundary is enforced
 // by the query itself, not by trusting the caller to strip fields.
-donorRoutes.get("/search-persons", requireAuth("donations:manage"), async (c) => {
+donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) => {
   const q = (c.req.query("q") ?? "").trim();
   if (q.length < 2) return c.html("");
 
@@ -267,7 +267,7 @@ function donorListUrl(base: Record<string, string | number>) {
 
 // GET /donors — sortable/paginated/searchable list, name + address only (see
 // Berechtigungsgrenze in the backlog note — no member-only data here).
-donorRoutes.get("/", requireAuth("donations:manage"), async (c) => {
+donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
   const { search, sort, dir, page, pageSize } = parseListQuery(c.req.query());
 
@@ -343,7 +343,7 @@ donorRoutes.get("/", requireAuth("donations:manage"), async (c) => {
 });
 
 // GET /donors/new — create a donor directly (search-or-create picker)
-donorRoutes.get("/new", requireAuth("donations:manage"), async (c) => {
+donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donors.newDonor")} user={user} activeNav="donors">
@@ -364,7 +364,7 @@ donorRoutes.get("/new", requireAuth("donations:manage"), async (c) => {
 });
 
 // POST /donors/new — get-or-create by personId
-donorRoutes.post("/new", requireAuth("donations:manage"), async (c) => {
+donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody();
   const personId = String(body.personId ?? "").trim() || undefined;
@@ -406,7 +406,7 @@ donorRoutes.post("/new", requireAuth("donations:manage"), async (c) => {
 });
 
 // GET/POST /donors/:id/edit — name + address only, even if the person is also a member
-donorRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
+donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const donor = await db.query.donors.findFirst({ where: eq(donors.id, c.req.param("id")), with: { person: true } }) as DonorWithPerson | undefined;
   if (!donor) return c.notFound();
@@ -429,7 +429,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
   );
 });
 
-donorRoutes.post("/:id/edit", requireAuth("donations:manage"), async (c) => {
+donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: true } }) as DonorWithPerson | undefined;
@@ -472,7 +472,7 @@ function currentYearRange(): { from: string; to: string } {
 
 // GET /donors/:id/summary-receipt — period defaults to the current calendar year;
 // already individually-issued donations are excluded (see Doppelbestätigungs-Sperre).
-donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (c) => {
+donorRoutes.get("/:id/summary-receipt", requireAuth("donations:issue-receipts"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: true } }) as DonorWithPerson | undefined;
@@ -605,7 +605,7 @@ donorRoutes.get("/:id/summary-receipt", requireAuth("donations:manage"), async (
 // POST /donors/:id/summary-receipt/mark-issued — re-derives the included set
 // server-side from from/to (never trusts a client-submitted id list) and stamps
 // receiptIssuedAt on all of them.
-donorRoutes.post("/:id/summary-receipt/mark-issued", requireAuth("donations:manage"), async (c) => {
+donorRoutes.post("/:id/summary-receipt/mark-issued", requireAuth("donations:issue-receipts"), async (c) => {
   const id = c.req.param("id");
   const donor = await db.query.donors.findFirst({ where: eq(donors.id, id) });
   if (!donor) return c.notFound();

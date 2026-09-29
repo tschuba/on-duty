@@ -180,7 +180,7 @@ function DonationFormFields({ values, errors }: { values?: Partial<DonationField
 // GET /donations — list with donor-name search and date range (filtered in JS,
 // same reasoning as members.tsx: the full set is small and already needs to be
 // loaded for the filter to run over joined donor/person fields).
-donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
+donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
   const q = c.req.query();
   const search = q.search ?? "";
@@ -273,7 +273,7 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
 });
 
 // GET /donations/new
-donationRoutes.get("/new", requireAuth("donations:manage"), async (c) => {
+donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
@@ -296,7 +296,7 @@ donationRoutes.get("/new", requireAuth("donations:manage"), async (c) => {
 });
 
 // POST /donations — creates the person (if new) / gets-or-creates the donor, then the donation
-donationRoutes.post("/", requireAuth("donations:manage"), async (c) => {
+donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody();
   const personId = String(body.personId ?? "").trim() || undefined;
@@ -349,7 +349,7 @@ donationRoutes.post("/", requireAuth("donations:manage"), async (c) => {
 });
 
 // GET/POST /donations/:id/edit — donation fields only, donor is fixed once recorded
-donationRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
+donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
@@ -375,7 +375,7 @@ donationRoutes.get("/:id/edit", requireAuth("donations:manage"), async (c) => {
   );
 });
 
-donationRoutes.post("/:id/edit", requireAuth("donations:manage"), async (c) => {
+donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const d = await fetchDonation(id);
@@ -418,7 +418,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:manage"), async (c) => {
 });
 
 // POST /donations/:id/delete
-donationRoutes.post("/:id/delete", requireAuth("donations:manage"), async (c) => {
+donationRoutes.post("/:id/delete", requireAuth("donations:record"), async (c) => {
   const id = c.req.param("id");
   await db.delete(donations).where(eq(donations.id, id));
   setFlash(c, t("donations.flash.deleted"), "success");
@@ -426,7 +426,7 @@ donationRoutes.post("/:id/delete", requireAuth("donations:manage"), async (c) =>
 });
 
 // GET /donations/:id/receipt — Einzelbestätigung, blocked if org config is incomplete
-donationRoutes.get("/:id/receipt", requireAuth("donations:manage"), async (c) => {
+donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), async (c) => {
   const user = c.get("user");
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
@@ -473,7 +473,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:manage"), async (c) =>
 
 // GET /donations/:id/receipt.xml — the FFW-schema XML file itself, downloadable
 // standalone (e.g. to re-download after mark-issued already ran once)
-donationRoutes.get("/:id/receipt.xml", requireAuth("donations:manage"), async (c) => {
+donationRoutes.get("/:id/receipt.xml", requireAuth("donations:issue-receipts"), async (c) => {
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
 
@@ -487,7 +487,7 @@ donationRoutes.get("/:id/receipt.xml", requireAuth("donations:manage"), async (c
 });
 
 // POST /donations/:id/mark-issued — set on every download click (re-issuing stays allowed)
-donationRoutes.post("/:id/mark-issued", requireAuth("donations:manage"), async (c) => {
+donationRoutes.post("/:id/mark-issued", requireAuth("donations:issue-receipts"), async (c) => {
   const id = c.req.param("id");
   await db.update(donations).set({ receiptIssuedAt: new Date() }).where(eq(donations.id, id));
   return c.redirect(`/donations/${id}/receipt.xml`);

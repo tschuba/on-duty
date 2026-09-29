@@ -77,7 +77,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", permissions: new Set(["donations:manage"]), disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -105,7 +105,7 @@ beforeEach(() => {
   donationsFindFirstResult = undefined;
   donorLookupResult = [];
   orgConfigFixture = [];
-  currentUser = { id: "u1", permissions: new Set(["donations:manage"]), disabled: false };
+  currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
 });
 
 function completeOrgConfig(overrides: Record<string, string> = {}) {

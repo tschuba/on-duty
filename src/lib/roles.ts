@@ -5,7 +5,8 @@ export const PERMISSIONS = [
   "members:read",
   "members:write",
   "system:admin",
-  "donations:manage",
+  "donations:record",
+  "donations:issue-receipts",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

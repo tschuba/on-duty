@@ -44,7 +44,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               >
                 {t("common.nav.anniversaries")}
               </a>
-              {user.permissions.has("donations:manage") && (
+              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
                   class={`btn btn-ghost btn-sm${activeNav === "donations" ? " btn-active" : ""}`}
@@ -52,7 +52,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                   {t("common.nav.donations")}
                 </a>
               )}
-              {user.permissions.has("donations:manage") && (
+              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donors"
                   class={`btn btn-ghost btn-sm${activeNav === "donors" ? " btn-active" : ""}`}
@@ -82,8 +82,8 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
-                {user.permissions.has("donations:manage") && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
-                {user.permissions.has("donations:manage") && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
