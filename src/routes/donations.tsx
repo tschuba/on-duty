@@ -53,6 +53,18 @@ function xmlEl(id: string, value: string): string {
   return `      <element id="${id}">${xmlEscape(value)}</element>`;
 }
 
+const UMLAUTS: Record<string, string> = { ä: "ae", ö: "oe", ü: "ue", ß: "ss", Ä: "Ae", Ö: "Oe", Ü: "Ue" };
+
+function receiptFilename(d: DonationWithDonor): string {
+  const slug = (s: string) =>
+    s
+      .replace(/[äöüßÄÖÜ]/g, (c) => UMLAUTS[c])
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_-]/g, "");
+  const p = d.donor.person;
+  return `Zuwendungsbestaetigung_${slug(p.lastName)}_${slug(p.firstName)}_${d.date}_${d.id.slice(0, 8)}.xml`;
+}
+
 // Builds the FFW xml-data import file for the official Muster 034122 form
 // (https://www.formulare-bfinv.de). Field IDs and the k1-k5/Finanzamt-block
 // meaning were reverse-engineered against the live FMS, see the backlog doc's
@@ -493,7 +505,7 @@ donationRoutes.get("/:id/receipt.xml", requireAuth("donations:issue-receipts"), 
 
   const xml = buildReceiptXml(d, config);
   c.header("Content-Type", "application/xml; charset=utf-8");
-  c.header("Content-Disposition", `attachment; filename="Zuwendungsbestaetigung-${d.id}.xml"`);
+  c.header("Content-Disposition", `attachment; filename="${receiptFilename(d)}"`);
   return c.body(xml);
 });
 

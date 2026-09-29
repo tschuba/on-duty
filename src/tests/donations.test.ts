@@ -270,7 +270,7 @@ describe("GET /:id/receipt.xml", () => {
     const res = await donationRoutes.request("/don1/receipt.xml");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/xml");
-    expect(res.headers.get("content-disposition")).toContain("Zuwendungsbestaetigung-don1.xml");
+    expect(res.headers.get("content-disposition")).toContain("Zuwendungsbestaetigung_Bauer_Anna_2026-03-01_don1.xml");
     const xml = await res.text();
     expect(xml).toContain('<form>catalog://Steuerformulare/gemein/034122</form>');
     expect(xml).toContain('<element id="name">Anna Bauer\nMusterweg 5\n12345 Musterstadt</element>');
@@ -281,6 +281,18 @@ describe("GET /:id/receipt.xml", () => {
     expect(xml).toContain('<element id="k2">true</element>');
     expect(xml).toContain('<element id="finamt">Finanzamt Musterstadt</element>');
     expect(xml).toContain('<element id="zeitraum">2019</element>');
+  });
+
+  it("transliterates umlauts and strips unsafe characters from the filename", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation({
+      donor: {
+        id: "d1", personId: "p1",
+        person: { id: "p1", firstName: "Jürgen", lastName: "Müller-O'Brien", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt" },
+      },
+    });
+    const res = await donationRoutes.request("/don1/receipt.xml");
+    expect(res.headers.get("content-disposition")).toContain("Zuwendungsbestaetigung_Mueller-OBrien_Juergen_2026-03-01_don1.xml");
   });
 });
 
