@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { members, persons, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications } from "../db/schema/index.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -25,6 +25,8 @@ let rolesFixture: any[] = [];
 let assignmentRowsFixture: any[] = []; // export: pre-joined {memberId, roleTitle, from, to}
 let findManyResult: any[] = [];
 let findFirstResult: any = undefined;
+let personLookupResult: any[] = []; // db.select().from(persons).where(...) — GET/POST /new personId linking
+let memberLookupResult: any[] = []; // db.select().from(members).where(...) — "already a member" guard
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -34,6 +36,8 @@ const select = vi.fn(() => ({
   from: vi.fn((table: any) => {
     if (table === memberRoles) return chainOf(rolesFixture);
     if (table === memberRoleAssignments) return chainOf(assignmentRowsFixture);
+    if (table === persons) return chainOf(personLookupResult);
+    if (table === members) return chainOf(memberLookupResult);
     return chainOf([]);
   }),
 }));
@@ -118,6 +122,8 @@ beforeEach(() => {
   assignmentRowsFixture = [];
   findManyResult = [];
   findFirstResult = undefined;
+  personLookupResult = [];
+  memberLookupResult = [];
   currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
 });
 
@@ -417,6 +423,23 @@ describe("GET /new", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain(roleAktiv.title);
   });
+
+  it("prefills from an existing person when ?personId is given", async () => {
+    personLookupResult = [{ id: "p1", lastName: "Bauer", firstName: "Anna", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt", gender: null, birthDate: "1995-01-01", phone: null, email: "anna@example.com" }];
+    const res = await memberRoutes.request("/new?personId=p1&applicationId=app1");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('value="Bauer"');
+    expect(html).toContain('name="personId" value="p1"');
+    expect(html).toContain('name="applicationId" value="app1"');
+  });
+
+  it("redirects to the application with an error when the person is already a member", async () => {
+    memberLookupResult = [{ id: "m-existing" }];
+    const res = await memberRoutes.request("/new?personId=p1&applicationId=app1");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/applications/app1");
+  });
 });
 
 describe("GET /role-row", () => {
@@ -492,6 +515,23 @@ describe("POST /new", () => {
       body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", _action: "save_and_new" }),
     });
     expect(res.headers.get("location")).toBe("/members/new");
+  });
+
+  it("links an existing person (via personId) instead of creating a new one, and approves the application", async () => {
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({
+        personId: "p1", applicationId: "app1",
+        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01",
+      }),
+    });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === persons)).toBe(false);
+    expect(updateCalls.some((c) => c.table === persons && c.set.lastName === "Bauer")).toBe(true);
+    const memberInsert = insertCalls.find((c) => c.table === members);
+    expect(memberInsert?.values.personId).toBe("p1");
+    const appUpdate = updateCalls.find((c) => c.table === applications);
+    expect(appUpdate?.set.status).toBe("approved");
   });
 });
 

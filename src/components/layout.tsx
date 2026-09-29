@@ -1,18 +1,31 @@
-import type { FC, PropsWithChildren } from "hono/jsx";
+import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
+import { countOpenApplications } from "../lib/applications.js";
 
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications";
 }>;
 
 export function ClickToEditHint() {
   return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
 }
 
-export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
+function ApplicationsBadge({ count }: { count: number }) {
+  return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
+}
+
+// Async component — hono/jsx resolves Promise children/return values during render,
+// so this stays a self-contained addition (only queries when the viewer actually has
+// the permission) instead of threading a count prop through every route that renders
+// the nav.
+export const Layout = async ({ title, children, user, activeNav }: Props) => {
+  const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
+  const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
+
+  return (
   <html lang="de">
     <head>
       <meta charset="utf-8" />
@@ -68,6 +81,15 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                   {t("common.nav.admin")}
                 </a>
               )}
+              {canReviewApplications && (
+                <a
+                  href="/applications"
+                  class={`btn btn-ghost btn-sm${activeNav === "applications" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.applications")}
+                  <ApplicationsBadge count={openApplicationsCount} />
+                </a>
+              )}
             </div>
           )}
         </div>
@@ -85,6 +107,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
+                {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<ApplicationsBadge count={openApplicationsCount} /></a></li>}
               </ul>
             </div>
           </div>
@@ -137,4 +160,5 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       ` }} />
     </body>
   </html>
-);
+  );
+};

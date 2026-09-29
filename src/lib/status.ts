@@ -11,6 +11,19 @@ type Assignment = typeof memberRoleAssignments.$inferSelect & {
 
 export type MemberStatus = "archiviert" | "kinder" | "jugend" | "aktiv" | "passiv";
 
+// Local date components, not new Date(str).getTime() — avoids UTC/local timezone
+// shift on the day-of-birthday boundary.
+export function ageInYears(birthDate: string): number {
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const beforeBirthday =
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
+  if (beforeBirthday) age--;
+  return age;
+}
+
 export function deriveMemberStatus(
   member: Pick<Member, "exitDate" | "deathDate" | "birthDate">,
   assignments: Assignment[],
@@ -24,14 +37,7 @@ export function deriveMemberStatus(
   );
 
   if (hasActiveRole) {
-    const today = new Date();
-    const birth = new Date(member.birthDate);
-    let age = today.getFullYear() - birth.getFullYear();
-    const beforeBirthday =
-      today.getMonth() < birth.getMonth() ||
-      (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate());
-    if (beforeBirthday) age--;
-
+    const age = ageInYears(member.birthDate);
     if (age < childrenAgeLimit) return "kinder";
     return age < youthAgeLimit ? "jugend" : "aktiv";
   }

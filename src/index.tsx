@@ -9,6 +9,7 @@ import { startBackupScheduler } from "./lib/backup.js";
 import { loginRoutes } from "./routes/login.js";
 import { applyRoutes } from "./routes/apply.js";
 import { memberRoutes } from "./routes/members.js";
+import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { donationRoutes } from "./routes/donations.js";
@@ -54,6 +55,9 @@ app.get("/", requireAuth(), (c) => {
 
 // Member routes
 app.route("/members", memberRoutes);
+
+// Application review routes
+app.route("/applications", applicationRoutes);
 
 // Anniversary routes
 app.route("/anniversaries", anniversaryRoutes);

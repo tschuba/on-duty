@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { eq, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, persons, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
+import { sendMail } from "../lib/mail.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
@@ -772,10 +773,26 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   );
 });
 
-// GET /members/new — new member form
+// GET /members/new — new member form. ?personId (+?applicationId) links an existing
+// persons row instead of creating a new one — used by the "Als Mitglied anlegen"
+// step of the applications review workflow (see routes/applications.tsx).
 memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+  const personId = c.req.query("personId");
+  const applicationId = c.req.query("applicationId");
+
+  let prefill: Partial<Member> | undefined;
+  if (personId) {
+    const [alreadyMember] = await db.select({ id: members.id }).from(members).where(eq(members.personId, personId));
+    if (alreadyMember) {
+      setFlash(c, t("members.error.personAlreadyMember"), "error");
+      return c.redirect(applicationId ? `/applications/${applicationId}` : "/members");
+    }
+    const [person] = await db.select().from(persons).where(eq(persons.id, personId));
+    if (person) prefill = { ...person, birthDate: person.birthDate ?? "" };
+  }
+
   return c.html(
     <Layout title={t("members.newMember")} user={user} activeNav="members">
       <div class="mb-4">
@@ -784,7 +801,16 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
-        <MemberFormFields />
+        {personId && <input type="hidden" name="personId" value={personId} />}
+        {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
+        {applicationId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+        <MemberFormFields m={prefill} />
+        {applicationId && (
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" name="notifyApplicant" class="checkbox" />
+            <span class="label-text">{t("members.form.notifyApplicant")}</span>
+          </label>
+        )}
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
@@ -833,11 +859,15 @@ memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   return c.html(<RoleRow index={index} roles={roles} />);
 });
 
-// POST /members/new — create member
+// POST /members/new — create member (or link an existing person, see GET /new)
 memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
+
+  const personId = String(body.personId ?? "").trim() || undefined;
+  const applicationId = String(body.applicationId ?? "").trim() || undefined;
+  const notifyApplicant = body.notifyApplicant === "on";
 
   const lastName = String(body.lastName ?? "").trim();
   const firstName = String(body.firstName ?? "").trim();
@@ -894,7 +924,16 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+          {personId && <input type="hidden" name="personId" value={personId} />}
+          {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
+          {applicationId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
           <MemberFormFields m={m} errors={errors} />
+          {applicationId && (
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
+              <span class="label-text">{t("members.form.notifyApplicant")}</span>
+            </label>
+          )}
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
@@ -929,21 +968,29 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     );
   }
 
+  const personFields = {
+    lastName, firstName,
+    street: (body.street as string) || null,
+    houseNumber: (body.houseNumber as string) || null,
+    zip: (body.zip as string) || null,
+    city: (body.city as string) || null,
+    gender: (body.gender as any) || null,
+    birthDate,
+    phone: (body.phone as string) || null,
+    email: (body.email as string) || null,
+  };
+
   const [newMember] = await db.transaction(async (tx) => {
-    const [person] = await tx.insert(persons).values({
-      lastName, firstName,
-      street: (body.street as string) || null,
-      houseNumber: (body.houseNumber as string) || null,
-      zip: (body.zip as string) || null,
-      city: (body.city as string) || null,
-      gender: (body.gender as any) || null,
-      birthDate,
-      phone: (body.phone as string) || null,
-      email: (body.email as string) || null,
-    }).returning();
+    let pid = personId;
+    if (pid) {
+      await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+    } else {
+      const [person] = await tx.insert(persons).values(personFields).returning();
+      pid = person.id;
+    }
 
     const [m] = await tx.insert(members).values({
-      personId: person.id,
+      personId: pid,
       entryDate,
       exitDate: (body.exitDate as string) || null,
       deathDate: (body.deathDate as string) || null,
@@ -959,8 +1006,20 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       });
     }
 
+    // Guarded by status="open" so a double-submit (e.g. two tabs) can't re-approve
+    // an application that already went through this once.
+    if (applicationId) {
+      await tx.update(applications)
+        .set({ status: "approved", reviewedAt: new Date(), reviewedBy: user.id })
+        .where(and(eq(applications.id, applicationId), eq(applications.status, "open")));
+    }
+
     return [m];
   });
+
+  if (applicationId && notifyApplicant && personFields.email) {
+    await sendMail(personFields.email, t("applications.mail.approvedSubject"), t("applications.mail.approvedBody"));
+  }
 
   setFlash(c, t("members.flash.created"), "success");
   const saveAndNew = String(body._action ?? "") === "save_and_new";
