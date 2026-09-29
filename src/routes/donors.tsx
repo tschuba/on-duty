@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
+import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
 
@@ -309,8 +310,8 @@ donorRoutes.get("/", requireAuth("donations:manage"), async (c) => {
       <table class="table table-zebra w-full">
         <thead>
           <tr>
-            <th><a href={donorListUrl({ search, sort: "lastName", sort_dir: sort === "lastName" && dir === "asc" ? "desc" : "asc", pageSize })} class="link link-hover">{t("donors.table.lastName")}</a></th>
-            <th><a href={donorListUrl({ search, sort: "firstName", sort_dir: sort === "firstName" && dir === "asc" ? "desc" : "asc", pageSize })} class="link link-hover">{t("donors.table.firstName")}</a></th>
+            <th><a href={donorListUrl({ search, sort: "lastName", sort_dir: sort === "lastName" && dir === "asc" ? "desc" : "asc", pageSize })} class="link link-hover">{t("donors.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
+            <th><a href={donorListUrl({ search, sort: "firstName", sort_dir: sort === "firstName" && dir === "asc" ? "desc" : "asc", pageSize })} class="link link-hover">{t("donors.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
             <th>{t("donors.table.address")}</th>
           </tr>
         </thead>

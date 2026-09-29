@@ -115,7 +115,7 @@ function formatDate(d: string | null | undefined): string {
   return `${day}.${m}.${y}`;
 }
 
-export function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "asc" | "desc" }) {
+export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
