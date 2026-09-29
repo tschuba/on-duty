@@ -197,8 +197,20 @@ donationRoutes.get("/", requireAuth("donations:manage"), async (c) => {
   });
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
+  const config = await loadOrgConfig();
+  const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
+
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
+      {orgConfigIncomplete && (
+        <div class="alert alert-warning max-w-xl mb-4">
+          <div>
+            <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
+            <p>{t("donations.receipt.blockedBody")}</p>
+            <a href="/admin/org-config" class="link">{t("donations.receipt.blockedLink")}</a>
+          </div>
+        </div>
+      )}
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>
         <a href="/donations/new" class="btn btn-primary btn-sm">{t("donations.newDonation")}</a>
