@@ -43,7 +43,7 @@ function textField(
   label: string,
   value: string,
   error: string | undefined,
-  opts: { type?: string; required?: boolean } = {},
+  opts: { type?: string; required?: boolean; hideErrorText?: boolean } = {},
 ) {
   return (
     <div class="form-control">
@@ -56,7 +56,7 @@ function textField(
         value={value}
         class={`input input-bordered w-full${error ? " input-error" : ""}`}
       />
-      {error && <span class="text-error text-sm mt-1">{error}</span>}
+      {error && !opts.hideErrorText && <span class="text-error text-sm mt-1">{error}</span>}
     </div>
   );
 }
@@ -76,9 +76,12 @@ function ApplicantFormFields({ values, errors }: { values: ApplicantValues; erro
       </div>
       {textField("city", t("apply.form.city"), values.city, errors.city, { required: true })}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {textField("email", t("apply.form.email"), values.email, errors.contact, { type: "email" })}
-        {textField("phone", t("apply.form.phone"), values.phone, undefined, { type: "tel" })}
+        {textField("email", t("apply.form.email"), values.email, errors.contact, { type: "email", hideErrorText: true })}
+        {textField("phone", t("apply.form.phone"), values.phone, errors.contact, { type: "tel", hideErrorText: true })}
       </div>
+      {errors.contact
+        ? <p class="text-error text-sm">{errors.contact}</p>
+        : <p class="text-sm opacity-60">{t("apply.error.contactRequired")}</p>}
       <div class="form-control">
         <label class="label"><span class="label-text">{t("apply.form.message")}</span></label>
         <textarea name="message" class="textarea textarea-bordered w-full" rows={3}>{values.message}</textarea>
@@ -91,7 +94,9 @@ function ApplicantFormFields({ values, errors }: { values: ApplicantValues; erro
 
 type GuardianValues = { firstName: string; lastName: string; email: string; phone: string };
 
-function parseGuardianRows(body: Record<string, any>): { rows: GuardianValues[]; rowErrors: (string | null)[]; hasGuardianError: boolean } {
+type GuardianRowError = { nameError: string | null; contactError: string | null };
+
+function parseGuardianRows(body: Record<string, any>): { rows: GuardianValues[]; rowErrors: GuardianRowError[]; hasGuardianError: boolean } {
   const firstNames = [body["guardian_firstName[]"]].flat().map((v) => String(v ?? "").trim());
   const lastNames = [body["guardian_lastName[]"]].flat().map((v) => String(v ?? "").trim());
   const emails = [body["guardian_email[]"]].flat().map((v) => String(v ?? "").trim());
@@ -103,9 +108,10 @@ function parseGuardianRows(body: Record<string, any>): { rows: GuardianValues[];
 
   let hasGuardianError = false;
   const rowErrors = rows.map((r) => {
-    if (!r.firstName || !r.lastName) { hasGuardianError = true; return t("common.required"); }
-    if (!r.email && !r.phone) { hasGuardianError = true; return t("apply.youth.error.guardianContactRequired"); }
-    return null;
+    const nameError = (!r.firstName || !r.lastName) ? t("common.required") : null;
+    const contactError = (!r.email && !r.phone) ? t("apply.youth.error.guardianContactRequired") : null;
+    if (nameError || contactError) hasGuardianError = true;
+    return { nameError, contactError };
   });
 
   return { rows, rowErrors, hasGuardianError };
@@ -114,8 +120,10 @@ function parseGuardianRows(body: Record<string, any>): { rows: GuardianValues[];
 // index === -1 renders a "__N__" placeholder instead of a number — used only for
 // the <template> row, which client-side JS clones and renumbers on "add" clicks
 // (avoids duplicating the translated label string in the inline script).
-function GuardianRow({ index, values, error }: { index: number; values?: GuardianValues; error?: string | null }) {
+function GuardianRow({ index, values, error }: { index: number; values?: GuardianValues; error?: GuardianRowError | null }) {
   const label = t("apply.youth.guardian.title", { index: index === -1 ? "__N__" : String(index + 1) });
+  const nameError = error?.nameError;
+  const contactError = error?.contactError;
   return (
     <div class="guardian-row border border-base-300 rounded-box p-4 mb-3">
       <div class="flex items-center justify-between mb-2">
@@ -125,12 +133,15 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
         </button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class="input input-bordered input-sm w-full" required />
-        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class="input input-bordered input-sm w-full" required />
-        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class="input input-bordered input-sm w-full" />
-        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class="input input-bordered input-sm w-full" />
+        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input input-bordered input-sm w-full${nameError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input input-bordered input-sm w-full${nameError ? " input-error" : ""}`} />
+        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input input-bordered input-sm w-full${contactError ? " input-error" : ""}`} />
+        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input input-bordered input-sm w-full${contactError ? " input-error" : ""}`} />
       </div>
-      {error && <p class="text-error text-sm mt-1">{error}</p>}
+      {nameError && <p class="text-error text-sm mt-1">{nameError}</p>}
+      {contactError
+        ? <p class="text-error text-sm mt-1">{contactError}</p>
+        : <p class="text-sm opacity-60 mt-1">{t("apply.youth.error.guardianContactRequired")}</p>}
     </div>
   );
 }
@@ -181,7 +192,7 @@ function YouthPage({
   values: ApplicantValues;
   errors: Record<string, string>;
   guardianRows: GuardianValues[];
-  guardianErrors: (string | null)[];
+  guardianErrors: GuardianRowError[];
   consentError?: string;
 }) {
   const rows = guardianRows.length > 0 ? guardianRows : [{ firstName: "", lastName: "", email: "", phone: "" }];
