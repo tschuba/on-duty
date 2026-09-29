@@ -26,12 +26,12 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
       <nav class="navbar bg-base-200 shadow-sm px-4">
-        <div class="navbar-start">
+        <div class="navbar-start flex-1">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-duty
           </a>
           {user && (
-            <div class="hidden sm:flex gap-1">
+            <div class="hidden lg:flex gap-1">
               <a
                 href="/members"
                 class={`btn btn-ghost btn-sm${activeNav === "members" ? " btn-active" : ""}`}
@@ -72,7 +72,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
           )}
         </div>
         {user && (
-          <div class="navbar-center sm:hidden">
+          <div class="navbar-center lg:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -90,7 +90,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
           </div>
         )}
         {user && (
-          <div class="navbar-end">
+          <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
                 <span>{user.name}</span>
