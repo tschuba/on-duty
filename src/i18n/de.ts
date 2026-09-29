@@ -133,6 +133,8 @@ export const de = {
   "donations.flash.saved": "Spende gespeichert.",
   "donations.flash.deleted": "Spende gelöscht.",
   "donations.warn.receiptIssued": "Für diese Spende wurde bereits eine Bestätigung ausgestellt.",
+  "donations.receipt.issuedBy": "(ausgestellt von {name} am {date})",
+  "donations.receipt.issuedByUnknown": "unbekannt",
   "donations.confirmDelete": "Spende wirklich löschen?",
   "donations.confirmDeleteIssued": "Für diese Spende wurde bereits eine Bestätigung ausgestellt. Trotzdem löschen?",
   "donations.receipt.title": "Zuwendungsbestätigung",

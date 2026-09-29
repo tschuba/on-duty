@@ -3,7 +3,7 @@ import { setCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
-import { persons, donors, donations } from "../db/schema/index.js";
+import { persons, donors, donations, users } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -17,7 +17,8 @@ export const donationRoutes = new Hono<{ Variables: Variables }>();
 type Person = typeof persons.$inferSelect;
 type DonorRow = typeof donors.$inferSelect;
 type DonationRow = typeof donations.$inferSelect;
-type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person } };
+type Issuer = typeof users.$inferSelect;
+type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person }; issuer: Issuer | null };
 
 type DonationType = "cash" | "transfer";
 
@@ -115,11 +116,11 @@ const TYPE_LABELS: Record<DonationType, string> = {
 };
 
 async function fetchDonations(): Promise<DonationWithDonor[]> {
-  return db.query.donations.findMany({ with: { donor: { with: { person: true } } } }) as Promise<DonationWithDonor[]>;
+  return db.query.donations.findMany({ with: { donor: { with: { person: true } }, issuer: true } }) as Promise<DonationWithDonor[]>;
 }
 
 async function fetchDonation(id: string): Promise<DonationWithDonor | undefined> {
-  return db.query.donations.findFirst({ where: eq(donations.id, id), with: { donor: { with: { person: true } } } }) as Promise<DonationWithDonor | undefined>;
+  return db.query.donations.findFirst({ where: eq(donations.id, id), with: { donor: { with: { person: true } }, issuer: true } }) as Promise<DonationWithDonor | undefined>;
 }
 
 type DonationFieldValues = { amount: string; date: string; type: string; purpose: string };
@@ -476,7 +477,14 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.receipt.title")}</h1>
       </div>
 
-      {d.receiptIssuedAt && <div class="alert alert-info max-w-2xl mb-4">{t("donations.warn.receiptIssued")}</div>}
+      {d.receiptIssuedAt && (
+        <div class="alert alert-info max-w-2xl mb-4">
+          <span>
+            {t("donations.warn.receiptIssued")}{" "}
+            {t("donations.receipt.issuedBy", { name: d.issuer?.name ?? t("donations.receipt.issuedByUnknown"), date: formatDateObj(d.receiptIssuedAt) })}
+          </span>
+        </div>
+      )}
 
       <div class="max-w-xl border border-base-300 rounded-box p-6">
         <p class="mb-1"><span class="font-semibold">{t("donations.receipt.summaryDonor")}:</span> {d.donor.person.firstName} {d.donor.person.lastName}</p>
@@ -509,9 +517,11 @@ donationRoutes.get("/:id/receipt.xml", requireAuth("donations:issue-receipts"), 
   return c.body(xml);
 });
 
-// POST /donations/:id/mark-issued — set on every download click (re-issuing stays allowed)
+// POST /donations/:id/mark-issued — set on every download click (re-issuing stays allowed,
+// overwriting both the timestamp and the issuer)
 donationRoutes.post("/:id/mark-issued", requireAuth("donations:issue-receipts"), async (c) => {
   const id = c.req.param("id");
-  await db.update(donations).set({ receiptIssuedAt: new Date() }).where(eq(donations.id, id));
+  const user = c.get("user");
+  await db.update(donations).set({ receiptIssuedAt: new Date(), issuedBy: user.id }).where(eq(donations.id, id));
   return c.redirect(`/donations/${id}/receipt.xml`);
 });

@@ -1,5 +1,6 @@
 import { pgEnum, pgTable, numeric, date, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { persons } from "./persons";
+import { users } from "./auth";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const donationTypeEnum = pgEnum("donation_type", ["cash", "transfer"]);
@@ -24,5 +25,6 @@ export const donations = pgTable("donations", {
   type: donationTypeEnum("type").notNull(),
   purpose: text("purpose"),
   receiptIssuedAt: timestamp("receipt_issued_at"),
+  issuedBy: text("issued_by").references(() => users.id, { onDelete: "set null" }),
 });
 /* v8 ignore stop */

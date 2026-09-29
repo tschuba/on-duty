@@ -247,6 +247,23 @@ describe("GET /:id/receipt", () => {
     expect(html).toContain("Anna Bauer");
     expect(html).toContain(t("donations.receipt.explanation"));
   });
+
+  it("shows who issued the receipt and when, once issued", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation({ receiptIssuedAt: new Date("2026-03-05"), issuer: { id: "u1", name: "Erika Musterfrau" } });
+    const res = await donationRoutes.request("/don1/receipt");
+    const html = await res.text();
+    expect(html).toContain("Erika Musterfrau");
+    expect(html).toContain("05.03.2026");
+  });
+
+  it("falls back to 'unbekannt' when the issuing user is gone", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation({ receiptIssuedAt: new Date("2026-03-05"), issuer: null });
+    const res = await donationRoutes.request("/don1/receipt");
+    const html = await res.text();
+    expect(html).toContain(t("donations.receipt.issuedByUnknown"));
+  });
 });
 
 describe("GET /:id/receipt.xml", () => {
@@ -297,11 +314,11 @@ describe("GET /:id/receipt.xml", () => {
 });
 
 describe("POST /:id/mark-issued", () => {
-  it("stamps receiptIssuedAt and redirects to the xml download", async () => {
+  it("stamps receiptIssuedAt and issuedBy, and redirects to the xml download", async () => {
     const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/donations/don1/receipt.xml");
-    expect(updateCalls.some((c) => c.table === donations && "receiptIssuedAt" in c.set)).toBe(true);
+    expect(updateCalls.some((c) => c.table === donations && "receiptIssuedAt" in c.set && c.set.issuedBy === "u1")).toBe(true);
   });
 });
 

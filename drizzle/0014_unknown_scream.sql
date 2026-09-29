@@ -1,0 +1,2 @@
+ALTER TABLE "donations" ADD COLUMN "issued_by" text;--> statement-breakpoint
+ALTER TABLE "donations" ADD CONSTRAINT "donations_issued_by_user_id_fk" FOREIGN KEY ("issued_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;

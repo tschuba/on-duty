@@ -3,6 +3,7 @@ import { members } from "./members";
 import { persons } from "./persons";
 import { memberRoleAssignments, memberRoles } from "./roles";
 import { donors, donations } from "./donations";
+import { users } from "./auth";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
 export const personsRelations = relations(persons, ({ one }) => ({
@@ -17,6 +18,7 @@ export const donorsRelations = relations(donors, ({ one, many }) => ({
 
 export const donationsRelations = relations(donations, ({ one }) => ({
   donor: one(donors, { fields: [donations.donorId], references: [donors.id] }),
+  issuer: one(users, { fields: [donations.issuedBy], references: [users.id] }),
 }));
 
 export const membersRelations = relations(members, ({ one, many }) => ({
