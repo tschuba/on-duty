@@ -165,7 +165,14 @@ beforeEach(() => {
 const localAdmin = { id: "local", name: "Lokaler Admin", email: "admin@localhost.invalid", disabled: false };
 
 function makeUser(overrides: Record<string, unknown> = {}) {
-  return { id: "u2", name: "Ben Bauer", email: "ben@example.com", disabled: false, ...overrides };
+  return {
+    id: "u2",
+    name: "Ben Bauer",
+    email: "ben@example.com",
+    disabled: false,
+    lastLoginAt: new Date("2024-01-01T00:00:00Z"),
+    ...overrides,
+  };
 }
 
 function makeRole(overrides: Record<string, unknown> = {}) {
@@ -302,6 +309,26 @@ describe("GET /users", () => {
     userAppRolesFixture = [];
     const html = await (await adminRoutes.request("/users")).text();
     expect(html).toContain("—");
+  });
+
+  it("shows 'unconfirmed' for a user who has never logged in", async () => {
+    usersFixture = [makeUser({ lastLoginAt: null })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusUnconfirmed"));
+  });
+
+  it("prioritizes 'disabled' over 'unconfirmed' when both apply", async () => {
+    usersFixture = [makeUser({ disabled: true, lastLoginAt: null })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusDisabled"));
+    expect(html).not.toContain(t("admin.users.statusUnconfirmed"));
+  });
+
+  it("never shows 'unconfirmed' for the local admin, even without a login timestamp", async () => {
+    usersFixture = [{ ...localAdmin, lastLoginAt: null }];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusActive"));
+    expect(html).not.toContain(t("admin.users.statusUnconfirmed"));
   });
 });
 
