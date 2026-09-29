@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
-import { eq, and, ne, ilike, desc } from "drizzle-orm";
+import { eq, and, ne, ilike } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
+import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
@@ -32,12 +33,24 @@ function formatDateTime(d: Date): string {
   return d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-async function fetchApplications(status?: ApplicationStatus): Promise<ApplicationWithPerson[]> {
+async function fetchApplications(): Promise<ApplicationWithPerson[]> {
   return db.query.applications.findMany({
-    where: status ? eq(applications.status, status) : undefined,
-    orderBy: desc(applications.submittedAt),
     with: { person: true, guardians: { with: { person: true } } },
   }) as unknown as Promise<ApplicationWithPerson[]>;
+}
+
+// ── Sort helpers (mirrors members.tsx's sortMembers/SortIcon pattern) ──────────
+
+type SortKey = "lastName" | "firstName" | "submittedAt";
+const DATE_SORT_KEYS: SortKey[] = ["submittedAt"];
+
+function sortApplications(list: ApplicationWithPerson[], sort: SortKey, dir: "asc" | "desc"): ApplicationWithPerson[] {
+  return [...list].sort((a, b) => {
+    const cmp = sort === "submittedAt"
+      ? a.submittedAt.getTime() - b.submittedAt.getTime()
+      : a.person[sort].localeCompare(b.person[sort], "de");
+    return dir === "asc" ? cmp : -cmp;
+  });
 }
 
 async function fetchApplication(id: string): Promise<ApplicationWithPerson | undefined> {
@@ -93,13 +106,39 @@ const STATUS_BADGE_CLASS: Record<ApplicationStatus, string> = {
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
+const ALL_STATUSES: ApplicationStatus[] = ["open", "approved", "rejected"];
+
 // GET /applications — queue, defaults to open only
 applicationRoutes.get("/", guard, async (c) => {
   const user = c.get("user");
-  const statusParam = c.req.query("status");
-  const status: ApplicationStatus | undefined = statusParam === "all" ? undefined : (statusParam as ApplicationStatus) || "open";
+  const statusRaw = (c.req.queries("status") ?? []).filter(Boolean);
+  const statusFilter: ApplicationStatus[] = statusRaw[0] === "all"
+    ? ALL_STATUSES
+    : statusRaw.length > 0 ? (statusRaw as ApplicationStatus[]) : ["open"];
+  const allSelected = ALL_STATUSES.every((s) => statusFilter.includes(s));
 
-  const rows = await fetchApplications(status);
+  const sort = ((c.req.query("sort") as SortKey) || "submittedAt");
+  const dir = ((c.req.query("sort_dir") as "asc" | "desc") || "desc");
+
+  const rows = sortApplications((await fetchApplications()).filter((a) => statusFilter.includes(a.status)), sort, dir);
+
+  function filterUrl(next: ApplicationStatus[]) {
+    const params = new URLSearchParams();
+    for (const s of next) params.append("status", s);
+    params.set("sort", sort);
+    params.set("sort_dir", dir);
+    return `/applications?${params}`;
+  }
+
+  function sortUrl(col: SortKey) {
+    const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
+    const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
+    const params = new URLSearchParams();
+    for (const s of statusFilter) params.append("status", s);
+    params.set("sort", col);
+    params.set("sort_dir", newDir);
+    return `/applications?${params}`;
+  }
 
   return c.html(
     <Layout title={t("applications.title")} user={user} activeNav="applications">
@@ -114,8 +153,12 @@ applicationRoutes.get("/", guard, async (c) => {
             return (
               <div key={type} class="flex items-center gap-2 flex-wrap">
                 <span class="badge badge-ghost">{TYPE_LABELS[type]}</span>
-                <code class="text-sm break-all">{url}</code>
-                <button type="button" class="btn btn-xs btn-outline apply-link-copy" data-url={url}>{t("applications.links.copy")}</button>
+                <a href={url} target="_blank" rel="noopener" class="link text-sm break-all">{url}</a>
+                <button type="button" class="btn btn-xs btn-outline apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
               </div>
             );
           })}
@@ -124,39 +167,46 @@ applicationRoutes.get("/", guard, async (c) => {
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
           document.querySelectorAll('.apply-link-copy').forEach(function(btn) {
-            var original = btn.textContent;
             btn.addEventListener('click', function() {
               navigator.clipboard.writeText(btn.dataset.url).then(function() {
-                btn.textContent = ${JSON.stringify(t("applications.links.copied"))};
-                setTimeout(function() { btn.textContent = original; }, 1500);
+                document.body.dispatchEvent(new CustomEvent('showToast', { detail: { message: ${JSON.stringify(t("applications.links.copied"))}, type: 'info' } }));
               });
             });
           });
         })();
       ` }} />
       <div class="join mb-4">
-        {(["open", "approved", "rejected", "all"] as const).map((s) => (
-          <a key={s} href={`/applications?status=${s}`} class={`btn btn-sm join-item${(status ?? "all") === s ? " btn-active" : ""}`}>
-            {s === "all" ? t("common.show") : STATUS_LABELS[s]}
+        {ALL_STATUSES.map((s) => (
+          <a
+            key={s}
+            href={filterUrl(statusFilter.includes(s) ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
+            class={`btn btn-sm join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
+          >
+            {STATUS_LABELS[s]}
           </a>
         ))}
+        <a key="all" href={filterUrl(ALL_STATUSES)} class={`btn btn-sm join-item${allSelected ? " btn-primary btn-outline" : " btn-ghost"}`}>
+          {t("applications.filter.all")}
+        </a>
       </div>
       <ClickToEditHint />
       <table class="table table-zebra w-full">
         <thead>
           <tr>
-            <th>{t("applications.table.name")}</th>
+            <th><a href={sortUrl("lastName")} class="link link-hover">{t("applications.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
+            <th><a href={sortUrl("firstName")} class="link link-hover">{t("applications.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
             <th>{t("applications.table.type")}</th>
-            <th>{t("applications.table.submittedAt")}</th>
+            <th><a href={sortUrl("submittedAt")} class="link link-hover">{t("applications.table.submittedAt")} <SortIcon col="submittedAt" active={sort} dir={dir} /></a></th>
             <th>{t("applications.table.status")}</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
-            <tr><td colspan={4} class="text-center opacity-50 py-8">{t("applications.table.empty")}</td></tr>
+            <tr><td colspan={5} class="text-center opacity-50 py-8">{t("applications.table.empty")}</td></tr>
           ) : rows.map((a) => (
             <tr key={a.id} class="cursor-pointer hover" onclick={`window.location='/applications/${a.id}'`}>
-              <td>{a.person.firstName} {a.person.lastName}</td>
+              <td>{a.person.lastName}</td>
+              <td>{a.person.firstName}</td>
               <td>{TYPE_LABELS[a.type]}</td>
               <td>{formatDateTime(a.submittedAt)}</td>
               <td><span class={STATUS_BADGE_CLASS[a.status]}>{STATUS_LABELS[a.status]}</span></td>
@@ -192,7 +242,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
       </div>
 
       {hasDuplicates && (
-        <div class="alert alert-warning mb-4">
+        <div class="alert alert-warning mb-4 max-w-2xl">
           <div>
             {memberMatches.length > 0 && <p class="font-bold">{t("applications.duplicate.isMember")}</p>}
             {applicationMatches.length > 0 && <p class="font-bold">{t("applications.duplicate.hasOpenApplication")}</p>}
@@ -269,12 +319,16 @@ applicationRoutes.get("/:id", guard, async (c) => {
 
       {app.status === "open" && (
         <div class="max-w-2xl space-y-4">
-          <button type="submit" form="application-edit-form" class="btn btn-outline btn-sm">{t("applications.actions.save")}</button>
+          <div class="flex items-center justify-between">
+            <button type="submit" form="application-edit-form" class="btn btn-primary btn-outline">{t("applications.actions.save")}</button>
+            <button type="submit" form="application-reject-form" class="btn btn-outline btn-error">{t("applications.actions.reject")}</button>
+            <button type="submit" form="application-approve-form" id="create-member-btn" class="btn btn-primary" disabled={hasDuplicates || ageWarning}>{t("applications.actions.createMember")}</button>
+          </div>
 
-          <form method="post" action={`/applications/${app.id}/approve`} class="border border-base-300 rounded-box p-4 space-y-3">
+          <form id="application-approve-form" method="post" action={`/applications/${app.id}/approve`}>
             {hasDuplicates && (
               <label class="label cursor-pointer justify-start gap-3">
-                <input type="checkbox" name="confirmDuplicate" class="checkbox" />
+                <input type="checkbox" name="confirmDuplicate" class="checkbox approve-required-checkbox" />
                 <span class="label-text">{t("applications.duplicate.confirm")}</span>
               </label>
             )}
@@ -282,15 +336,25 @@ applicationRoutes.get("/:id", guard, async (c) => {
               <>
                 <p class="text-warning text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
                 <label class="label cursor-pointer justify-start gap-3">
-                  <input type="checkbox" name="confirmAge" class="checkbox" />
+                  <input type="checkbox" name="confirmAge" class="checkbox approve-required-checkbox" />
                   <span class="label-text">{t("applications.ageWarning.confirm")}</span>
                 </label>
               </>
             )}
-            <button type="submit" class="btn btn-primary">{t("applications.actions.createMember")}</button>
           </form>
+          {(hasDuplicates || ageWarning) && (
+            <script dangerouslySetInnerHTML={{ __html: `
+              (function() {
+                var btn = document.getElementById('create-member-btn');
+                var boxes = document.querySelectorAll('.approve-required-checkbox');
+                function update() { btn.disabled = Array.prototype.some.call(boxes, function(cb) { return !cb.checked; }); }
+                boxes.forEach(function(cb) { cb.addEventListener('change', update); });
+              })();
+            ` }} />
+          )}
 
           <form
+            id="application-reject-form"
             method="post"
             action={`/applications/${app.id}/reject`}
             class="border border-base-300 rounded-box p-4 space-y-3"
@@ -304,7 +368,6 @@ applicationRoutes.get("/:id", guard, async (c) => {
               <input type="checkbox" name="notifyApplicant" class="checkbox" />
               <span class="label-text">{t("applications.reject.notifyLabel")}</span>
             </label>
-            <button type="submit" class="btn btn-outline btn-error">{t("applications.actions.reject")}</button>
           </form>
         </div>
       )}

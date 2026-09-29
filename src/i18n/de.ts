@@ -443,7 +443,9 @@ export const de = {
 
   // ── Applications (Antrags-Review) ─────────────────────────────────────────────
   "applications.title": "Anträge",
-  "applications.table.name": "Name",
+  "applications.filter.all": "Alle",
+  "applications.table.lastName": "Nachname",
+  "applications.table.firstName": "Vorname",
   "applications.table.type": "Art",
   "applications.table.submittedAt": "Eingereicht am",
   "applications.table.status": "Status",
@@ -464,7 +466,7 @@ export const de = {
   "applications.ageWarning.confirm": "Ich habe das Alter geprüft und fahre trotzdem fort.",
   "applications.actions.createMember": "Als Mitglied anlegen",
   "applications.actions.reject": "Ablehnen",
-  "applications.actions.save": "Änderungen speichern",
+  "applications.actions.save": "Speichern",
   "applications.reject.reasonLabel": "Ablehnungsgrund (intern, optional)",
   "applications.reject.notifyLabel": "Antragsteller/in per E-Mail benachrichtigen",
   "applications.reject.confirm": "Antrag wirklich ablehnen?",
@@ -478,7 +480,7 @@ export const de = {
   "applications.mail.rejectedBody": "Ihr Antrag wurde leider abgelehnt.",
   "applications.links.title": "Bewerbungslinks",
   "applications.links.copy": "Kopieren",
-  "applications.links.copied": "Kopiert!",
+  "applications.links.copied": "In Zwischenablage kopiert",
 
   // ── Members – application linking ─────────────────────────────────────────────
   "members.applicant.notice": "Diese Angaben stammen aus einem eingereichten Antrag. Beim Speichern wird kein neuer Datensatz angelegt, sondern dieser Antrag verknüpft.",

@@ -138,7 +138,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <script dangerouslySetInnerHTML={{ __html: `
         function showToast(message, type) {
           const el = document.createElement("div");
-          el.className = "alert " + (type === "error" ? "alert-error" : "alert-success") + " shadow-lg";
+          el.className = "alert " + (type === "error" ? "alert-error" : type === "info" ? "alert-info" : "alert-success") + " shadow-lg";
           el.textContent = message;
           const container = document.getElementById("toast-container");
           container.appendChild(el);
