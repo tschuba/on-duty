@@ -119,7 +119,6 @@ export const de = {
   "donations.form.type": "Spendenart",
   "donations.form.typeCash": "Bar",
   "donations.form.typeTransfer": "Überweisung",
-  "donations.form.typeSelect": "— Art wählen —",
   "donations.form.purpose": "Verwendungszweck / Notiz",
   "donations.form.donor": "Spender",
   "donations.form.donorSearchPlaceholder": "Person suchen…",

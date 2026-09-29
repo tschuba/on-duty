@@ -155,11 +155,16 @@ function DonationFormFields({ values, errors }: { values?: Partial<DonationField
       </div>
       <div class="form-control">
         <label class="label"><span class="label-text">{t("donations.form.type")}<span class="text-error ml-1">*</span></span></label>
-        <select name="type" class={`select select-bordered w-full${errors?.type ? " select-error" : ""}`}>
-          <option value="" selected={!values?.type}>{t("donations.form.typeSelect")}</option>
-          <option value="cash" selected={values?.type === "cash"}>{t("donations.form.typeCash")}</option>
-          <option value="transfer" selected={values?.type === "transfer"}>{t("donations.form.typeTransfer")}</option>
-        </select>
+        <div class={`join w-full${errors?.type ? " border border-error rounded-lg" : ""}`}>
+          <label class="join-item btn flex-1 has-[:checked]:btn-primary">
+            <input type="radio" name="type" value="cash" checked={values?.type === "cash"} class="hidden" />
+            {t("donations.form.typeCash")}
+          </label>
+          <label class="join-item btn flex-1 has-[:checked]:btn-primary">
+            <input type="radio" name="type" value="transfer" checked={values?.type === "transfer"} class="hidden" />
+            {t("donations.form.typeTransfer")}
+          </label>
+        </div>
         {errors?.type && <span class="text-error text-sm mt-1">{errors.type}</span>}
       </div>
       <div class="form-control">
