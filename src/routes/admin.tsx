@@ -239,6 +239,8 @@ adminRoutes.get("/users", guard, async (c) => {
                   <td>
                     {u.disabled ? (
                       <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
+                    ) : !isLocal && u.lastLoginAt === null ? (
+                      <span class="badge badge-warning badge-sm">{t("admin.users.statusUnconfirmed")}</span>
                     ) : (
                       <span class="badge badge-success badge-sm">{t("admin.users.statusActive")}</span>
                     )}

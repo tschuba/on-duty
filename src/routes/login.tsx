@@ -102,6 +102,7 @@ function adminLoginPage(error?: string) {
                   name="username"
                   class="input input-bordered"
                   autocomplete="username"
+                  autofocus
                   required
                 />
               </label>

@@ -188,6 +188,7 @@ export const de = {
   "admin.users.table.status": "Status",
   "admin.users.statusActive": "Aktiv",
   "admin.users.statusDisabled": "Deaktiviert",
+  "admin.users.statusUnconfirmed": "Unbestätigt",
   "admin.users.localAdminBadge": "Lokaler Admin-Account",
   "admin.users.activate": "Aktivieren",
   "admin.users.deactivate": "Deaktivieren",
