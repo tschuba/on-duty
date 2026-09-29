@@ -274,7 +274,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}/edit'`}>
               <td>{formatDate(d.date)}</td>
               <td>{d.donor.person.firstName} {d.donor.person.lastName}</td>
-              <td class="text-right">{formatAmount(d.amount)}</td>
+              <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
               <td>{TYPE_LABELS[d.type]}</td>
               <td>{d.purpose ?? "—"}</td>
               <td>
