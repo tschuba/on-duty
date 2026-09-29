@@ -10,6 +10,7 @@ export const permissionEnum = pgEnum("permission", [
   "system:admin",
   "donations:record",
   "donations:issue-receipts",
+  "applications:review",
 ]);
 
 export const appRoles = pgTable("app_roles", {

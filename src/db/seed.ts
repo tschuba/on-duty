@@ -19,14 +19,14 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration",
     isProtected: true,
-    permissions: ["members:read", "members:write", "system:admin", "donations:record", "donations:issue-receipts"],
+    permissions: ["members:read", "members:write", "system:admin", "donations:record", "donations:issue-receipts", "applications:review"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
     name: "Bearbeiter",
-    description: "Kann Mitglieder anlegen und bearbeiten",
+    description: "Kann Mitglieder anlegen und bearbeiten, Anträge prüfen",
     isProtected: true,
-    permissions: ["members:read", "members:write"],
+    permissions: ["members:read", "members:write", "applications:review"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
@@ -38,9 +38,9 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
   {
     id: "4a2b5c6d-7e8f-4a1b-9c2d-3e4f5a6b7c8d",
     name: "Vorstand",
-    description: "Kann Spenden erfassen und Zuwendungsbestätigungen ausstellen",
+    description: "Kann Spenden erfassen, Zuwendungsbestätigungen ausstellen und Anträge prüfen",
     isProtected: true,
-    permissions: ["donations:record", "donations:issue-receipts"],
+    permissions: ["donations:record", "donations:issue-receipts", "applications:review"],
   },
   // Führung is seeded again once the feature that gives it a distinct permission set
   // ships (inventory+training:*) — see backlog doc 11. Seeding it empty now would

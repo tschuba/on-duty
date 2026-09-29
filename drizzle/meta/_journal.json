@@ -113,6 +113,13 @@
       "when": 1790706484127,
       "tag": "0015_faulty_blink",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790708516624,
+      "tag": "0016_digitale_antraege",
+      "breakpoints": true
     }
   ]
 }
