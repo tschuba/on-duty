@@ -476,6 +476,9 @@ export const de = {
   "applications.mail.approvedBody": "Ihr Antrag wurde angenommen. Sie sind nun Mitglied.",
   "applications.mail.rejectedSubject": "Ihr Antrag wurde abgelehnt",
   "applications.mail.rejectedBody": "Ihr Antrag wurde leider abgelehnt.",
+  "applications.links.title": "Bewerbungslinks",
+  "applications.links.copy": "Kopieren",
+  "applications.links.copied": "Kopiert!",
 
   // ── Members – application linking ─────────────────────────────────────────────
   "members.applicant.notice": "Diese Angaben stammen aus einem eingereichten Antrag. Beim Speichern wird kein neuer Datensatz angelegt, sondern dieser Antrag verknüpft.",

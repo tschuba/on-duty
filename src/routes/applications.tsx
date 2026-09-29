@@ -106,6 +106,34 @@ applicationRoutes.get("/", guard, async (c) => {
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
       </div>
+      <div class="bg-base-200 rounded-box p-4 mb-4">
+        <p class="text-sm font-medium mb-2">{t("applications.links.title")}</p>
+        <div class="flex flex-col gap-2">
+          {(["membership", "youth"] as const).map((type) => {
+            const url = new URL(type === "membership" ? "/apply" : "/apply/youth", env.OIDC_APP_URL).toString();
+            return (
+              <div key={type} class="flex items-center gap-2 flex-wrap">
+                <span class="badge badge-ghost">{TYPE_LABELS[type]}</span>
+                <code class="text-sm break-all">{url}</code>
+                <button type="button" class="btn btn-xs btn-outline apply-link-copy" data-url={url}>{t("applications.links.copy")}</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function() {
+          document.querySelectorAll('.apply-link-copy').forEach(function(btn) {
+            var original = btn.textContent;
+            btn.addEventListener('click', function() {
+              navigator.clipboard.writeText(btn.dataset.url).then(function() {
+                btn.textContent = ${JSON.stringify(t("applications.links.copied"))};
+                setTimeout(function() { btn.textContent = original; }, 1500);
+              });
+            });
+          });
+        })();
+      ` }} />
       <div class="join mb-4">
         {(["open", "approved", "rejected", "all"] as const).map((s) => (
           <a key={s} href={`/applications?status=${s}`} class={`btn btn-sm join-item${(status ?? "all") === s ? " btn-active" : ""}`}>

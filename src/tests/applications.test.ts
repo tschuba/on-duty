@@ -4,6 +4,7 @@ import { persons, members, applications } from "../db/schema/index.js";
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
 process.env.ORG_NAME = "Test Feuerwehr";
+process.env.OIDC_APP_URL = "http://localhost:3000";
 
 function chainOf(rows: unknown) {
   const chain: any = Object.assign(Promise.resolve(rows), {
