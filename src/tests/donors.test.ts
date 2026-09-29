@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { persons, donors, donations } from "../db/schema/index.js";
-import { t } from "../i18n/index.js";
+import { persons, donors } from "../db/schema/index.js";
 
 // ── DB chain-stub helpers (same philosophy as members.test.ts/admin.test.ts) ──
 
@@ -17,8 +16,6 @@ function chainOf(rows: unknown) {
 let personsFixture: any[] = [];
 let donorsFindManyResult: any[] = [];
 let donorsFindFirstResult: any = undefined;
-let donationsFixture: any[] = [];
-let orgConfigFixture: any[] = [];
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -34,7 +31,6 @@ const select = vi.fn((cols?: any) => {
     from: vi.fn((table: any) => {
       if (table === persons) return chainOf(personsFixture);
       if (table === donors) return chainOf(donorLookupResult);
-      if (table === donations) return chainOf(donationsFixture);
       return chainOf([]);
     }),
   };
@@ -99,14 +95,6 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
-vi.mock("../lib/org-config.js", async () => {
-  const actual = await vi.importActual<typeof import("../lib/org-config.js")>("../lib/org-config.js");
-  return {
-    ...actual,
-    loadOrgConfig: vi.fn(() => Promise.resolve(Object.fromEntries(orgConfigFixture.map((r: any) => [r.key, r.value])))),
-  };
-});
-
 const { donorRoutes, parseDonorPersonFields, getOrCreateDonor } = await import("../routes/donors.js");
 
 beforeEach(() => {
@@ -118,28 +106,9 @@ beforeEach(() => {
   personsFixture = [];
   donorsFindManyResult = [];
   donorsFindFirstResult = undefined;
-  donationsFixture = [];
   donorLookupResult = [];
-  orgConfigFixture = [];
   currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
 });
-
-function completeOrgConfig(overrides: Record<string, string> = {}) {
-  orgConfigFixture = Object.entries({
-    orgName: "Feuerwehr Musterstadt e.V.",
-    orgStreet: "Hauptstr.",
-    orgHouseNumber: "1",
-    orgZip: "12345",
-    orgCity: "Musterstadt",
-    taxExemptionDate: "2020-01-01",
-    taxExemptionNumber: "12/345/6789",
-    taxOffice: "Finanzamt Musterstadt",
-    taxAssessmentPeriodFrom: "2019",
-    taxAssessmentPeriodTo: "2019",
-    charitablePurpose: "Förderung des Feuerwehrwesens",
-    ...overrides,
-  }).map(([key, value]) => ({ key, value }));
-}
 
 function makePerson(overrides: Record<string, unknown> = {}) {
   return {
@@ -279,42 +248,3 @@ describe("POST /new", () => {
   });
 });
 
-// ── Summary receipt ──────────────────────────────────────────────────────────
-
-describe("GET /:id/summary-receipt", () => {
-  it("blocks with a link to org-config when org data is incomplete", async () => {
-    orgConfigFixture = [];
-    donorsFindFirstResult = { id: "d1", personId: "p1", person: makePerson() };
-    const res = await donorRoutes.request("/d1/summary-receipt");
-    const html = await res.text();
-    expect(html).toContain("/admin/org-config");
-    expect(html).not.toContain(t("donors.summaryReceipt.total"));
-  });
-
-  it("excludes already-issued donations from the included set and total", async () => {
-    completeOrgConfig();
-    donorsFindFirstResult = { id: "d1", personId: "p1", person: makePerson() };
-    donationsFixture = [
-      { id: "don1", donorId: "d1", amount: "50.00", date: "2026-03-01", type: "cash", purpose: null, receiptIssuedAt: null },
-      { id: "don2", donorId: "d1", amount: "30.00", date: "2026-04-01", type: "transfer", purpose: null, receiptIssuedAt: new Date() },
-    ];
-    const res = await donorRoutes.request("/d1/summary-receipt");
-    const html = await res.text();
-    expect(html).toContain("50,00");
-    expect(html).not.toContain("30,00");
-    expect(html).toContain(t("donors.summaryReceipt.excludedNote", { count: 1 }));
-  });
-});
-
-describe("POST /:id/summary-receipt/mark-issued", () => {
-  it("stamps receiptIssuedAt via an update scoped by donor and period", async () => {
-    donorsFindFirstResult = { id: "d1", personId: "p1" };
-    const res = await donorRoutes.request("/d1/summary-receipt/mark-issued", {
-      method: "POST",
-      body: formBody({ from: "2026-01-01", to: "2026-12-31" }),
-    });
-    expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toContain("print=1");
-    expect(updateCalls.some((c) => c.table === donations && "receiptIssuedAt" in c.set)).toBe(true);
-  });
-});

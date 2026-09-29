@@ -1,13 +1,12 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
-import { eq, or, ilike, asc, gte, lte, isNull, and } from "drizzle-orm";
+import { eq, or, ilike, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { persons, donors, donations } from "../db/schema/index.js";
+import { persons, donors } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
-import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -36,12 +35,6 @@ function setFlash(c: any, message: string, type: "success" | "error") {
   setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
 }
 
-function formatDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 function formatAddress(p: Pick<Person, "street" | "houseNumber" | "zip" | "city">): string {
   const line1 = [p.street, p.houseNumber].filter(Boolean).join(" ");
   const line2 = [p.zip, p.city].filter(Boolean).join(" ");
@@ -65,8 +58,7 @@ export function parseDonorPersonFields(body: Record<string, any>): { values: Per
 }
 
 // Get-or-create by personId — keeps every donation for a person under one
-// `donors` row (donors.personId is UNIQUE), required for the Sammelbestätigung's
-// "no other receipts for this donor" guarantee to hold.
+// `donors` row (donors.personId is UNIQUE).
 export async function getOrCreateDonor(tx: typeof db, personId: string): Promise<DonorRow> {
   const [existing] = await tx.select().from(donors).where(eq(donors.personId, personId));
   if (existing) return existing;
@@ -463,160 +455,3 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   return c.redirect("/donors");
 });
 
-// ── Sammelbestätigung ────────────────────────────────────────────────────────
-
-function currentYearRange(): { from: string; to: string } {
-  const y = new Date().getFullYear();
-  return { from: `${y}-01-01`, to: `${y}-12-31` };
-}
-
-// GET /donors/:id/summary-receipt — period defaults to the current calendar year;
-// already individually-issued donations are excluded (see Doppelbestätigungs-Sperre).
-donorRoutes.get("/:id/summary-receipt", requireAuth("donations:issue-receipts"), async (c) => {
-  const user = c.get("user");
-  const id = c.req.param("id");
-  const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: true } }) as DonorWithPerson | undefined;
-  if (!donor) return c.notFound();
-
-  const def = currentYearRange();
-  const from = c.req.query("from") || def.from;
-  const to = c.req.query("to") || def.to;
-
-  const config = await loadOrgConfig();
-  if (!isOrgConfigCompleteForReceipts(config)) {
-    return c.html(
-      <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donors">
-        <div class="alert alert-warning">
-          <div>
-            <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
-            <p>{t("donations.receipt.blockedBody")}</p>
-            <a href="/admin/org-config" class="link">{t("donations.receipt.blockedLink")}</a>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  const allInPeriod = await db.select().from(donations).where(
-    and(eq(donations.donorId, donor.id), gte(donations.date, from), lte(donations.date, to))
-  );
-  const included = allInPeriod.filter((d) => !d.receiptIssuedAt).sort((a, b) => a.date.localeCompare(b.date));
-  const excludedCount = allInPeriod.length - included.length;
-  const total = included.reduce((sum, d) => sum + Number(d.amount), 0);
-
-  const qs = `from=${from}&to=${to}`;
-  const print = c.req.query("print") === "1";
-
-  return c.html(
-    <Layout title={t("donors.summaryReceipt.title")} user={user} activeNav="donors">
-      <div class="mb-4 print:hidden">
-        <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.summaryReceipt.title")}</h1>
-      </div>
-
-      <form method="get" class="flex flex-wrap items-end gap-3 mb-6 print:hidden">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("donors.summaryReceipt.from")}</span></label>
-          <input type="date" name="from" value={from} class="input input-bordered input-sm" />
-        </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("donors.summaryReceipt.to")}</span></label>
-          <input type="date" name="to" value={to} class="input input-bordered input-sm" />
-        </div>
-        <button type="submit" class="btn btn-sm">{t("common.apply")}</button>
-      </form>
-
-      {excludedCount > 0 && (
-        <div class="alert alert-info max-w-2xl mb-4 print:hidden">
-          <span>{t("donors.summaryReceipt.excludedNote", { count: excludedCount })}</span>
-        </div>
-      )}
-
-      <div class="max-w-2xl border border-base-300 rounded-box p-8 print:border-none print:p-0">
-        <p class="text-xs opacity-60 mb-6">{t("donors.summaryReceipt.musterRef")}</p>
-
-        <p class="mb-1">{config.orgName}</p>
-        <p class="mb-1">{[config.orgStreet, config.orgHouseNumber].filter(Boolean).join(" ")}</p>
-        <p class="mb-6">{[config.orgZip, config.orgCity].filter(Boolean).join(" ")}</p>
-
-        <p class="mb-1 font-semibold">{t("donors.summaryReceipt.donorLabel")}</p>
-        <p class="mb-1">{donor.person.firstName} {donor.person.lastName}</p>
-        <p class="mb-6">{formatAddress(donor.person)}</p>
-
-        <p class="mb-4">{t("donors.summaryReceipt.period")}: {formatDate(from)} – {formatDate(to)}</p>
-
-        {included.length === 0 ? (
-          <p class="opacity-60 mb-4">{t("donors.summaryReceipt.empty")}</p>
-        ) : (
-          <table class="table table-sm w-full mb-4">
-            <thead>
-              <tr>
-                <th>{t("donors.summaryReceipt.tableDate")}</th>
-                <th>{t("donors.summaryReceipt.tableType")}</th>
-                <th>{t("donors.summaryReceipt.tableWaiver")}</th>
-                <th class="text-right">{t("donors.summaryReceipt.tableAmount")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {included.map((d) => (
-                <tr key={d.id}>
-                  <td>{formatDate(d.date)}</td>
-                  <td>{d.type === "cash" ? t("donations.form.typeCash") : t("donations.form.typeTransfer")}</td>
-                  <td>{t("donors.summaryReceipt.waiverNo")}</td>
-                  <td class="text-right">{Number(d.amount).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr class="font-semibold">
-                <td colspan={3}>{t("donors.summaryReceipt.total")}</td>
-                <td class="text-right">{total.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
-
-        <p class="mb-4">{t("donors.summaryReceipt.confirmText")}</p>
-        <p class="mb-4">{t("donors.summaryReceipt.noOtherReceipts")}</p>
-        <p class="mb-4">{t("donors.summaryReceipt.exemptionText", { taxOffice: config.taxOffice, taxExemptionDate: formatDate(config.taxExemptionDate), taxExemptionNumber: config.taxExemptionNumber })}</p>
-        <p class="text-xs mb-8">{t("donors.summaryReceipt.liabilityText")}</p>
-
-        <div class="flex justify-between mt-12 pt-2">
-          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donors.summaryReceipt.place")}</span>
-          <span class="border-t border-base-content/40 pt-1 text-sm w-48">{t("donors.summaryReceipt.signature")}</span>
-        </div>
-
-        <p class="text-xs opacity-50 mt-8 print:hidden">{t("donors.summaryReceipt.disclaimer")}</p>
-      </div>
-
-      {included.length > 0 && (
-        <form method="post" action={`/donors/${donor.id}/summary-receipt/mark-issued?${qs}`} class="mt-4 print:hidden">
-          <input type="hidden" name="from" value={from} />
-          <input type="hidden" name="to" value={to} />
-          <button type="submit" class="btn btn-primary">{t("donors.summaryReceipt.print")}</button>
-        </form>
-      )}
-
-      {print && <script dangerouslySetInnerHTML={{ __html: "window.print();" }} />}
-    </Layout>
-  );
-});
-
-// POST /donors/:id/summary-receipt/mark-issued — re-derives the included set
-// server-side from from/to (never trusts a client-submitted id list) and stamps
-// receiptIssuedAt on all of them.
-donorRoutes.post("/:id/summary-receipt/mark-issued", requireAuth("donations:issue-receipts"), async (c) => {
-  const id = c.req.param("id");
-  const donor = await db.query.donors.findFirst({ where: eq(donors.id, id) });
-  if (!donor) return c.notFound();
-
-  const body = await c.req.parseBody();
-  const from = String(body.from ?? "");
-  const to = String(body.to ?? "");
-
-  await db.update(donations).set({ receiptIssuedAt: new Date() }).where(
-    and(eq(donations.donorId, id), gte(donations.date, from), lte(donations.date, to), isNull(donations.receiptIssuedAt))
-  );
-
-  return c.redirect(`/donors/${id}/summary-receipt?from=${from}&to=${to}&print=1`);
-});

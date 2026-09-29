@@ -5,8 +5,7 @@ import { persons } from "./persons";
 export const donationTypeEnum = pgEnum("donation_type", ["cash", "transfer"]);
 
 // One donor per person: personId is UNIQUE so donor selection can be get-or-create,
-// keeping every donation for a person under a single donors row (required for the
-// Sammelbestätigung's "no other receipts for this donor" guarantee).
+// keeping every donation for a person under a single donors row.
 export const donors = pgTable("donors", {
   id: uuid("id").primaryKey().defaultRandom(),
   personId: uuid("person_id")
