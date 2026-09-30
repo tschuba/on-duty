@@ -10,6 +10,7 @@ import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { parsePagination, buildListUrl } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
+import { trimmed } from "../lib/forms.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { sendMail } from "../lib/mail.js";
@@ -925,9 +926,9 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
-  const personId = String(body.personId ?? "").trim() || undefined;
-  const linkMemberId = String(body.linkMemberId ?? "").trim() || undefined;
-  const applicationId = String(body.applicationId ?? "").trim() || undefined;
+  const personId = trimmed(body, "personId") || undefined;
+  const linkMemberId = trimmed(body, "linkMemberId") || undefined;
+  const applicationId = trimmed(body, "applicationId") || undefined;
   const notifyApplicant = body.notifyApplicant === "on";
 
   let targetPersonId: string | undefined;
@@ -939,10 +940,10 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     linkedWasArchived = !!(target.exitDate || target.deathDate);
   }
 
-  const lastName = String(body.lastName ?? "").trim();
-  const firstName = String(body.firstName ?? "").trim();
-  const birthDate = String(body.birthDate ?? "").trim();
-  const entryDate = String(body.entryDate ?? "").trim();
+  const lastName = trimmed(body, "lastName");
+  const firstName = trimmed(body, "firstName");
+  const birthDate = trimmed(body, "birthDate");
+  const entryDate = trimmed(body, "entryDate");
 
   if (!lastName) errors.lastName = t("common.required");
   if (!firstName) errors.firstName = t("common.required");
@@ -1315,10 +1316,10 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
-  const lastName = String(body.lastName ?? "").trim();
-  const firstName = String(body.firstName ?? "").trim();
-  const birthDate = String(body.birthDate ?? "").trim();
-  const entryDate = String(body.entryDate ?? "").trim();
+  const lastName = trimmed(body, "lastName");
+  const firstName = trimmed(body, "firstName");
+  const birthDate = trimmed(body, "birthDate");
+  const entryDate = trimmed(body, "entryDate");
   const exitDate = (body.exitDate as string) || null;
   const deathDate = (body.deathDate as string) || null;
 

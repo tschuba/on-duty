@@ -8,6 +8,7 @@ import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { parsePagination, buildListUrl } from "../lib/list-query.js";
+import { trimmed } from "../lib/forms.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -40,12 +41,12 @@ function formatAddress(p: Pick<Person, "street" | "houseNumber" | "zip" | "city"
 
 export function parseDonorPersonFields(body: Record<string, any>): { values: PersonFieldValues; errors: Record<string, string> } {
   const values: PersonFieldValues = {
-    firstName: String(body.firstName ?? "").trim(),
-    lastName: String(body.lastName ?? "").trim(),
-    street: String(body.street ?? "").trim(),
-    houseNumber: String(body.houseNumber ?? "").trim(),
-    zip: String(body.zip ?? "").trim(),
-    city: String(body.city ?? "").trim(),
+    firstName: trimmed(body, "firstName"),
+    lastName: trimmed(body, "lastName"),
+    street: trimmed(body, "street"),
+    houseNumber: trimmed(body, "houseNumber"),
+    zip: trimmed(body, "zip"),
+    city: trimmed(body, "city"),
   };
   const errors: Record<string, string> = {};
   for (const key of ["firstName", "lastName", "street", "houseNumber", "zip", "city"] as const) {
@@ -353,7 +354,7 @@ donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
 donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody();
-  const personId = String(body.personId ?? "").trim() || undefined;
+  const personId = trimmed(body, "personId") || undefined;
   const { values, errors } = parseDonorPersonFields(body);
 
   if (Object.keys(errors).length > 0) {

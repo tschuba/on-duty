@@ -9,6 +9,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
 import { formatDate } from "../lib/format.js";
+import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
 export const donationRoutes = new Hono<{ Variables: Variables }>();
@@ -117,10 +118,10 @@ type DonationFieldValues = { amount: string; date: string; type: string; purpose
 
 function parseDonationFields(body: Record<string, any>): { values: DonationFieldValues; errors: Record<string, string> } {
   const values: DonationFieldValues = {
-    amount: String(body.amount ?? "").trim(),
-    date: String(body.date ?? "").trim(),
-    type: String(body.type ?? "").trim(),
-    purpose: String(body.purpose ?? "").trim(),
+    amount: trimmed(body, "amount"),
+    date: trimmed(body, "date"),
+    type: trimmed(body, "type"),
+    purpose: trimmed(body, "purpose"),
   };
   const errors: Record<string, string> = {};
   const amountNum = Number(values.amount.replace(",", "."));
@@ -313,7 +314,7 @@ donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
 donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody();
-  const personId = String(body.personId ?? "").trim() || undefined;
+  const personId = trimmed(body, "personId") || undefined;
   const donorFields = parseDonorPersonFields(body);
   const donationFields = parseDonationFields(body);
   const errors = { ...donorFields.errors, ...donationFields.errors };
