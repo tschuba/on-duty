@@ -304,6 +304,7 @@ applicationRoutes.get("/", guard, async (c) => {
             form.querySelectorAll('input[name="status"]').forEach(function(r) { r.addEventListener('change', update); });
             startInput.addEventListener('input', update);
             endInput.addEventListener('input', update);
+            form.closest('dialog').addEventListener('close', function() { form.reset(); update(); });
             update();
           });
         })();
