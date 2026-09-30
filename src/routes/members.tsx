@@ -8,6 +8,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
+import { parsePagination } from "../lib/list-query.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { sendMail } from "../lib/mail.js";
@@ -706,8 +707,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
     ? roleFilterRaw[0].split(",")
     : roleFilterRaw).filter(Boolean);
-  const page = Math.max(1, Number(q.page) || 1);
-  const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+  const { page, pageSize } = parsePagination(q);
 
   return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
 }

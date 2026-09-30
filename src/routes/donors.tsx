@@ -7,6 +7,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
+import { parsePagination } from "../lib/list-query.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -242,8 +243,7 @@ function parseListQuery(q: Record<string, string>) {
   const search = q.search ?? "";
   const sort: SortKey = q.sort === "firstName" ? "firstName" : "lastName";
   const dir: "asc" | "desc" = q.sort_dir === "desc" ? "desc" : "asc";
-  const page = Math.max(1, Number(q.page) || 1);
-  const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+  const { page, pageSize } = parsePagination(q);
   return { search, sort, dir, page, pageSize };
 }
 
