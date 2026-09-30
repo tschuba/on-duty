@@ -35,12 +35,15 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "system:admin": t("admin.permissions.key.systemAdmin"),
   "donations:record": t("admin.permissions.key.donationsRecord"),
   "donations:issue-receipts": t("admin.permissions.key.donationsIssueReceipts"),
+  "applications:review": t("admin.permissions.key.applicationsReview"),
+  "applications:manage-forms": t("admin.permissions.key.applicationsManageForms"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
   members: t("admin.permissions.resource.members"),
   system: t("admin.permissions.resource.system"),
   donations: t("admin.permissions.resource.donations"),
+  applications: t("admin.permissions.resource.applications"),
 };
 
 function setFlash(c: any, msg: string, type: "success" | "error") {
@@ -1536,12 +1539,14 @@ const ORG_CONFIG_FIELDS = [
   { key: "charitablePurpose", type: "text", section: "tax" },
   { key: "iban", type: "text", section: "bank" },
   { key: "bic", type: "text", section: "bank" },
+  { key: "applicationNotifyEmail", type: "email", section: "applications" },
 ] as const;
 
 const ORG_CONFIG_SECTIONS = [
   { id: "address", title: t("admin.orgConfig.section.address") },
   { id: "tax", title: t("admin.orgConfig.section.tax") },
   { id: "bank", title: t("admin.orgConfig.section.bank") },
+  { id: "applications", title: t("admin.orgConfig.section.applications") },
 ] as const;
 
 const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
@@ -1558,6 +1563,7 @@ const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
   charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
   iban: t("admin.orgConfig.field.iban"),
   bic: t("admin.orgConfig.field.bic"),
+  applicationNotifyEmail: t("admin.orgConfig.field.applicationNotifyEmail"),
 };
 
 // iban/bic are normalized (no spaces, uppercase) so consuming features don't
@@ -1634,6 +1640,12 @@ adminRoutes.get("/org-config", guard, async (c) => {
                 {field("iban", "text")}
                 {field("bic", "text")}
               </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[3].title}</h2>
+              {field("applicationNotifyEmail", "email")}
             </div>
           </div>
         </form>

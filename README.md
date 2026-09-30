@@ -111,6 +111,12 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `S3_SECRET_KEY` | — | — | S3 Secret Access Key |
 | `S3_REGION` | — | — | S3-Region (optional) |
 | `S3_PREFIX` | — | — | Pfad-Prefix im Bucket (optional) |
+| `SMTP_HOST` | — | — | SMTP-Server für E-Mail-Benachrichtigungen |
+| `SMTP_PORT` | — | `587` | SMTP-Port |
+| `SMTP_USER` | — | — | SMTP-Benutzername |
+| `SMTP_PASS` | — | — | SMTP-Passwort |
+| `SMTP_FROM` | — | — | Absenderadresse für E-Mail-Benachrichtigungen |
 
 > S3-Backup ist aktiv wenn `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` und `S3_SECRET_KEY` alle gesetzt sind.
 > Lokales Backup ist aktiv wenn `BACKUP_LOCAL_PATH` gesetzt ist.
+> E-Mail-Versand ist aktiv wenn `SMTP_HOST` und `SMTP_FROM` gesetzt sind — ohne SMTP-Konfiguration (oder falls der Server nicht erreichbar ist) wird die Benachrichtigung übersprungen, der jeweilige Workflow (Antrag einreichen/annehmen/ablehnen) schlägt dadurch nie fehl.

@@ -4,11 +4,26 @@ import { persons } from "./persons";
 import { memberRoleAssignments, memberRoles } from "./roles";
 import { donors, donations } from "./donations";
 import { users } from "./auth";
+import { applications, applicationGuardians } from "./applications";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
-export const personsRelations = relations(persons, ({ one }) => ({
+export const personsRelations = relations(persons, ({ one, many }) => ({
   member: one(members),
   donor: one(donors),
+  // many, not one: a person can reapply after a rejection, or submit again years
+  // later — every application stays attached, "rejected" ones included.
+  applications: many(applications),
+}));
+
+export const applicationsRelations = relations(applications, ({ one, many }) => ({
+  person: one(persons, { fields: [applications.personId], references: [persons.id] }),
+  reviewer: one(users, { fields: [applications.reviewedBy], references: [users.id] }),
+  guardians: many(applicationGuardians),
+}));
+
+export const applicationGuardiansRelations = relations(applicationGuardians, ({ one }) => ({
+  application: one(applications, { fields: [applicationGuardians.applicationId], references: [applications.id] }),
+  person: one(persons, { fields: [applicationGuardians.personId], references: [persons.id] }),
 }));
 
 export const donorsRelations = relations(donors, ({ one, many }) => ({
