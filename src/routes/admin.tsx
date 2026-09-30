@@ -266,7 +266,7 @@ adminRoutes.get("/users", guard, async (c) => {
                               </button>
                             </form>
                             <button
-                              class="btn btn-ghost btn-xs text-error"
+                              class="btn btn-outline btn-error btn-xs"
                               onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
                             >
                               {t("common.delete")}
@@ -667,7 +667,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                       {canDelete ? (
                         <>
                           <button
-                            class="btn btn-ghost btn-xs text-error"
+                            class="btn btn-outline btn-error btn-xs"
                             onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`}
                           >
                             {t("common.delete")}
@@ -1022,7 +1022,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                       {canDelete ? (
                         <>
                           <button
-                            class="btn btn-ghost btn-xs text-error"
+                            class="btn btn-outline btn-error btn-xs"
                             onclick={`event.stopPropagation(); document.getElementById('delete-role-${r.id}').showModal()`}
                           >
                             {t("common.delete")}
@@ -1305,7 +1305,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                   <td>
                     <div class="flex gap-2 justify-end">
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-outline btn-error btn-xs"
                         onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.year}').showModal()`}
                       >
                         {t("common.delete")}
