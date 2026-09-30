@@ -4,13 +4,20 @@ import { groupPermissionsForBadges } from "../lib/roles.js";
 describe("groupPermissionsForBadges", () => {
   it("collapses every permission into one full-access badge", () => {
     expect(
-      groupPermissionsForBadges(["members:read", "members:write", "system:admin", "donations:record", "donations:issue-receipts", "applications:review", "applications:manage-forms"]),
+      groupPermissionsForBadges(["members:read", "members:write", "members:delete", "system:admin", "donations:record", "donations:issue-receipts", "applications:review", "applications:manage-forms"]),
     ).toEqual([{ kind: "full" }]);
   });
 
   it("collapses every permission of a resource into one resource-full badge", () => {
-    expect(groupPermissionsForBadges(["members:read", "members:write"])).toEqual([
+    expect(groupPermissionsForBadges(["members:read", "members:write", "members:delete"])).toEqual([
       { kind: "resource-full", resource: "members" },
+    ]);
+  });
+
+  it("does not collapse a resource when only some of its permissions are held", () => {
+    expect(groupPermissionsForBadges(["members:read", "members:write"])).toEqual([
+      { kind: "single", permission: "members:read" },
+      { kind: "single", permission: "members:write" },
     ]);
   });
 

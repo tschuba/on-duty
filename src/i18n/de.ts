@@ -238,6 +238,7 @@ export const de = {
   "admin.permissions.flash.hasAssignments": "Rolle hat bestehende Zuweisungen und kann nicht gelöscht werden.",
   "admin.permissions.key.membersRead": "Mitglieder ansehen",
   "admin.permissions.key.membersWrite": "Mitglieder anlegen und bearbeiten",
+  "admin.permissions.key.membersDelete": "Mitglieder endgültig löschen",
   "admin.permissions.key.systemAdmin": "Systemverwaltung (Benutzer, Rollen, Konfiguration)",
   "admin.permissions.key.donationsRecord": "Spenden erfassen",
   "admin.permissions.key.donationsIssueReceipts": "Zuwendungsbestätigungen ausstellen",
