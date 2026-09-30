@@ -9,6 +9,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { parsePagination, buildListUrl } from "../lib/list-query.js";
 import { trimmed } from "../lib/forms.js";
+import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -127,7 +128,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
           placeholder={t("donations.form.donorSearchPlaceholder")}
           class="input input-bordered w-full"
           hx-get="/donors/search-persons"
-          hx-trigger="input changed delay:300ms"
+          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#donor-picker-results"
         />
         <div id="donor-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />

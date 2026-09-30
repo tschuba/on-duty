@@ -11,6 +11,7 @@ import { setFlash } from "../lib/flash.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
+import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { sendMail } from "../lib/mail.js";
@@ -770,7 +771,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           value={search}
           class="input input-bordered input-sm w-64"
           hx-get="/members"
-          hx-trigger="input changed delay:300ms"
+          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#members-results"
           hx-include="[name='search']"
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
