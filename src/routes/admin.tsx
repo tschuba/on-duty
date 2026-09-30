@@ -103,7 +103,7 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
 
 function getBackupWarnProps(
   configured: boolean,
-  last: Awaited<ReturnType<typeof getLastBackup>>,
+  last: Awaited<ReturnType<typeof getLastBackup>> | null,
   schedule: ReturnType<typeof getCronScheduleTimes> | null,
 ) {
   const lastFailed = schedule?.prev
