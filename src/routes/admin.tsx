@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
-import { setCookie } from "hono/cookie";
 import { db } from "../db/index.js";
 import {
   users,
@@ -21,6 +20,8 @@ import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
+import { setFlash } from "../lib/flash.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
@@ -46,14 +47,6 @@ const RESOURCE_LABELS: Record<string, string> = {
   donations: t("admin.permissions.resource.donations"),
   applications: t("admin.permissions.resource.applications"),
 };
-
-function setFlash(c: any, msg: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message: msg, type }), {
-    path: "/",
-    maxAge: 10,
-    httpOnly: false,
-  });
-}
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {
   return (
@@ -229,7 +222,7 @@ adminRoutes.get("/users", guard, async (c) => {
           </thead>
           <tbody>
             {allUsers.map((u) => {
-              const isLocal = u.email === "admin@localhost.invalid";
+              const isLocal = u.email === LOCAL_ADMIN_EMAIL;
               return (
                 <tr
                   key={u.id}
@@ -274,7 +267,7 @@ adminRoutes.get("/users", guard, async (c) => {
                               </button>
                             </form>
                             <button
-                              class="btn btn-ghost btn-xs text-error"
+                              class="btn btn-outline btn-error btn-xs"
                               onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
                             >
                               {t("common.delete")}
@@ -421,7 +414,7 @@ adminRoutes.get("/users/new", guard, async (c) => {
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select().from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const [allRoles, permRows, assigned] = await Promise.all([
     db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
@@ -521,7 +514,7 @@ adminRoutes.post("/users", guard, async (c) => {
 adminRoutes.post("/users/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [existing] = await db.select().from(users).where(eq(users.id, id));
-  if (!existing || existing.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!existing || existing.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
@@ -563,7 +556,7 @@ adminRoutes.post("/users/:id", guard, async (c) => {
 adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   await db.update(users).set({ disabled: true, updatedAt: new Date() }).where(eq(users.id, id));
   await db.delete(sessions).where(eq(sessions.userId, id));
@@ -576,7 +569,7 @@ adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
 adminRoutes.post("/users/:id/activate", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   await db.update(users).set({ disabled: false, updatedAt: new Date() }).where(eq(users.id, id));
 
@@ -588,11 +581,11 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
 adminRoutes.post("/users/:id/delete", guard, async (c) => {
   const id = c.req.param("id");
   const currentUser = c.get("user");
-  if (currentUser.id === id) return c.html("", 403);
+  if (currentUser.id === id) return c.html("", HTTP_STATUS.FORBIDDEN);
 
   const [u] = await db.select({ email: users.email, disabled: users.disabled }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
-  if (!u.disabled) return c.html("", 400);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
+  if (!u.disabled) return c.html("", HTTP_STATUS.BAD_REQUEST);
 
   await db.delete(users).where(eq(users.id, id));
 
@@ -675,7 +668,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                       {canDelete ? (
                         <>
                           <button
-                            class="btn btn-ghost btn-xs text-error"
+                            class="btn btn-outline btn-error btn-xs"
                             onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`}
                           >
                             {t("common.delete")}
@@ -805,7 +798,7 @@ adminRoutes.get("/permissions/new", guard, (c) => {
 adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
   const hasAssignments = cnt > 0;
@@ -884,7 +877,7 @@ adminRoutes.post("/permissions", guard, async (c) => {
 adminRoutes.post("/permissions/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody({ all: true });
   const permissions = parsePermissions(body);
@@ -1030,7 +1023,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                       {canDelete ? (
                         <>
                           <button
-                            class="btn btn-ghost btn-xs text-error"
+                            class="btn btn-outline btn-error btn-xs"
                             onclick={`event.stopPropagation(); document.getElementById('delete-role-${r.id}').showModal()`}
                           >
                             {t("common.delete")}
@@ -1123,7 +1116,7 @@ adminRoutes.get("/roles/new", guard, (c) => {
 adminRoutes.get("/roles/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const [{ cnt }] = await db
     .select({ cnt: count() })
@@ -1204,7 +1197,7 @@ adminRoutes.post("/roles", guard, async (c) => {
 adminRoutes.post("/roles/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody();
   const grantsActiveStatus = body.grantsActiveStatus === "1";
@@ -1284,7 +1277,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
 
       <ClickToEditHint />
       <div class="overflow-x-auto mb-6">
-        <table class="table table-zebra w-full max-w-md">
+        <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.anniversaries.table.years")}</th>
@@ -1313,7 +1306,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                   <td>
                     <div class="flex gap-2 justify-end">
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-outline btn-error btn-xs"
                         onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.year}').showModal()`}
                       >
                         {t("common.delete")}
@@ -1391,7 +1384,7 @@ adminRoutes.get("/anniversaries/new", guard, (c) => {
 adminRoutes.get("/anniversaries/:year/edit", guard, async (c) => {
   const year = parseInt(c.req.param("year"), 10);
   const [y] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, year));
-  if (!y) return c.html("", 404);
+  if (!y) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   return c.html(
     <>
@@ -1443,7 +1436,7 @@ adminRoutes.post("/anniversaries", guard, async (c) => {
 adminRoutes.post("/anniversaries/:year", guard, async (c) => {
   const oldYear = parseInt(c.req.param("year"), 10);
   const [existing] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, oldYear));
-  if (!existing) return c.html("", 404);
+  if (!existing) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody();
   const newYear = parseInt(String(body.year ?? ""), 10);
@@ -1508,7 +1501,7 @@ adminRoutes.get("/config", guard, async (c) => {
         {t("admin.config.title")}
       </h1>
       <div class="overflow-x-auto">
-        <table class="table w-full max-w-2xl">
+        <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.config.table.variable")}</th>
@@ -1752,7 +1745,7 @@ adminRoutes.get("/backup", guard, async (c) => {
         <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>
       ) : (
         <div class="overflow-x-auto">
-          <table class="table w-full">
+          <table class="table table-zebra w-full">
             <thead>
               <tr>
                 <th>{t("admin.backup.table.timestamp")}</th>

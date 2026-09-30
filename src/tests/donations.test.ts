@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 function chainOf(rows: unknown) {
   const chain: any = Object.assign(Promise.resolve(rows), {
@@ -136,12 +137,6 @@ function makeDonation(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function formBody(fields: Record<string, string>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.append(k, v);
-  return params;
-}
-
 // ── GET / (list) ─────────────────────────────────────────────────────────────
 
 describe("GET /", () => {
@@ -173,6 +168,17 @@ describe("GET /", () => {
     const html = await res.text();
     expect(html).not.toContain("15.01.2026");
     expect(html).toContain("15.06.2026");
+  });
+
+  it("excludes donations after the 'to' cutoff", async () => {
+    donationsFindManyResult = [
+      makeDonation({ id: "don1", date: "2026-01-15" }),
+      makeDonation({ id: "don2", date: "2026-06-15" }),
+    ];
+    const res = await donationRoutes.request("/?to=2026-03-01");
+    const html = await res.text();
+    expect(html).toContain("15.01.2026");
+    expect(html).not.toContain("15.06.2026");
   });
 });
 

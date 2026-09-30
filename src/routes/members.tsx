@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import { getCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
@@ -7,6 +7,11 @@ import { members, persons, memberRoles, memberRoleAssignments, applications, app
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
+import { setFlash } from "../lib/flash.js";
+import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
+import { formatDate } from "../lib/format.js";
+import { trimmed } from "../lib/forms.js";
+import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { sendMail } from "../lib/mail.js";
@@ -99,10 +104,6 @@ export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" 
 
 // ── Flash cookie helpers ─────────────────────────────────────────────────────
 
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
-
 // ── JSX components ───────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<MemberStatus, string> = {
@@ -124,13 +125,6 @@ const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
 function StatusBadge({ status }: { status: MemberStatus }) {
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;
 }
-
-function formatDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
@@ -202,30 +196,16 @@ export function MembersTable({
   roleFilter: string[];
   isEditor: boolean;
 }) {
+  const currentState = { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize };
+
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
     const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    for (const s of statusFilter) params.append("status", s);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", col);
-    params.set("sort_dir", newDir);
-    params.set("page", "1");
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", currentState, { sort: col, sort_dir: newDir, page: 1 });
   }
 
   function pageUrl(p: number) {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    for (const s of statusFilter) params.append("status", s);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    params.set("page", String(p));
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", currentState, { page: p });
   }
 
   const openRoles = (m: MemberWithStatus) =>
@@ -303,7 +283,7 @@ export function MembersTable({
               window.location = url.toString();
             `}
           >
-            {[10, 25, 50, 100].map((n) => (
+            {PAGE_SIZE_OPTIONS.map((n) => (
               <option key={n} value={n} selected={n === pageSize}>{n}</option>
             ))}
           </select>
@@ -709,8 +689,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
     ? roleFilterRaw[0].split(",")
     : roleFilterRaw).filter(Boolean);
-  const page = Math.max(1, Number(q.page) || 1);
-  const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+  const { page, pageSize } = parsePagination(q);
 
   return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
 }
@@ -761,18 +740,10 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   if (isHtmx) return c.html(tableEl);
 
   function filterToggleUrl(s: MemberStatus) {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
     const next = statusFilter.includes(s)
       ? statusFilter.filter((x) => x !== s)
       : [...statusFilter, s];
-    for (const f of next) params.append("status", f);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    params.set("page", "1");
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize }, { status: next, page: 1 });
   }
 
   return c.html(
@@ -800,7 +771,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           value={search}
           class="input input-bordered input-sm w-64"
           hx-get="/members"
-          hx-trigger="input changed delay:300ms"
+          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#members-results"
           hx-include="[name='search']"
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
@@ -904,7 +875,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         )}
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table w-full">
             <thead>
               <tr>
                 <th>{t("members.form.role")}</th>
@@ -956,9 +927,9 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
-  const personId = String(body.personId ?? "").trim() || undefined;
-  const linkMemberId = String(body.linkMemberId ?? "").trim() || undefined;
-  const applicationId = String(body.applicationId ?? "").trim() || undefined;
+  const personId = trimmed(body, "personId") || undefined;
+  const linkMemberId = trimmed(body, "linkMemberId") || undefined;
+  const applicationId = trimmed(body, "applicationId") || undefined;
   const notifyApplicant = body.notifyApplicant === "on";
 
   let targetPersonId: string | undefined;
@@ -970,10 +941,10 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     linkedWasArchived = !!(target.exitDate || target.deathDate);
   }
 
-  const lastName = String(body.lastName ?? "").trim();
-  const firstName = String(body.firstName ?? "").trim();
-  const birthDate = String(body.birthDate ?? "").trim();
-  const entryDate = String(body.entryDate ?? "").trim();
+  const lastName = trimmed(body, "lastName");
+  const firstName = trimmed(body, "firstName");
+  const birthDate = trimmed(body, "birthDate");
+  const entryDate = trimmed(body, "entryDate");
 
   if (!lastName) errors.lastName = t("common.required");
   if (!firstName) errors.firstName = t("common.required");
@@ -1039,7 +1010,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           )}
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -1312,7 +1283,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table w-full">
             <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
@@ -1346,10 +1317,10 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
-  const lastName = String(body.lastName ?? "").trim();
-  const firstName = String(body.firstName ?? "").trim();
-  const birthDate = String(body.birthDate ?? "").trim();
-  const entryDate = String(body.entryDate ?? "").trim();
+  const lastName = trimmed(body, "lastName");
+  const firstName = trimmed(body, "firstName");
+  const birthDate = trimmed(body, "birthDate");
+  const entryDate = trimmed(body, "entryDate");
   const exitDate = (body.exitDate as string) || null;
   const deathDate = (body.deathDate as string) || null;
 
@@ -1389,7 +1360,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
           <MemberFormFields m={m} errors={errors} />
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -1460,7 +1431,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
             phone: body.phone as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (

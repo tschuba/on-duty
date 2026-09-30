@@ -7,6 +7,8 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
+import { buildListUrl } from "../lib/list-query.js";
+import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 
@@ -38,12 +40,6 @@ function addMonths(dateStr: string, months: number): string {
   const dt = new Date(y, m - 1 + months, d);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
-
-function formatDate(d: string): string {
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 const MONTH_KEYS = [
   "month.january", "month.february", "month.march", "month.april",
   "month.may", "month.june", "month.july", "month.august",
@@ -117,7 +113,7 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
 
   return (
     <div class="overflow-x-auto">
-      <table class="table table-sm w-full [&_tbody_td]:border-b-0">
+      <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
         <tbody>
           {[...groups.entries()].map(([month, evs], i) => (
             <>
@@ -229,17 +225,8 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
     );
   }
 
-  const qs = (extra: Record<string, string | string[]>) => {
-    const p = new URLSearchParams({ start, end, filter });
-    if (gte > 0) p.set("gte", String(gte));
-    for (const m of mods) p.append("mod", m);
-    for (const [k, v] of Object.entries(extra)) {
-      p.delete(k);
-      if (Array.isArray(v)) { for (const x of v) p.append(k, x); }
-      else if (v) p.set(k, v);
-    }
-    return "/anniversaries?" + p.toString();
-  };
+  const qs = (extra: Record<string, string | string[]>) =>
+    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
   const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
   const filterLink = (f: string) => qs({ filter: f });

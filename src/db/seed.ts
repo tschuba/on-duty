@@ -2,6 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and } from "drizzle-orm";
+import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL } from "../lib/constants.js";
 import {
   users,
   accounts,
@@ -94,9 +95,9 @@ export async function runSeed() {
     await db
       .insert(users)
       .values({
-        id: "admin",
+        id: LOCAL_ADMIN_ACCOUNT_ID,
         name: "Administrator",
-        email: "admin@localhost.invalid",
+        email: LOCAL_ADMIN_EMAIL,
         emailVerified: true,
         disabled: false,
         createdAt: now,
@@ -108,20 +109,20 @@ export async function runSeed() {
     // pre-existing user's old appRole is not backfilled (dev/seed-only data, no migration needed)
     await db
       .insert(userAppRoles)
-      .values({ userId: "admin", roleId: APP_ROLES[0].id })
+      .values({ userId: LOCAL_ADMIN_ACCOUNT_ID, roleId: APP_ROLES[0].id })
       .onConflictDoNothing();
 
     const existing = await db
       .select({ id: accounts.id })
       .from(accounts)
-      .where(and(eq(accounts.accountId, "admin"), eq(accounts.providerId, "credential")));
+      .where(and(eq(accounts.accountId, LOCAL_ADMIN_ACCOUNT_ID), eq(accounts.providerId, "credential")));
 
     if (existing.length === 0) {
       await db.insert(accounts).values({
         id: "admin-credential",
-        accountId: "admin",
+        accountId: LOCAL_ADMIN_ACCOUNT_ID,
         providerId: "credential",
-        userId: "admin",
+        userId: LOCAL_ADMIN_ACCOUNT_ID,
         password: hash,
         createdAt: now,
         updatedAt: now,

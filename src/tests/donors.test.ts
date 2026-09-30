@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, donors } from "../db/schema/index.js";
+import { formBody } from "./test-utils.js";
+import { makePerson } from "./fixtures.js";
 
 // ── DB chain-stub helpers (same philosophy as members.test.ts/admin.test.ts) ──
 
@@ -110,21 +112,6 @@ beforeEach(() => {
   currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
 });
 
-function makePerson(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "p1", firstName: "Anna", lastName: "Bauer",
-    street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt",
-    gender: "female", birthDate: "1985-05-01", phone: "0123", email: "a@b.de",
-    ...overrides,
-  };
-}
-
-function formBody(fields: Record<string, string>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.append(k, v);
-  return params;
-}
-
 // ── Pure functions ───────────────────────────────────────────────────────────
 
 describe("parseDonorPersonFields", () => {
@@ -213,6 +200,16 @@ describe("GET /", () => {
     const html = await res.text();
     expect(html).toContain("Bauer");
     expect(html).not.toContain("Adler");
+  });
+
+  it("sorts by first name descending when requested", async () => {
+    donorsFindManyResult = [
+      { id: "d1", personId: "p1", person: makePerson({ lastName: "Bauer", firstName: "Anna" }) },
+      { id: "d2", personId: "p2", person: makePerson({ lastName: "Adler", firstName: "Ben" }) },
+    ];
+    const res = await donorRoutes.request("/?sort=firstName&sort_dir=desc");
+    const html = await res.text();
+    expect(html.indexOf("Ben")).toBeLessThan(html.indexOf("Anna"));
   });
 });
 

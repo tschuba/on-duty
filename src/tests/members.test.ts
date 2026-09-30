@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -209,6 +210,12 @@ describe("sortMembers", () => {
   it("sorts by a date key (birthDate)", () => {
     const sorted = sortMembers([a, c, b], "birthDate", "asc");
     expect(sorted.map((m) => m.id)).toEqual(["3", "2", "1"]);
+  });
+
+  it("treats a missing birthDate as sorting first", () => {
+    const noBirthDate = withStatus(memberWithAssignments({ id: "4", lastName: "Zorn", firstName: "Zoe", birthDate: null as any, entryDate: "2015-01-01" }));
+    const sorted = sortMembers([a, noBirthDate], "birthDate", "asc");
+    expect(sorted.map((m) => m.id)).toEqual(["4", "1"]);
   });
 });
 
@@ -494,14 +501,6 @@ describe("GET /role-row", () => {
     expect(await res.text()).toContain("role-row-2");
   });
 });
-
-function formBody(fields: Record<string, string | string[]>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) {
-    for (const val of Array.isArray(v) ? v : [v]) params.append(k, val);
-  }
-  return params;
-}
 
 describe("POST /new", () => {
   it("re-renders the form with 422 when required fields are missing", async () => {

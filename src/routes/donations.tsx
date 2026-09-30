@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
@@ -7,7 +6,10 @@ import { persons, donors, donations, users } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
+import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
+import { formatDate } from "../lib/format.js";
+import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
 export const donationRoutes = new Hono<{ Variables: Variables }>();
@@ -23,17 +25,6 @@ type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person }; i
 type DonationType = "cash" | "transfer";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
-
-function formatDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 function formatAmount(amount: string | number): string {
   return `${Number(amount).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
 }
@@ -127,10 +118,10 @@ type DonationFieldValues = { amount: string; date: string; type: string; purpose
 
 function parseDonationFields(body: Record<string, any>): { values: DonationFieldValues; errors: Record<string, string> } {
   const values: DonationFieldValues = {
-    amount: String(body.amount ?? "").trim(),
-    date: String(body.date ?? "").trim(),
-    type: String(body.type ?? "").trim(),
-    purpose: String(body.purpose ?? "").trim(),
+    amount: trimmed(body, "amount"),
+    date: trimmed(body, "date"),
+    type: trimmed(body, "type"),
+    purpose: trimmed(body, "purpose"),
   };
   const errors: Record<string, string> = {};
   const amountNum = Number(values.amount.replace(",", "."));
@@ -323,7 +314,7 @@ donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
 donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody();
-  const personId = String(body.personId ?? "").trim() || undefined;
+  const personId = trimmed(body, "personId") || undefined;
   const donorFields = parseDonorPersonFields(body);
   const donationFields = parseDonationFields(body);
   const errors = { ...donorFields.errors, ...donationFields.errors };

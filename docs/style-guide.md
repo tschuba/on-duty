@@ -73,7 +73,9 @@ Zwei Kategorien, bewusst unterschiedlich behandelt — nicht alles muss wie die 
 - Pagination bei potenziell langen Listen
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-8">{leerer-Text}</td></tr>`
 
-⚠️ Abweichung im Code: `anniversaries.tsx` nutzt `table table-sm` ohne Zebra für seine Hauptliste — sollte auf `table-zebra` angeglichen werden. `admin.tsx` hat vier verschiedene Table-Klassen-Kombinationen über seine Tabs hinweg — beim Angleichen einheitlich nach Kategorie sortieren (welche Tabs sind Haupt-Listen, welche Sub-Tabellen, siehe unten).
+Die Kategorie richtet sich nur danach, ob die Tabelle die **primäre Datenliste ihres Tabs/ihrer Seite** ist — nicht danach, ob zusätzlich eine Breiten-Einschränkung (`max-w-*`) angewendet wird. `max-w-*` gehört auf den Wrapper/die Tabelle als zusätzlicher Modifier, entscheidet aber nicht die Kategorie (Haupt-Liste vs. Sub-Tabelle).
+
+⚠️ Abweichung im Code: keine — `anniversaries.tsx` (Hauptliste) und alle `admin.tsx`-Tabs nutzen konsistent `table-zebra w-full`; `admin.tsx`s Rollen-/Berechtigungs-Sub-Tabellen sowie `members.tsx`s Rollen-Zuweisungszeilen nutzen konsistent die Sub-Tabellen-Klasse unten.
 
 ### Kleine Inline-Sub-Tabellen
 (z.B. Rollen-/Berechtigungs-Listen in `admin.tsx` — wenige Zeilen, meist innerhalb eines Formular-/Admin-Kontexts)

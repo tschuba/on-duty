@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
@@ -8,6 +7,8 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
+import { setFlash } from "../lib/flash.js";
+import { buildListUrl } from "../lib/list-query.js";
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
 import { sendMail } from "../lib/mail.js";
@@ -31,10 +32,6 @@ type ApplicationType = "membership" | "youth";
 type ApplicationStatus = "open" | "approved" | "rejected";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
 
 function formatDateTime(d: Date): string {
   return d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -152,21 +149,13 @@ applicationRoutes.get("/", guard, async (c) => {
   const canManageForms = user.permissions.has("applications:manage-forms");
 
   function filterUrl(next: ApplicationStatus[]) {
-    const params = new URLSearchParams();
-    for (const s of next) params.append("status", s);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    return `/applications?${params}`;
+    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, { status: next });
   }
 
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
     const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    const params = new URLSearchParams();
-    for (const s of statusFilter) params.append("status", s);
-    params.set("sort", col);
-    params.set("sort_dir", newDir);
-    return `/applications?${params}`;
+    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, { sort: col, sort_dir: newDir });
   }
 
   return c.html(

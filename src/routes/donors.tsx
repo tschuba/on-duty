@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { eq, or, ilike, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, donors } from "../db/schema/index.js";
@@ -7,6 +6,10 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
+import { setFlash } from "../lib/flash.js";
+import { parsePagination, buildListUrl } from "../lib/list-query.js";
+import { trimmed } from "../lib/forms.js";
+import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -31,10 +34,6 @@ type PersonFieldValues = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
-
 function formatAddress(p: Pick<Person, "street" | "houseNumber" | "zip" | "city">): string {
   const line1 = [p.street, p.houseNumber].filter(Boolean).join(" ");
   const line2 = [p.zip, p.city].filter(Boolean).join(" ");
@@ -43,12 +42,12 @@ function formatAddress(p: Pick<Person, "street" | "houseNumber" | "zip" | "city"
 
 export function parseDonorPersonFields(body: Record<string, any>): { values: PersonFieldValues; errors: Record<string, string> } {
   const values: PersonFieldValues = {
-    firstName: String(body.firstName ?? "").trim(),
-    lastName: String(body.lastName ?? "").trim(),
-    street: String(body.street ?? "").trim(),
-    houseNumber: String(body.houseNumber ?? "").trim(),
-    zip: String(body.zip ?? "").trim(),
-    city: String(body.city ?? "").trim(),
+    firstName: trimmed(body, "firstName"),
+    lastName: trimmed(body, "lastName"),
+    street: trimmed(body, "street"),
+    houseNumber: trimmed(body, "houseNumber"),
+    zip: trimmed(body, "zip"),
+    city: trimmed(body, "city"),
   };
   const errors: Record<string, string> = {};
   for (const key of ["firstName", "lastName", "street", "houseNumber", "zip", "city"] as const) {
@@ -129,7 +128,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
           placeholder={t("donations.form.donorSearchPlaceholder")}
           class="input input-bordered w-full"
           hx-get="/donors/search-persons"
-          hx-trigger="input changed delay:300ms"
+          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#donor-picker-results"
         />
         <div id="donor-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
@@ -246,15 +245,12 @@ function parseListQuery(q: Record<string, string>) {
   const search = q.search ?? "";
   const sort: SortKey = q.sort === "firstName" ? "firstName" : "lastName";
   const dir: "asc" | "desc" = q.sort_dir === "desc" ? "desc" : "asc";
-  const page = Math.max(1, Number(q.page) || 1);
-  const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+  const { page, pageSize } = parsePagination(q);
   return { search, sort, dir, page, pageSize };
 }
 
 function donorListUrl(base: Record<string, string | number>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(base)) if (v !== "" && v != null) params.set(k, String(v));
-  return `/donors?${params}`;
+  return buildListUrl("/donors", {}, base);
 }
 
 // GET /donors — sortable/paginated/searchable list, name + address only (see
@@ -359,7 +355,7 @@ donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
 donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody();
-  const personId = String(body.personId ?? "").trim() || undefined;
+  const personId = trimmed(body, "personId") || undefined;
   const { values, errors } = parseDonorPersonFields(body);
 
   if (Object.keys(errors).length > 0) {

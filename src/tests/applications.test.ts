@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, members, applications } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
+import { makePerson } from "./fixtures.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -95,14 +97,6 @@ beforeEach(() => {
   saveApplicationFormCalls.length = 0;
 });
 
-function makePerson(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "p1", lastName: "Bauer", firstName: "Anna", street: "Musterweg", houseNumber: "5",
-    zip: "12345", city: "Musterstadt", gender: null, birthDate: "1995-01-01", phone: "0123", email: "anna@example.com",
-    ...overrides,
-  };
-}
-
 function makeApplication(overrides: Record<string, unknown> = {}) {
   return {
     id: "app1", personId: "p1", type: "membership", status: "open",
@@ -112,12 +106,6 @@ function makeApplication(overrides: Record<string, unknown> = {}) {
     guardians: [],
     ...overrides,
   };
-}
-
-function formBody(fields: Record<string, string>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.append(k, v);
-  return params;
 }
 
 describe("GET /", () => {
