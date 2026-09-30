@@ -8,7 +8,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
-import { parsePagination, buildListUrl } from "../lib/list-query.js";
+import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { env } from "../env.js";
@@ -282,7 +282,7 @@ export function MembersTable({
               window.location = url.toString();
             `}
           >
-            {[10, 25, 50, 100].map((n) => (
+            {PAGE_SIZE_OPTIONS.map((n) => (
               <option key={n} value={n} selected={n === pageSize}>{n}</option>
             ))}
           </select>
