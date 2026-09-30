@@ -13,6 +13,7 @@ import {
   orgConfig,
 } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 process.env.ORG_NAME = "Test Feuerwehr";
 
@@ -200,14 +201,6 @@ function makeBackupEntry(overrides: Record<string, unknown> = {}) {
     errorMessage: null,
     ...overrides,
   };
-}
-
-function formBody(fields: Record<string, string | string[]>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) {
-    for (const val of Array.isArray(v) ? v : [v]) params.append(k, val);
-  }
-  return params;
 }
 
 // ── Pure logic ───────────────────────────────────────────────────────────────

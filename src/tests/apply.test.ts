@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, applications, applicationGuardians } from "../db/schema/index.js";
+import { formBody } from "./test-utils.js";
 
 let idCounter = 0;
 let insertCalls: { table: any; values: any }[] = [];
@@ -34,14 +35,6 @@ vi.mock("../lib/application-forms.js", () => ({
 }));
 
 const { applyRoutes } = await import("../routes/apply.js");
-
-function formBody(fields: Record<string, string | string[]>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) {
-    for (const val of Array.isArray(v) ? v : [v]) params.append(k, val);
-  }
-  return params;
-}
 
 function validMembership(overrides: Record<string, string> = {}) {
   return {

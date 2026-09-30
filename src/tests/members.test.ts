@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -494,14 +495,6 @@ describe("GET /role-row", () => {
     expect(await res.text()).toContain("role-row-2");
   });
 });
-
-function formBody(fields: Record<string, string | string[]>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) {
-    for (const val of Array.isArray(v) ? v : [v]) params.append(k, val);
-  }
-  return params;
-}
 
 describe("POST /new", () => {
   it("re-renders the form with 422 when required fields are missing", async () => {

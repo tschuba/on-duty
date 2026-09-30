@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, members, applications } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -112,12 +113,6 @@ function makeApplication(overrides: Record<string, unknown> = {}) {
     guardians: [],
     ...overrides,
   };
-}
-
-function formBody(fields: Record<string, string>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.append(k, v);
-  return params;
 }
 
 describe("GET /", () => {

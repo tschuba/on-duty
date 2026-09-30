@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, donors } from "../db/schema/index.js";
+import { formBody } from "./test-utils.js";
 
 // ── DB chain-stub helpers (same philosophy as members.test.ts/admin.test.ts) ──
 
@@ -117,12 +118,6 @@ function makePerson(overrides: Record<string, unknown> = {}) {
     gender: "female", birthDate: "1985-05-01", phone: "0123", email: "a@b.de",
     ...overrides,
   };
-}
-
-function formBody(fields: Record<string, string>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.append(k, v);
-  return params;
 }
 
 // ── Pure functions ───────────────────────────────────────────────────────────

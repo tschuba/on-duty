@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 function chainOf(rows: unknown) {
   const chain: any = Object.assign(Promise.resolve(rows), {
@@ -134,12 +135,6 @@ function makeDonation(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   };
-}
-
-function formBody(fields: Record<string, string>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) params.append(k, v);
-  return params;
 }
 
 // ── GET / (list) ─────────────────────────────────────────────────────────────
