@@ -101,14 +101,22 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
   );
 }
 
-export async function backupWarnProps() {
-  const configured = isBackupConfigured();
-  const last = configured ? await getLastBackup() : null;
-  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+function getBackupWarnProps(
+  configured: boolean,
+  last: Awaited<ReturnType<typeof getLastBackup>> | null,
+  schedule: ReturnType<typeof getCronScheduleTimes> | null,
+) {
   const lastFailed = schedule?.prev
     ? !(last?.startedAt && last.startedAt >= schedule.prev && last.status === "success")
     : last?.status === "failed";
   return { configured, lastFailed: lastFailed ?? false };
+}
+
+export async function backupWarnProps() {
+  const configured = isBackupConfigured();
+  const last = configured ? await getLastBackup() : null;
+  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  return getBackupWarnProps(configured, last, schedule);
 }
 
 function ModalScaffold() {
@@ -1682,12 +1690,10 @@ adminRoutes.post("/org-config", guard, async (c) => {
 // ── /admin/backup ──────────────────────────────────────────────────────────────
 adminRoutes.get("/backup", guard, async (c) => {
   const user = c.get("user");
-  const [entries, warn] = await Promise.all([
-    db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50),
-    backupWarnProps(),
-  ]);
-
-  const schedule = isBackupConfigured() ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  const configured = isBackupConfigured();
+  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  const entries = await db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50);
+  const warn = getBackupWarnProps(configured, entries[0] ?? null, schedule);
   const lastBackupAfterSchedule =
     schedule?.prev && entries[0]?.startedAt && entries[0].startedAt >= schedule.prev
       ? entries[0].status
