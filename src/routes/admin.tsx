@@ -21,6 +21,7 @@ import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } fr
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
 import { setFlash } from "../lib/flash.js";
+import { LOCAL_ADMIN_EMAIL } from "../lib/constants.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
@@ -221,7 +222,7 @@ adminRoutes.get("/users", guard, async (c) => {
           </thead>
           <tbody>
             {allUsers.map((u) => {
-              const isLocal = u.email === "admin@localhost.invalid";
+              const isLocal = u.email === LOCAL_ADMIN_EMAIL;
               return (
                 <tr
                   key={u.id}
@@ -413,7 +414,7 @@ adminRoutes.get("/users/new", guard, async (c) => {
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select().from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", 404);
 
   const [allRoles, permRows, assigned] = await Promise.all([
     db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
@@ -513,7 +514,7 @@ adminRoutes.post("/users", guard, async (c) => {
 adminRoutes.post("/users/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [existing] = await db.select().from(users).where(eq(users.id, id));
-  if (!existing || existing.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!existing || existing.email === LOCAL_ADMIN_EMAIL) return c.html("", 404);
 
   const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
@@ -555,7 +556,7 @@ adminRoutes.post("/users/:id", guard, async (c) => {
 adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", 404);
 
   await db.update(users).set({ disabled: true, updatedAt: new Date() }).where(eq(users.id, id));
   await db.delete(sessions).where(eq(sessions.userId, id));
@@ -568,7 +569,7 @@ adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
 adminRoutes.post("/users/:id/activate", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", 404);
 
   await db.update(users).set({ disabled: false, updatedAt: new Date() }).where(eq(users.id, id));
 
@@ -583,7 +584,7 @@ adminRoutes.post("/users/:id/delete", guard, async (c) => {
   if (currentUser.id === id) return c.html("", 403);
 
   const [u] = await db.select({ email: users.email, disabled: users.disabled }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", 404);
   if (!u.disabled) return c.html("", 400);
 
   await db.delete(users).where(eq(users.id, id));
