@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { eq, or, ilike, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, donors } from "../db/schema/index.js";
@@ -7,6 +6,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
+import { setFlash } from "../lib/flash.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -30,10 +30,6 @@ type PersonFieldValues = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
 
 function formatAddress(p: Pick<Person, "street" | "houseNumber" | "zip" | "city">): string {
   const line1 = [p.street, p.houseNumber].filter(Boolean).join(" ");

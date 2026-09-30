@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { setCookie } from "hono/cookie";
 import { eq } from "drizzle-orm";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
@@ -7,6 +6,7 @@ import { persons, donors, donations, users } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
+import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
@@ -23,10 +23,6 @@ type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person }; i
 type DonationType = "cash" | "transfer";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
 
 function formatDate(d: string | null | undefined): string {
   if (!d) return "—";

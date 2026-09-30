@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
-import { setCookie } from "hono/cookie";
 import { db } from "../db/index.js";
 import {
   users,
@@ -21,6 +20,7 @@ import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
+import { setFlash } from "../lib/flash.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
@@ -46,14 +46,6 @@ const RESOURCE_LABELS: Record<string, string> = {
   donations: t("admin.permissions.resource.donations"),
   applications: t("admin.permissions.resource.applications"),
 };
-
-function setFlash(c: any, msg: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message: msg, type }), {
-    path: "/",
-    maxAge: 10,
-    httpOnly: false,
-  });
-}
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {
   return (

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
+import { getCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
@@ -7,6 +7,7 @@ import { members, persons, memberRoles, memberRoleAssignments, applications, app
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
+import { setFlash } from "../lib/flash.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { sendMail } from "../lib/mail.js";
@@ -98,10 +99,6 @@ export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" 
 }
 
 // ── Flash cookie helpers ─────────────────────────────────────────────────────
-
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
 
 // ── JSX components ───────────────────────────────────────────────────────────
 
