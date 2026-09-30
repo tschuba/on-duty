@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { members, persons, memberRoles, memberRoleAssignments, applications } from "../db/schema/index.js";
+import { t } from "../i18n/index.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -26,7 +27,8 @@ let assignmentRowsFixture: any[] = []; // export: pre-joined {memberId, roleTitl
 let findManyResult: any[] = [];
 let findFirstResult: any = undefined;
 let personLookupResult: any[] = []; // db.select().from(persons).where(...) — GET/POST /new personId linking
-let memberLookupResult: any[] = []; // db.select().from(members).where(...) — "already a member" guard
+let memberLookupResult: any[] = []; // db.select().from(members).where(...) — "already a member" guard / linkMemberId target lookup
+let applicationFindFirstResult: any = undefined; // db.query.applications.findFirst(...) — linkMemberId prefill
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -85,6 +87,9 @@ vi.mock("../db/index.js", () => ({
       memberRoles: {
         findMany: vi.fn(() => Promise.resolve(rolesFixture)),
       },
+      applications: {
+        findFirst: vi.fn(() => Promise.resolve(applicationFindFirstResult)),
+      },
     },
     select,
     insert,
@@ -124,6 +129,7 @@ beforeEach(() => {
   findFirstResult = undefined;
   personLookupResult = [];
   memberLookupResult = [];
+  applicationFindFirstResult = undefined;
   currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
 });
 
@@ -440,6 +446,36 @@ describe("GET /new", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/applications/app1");
   });
+
+  it("prefills from an archived member match (?linkMemberId) using the application's fresher contact data", async () => {
+    findFirstResult = memberWithAssignments({ id: "m-old", personId: "p-old", lastName: "Altname", firstName: "Alt", entryDate: "2005-01-01", exitDate: "2020-01-01" });
+    applicationFindFirstResult = {
+      id: "app1",
+      person: { lastName: "Bauer", firstName: "Anna", birthDate: "1995-01-01", street: "Neuweg", houseNumber: "1", zip: "99999", city: "Neustadt", email: "anna@new.example", phone: "555" },
+    };
+    const res = await memberRoutes.request("/new?linkMemberId=m-old&applicationId=app1");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('value="Bauer"');
+    expect(html).toContain('value="2005-01-01"');
+    expect(html).toContain('name="linkMemberId" value="m-old"');
+  });
+
+  it("prefills from an active member match (?linkMemberId) and shows the active relink notice", async () => {
+    findFirstResult = memberWithAssignments({ id: "m-active", personId: "p-active", lastName: "Bauer", firstName: "Anna", entryDate: "2015-01-01" });
+    const res = await memberRoutes.request("/new?linkMemberId=m-active");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('value="2015-01-01"');
+    expect(html).toContain(t("members.relink.noticeActive"));
+    expect(html).not.toContain(t("members.relink.notice"));
+  });
+
+  it("404s for an unknown linkMemberId", async () => {
+    findFirstResult = undefined;
+    const res = await memberRoutes.request("/new?linkMemberId=missing");
+    expect(res.status).toBe(404);
+  });
 });
 
 describe("GET /role-row", () => {
@@ -532,6 +568,35 @@ describe("POST /new", () => {
     expect(memberInsert?.values.personId).toBe("p1");
     const appUpdate = updateCalls.find((c) => c.table === applications);
     expect(appUpdate?.set.status).toBe("approved");
+  });
+
+  it("links an archived member (via linkMemberId) instead of creating a new person/member, and approves the application", async () => {
+    memberLookupResult = [{ personId: "old-p1" }];
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({
+        linkMemberId: "m-old", applicationId: "app1",
+        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2010-01-01",
+      }),
+    });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === persons)).toBe(false);
+    expect(insertCalls.some((c) => c.table === members)).toBe(false);
+    const personUpdate = updateCalls.find((c) => c.table === persons);
+    expect(personUpdate?.set.lastName).toBe("Bauer");
+    const memberUpdate = updateCalls.find((c) => c.table === members);
+    expect(memberUpdate?.set.exitDate).toBe(null);
+    const appUpdate = updateCalls.find((c) => c.table === applications);
+    expect(appUpdate?.set.status).toBe("approved");
+  });
+
+  it("404s when linkMemberId doesn't match an existing member", async () => {
+    memberLookupResult = [];
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({ linkMemberId: "missing", lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2010-01-01" }),
+    });
+    expect(res.status).toBe(404);
   });
 });
 

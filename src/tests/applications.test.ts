@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, members, applications } from "../db/schema/index.js";
+import { t } from "../i18n/index.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -116,13 +117,26 @@ describe("GET /:id", () => {
     expect(res.status).toBe(404);
   });
 
-  it("shows the member-duplicate warning when a matching member exists", async () => {
+  it("shows the member-duplicate warning and link modal when a matching active member exists", async () => {
     findFirstResult = makeApplication();
-    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna" }];
+    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna", exitDate: null, deathDate: null }];
     const res = await applicationRoutes.request("/app1");
     const html = await res.text();
     expect(html).toContain("Bereits Mitglied");
-    expect(html).toContain('name="confirmDuplicate"');
+    expect(html).toContain(t("applications.duplicate.statusActive"));
+    expect(html).toContain('id="approve-modal"');
+    expect(html).toContain('name="linkMemberId" value="m1"');
+    expect(html).toContain(t("applications.duplicate.linkOptionDescActive"));
+  });
+
+  it("shows the link/reactivate modal when the matching member is archived", async () => {
+    findFirstResult = makeApplication();
+    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna", exitDate: "2020-01-01", deathDate: null }];
+    const res = await applicationRoutes.request("/app1");
+    const html = await res.text();
+    expect(html).toContain(t("applications.duplicate.statusArchived"));
+    expect(html).toContain('id="approve-modal"');
+    expect(html).toContain('name="linkMemberId" value="m1"');
   });
 
   it("shows the age warning for a youth application past the age limit", async () => {
@@ -136,7 +150,7 @@ describe("GET /:id", () => {
     findFirstResult = makeApplication();
     const res = await applicationRoutes.request("/app1");
     const html = await res.text();
-    expect(html).not.toContain('name="confirmDuplicate"');
+    expect(html).not.toContain('id="approve-modal"');
     expect(html).not.toContain('name="confirmAge"');
   });
 });
@@ -162,27 +176,59 @@ describe("POST /:id/approve", () => {
     findFirstResult = makeApplication();
     const res = await applicationRoutes.request("/app1/approve", { method: "POST" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/members/new?personId=p1&applicationId=app1");
+    expect(res.headers.get("location")).toBe("/members/new?applicationId=app1&personId=p1");
   });
 
-  it("blocks approval when a duplicate exists and the confirm checkbox is unchecked", async () => {
+  it("creates a new independent person when no linkMemberId is submitted, even with an active member match", async () => {
     findFirstResult = makeApplication();
-    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna" }];
+    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna", exitDate: null, deathDate: null }];
     const res = await applicationRoutes.request("/app1/approve", { method: "POST" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/applications/app1");
+    expect(res.headers.get("location")).toBe("/members/new?applicationId=app1&personId=p1");
   });
 
-  it("allows approval when the duplicate is confirmed", async () => {
+  it("redirects to the reactivation form when linkMemberId matches an archived member", async () => {
     findFirstResult = makeApplication();
-    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna" }];
+    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna", exitDate: "2020-01-01", deathDate: null }];
     const res = await applicationRoutes.request("/app1/approve", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: formBody({ confirmDuplicate: "on" }),
+      body: formBody({ linkMemberId: "m1" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/members/new?personId=p1&applicationId=app1");
+    expect(res.headers.get("location")).toBe("/members/new?applicationId=app1&linkMemberId=m1");
+  });
+
+  it("redirects to the link form when linkMemberId matches an active member", async () => {
+    findFirstResult = makeApplication();
+    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna", exitDate: null, deathDate: null }];
+    const res = await applicationRoutes.request("/app1/approve", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: formBody({ linkMemberId: "m1" }),
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members/new?applicationId=app1&linkMemberId=m1");
+  });
+
+  it("rejects a linkMemberId that isn't among the found duplicates (tamper guard)", async () => {
+    findFirstResult = makeApplication();
+    memberDuplicatesFixture = [{ id: "m1", lastName: "Bauer", firstName: "Anna", exitDate: null, deathDate: null }];
+    const res = await applicationRoutes.request("/app1/approve", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: formBody({ linkMemberId: "someone-elses-id" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("auto-rejects open twin applications found as duplicates", async () => {
+    findFirstResult = makeApplication();
+    applicationDuplicatesFixture = [{ id: "app2", lastName: "Bauer", firstName: "Anna" }];
+    const res = await applicationRoutes.request("/app1/approve", { method: "POST" });
+    expect(res.status).toBe(302);
+    const twinReject = updateCalls.find((c) => c.table === applications && c.set.status === "rejected");
+    expect(twinReject?.set.rejectedReason).toBe(t("applications.duplicate.autoRejectedReason"));
   });
 
   it("404s when the application is no longer open", async () => {

@@ -774,15 +774,20 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 });
 
 // GET /members/new — new member form. ?personId (+?applicationId) links an existing
-// persons row instead of creating a new one — used by the "Als Mitglied anlegen"
-// step of the applications review workflow (see routes/applications.tsx).
+// persons row instead of creating a new one — used by the "Annehmen" step of the
+// applications review workflow (see routes/applications.tsx). ?linkMemberId
+// (+?applicationId) instead links a duplicate-matched members row (archived: a
+// reactivation; active: an update), prefilled with the application's (fresher)
+// contact data.
 memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   const personId = c.req.query("personId");
+  const linkMemberId = c.req.query("linkMemberId");
   const applicationId = c.req.query("applicationId");
 
   let prefill: Partial<Member> | undefined;
+  let linkedWasArchived = false;
   if (personId) {
     const [alreadyMember] = await db.select({ id: members.id }).from(members).where(eq(members.personId, personId));
     if (alreadyMember) {
@@ -791,6 +796,23 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     }
     const [person] = await db.select().from(persons).where(eq(persons.id, personId));
     if (person) prefill = { ...person, birthDate: person.birthDate ?? "" };
+  } else if (linkMemberId) {
+    const target = await fetchMember(linkMemberId);
+    if (!target) return c.notFound();
+    linkedWasArchived = !!(target.exitDate || target.deathDate);
+    let contactOverride: Partial<Member> = {};
+    if (applicationId) {
+      const app = await db.query.applications.findFirst({ where: eq(applications.id, applicationId), with: { person: true } });
+      if (app) {
+        contactOverride = {
+          lastName: app.person.lastName, firstName: app.person.firstName, birthDate: app.person.birthDate ?? "",
+          street: app.person.street, houseNumber: app.person.houseNumber, zip: app.person.zip, city: app.person.city,
+          email: app.person.email, phone: app.person.phone,
+        };
+      }
+    }
+    const { assignments: _assignments, status: _status, ...targetMember } = target;
+    prefill = { ...targetMember, ...contactOverride, exitDate: "", deathDate: "" };
   }
 
   return c.html(
@@ -802,8 +824,10 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
       </div>
       <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
         {personId && <input type="hidden" name="personId" value={personId} />}
+        {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
-        {applicationId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+        {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+        {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
         <MemberFormFields m={prefill} />
         {applicationId && (
           <label class="label cursor-pointer justify-start gap-3">
@@ -866,8 +890,18 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const errors: Record<string, string> = {};
 
   const personId = String(body.personId ?? "").trim() || undefined;
+  const linkMemberId = String(body.linkMemberId ?? "").trim() || undefined;
   const applicationId = String(body.applicationId ?? "").trim() || undefined;
   const notifyApplicant = body.notifyApplicant === "on";
+
+  let targetPersonId: string | undefined;
+  let linkedWasArchived = false;
+  if (linkMemberId) {
+    const [target] = await db.select({ personId: members.personId, exitDate: members.exitDate, deathDate: members.deathDate }).from(members).where(eq(members.id, linkMemberId));
+    if (!target) return c.notFound();
+    targetPersonId = target.personId;
+    linkedWasArchived = !!(target.exitDate || target.deathDate);
+  }
 
   const lastName = String(body.lastName ?? "").trim();
   const firstName = String(body.firstName ?? "").trim();
@@ -925,8 +959,10 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         )}
         <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
           {personId && <input type="hidden" name="personId" value={personId} />}
+          {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
-          {applicationId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+          {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+          {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
           <MemberFormFields m={m} errors={errors} />
           {applicationId && (
             <label class="label cursor-pointer justify-start gap-3">
@@ -980,26 +1016,40 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     email: (body.email as string) || null,
   };
 
-  const [newMember] = await db.transaction(async (tx) => {
+  const [{ id: newMemberId }] = await db.transaction(async (tx) => {
     let pid = personId;
-    if (pid) {
-      await tx.update(persons).set(personFields).where(eq(persons.id, pid));
-    } else {
-      const [person] = await tx.insert(persons).values(personFields).returning();
-      pid = person.id;
-    }
+    let memberId: string;
 
-    const [m] = await tx.insert(members).values({
-      personId: pid,
-      entryDate,
-      exitDate: (body.exitDate as string) || null,
-      deathDate: (body.deathDate as string) || null,
-    }).returning();
+    if (linkMemberId && targetPersonId) {
+      pid = targetPersonId;
+      await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+      await tx.update(members).set({
+        entryDate,
+        exitDate: (body.exitDate as string) || null,
+        deathDate: (body.deathDate as string) || null,
+      }).where(eq(members.id, linkMemberId));
+      memberId = linkMemberId;
+    } else {
+      if (pid) {
+        await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+      } else {
+        const [person] = await tx.insert(persons).values(personFields).returning();
+        pid = person.id;
+      }
+
+      const [m] = await tx.insert(members).values({
+        personId: pid,
+        entryDate,
+        exitDate: (body.exitDate as string) || null,
+        deathDate: (body.deathDate as string) || null,
+      }).returning();
+      memberId = m.id;
+    }
 
     for (let i = 0; i < assignmentRoles.length; i++) {
       if (!assignmentRoles[i]) continue;
       await tx.insert(memberRoleAssignments).values({
-        memberId: m.id,
+        memberId,
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
@@ -1014,11 +1064,12 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         .where(and(eq(applications.id, applicationId), eq(applications.status, "open")));
     }
 
-    return [m];
+    return [{ id: memberId }];
   });
 
   if (applicationId && notifyApplicant && personFields.email) {
-    await sendMail(personFields.email, t("applications.mail.approvedSubject"), t("applications.mail.approvedBody"));
+    const bodyKey = linkMemberId && linkedWasArchived ? "applications.mail.approvedBodyRejoin" : "applications.mail.approvedBody";
+    await sendMail(personFields.email, t("applications.mail.approvedSubject"), t(bodyKey));
   }
 
   setFlash(c, t("members.flash.created"), "success");

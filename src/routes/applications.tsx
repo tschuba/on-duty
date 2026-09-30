@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { setCookie } from "hono/cookie";
-import { eq, and, ne, ilike } from "drizzle-orm";
+import { eq, and, ne, ilike, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -67,7 +67,7 @@ async function findDuplicates(person: Pick<Person, "lastName" | "firstName" | "b
   if (!person.birthDate) return { memberMatches: [], applicationMatches: [] };
 
   const memberMatches = await db
-    .select({ id: members.id, lastName: persons.lastName, firstName: persons.firstName })
+    .select({ id: members.id, lastName: persons.lastName, firstName: persons.firstName, exitDate: members.exitDate, deathDate: members.deathDate })
     .from(members)
     .innerJoin(persons, eq(members.personId, persons.id))
     .where(and(ilike(persons.lastName, person.lastName), ilike(persons.firstName, person.firstName), eq(persons.birthDate, person.birthDate)));
@@ -234,6 +234,10 @@ applicationRoutes.get("/:id", guard, async (c) => {
     ? await findDuplicates(app.person, app.id)
     : { memberMatches: [], applicationMatches: [] };
   const hasDuplicates = memberMatches.length > 0 || applicationMatches.length > 0;
+  // Only the first match is offered for linking — a second, coinciding match is an
+  // out-of-scope edge case (see backlog "Digitale Anträge" § Duplikat-Prüfung).
+  const memberMatch = memberMatches[0];
+  const memberMatchIsArchived = !!(memberMatch?.exitDate || memberMatch?.deathDate);
   const ageWarning = app.type === "youth" && app.person.birthDate ? ageInYears(app.person.birthDate) >= env.YOUTH_AGE_LIMIT : false;
 
   return c.html(
@@ -250,7 +254,12 @@ applicationRoutes.get("/:id", guard, async (c) => {
       {hasDuplicates && (
         <div class="alert alert-warning mb-4 max-w-2xl">
           <div>
-            {memberMatches.length > 0 && <p class="font-bold">{t("applications.duplicate.isMember")}</p>}
+            {memberMatches.length > 0 && (
+              <>
+                <p class="font-bold">{t("applications.duplicate.isMember")}</p>
+                <p class="text-sm">{t(memberMatchIsArchived ? "applications.duplicate.statusArchived" : "applications.duplicate.statusActive")}</p>
+              </>
+            )}
             {applicationMatches.length > 0 && <p class="font-bold">{t("applications.duplicate.hasOpenApplication")}</p>}
           </div>
         </div>
@@ -326,55 +335,79 @@ applicationRoutes.get("/:id", guard, async (c) => {
       {app.status === "open" && (
         <div class="max-w-2xl space-y-4">
           <div class="flex items-center justify-between">
-            <button type="submit" form="application-edit-form" class="btn btn-primary btn-outline">{t("applications.actions.save")}</button>
-            <button type="submit" form="application-reject-form" class="btn btn-outline btn-error">{t("applications.actions.reject")}</button>
-            <button type="submit" form="application-approve-form" id="create-member-btn" class="btn btn-primary" disabled={hasDuplicates || ageWarning}>{t("applications.actions.createMember")}</button>
+            <div class="flex items-center gap-2">
+              <button type="submit" form="application-edit-form" class="btn btn-primary btn-outline">{t("applications.actions.save")}</button>
+              {memberMatch ? (
+                <button type="button" id="create-member-btn" class="btn btn-primary" onclick="document.getElementById('approve-modal').showModal()">{t("applications.actions.approve")}</button>
+              ) : (
+                <button type="submit" form="application-approve-form" id="create-member-btn" class="btn btn-primary">{t("applications.actions.approve")}</button>
+              )}
+            </div>
+            <button type="button" class="btn btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()">{t("applications.actions.reject")}</button>
           </div>
 
           <form id="application-approve-form" method="post" action={`/applications/${app.id}/approve`}>
-            {hasDuplicates && (
-              <label class="label cursor-pointer justify-start gap-3">
-                <input type="checkbox" name="confirmDuplicate" class="checkbox approve-required-checkbox" />
-                <span class="label-text">{t("applications.duplicate.confirm")}</span>
-              </label>
-            )}
             {ageWarning && (
               <>
                 <p class="text-warning text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
                 <label class="label cursor-pointer justify-start gap-3">
-                  <input type="checkbox" name="confirmAge" class="checkbox approve-required-checkbox" />
+                  <input type="checkbox" name="confirmAge" class="checkbox" />
                   <span class="label-text">{t("applications.ageWarning.confirm")}</span>
                 </label>
               </>
             )}
           </form>
-          {(hasDuplicates || ageWarning) && (
-            <script dangerouslySetInnerHTML={{ __html: `
-              (function() {
-                var btn = document.getElementById('create-member-btn');
-                var boxes = document.querySelectorAll('.approve-required-checkbox');
-                function update() { btn.disabled = Array.prototype.some.call(boxes, function(cb) { return !cb.checked; }); }
-                boxes.forEach(function(cb) { cb.addEventListener('change', update); });
-              })();
-            ` }} />
+
+          {memberMatch && (
+            <dialog id="approve-modal" class="modal">
+              <div class="modal-box max-w-xl">
+                <h3 class="font-bold text-lg mb-4">{t("applications.duplicate.chooseTitle")}</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button type="submit" form="application-approve-form" name="linkMemberId" value={memberMatch.id} class="card bg-base-200 hover:bg-base-300 p-4 text-left">
+                    <div class="font-bold">{t("applications.duplicate.linkOption")}</div>
+                    <div class="text-sm opacity-70 mt-1">{t(memberMatchIsArchived ? "applications.duplicate.linkOptionDesc" : "applications.duplicate.linkOptionDescActive")}</div>
+                  </button>
+                  <button type="submit" form="application-approve-form" name="linkMemberId" value="" class="card bg-base-200 hover:bg-base-300 p-4 text-left">
+                    <div class="font-bold">{t("applications.duplicate.newOption")}</div>
+                    <div class="text-sm opacity-70 mt-1">{t("applications.duplicate.newOptionDesc")}</div>
+                  </button>
+                </div>
+                <div class="modal-action">
+                  <form method="dialog">
+                    <button class="btn">{t("common.cancel")}</button>
+                  </form>
+                </div>
+              </div>
+              <form method="dialog" class="modal-backdrop">
+                <button>{t("common.close")}</button>
+              </form>
+            </dialog>
           )}
 
-          <form
-            id="application-reject-form"
-            method="post"
-            action={`/applications/${app.id}/reject`}
-            class="border border-base-300 rounded-box p-4 space-y-3"
-            onsubmit={`return confirm('${t("applications.reject.confirm")}')`}
-          >
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("applications.reject.reasonLabel")}</span></label>
-              <textarea name="rejectedReason" class="textarea textarea-bordered w-full" rows={2}></textarea>
+          <dialog id="reject-modal" class="modal">
+            <div class="modal-box">
+              <h3 class="font-bold text-lg">{t("applications.reject.confirm")}</h3>
+              <form id="application-reject-form" method="post" action={`/applications/${app.id}/reject`} class="space-y-3 mt-4">
+                <div class="form-control">
+                  <label class="label"><span class="label-text">{t("applications.reject.reasonLabel")}</span></label>
+                  <textarea name="rejectedReason" class="textarea textarea-bordered w-full" rows={2}></textarea>
+                </div>
+                <label class="label cursor-pointer justify-start gap-3">
+                  <input type="checkbox" name="notifyApplicant" class="checkbox" />
+                  <span class="label-text">{t("applications.reject.notifyLabel")}</span>
+                </label>
+              </form>
+              <div class="modal-action">
+                <form method="dialog">
+                  <button class="btn">{t("common.cancel")}</button>
+                </form>
+                <button type="submit" form="application-reject-form" class="btn btn-error">{t("applications.reject.confirmButton")}</button>
+              </div>
             </div>
-            <label class="label cursor-pointer justify-start gap-3">
-              <input type="checkbox" name="notifyApplicant" class="checkbox" />
-              <span class="label-text">{t("applications.reject.notifyLabel")}</span>
-            </label>
-          </form>
+            <form method="dialog" class="modal-backdrop">
+              <button>{t("common.close")}</button>
+            </form>
+          </dialog>
         </div>
       )}
     </Layout>
@@ -405,29 +438,42 @@ applicationRoutes.post("/:id", guard, async (c) => {
   return c.redirect(`/applications/${id}`);
 });
 
-// POST /applications/:id/approve — re-validates the duplicate/age hard-confirms
-// server-side, then hands off to the prefilled /members/new form. The application's
-// status only flips to "approved" once that form is actually saved (see members.tsx).
+// POST /applications/:id/approve — re-validates the age hard-confirm server-side
+// (the member-duplicate choice is now made directly via the linkMemberId submit
+// button, see GET /:id's approve-modal), auto-rejects any open twin applications
+// found by findDuplicates, then hands off to the prefilled /members/new form. The
+// application's status only flips to "approved" once that form is actually saved
+// (see members.tsx).
 applicationRoutes.post("/:id/approve", guard, async (c) => {
+  const user = c.get("user");
   const id = c.req.param("id");
   const app = await fetchApplication(id);
   if (!app || app.status !== "open") return c.notFound();
 
   const body = await c.req.parseBody();
   const { memberMatches, applicationMatches } = await findDuplicates(app.person, app.id);
-  const hasDuplicates = memberMatches.length > 0 || applicationMatches.length > 0;
   const ageWarning = app.type === "youth" && app.person.birthDate ? ageInYears(app.person.birthDate) >= env.YOUTH_AGE_LIMIT : false;
 
-  if (hasDuplicates && body.confirmDuplicate !== "on") {
-    setFlash(c, t("applications.duplicate.confirm"), "error");
-    return c.redirect(`/applications/${id}`);
-  }
   if (ageWarning && body.confirmAge !== "on") {
     setFlash(c, t("applications.ageWarning.confirm"), "error");
     return c.redirect(`/applications/${id}`);
   }
 
-  return c.redirect(`/members/new?personId=${app.personId}&applicationId=${app.id}`);
+  const linkMemberId = String(body.linkMemberId ?? "").trim() || undefined;
+  if (linkMemberId && !memberMatches.some((m) => m.id === linkMemberId)) {
+    return c.notFound();
+  }
+
+  if (applicationMatches.length > 0) {
+    await db.update(applications)
+      .set({ status: "rejected", rejectedReason: t("applications.duplicate.autoRejectedReason"), reviewedAt: new Date(), reviewedBy: user.id })
+      .where(inArray(applications.id, applicationMatches.map((m) => m.id)));
+  }
+
+  const params = new URLSearchParams({ applicationId: app.id });
+  if (linkMemberId) params.set("linkMemberId", linkMemberId);
+  else params.set("personId", app.personId);
+  return c.redirect(`/members/new?${params}`);
 });
 
 // POST /applications/:id/reject
