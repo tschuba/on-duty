@@ -2,6 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and } from "drizzle-orm";
+import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL } from "../lib/constants.js";
 import {
   users,
   accounts,
@@ -19,14 +20,14 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration",
     isProtected: true,
-    permissions: ["members:read", "members:write", "system:admin"],
+    permissions: ["members:read", "members:write", "members:delete", "system:admin", "donations:record", "donations:issue-receipts", "applications:review", "applications:manage-forms"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
     name: "Bearbeiter",
-    description: "Kann Mitglieder anlegen und bearbeiten",
+    description: "Kann Mitglieder anlegen und bearbeiten, Anträge prüfen",
     isProtected: true,
-    permissions: ["members:read", "members:write"],
+    permissions: ["members:read", "members:write", "applications:review"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
@@ -35,9 +36,16 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     isProtected: true,
     permissions: ["members:read"],
   },
-  // Vorstand and Führung are seeded again once the feature that gives them a distinct
-  // permission set ships (donations:manage / inventory+training:*) — see backlog docs
-  // 09-11. Seeding them empty now would just duplicate "Leser".
+  {
+    id: "4a2b5c6d-7e8f-4a1b-9c2d-3e4f5a6b7c8d",
+    name: "Vorstand",
+    description: "Kann Spenden erfassen, Zuwendungsbestätigungen ausstellen und Anträge prüfen",
+    isProtected: true,
+    permissions: ["donations:record", "donations:issue-receipts", "applications:review"],
+  },
+  // Führung is seeded again once the feature that gives it a distinct permission set
+  // ships (inventory+training:*) — see backlog doc 11. Seeding it empty now would
+  // just duplicate "Leser".
 ];
 
 export async function runSeed() {
@@ -87,9 +95,9 @@ export async function runSeed() {
     await db
       .insert(users)
       .values({
-        id: "admin",
+        id: LOCAL_ADMIN_ACCOUNT_ID,
         name: "Administrator",
-        email: "admin@localhost.invalid",
+        email: LOCAL_ADMIN_EMAIL,
         emailVerified: true,
         disabled: false,
         createdAt: now,
@@ -101,20 +109,20 @@ export async function runSeed() {
     // pre-existing user's old appRole is not backfilled (dev/seed-only data, no migration needed)
     await db
       .insert(userAppRoles)
-      .values({ userId: "admin", roleId: APP_ROLES[0].id })
+      .values({ userId: LOCAL_ADMIN_ACCOUNT_ID, roleId: APP_ROLES[0].id })
       .onConflictDoNothing();
 
     const existing = await db
       .select({ id: accounts.id })
       .from(accounts)
-      .where(and(eq(accounts.accountId, "admin"), eq(accounts.providerId, "credential")));
+      .where(and(eq(accounts.accountId, LOCAL_ADMIN_ACCOUNT_ID), eq(accounts.providerId, "credential")));
 
     if (existing.length === 0) {
       await db.insert(accounts).values({
         id: "admin-credential",
-        accountId: "admin",
+        accountId: LOCAL_ADMIN_ACCOUNT_ID,
         providerId: "credential",
-        userId: "admin",
+        userId: LOCAL_ADMIN_ACCOUNT_ID,
         password: hash,
         createdAt: now,
         updatedAt: now,

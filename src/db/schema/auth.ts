@@ -11,6 +11,7 @@ export const users = pgTable("user", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   disabled: boolean("disabled").notNull().default(false),
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 export const sessions = pgTable("session", {

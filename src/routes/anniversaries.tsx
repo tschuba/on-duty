@@ -2,11 +2,13 @@ import { Hono } from "hono";
 import { asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
+import { buildListUrl } from "../lib/list-query.js";
+import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 
@@ -14,8 +16,17 @@ export const anniversaryRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+type Person = typeof persons.$inferSelect;
+type MemberRow = typeof members.$inferSelect;
+// birthDate is nullable in `persons` (donor-only persons need none) but every
+// member is guaranteed one at the app layer (members.tsx form validation).
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
+
+function flattenMember({ person, ...m }: { person: Person | null } & MemberRow & Record<string, unknown>): Member {
+  return { ...(person as Person), ...m } as Member;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,12 +40,6 @@ function addMonths(dateStr: string, months: number): string {
   const dt = new Date(y, m - 1 + months, d);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
-
-function formatDate(d: string): string {
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 const MONTH_KEYS = [
   "month.january", "month.february", "month.march", "month.april",
   "month.may", "month.june", "month.july", "month.august",
@@ -108,7 +113,7 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
 
   return (
     <div class="overflow-x-auto">
-      <table class="table table-sm w-full [&_tbody_td]:border-b-0">
+      <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
         <tbody>
           {[...groups.entries()].map(([month, evs], i) => (
             <>
@@ -197,14 +202,17 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   const mods = c.req.queries("mod") ?? [];
 
   const [memberRows, ayRows] = await Promise.all([
-    db.query.members.findMany({ with: { assignments: { with: { role: true } } } }),
+    db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
     db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
   ]);
 
-  const membersWithStatus = memberRows.map((m) => ({
-    ...m,
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
-  }));
+  const membersWithStatus = memberRows.map((row) => {
+    const m = flattenMember(row as any);
+    return {
+      ...m,
+      status: deriveMemberStatus(m, row.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    };
+  });
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   if (gte > 0) events = events.filter((e) => e.years >= gte);
@@ -217,17 +225,8 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
     );
   }
 
-  const qs = (extra: Record<string, string | string[]>) => {
-    const p = new URLSearchParams({ start, end, filter });
-    if (gte > 0) p.set("gte", String(gte));
-    for (const m of mods) p.append("mod", m);
-    for (const [k, v] of Object.entries(extra)) {
-      p.delete(k);
-      if (Array.isArray(v)) { for (const x of v) p.append(k, x); }
-      else if (v) p.set(k, v);
-    }
-    return "/anniversaries?" + p.toString();
-  };
+  const qs = (extra: Record<string, string | string[]>) =>
+    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
   const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
   const filterLink = (f: string) => qs({ filter: f });
@@ -352,13 +351,15 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const mod = q.mod || "";
 
   const [memberRows, ayRows] = await Promise.all([
-    db.query.members.findMany({ with: { assignments: { with: { role: true } } } }),
+    db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
     db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
   ]);
 
-  const membersWithStatus = memberRows.map((m) => ({
+  const flatMembers = memberRows.map((row) => flattenMember(row as any));
+
+  const membersWithStatus = flatMembers.map((m, i) => ({
     ...m,
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, memberRows[i].assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   }));
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
@@ -368,7 +369,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
   else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
 
-  const memberMap = new Map(memberRows.map((m) => [m.id, m]));
+  const memberMap = new Map(flatMembers.map((m) => [m.id, m]));
 
   const STATUS_LABEL: Record<string, string> = {
     aktiv: t("status.aktiv"), passiv: t("status.passiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), archiviert: t("status.archiviert"),

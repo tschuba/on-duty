@@ -1,54 +1,86 @@
 import { Hono } from "hono";
-import { getCookie, setCookie } from "hono/cookie";
-import { eq, or, ilike, asc } from "drizzle-orm";
+import { getCookie } from "hono/cookie";
+import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
+import { setFlash } from "../lib/flash.js";
+import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
+import { formatDate } from "../lib/format.js";
+import { trimmed } from "../lib/forms.js";
+import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
+import { sendMail } from "../lib/mail.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Member = typeof members.$inferSelect;
+type Person = typeof persons.$inferSelect;
+type MemberRow = typeof members.$inferSelect;
+// birthDate is nullable in `persons` (donor-only persons need none) but this route's
+// own form validation always requires it for a member — re-asserted non-null here.
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };
 
 // ── DB helpers ───────────────────────────────────────────────────────────────
 
+// ponytail: search filters in JS, not SQL — Drizzle's relational query API can't
+// filter the base table by a `with` relation's columns, and the full list is
+// already loaded into memory for stats/sort/pagination either way.
 async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus[]> {
   const rows = await db.query.members.findMany({
-    where: search
-      ? or(ilike(members.lastName, `%${search}%`), ilike(members.firstName, `%${search}%`))
-      : undefined,
-    with: {
-      assignments: { with: { role: true } },
-    },
+    with: { person: true, assignments: { with: { role: true } } },
   });
 
-  return rows.map((m) => ({
-    ...m,
-    assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
-  }));
+  const all = rows.map(({ person, ...m }) => {
+    const member = { ...(person as Person), ...m } as Member;
+    return {
+      ...member,
+      assignments: m.assignments as Assignment[],
+      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    };
+  });
+
+  if (!search) return all;
+  const needle = search.toLowerCase();
+  return all.filter((m) => m.lastName.toLowerCase().includes(needle) || m.firstName.toLowerCase().includes(needle));
 }
 
 async function fetchMember(id: string): Promise<MemberWithStatus | null> {
-  const m = await db.query.members.findFirst({
+  const row = await db.query.members.findFirst({
     where: eq(members.id, id),
-    with: { assignments: { with: { role: true } } },
+    with: { person: true, assignments: { with: { role: true } } },
   });
-  if (!m) return null;
+  if (!row) return null;
+  const { person, ...m } = row;
+  const member = { ...(person as Person), ...m } as Member;
   return {
-    ...m,
+    ...member,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   };
+}
+
+// Deleting a member also erases its person record (see backlog 19_Mitglieder-loeschen.md),
+// but that record may still be needed elsewhere — donations carry retention duties of
+// their own, and applications are a separate workflow. Block rather than cascade.
+export type PersonBlockingLink = "donor" | "application" | null;
+
+async function findPersonBlockingLink(personId: string): Promise<PersonBlockingLink> {
+  const [donorRow] = await db.select({ id: donors.id }).from(donors).where(eq(donors.personId, personId));
+  if (donorRow) return "donor";
+  const [applicationRow] = await db.select({ id: applications.id }).from(applications).where(eq(applications.personId, personId));
+  if (applicationRow) return "application";
+  const [guardianRow] = await db.select({ id: applicationGuardians.id }).from(applicationGuardians).where(eq(applicationGuardians.personId, personId));
+  if (guardianRow) return "application";
+  return null;
 }
 
 // ── Sort / filter helpers ────────────────────────────────────────────────────
@@ -72,10 +104,6 @@ export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" 
 
 // ── Flash cookie helpers ─────────────────────────────────────────────────────
 
-function setFlash(c: any, message: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message, type }), { path: "/", maxAge: 10, httpOnly: false });
-}
-
 // ── JSX components ───────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<MemberStatus, string> = {
@@ -97,14 +125,7 @@ const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
 function StatusBadge({ status }: { status: MemberStatus }) {
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;
 }
-
-function formatDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
-export function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "asc" | "desc" }) {
+export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
@@ -175,30 +196,16 @@ export function MembersTable({
   roleFilter: string[];
   isEditor: boolean;
 }) {
+  const currentState = { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize };
+
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
     const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    for (const s of statusFilter) params.append("status", s);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", col);
-    params.set("sort_dir", newDir);
-    params.set("page", "1");
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", currentState, { sort: col, sort_dir: newDir, page: 1 });
   }
 
   function pageUrl(p: number) {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    for (const s of statusFilter) params.append("status", s);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    params.set("page", String(p));
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", currentState, { page: p });
   }
 
   const openRoles = (m: MemberWithStatus) =>
@@ -207,6 +214,7 @@ export function MembersTable({
   return (
     <div id="members-results">
       <div>
+        <ClickToEditHint />
         <table class="table table-zebra w-full">
           <thead>
             <tr>
@@ -275,7 +283,7 @@ export function MembersTable({
               window.location = url.toString();
             `}
           >
-            {[10, 25, 50, 100].map((n) => (
+            {PAGE_SIZE_OPTIONS.map((n) => (
               <option key={n} value={n} selected={n === pageSize}>{n}</option>
             ))}
           </select>
@@ -375,7 +383,7 @@ function MemberFormFields({
           type={type}
           name={name as string}
           value={value as string}
-          class={`input input-bordered${err ? " input-error" : ""}`}
+          class={`input input-bordered w-full${err ? " input-error" : ""}`}
           {...(required ? { required: true } : {})}
         />
         {err && <span class="text-error text-sm mt-1">{err}</span>}
@@ -399,7 +407,7 @@ function MemberFormFields({
         {field("city", t("members.form.city"))}
         <div class="form-control">
           <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
-          <select name="gender" class={`select select-bordered${genderErr ? " select-error" : ""}`}>
+          <select name="gender" class={`select select-bordered w-full${genderErr ? " select-error" : ""}`}>
             <option value="" selected={!m?.gender}>{t("members.form.genderNone")}</option>
             <option value="male" selected={m?.gender === "male"}>{t("members.form.genderMale")}</option>
             <option value="female" selected={m?.gender === "female"}>{t("members.form.genderFemale")}</option>
@@ -459,6 +467,58 @@ function ReactivationModal({
         <a href={`/members/${memberId}`}>×</a>
       </form>
     </dialog>
+  );
+}
+
+// ── Delete member ────────────────────────────────────────────────────────────
+
+function DeleteMemberButton({
+  member,
+  blockedBy,
+}: {
+  member: Pick<MemberWithStatus, "id" | "firstName" | "lastName">;
+  blockedBy: PersonBlockingLink;
+}) {
+  if (blockedBy) {
+    return (
+      <button
+        class="btn btn-ghost btn-sm text-base-content/30 ml-auto"
+        disabled
+        title={t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication")}
+      >
+        {t("common.delete")}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        class="btn btn-ghost btn-sm text-error ml-auto"
+        onclick="document.getElementById('delete-member-modal').showModal()"
+      >
+        {t("common.delete")}
+      </button>
+      <dialog id="delete-member-modal" class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">{t("members.delete.confirmTitle")}</h3>
+          <p class="py-2 opacity-70">
+            {t("members.delete.confirmBody", { name: `${member.firstName} ${member.lastName}` })}
+          </p>
+          <div class="modal-action">
+            <form method="dialog">
+              <button class="btn">{t("common.cancel")}</button>
+            </form>
+            <form method="post" action={`/members/${member.id}/delete`}>
+              <button type="submit" class="btn btn-error">{t("common.delete")}</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button>{t("common.close")}</button>
+        </form>
+      </dialog>
+    </>
   );
 }
 
@@ -629,8 +689,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
     ? roleFilterRaw[0].split(",")
     : roleFilterRaw).filter(Boolean);
-  const page = Math.max(1, Number(q.page) || 1);
-  const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+  const { page, pageSize } = parsePagination(q);
 
   return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
 }
@@ -681,18 +740,10 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   if (isHtmx) return c.html(tableEl);
 
   function filterToggleUrl(s: MemberStatus) {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
     const next = statusFilter.includes(s)
       ? statusFilter.filter((x) => x !== s)
       : [...statusFilter, s];
-    for (const f of next) params.append("status", f);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    params.set("page", "1");
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize }, { status: next, page: 1 });
   }
 
   return c.html(
@@ -720,7 +771,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           value={search}
           class="input input-bordered input-sm w-64"
           hx-get="/members"
-          hx-trigger="input changed delay:300ms"
+          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#members-results"
           hx-include="[name='search']"
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
@@ -760,10 +811,48 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   );
 });
 
-// GET /members/new — new member form
+// GET /members/new — new member form. ?personId (+?applicationId) links an existing
+// persons row instead of creating a new one — used by the "Annehmen" step of the
+// applications review workflow (see routes/applications.tsx). ?linkMemberId
+// (+?applicationId) instead links a duplicate-matched members row (archived: a
+// reactivation; active: an update), prefilled with the application's (fresher)
+// contact data.
 memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+  const personId = c.req.query("personId");
+  const linkMemberId = c.req.query("linkMemberId");
+  const applicationId = c.req.query("applicationId");
+
+  let prefill: Partial<Member> | undefined;
+  let linkedWasArchived = false;
+  if (personId) {
+    const [alreadyMember] = await db.select({ id: members.id }).from(members).where(eq(members.personId, personId));
+    if (alreadyMember) {
+      setFlash(c, t("members.error.personAlreadyMember"), "error");
+      return c.redirect(applicationId ? `/applications/${applicationId}` : "/members");
+    }
+    const [person] = await db.select().from(persons).where(eq(persons.id, personId));
+    if (person) prefill = { ...person, birthDate: person.birthDate ?? "" };
+  } else if (linkMemberId) {
+    const target = await fetchMember(linkMemberId);
+    if (!target) return c.notFound();
+    linkedWasArchived = !!(target.exitDate || target.deathDate);
+    let contactOverride: Partial<Member> = {};
+    if (applicationId) {
+      const app = await db.query.applications.findFirst({ where: eq(applications.id, applicationId), with: { person: true } });
+      if (app) {
+        contactOverride = {
+          lastName: app.person.lastName, firstName: app.person.firstName, birthDate: app.person.birthDate ?? "",
+          street: app.person.street, houseNumber: app.person.houseNumber, zip: app.person.zip, city: app.person.city,
+          email: app.person.email, phone: app.person.phone,
+        };
+      }
+    }
+    const { assignments: _assignments, status: _status, ...targetMember } = target;
+    prefill = { ...targetMember, ...contactOverride, exitDate: "", deathDate: "" };
+  }
+
   return c.html(
     <Layout title={t("members.newMember")} user={user} activeNav="members">
       <div class="mb-4">
@@ -772,10 +861,21 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
-        <MemberFormFields />
+        {personId && <input type="hidden" name="personId" value={personId} />}
+        {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
+        {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
+        {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+        {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
+        <MemberFormFields m={prefill} />
+        {applicationId && (
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" name="notifyApplicant" class="checkbox" />
+            <span class="label-text">{t("members.form.notifyApplicant")}</span>
+          </label>
+        )}
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table w-full">
             <thead>
               <tr>
                 <th>{t("members.form.role")}</th>
@@ -821,16 +921,30 @@ memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   return c.html(<RoleRow index={index} roles={roles} />);
 });
 
-// POST /members/new — create member
+// POST /members/new — create member (or link an existing person, see GET /new)
 memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
-  const lastName = String(body.lastName ?? "").trim();
-  const firstName = String(body.firstName ?? "").trim();
-  const birthDate = String(body.birthDate ?? "").trim();
-  const entryDate = String(body.entryDate ?? "").trim();
+  const personId = trimmed(body, "personId") || undefined;
+  const linkMemberId = trimmed(body, "linkMemberId") || undefined;
+  const applicationId = trimmed(body, "applicationId") || undefined;
+  const notifyApplicant = body.notifyApplicant === "on";
+
+  let targetPersonId: string | undefined;
+  let linkedWasArchived = false;
+  if (linkMemberId) {
+    const [target] = await db.select({ personId: members.personId, exitDate: members.exitDate, deathDate: members.deathDate }).from(members).where(eq(members.id, linkMemberId));
+    if (!target) return c.notFound();
+    targetPersonId = target.personId;
+    linkedWasArchived = !!(target.exitDate || target.deathDate);
+  }
+
+  const lastName = trimmed(body, "lastName");
+  const firstName = trimmed(body, "firstName");
+  const birthDate = trimmed(body, "birthDate");
+  const entryDate = trimmed(body, "entryDate");
 
   if (!lastName) errors.lastName = t("common.required");
   if (!firstName) errors.firstName = t("common.required");
@@ -882,10 +996,21 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+          {personId && <input type="hidden" name="personId" value={personId} />}
+          {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
+          {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
+          {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+          {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
           <MemberFormFields m={m} errors={errors} />
+          {applicationId && (
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
+              <span class="label-text">{t("members.form.notifyApplicant")}</span>
+            </label>
+          )}
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -917,34 +1042,73 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     );
   }
 
-  const [newMember] = await db.transaction(async (tx) => {
-    const [m] = await tx.insert(members).values({
-      lastName, firstName,
-      street: (body.street as string) || null,
-      houseNumber: (body.houseNumber as string) || null,
-      zip: (body.zip as string) || null,
-      city: (body.city as string) || null,
-      gender: (body.gender as any) || null,
-      birthDate,
-      entryDate,
-      exitDate: (body.exitDate as string) || null,
-      deathDate: (body.deathDate as string) || null,
-      phone: (body.phone as string) || null,
-      email: (body.email as string) || null,
-    }).returning();
+  const personFields = {
+    lastName, firstName,
+    street: (body.street as string) || null,
+    houseNumber: (body.houseNumber as string) || null,
+    zip: (body.zip as string) || null,
+    city: (body.city as string) || null,
+    gender: (body.gender as any) || null,
+    birthDate,
+    phone: (body.phone as string) || null,
+    email: (body.email as string) || null,
+  };
+
+  const [{ id: newMemberId }] = await db.transaction(async (tx) => {
+    let pid = personId;
+    let memberId: string;
+
+    if (linkMemberId && targetPersonId) {
+      pid = targetPersonId;
+      await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+      await tx.update(members).set({
+        entryDate,
+        exitDate: (body.exitDate as string) || null,
+        deathDate: (body.deathDate as string) || null,
+      }).where(eq(members.id, linkMemberId));
+      memberId = linkMemberId;
+    } else {
+      if (pid) {
+        await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+      } else {
+        const [person] = await tx.insert(persons).values(personFields).returning();
+        pid = person.id;
+      }
+
+      const [m] = await tx.insert(members).values({
+        personId: pid,
+        entryDate,
+        exitDate: (body.exitDate as string) || null,
+        deathDate: (body.deathDate as string) || null,
+      }).returning();
+      memberId = m.id;
+    }
 
     for (let i = 0; i < assignmentRoles.length; i++) {
       if (!assignmentRoles[i]) continue;
       await tx.insert(memberRoleAssignments).values({
-        memberId: m.id,
+        memberId,
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
       });
     }
 
-    return [m];
+    // Guarded by status="open" so a double-submit (e.g. two tabs) can't re-approve
+    // an application that already went through this once.
+    if (applicationId) {
+      await tx.update(applications)
+        .set({ status: "approved", reviewedAt: new Date(), reviewedBy: user.id })
+        .where(and(eq(applications.id, applicationId), eq(applications.status, "open")));
+    }
+
+    return [{ id: memberId }];
   });
+
+  if (applicationId && notifyApplicant && personFields.email) {
+    const bodyKey = linkMemberId && linkedWasArchived ? "applications.mail.approvedBodyRejoin" : "applications.mail.approvedBody";
+    await sendMail(personFields.email, t("applications.mail.approvedSubject"), t(bodyKey));
+  }
 
   setFlash(c, t("members.flash.created"), "success");
   const saveAndNew = String(body._action ?? "") === "save_and_new";
@@ -1019,7 +1183,8 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
     assignments: q.assignments === "1",
   };
 
-  const allMembers = await db.select().from(members);
+  const memberRows = await db.query.members.findMany({ with: { person: true } });
+  const allMembers: Member[] = memberRows.map(({ person, ...m }) => ({ ...(person as Person), ...m } as Member));
   const rawAssignments: ExportAssignmentRow[] = opts.assignments
     ? await db.select({
         memberId: memberRoleAssignments.memberId,
@@ -1056,6 +1221,9 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const isEditor = user.permissions.has("members:write");
   const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
 
+  const canDelete = user.permissions.has("members:delete");
+  const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
+
   if (!isEditor) {
     // Read-only view
     const openRoles = m.assignments.filter((a) => !a.to);
@@ -1068,6 +1236,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
               {m.firstName} {m.lastName}
             </h1>
             <StatusBadge status={m.status} />
+            {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} />}
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
@@ -1106,6 +1275,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             {m.firstName} {m.lastName}
           </h1>
           <StatusBadge status={m.status} />
+          {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} />}
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
@@ -1113,7 +1283,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table w-full">
             <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
@@ -1147,10 +1317,10 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
-  const lastName = String(body.lastName ?? "").trim();
-  const firstName = String(body.firstName ?? "").trim();
-  const birthDate = String(body.birthDate ?? "").trim();
-  const entryDate = String(body.entryDate ?? "").trim();
+  const lastName = trimmed(body, "lastName");
+  const firstName = trimmed(body, "firstName");
+  const birthDate = trimmed(body, "birthDate");
+  const entryDate = trimmed(body, "entryDate");
   const exitDate = (body.exitDate as string) || null;
   const deathDate = (body.deathDate as string) || null;
 
@@ -1190,7 +1360,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
           <MemberFormFields m={m} errors={errors} />
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -1261,7 +1431,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
             phone: body.phone as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -1293,19 +1463,23 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   }
 
   await db.transaction(async (tx) => {
-    // Update member fields
-    await tx.update(members).set({
+    // Update person + member fields
+    await tx.update(persons).set({
       lastName, firstName,
       street: (body.street as string) || null,
       houseNumber: (body.houseNumber as string) || null,
       zip: (body.zip as string) || null,
       city: (body.city as string) || null,
       gender: (body.gender as any) || null,
-      birthDate, entryDate,
-      exitDate: exitDate || null,
-      deathDate: deathDate || null,
+      birthDate,
       phone: (body.phone as string) || null,
       email: (body.email as string) || null,
+    }).where(eq(persons.id, existing.personId));
+
+    await tx.update(members).set({
+      entryDate,
+      exitDate: exitDate || null,
+      deathDate: deathDate || null,
     }).where(eq(members.id, id));
 
     // Archive: close open assignments when exitDate or deathDate set
@@ -1350,6 +1524,30 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
 
   setFlash(c, t("members.flash.saved"), "success");
   return c.redirect(`/members/${id}`);
+});
+
+// POST /members/:id/delete — permanently deletes the member AND its person record
+// (name, address, contact data). Role assignments cascade at the DB level. Blocked
+// (not cascaded further) if the same person still has a donor profile or is linked
+// to an application — see findPersonBlockingLink.
+memberRoutes.post("/:id/delete", requireAuth("members:delete"), async (c) => {
+  const id = c.req.param("id");
+  const existing = await fetchMember(id);
+  if (!existing) return c.notFound();
+
+  const blockedBy = await findPersonBlockingLink(existing.personId);
+  if (blockedBy) {
+    setFlash(c, t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication"), "error");
+    return c.redirect(`/members/${id}`);
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(members).where(eq(members.id, id));
+    await tx.delete(persons).where(eq(persons.id, existing.personId));
+  });
+
+  setFlash(c, t("members.flash.deleted"), "success");
+  return c.redirect("/members");
 });
 
 // ── Read-only view field helper ───────────────────────────────────────────────

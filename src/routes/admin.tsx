@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
-import { setCookie } from "hono/cookie";
 import { db } from "../db/index.js";
 import {
   users,
@@ -13,13 +12,16 @@ import {
   appRoles,
   appRolePermissions,
   userAppRoles,
+  orgConfig,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
+import { setFlash } from "../lib/flash.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
@@ -31,23 +33,22 @@ const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
 const PERMISSION_LABELS: Record<Permission, string> = {
   "members:read": t("admin.permissions.key.membersRead"),
   "members:write": t("admin.permissions.key.membersWrite"),
+  "members:delete": t("admin.permissions.key.membersDelete"),
   "system:admin": t("admin.permissions.key.systemAdmin"),
+  "donations:record": t("admin.permissions.key.donationsRecord"),
+  "donations:issue-receipts": t("admin.permissions.key.donationsIssueReceipts"),
+  "applications:review": t("admin.permissions.key.applicationsReview"),
+  "applications:manage-forms": t("admin.permissions.key.applicationsManageForms"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
   members: t("admin.permissions.resource.members"),
   system: t("admin.permissions.resource.system"),
+  donations: t("admin.permissions.resource.donations"),
+  applications: t("admin.permissions.resource.applications"),
 };
 
-function setFlash(c: any, msg: string, type: "success" | "error") {
-  setCookie(c, "flash", JSON.stringify({ message: msg, type }), {
-    path: "/",
-    maxAge: 10,
-    httpOnly: false,
-  });
-}
-
-function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -64,6 +65,9 @@ function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "an
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         {t("admin.tabs.config")}
+      </a>
+      <a href="/admin/org-config" role="tab" class={`tab${active === "org-config" ? " tab-active" : ""}`}>
+        {t("admin.tabs.orgConfig")}
       </a>
       <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
         {t("admin.tabs.backup")}
@@ -91,14 +95,22 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
   );
 }
 
-export async function backupWarnProps() {
-  const configured = isBackupConfigured();
-  const last = configured ? await getLastBackup() : null;
-  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+function getBackupWarnProps(
+  configured: boolean,
+  last: Awaited<ReturnType<typeof getLastBackup>> | null,
+  schedule: ReturnType<typeof getCronScheduleTimes> | null,
+) {
   const lastFailed = schedule?.prev
     ? !(last?.startedAt && last.startedAt >= schedule.prev && last.status === "success")
     : last?.status === "failed";
   return { configured, lastFailed: lastFailed ?? false };
+}
+
+export async function backupWarnProps() {
+  const configured = isBackupConfigured();
+  const last = configured ? await getLastBackup() : null;
+  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  return getBackupWarnProps(configured, last, schedule);
 }
 
 function ModalScaffold() {
@@ -159,10 +171,6 @@ function PermissionBadges({ permissions }: { permissions: Permission[] }) {
   );
 }
 
-function ClickToEditHint() {
-  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
-}
-
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
 adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 
@@ -214,7 +222,7 @@ adminRoutes.get("/users", guard, async (c) => {
           </thead>
           <tbody>
             {allUsers.map((u) => {
-              const isLocal = u.email === "admin@localhost.invalid";
+              const isLocal = u.email === LOCAL_ADMIN_EMAIL;
               return (
                 <tr
                   key={u.id}
@@ -236,6 +244,8 @@ adminRoutes.get("/users", guard, async (c) => {
                   <td>
                     {u.disabled ? (
                       <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
+                    ) : !isLocal && u.lastLoginAt === null ? (
+                      <span class="badge badge-warning badge-sm">{t("admin.users.statusUnconfirmed")}</span>
                     ) : (
                       <span class="badge badge-success badge-sm">{t("admin.users.statusActive")}</span>
                     )}
@@ -257,7 +267,7 @@ adminRoutes.get("/users", guard, async (c) => {
                               </button>
                             </form>
                             <button
-                              class="btn btn-ghost btn-xs text-error"
+                              class="btn btn-outline btn-error btn-xs"
                               onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
                             >
                               {t("common.delete")}
@@ -404,7 +414,7 @@ adminRoutes.get("/users/new", guard, async (c) => {
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select().from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const [allRoles, permRows, assigned] = await Promise.all([
     db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
@@ -504,7 +514,7 @@ adminRoutes.post("/users", guard, async (c) => {
 adminRoutes.post("/users/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [existing] = await db.select().from(users).where(eq(users.id, id));
-  if (!existing || existing.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!existing || existing.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
@@ -546,7 +556,7 @@ adminRoutes.post("/users/:id", guard, async (c) => {
 adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   await db.update(users).set({ disabled: true, updatedAt: new Date() }).where(eq(users.id, id));
   await db.delete(sessions).where(eq(sessions.userId, id));
@@ -559,7 +569,7 @@ adminRoutes.post("/users/:id/deactivate", guard, async (c) => {
 adminRoutes.post("/users/:id/activate", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   await db.update(users).set({ disabled: false, updatedAt: new Date() }).where(eq(users.id, id));
 
@@ -571,11 +581,11 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
 adminRoutes.post("/users/:id/delete", guard, async (c) => {
   const id = c.req.param("id");
   const currentUser = c.get("user");
-  if (currentUser.id === id) return c.html("", 403);
+  if (currentUser.id === id) return c.html("", HTTP_STATUS.FORBIDDEN);
 
   const [u] = await db.select({ email: users.email, disabled: users.disabled }).from(users).where(eq(users.id, id));
-  if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
-  if (!u.disabled) return c.html("", 400);
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
+  if (!u.disabled) return c.html("", HTTP_STATUS.BAD_REQUEST);
 
   await db.delete(users).where(eq(users.id, id));
 
@@ -658,7 +668,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                       {canDelete ? (
                         <>
                           <button
-                            class="btn btn-ghost btn-xs text-error"
+                            class="btn btn-outline btn-error btn-xs"
                             onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`}
                           >
                             {t("common.delete")}
@@ -788,7 +798,7 @@ adminRoutes.get("/permissions/new", guard, (c) => {
 adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
   const hasAssignments = cnt > 0;
@@ -867,7 +877,7 @@ adminRoutes.post("/permissions", guard, async (c) => {
 adminRoutes.post("/permissions/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody({ all: true });
   const permissions = parsePermissions(body);
@@ -1013,7 +1023,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                       {canDelete ? (
                         <>
                           <button
-                            class="btn btn-ghost btn-xs text-error"
+                            class="btn btn-outline btn-error btn-xs"
                             onclick={`event.stopPropagation(); document.getElementById('delete-role-${r.id}').showModal()`}
                           >
                             {t("common.delete")}
@@ -1106,7 +1116,7 @@ adminRoutes.get("/roles/new", guard, (c) => {
 adminRoutes.get("/roles/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const [{ cnt }] = await db
     .select({ cnt: count() })
@@ -1187,7 +1197,7 @@ adminRoutes.post("/roles", guard, async (c) => {
 adminRoutes.post("/roles/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", 404);
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody();
   const grantsActiveStatus = body.grantsActiveStatus === "1";
@@ -1267,7 +1277,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
 
       <ClickToEditHint />
       <div class="overflow-x-auto mb-6">
-        <table class="table table-zebra w-full max-w-md">
+        <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.anniversaries.table.years")}</th>
@@ -1296,7 +1306,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                   <td>
                     <div class="flex gap-2 justify-end">
                       <button
-                        class="btn btn-ghost btn-xs text-error"
+                        class="btn btn-outline btn-error btn-xs"
                         onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.year}').showModal()`}
                       >
                         {t("common.delete")}
@@ -1374,7 +1384,7 @@ adminRoutes.get("/anniversaries/new", guard, (c) => {
 adminRoutes.get("/anniversaries/:year/edit", guard, async (c) => {
   const year = parseInt(c.req.param("year"), 10);
   const [y] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, year));
-  if (!y) return c.html("", 404);
+  if (!y) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   return c.html(
     <>
@@ -1426,7 +1436,7 @@ adminRoutes.post("/anniversaries", guard, async (c) => {
 adminRoutes.post("/anniversaries/:year", guard, async (c) => {
   const oldYear = parseInt(c.req.param("year"), 10);
   const [existing] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, oldYear));
-  if (!existing) return c.html("", 404);
+  if (!existing) return c.html("", HTTP_STATUS.NOT_FOUND);
 
   const body = await c.req.parseBody();
   const newYear = parseInt(String(body.year ?? ""), 10);
@@ -1491,7 +1501,7 @@ adminRoutes.get("/config", guard, async (c) => {
         {t("admin.config.title")}
       </h1>
       <div class="overflow-x-auto">
-        <table class="table w-full max-w-2xl">
+        <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.config.table.variable")}</th>
@@ -1516,15 +1526,168 @@ adminRoutes.get("/config", guard, async (c) => {
   );
 });
 
+// ── /admin/org-config ────────────────────────────────────────────────────────
+const ORG_CONFIG_FIELDS = [
+  { key: "orgName", type: "text", section: "address" },
+  { key: "orgStreet", type: "text", section: "address" },
+  { key: "orgHouseNumber", type: "text", section: "address" },
+  { key: "orgZip", type: "text", section: "address" },
+  { key: "orgCity", type: "text", section: "address" },
+  { key: "taxExemptionDate", type: "date", section: "tax" },
+  { key: "taxExemptionNumber", type: "text", section: "tax" },
+  { key: "taxOffice", type: "text", section: "tax" },
+  { key: "taxAssessmentPeriodFrom", type: "number", section: "tax" },
+  { key: "taxAssessmentPeriodTo", type: "number", section: "tax" },
+  { key: "charitablePurpose", type: "text", section: "tax" },
+  { key: "iban", type: "text", section: "bank" },
+  { key: "bic", type: "text", section: "bank" },
+  { key: "applicationNotifyEmail", type: "email", section: "applications" },
+] as const;
+
+const ORG_CONFIG_SECTIONS = [
+  { id: "address", title: t("admin.orgConfig.section.address") },
+  { id: "tax", title: t("admin.orgConfig.section.tax") },
+  { id: "bank", title: t("admin.orgConfig.section.bank") },
+  { id: "applications", title: t("admin.orgConfig.section.applications") },
+] as const;
+
+const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
+  orgName: t("admin.orgConfig.field.orgName"),
+  orgStreet: t("admin.orgConfig.field.orgStreet"),
+  orgHouseNumber: t("admin.orgConfig.field.orgHouseNumber"),
+  orgZip: t("admin.orgConfig.field.orgZip"),
+  orgCity: t("admin.orgConfig.field.orgCity"),
+  taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
+  taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
+  taxOffice: t("admin.orgConfig.field.taxOffice"),
+  taxAssessmentPeriodFrom: t("admin.orgConfig.field.taxAssessmentPeriodFrom"),
+  taxAssessmentPeriodTo: t("admin.orgConfig.field.taxAssessmentPeriodTo"),
+  charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
+  iban: t("admin.orgConfig.field.iban"),
+  bic: t("admin.orgConfig.field.bic"),
+  applicationNotifyEmail: t("admin.orgConfig.field.applicationNotifyEmail"),
+};
+
+// iban/bic are normalized (no spaces, uppercase) so consuming features don't
+// each have to re-clean what an admin typed as "DE12 3456 ...".
+function normalizeOrgConfigValue(key: string, value: string): string {
+  if (key === "iban" || key === "bic") return value.replace(/\s+/g, "").toUpperCase();
+  return value;
+}
+
+adminRoutes.get("/org-config", guard, async (c) => {
+  const user = c.get("user");
+  const warn = await backupWarnProps();
+  const rows = await db.select().from(orgConfig);
+  const values = new Map(rows.map((r) => [r.key, r.value]));
+
+  function field(key: (typeof ORG_CONFIG_FIELDS)[number]["key"], type: string) {
+    return (
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">{ORG_CONFIG_FIELD_LABELS[key]}</span>
+        </label>
+        <input type={type} name={key} class="input input-bordered w-full" value={values.get(key) ?? ""} />
+      </div>
+    );
+  }
+
+  return c.html(
+    <Layout title={t("admin.orgConfig.title")} user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
+      <AdminTabs active="org-config" />
+      <div class="max-w-4xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+            {t("admin.orgConfig.title")}
+          </h1>
+          <button type="submit" form="org-config-form" class="btn btn-primary btn-sm">
+            {t("common.save")}
+          </button>
+        </div>
+        <form id="org-config-form" method="post" action="/admin/org-config" class="flex flex-col gap-6">
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[0].title}</h2>
+              {field("orgName", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-[3fr_1fr] gap-4">
+                {field("orgStreet", "text")}
+                {field("orgHouseNumber", "text")}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_3fr] gap-4">
+                {field("orgZip", "text")}
+                {field("orgCity", "text")}
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[1].title}</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4">
+                {field("taxExemptionDate", "date")}
+                {field("taxExemptionNumber", "text")}
+              </div>
+              {field("taxOffice", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("taxAssessmentPeriodFrom", "number")}
+                {field("taxAssessmentPeriodTo", "number")}
+              </div>
+              {field("charitablePurpose", "text")}
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[2].title}</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("iban", "text")}
+                {field("bic", "text")}
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[3].title}</h2>
+              {field("applicationNotifyEmail", "email")}
+            </div>
+          </div>
+        </form>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.post("/org-config", guard, async (c) => {
+  const body = await c.req.parseBody();
+
+  const periodFrom = String(body.taxAssessmentPeriodFrom ?? "").trim();
+  const periodTo = String(body.taxAssessmentPeriodTo ?? "").trim();
+  if (periodFrom && periodTo && Number(periodTo) < Number(periodFrom)) {
+    setFlash(c, t("admin.orgConfig.flash.invalidPeriod"), "error");
+    return c.redirect("/admin/org-config");
+  }
+
+  for (const field of ORG_CONFIG_FIELDS) {
+    const value = normalizeOrgConfigValue(field.key, String(body[field.key] ?? "").trim());
+    if (value) {
+      await db
+        .insert(orgConfig)
+        .values({ key: field.key, value })
+        .onConflictDoUpdate({ target: orgConfig.key, set: { value } });
+    } else {
+      await db.delete(orgConfig).where(eq(orgConfig.key, field.key));
+    }
+  }
+  setFlash(c, t("admin.orgConfig.flash.saved"), "success");
+  return c.redirect("/admin/org-config");
+});
+
 // ── /admin/backup ──────────────────────────────────────────────────────────────
 adminRoutes.get("/backup", guard, async (c) => {
   const user = c.get("user");
-  const [entries, warn] = await Promise.all([
-    db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50),
-    backupWarnProps(),
-  ]);
-
-  const schedule = isBackupConfigured() ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  const configured = isBackupConfigured();
+  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
+  const entries = await db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50);
+  const warn = getBackupWarnProps(configured, entries[0] ?? null, schedule);
   const lastBackupAfterSchedule =
     schedule?.prev && entries[0]?.startedAt && entries[0].startedAt >= schedule.prev
       ? entries[0].status
@@ -1582,7 +1745,7 @@ adminRoutes.get("/backup", guard, async (c) => {
         <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>
       ) : (
         <div class="overflow-x-auto">
-          <table class="table w-full">
+          <table class="table table-zebra w-full">
             <thead>
               <tr>
                 <th>{t("admin.backup.table.timestamp")}</th>

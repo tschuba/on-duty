@@ -10,8 +10,10 @@ import {
   appRoles,
   appRolePermissions,
   userAppRoles,
+  orgConfig,
 } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { formBody } from "./test-utils.js";
 
 process.env.ORG_NAME = "Test Feuerwehr";
 
@@ -45,6 +47,7 @@ let backupHistoryFixture: any[] = [];
 let appRolesFixture: any[] = [];
 let appRolePermissionsFixture: any[] = [];
 let userAppRolesFixture: any[] = [];
+let orgConfigFixture: any[] = [];
 
 // Per-table one-shot queues: lets a single request that issues two selects
 // against the same table (e.g. lookup, then a separate email-dupe check)
@@ -73,6 +76,7 @@ const select = vi.fn(() => ({
     if (table === appRoles) return chainOf(nextRows(appRoles, appRolesFixture));
     if (table === appRolePermissions) return chainOf(nextRows(appRolePermissions, appRolePermissionsFixture));
     if (table === userAppRoles) return chainOf(nextRows(userAppRoles, userAppRolesFixture));
+    if (table === orgConfig) return chainOf(nextRows(orgConfig, orgConfigFixture));
     return chainOf([]);
   }),
 }));
@@ -83,6 +87,7 @@ function makeInsert() {
       insertCalls.push({ table, values: vals });
       const p: any = Promise.resolve(undefined);
       p.onConflictDoNothing = vi.fn(() => Promise.resolve(undefined));
+      p.onConflictDoUpdate = vi.fn(() => Promise.resolve(undefined));
       return p;
     }),
   }));
@@ -149,6 +154,7 @@ beforeEach(() => {
   appRolesFixture = [];
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
+  orgConfigFixture = [];
   currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
   backupConfigured = false;
   lastBackupResult = null;
@@ -160,7 +166,14 @@ beforeEach(() => {
 const localAdmin = { id: "local", name: "Lokaler Admin", email: "admin@localhost.invalid", disabled: false };
 
 function makeUser(overrides: Record<string, unknown> = {}) {
-  return { id: "u2", name: "Ben Bauer", email: "ben@example.com", disabled: false, ...overrides };
+  return {
+    id: "u2",
+    name: "Ben Bauer",
+    email: "ben@example.com",
+    disabled: false,
+    lastLoginAt: new Date("2024-01-01T00:00:00Z"),
+    ...overrides,
+  };
 }
 
 function makeRole(overrides: Record<string, unknown> = {}) {
@@ -188,14 +201,6 @@ function makeBackupEntry(overrides: Record<string, unknown> = {}) {
     errorMessage: null,
     ...overrides,
   };
-}
-
-function formBody(fields: Record<string, string | string[]>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) {
-    for (const val of Array.isArray(v) ? v : [v]) params.append(k, val);
-  }
-  return params;
 }
 
 // ── Pure logic ───────────────────────────────────────────────────────────────
@@ -297,6 +302,26 @@ describe("GET /users", () => {
     userAppRolesFixture = [];
     const html = await (await adminRoutes.request("/users")).text();
     expect(html).toContain("—");
+  });
+
+  it("shows 'unconfirmed' for a user who has never logged in", async () => {
+    usersFixture = [makeUser({ lastLoginAt: null })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusUnconfirmed"));
+  });
+
+  it("prioritizes 'disabled' over 'unconfirmed' when both apply", async () => {
+    usersFixture = [makeUser({ disabled: true, lastLoginAt: null })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusDisabled"));
+    expect(html).not.toContain(t("admin.users.statusUnconfirmed"));
+  });
+
+  it("never shows 'unconfirmed' for the local admin, even without a login timestamp", async () => {
+    usersFixture = [{ ...localAdmin, lastLoginAt: null }];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusActive"));
+    expect(html).not.toContain(t("admin.users.statusUnconfirmed"));
   });
 });
 
@@ -897,6 +922,48 @@ describe("GET /config", () => {
   });
 });
 
+describe("GET /org-config", () => {
+  it("renders known fields with their current values and blanks for missing ones", async () => {
+    orgConfigFixture = [{ key: "orgName", value: "Feuerwehr Musterstadt e.V." }];
+    const html = await (await adminRoutes.request("/org-config")).text();
+    expect(html).toContain(t("admin.orgConfig.field.orgName"));
+    expect(html).toContain("Feuerwehr Musterstadt e.V.");
+    expect(html).toMatch(/name="orgStreet"[^>]*value=""/);
+    expect(html).toMatch(/name="orgHouseNumber"[^>]*value=""/);
+  });
+});
+
+describe("POST /org-config", () => {
+  it("upserts a submitted value", async () => {
+    const res = await adminRoutes.request("/org-config", {
+      method: "POST",
+      body: formBody({ orgName: "Feuerwehr Musterstadt e.V." }),
+    });
+    expect(res.status).toBe(302);
+    expect(
+      insertCalls.some((c) => c.table === orgConfig && c.values.key === "orgName" && c.values.value === "Feuerwehr Musterstadt e.V.")
+    ).toBe(true);
+  });
+
+  it("deletes the row when a field is submitted empty", async () => {
+    const res = await adminRoutes.request("/org-config", { method: "POST", body: formBody({ orgName: "" }) });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === orgConfig)).toBe(true);
+  });
+
+  it("normalizes iban/bic by stripping spaces and uppercasing", async () => {
+    await adminRoutes.request("/org-config", { method: "POST", body: formBody({ iban: "de12 3456 7890 1234 5678 90" }) });
+    expect(
+      insertCalls.some((c) => c.table === orgConfig && c.values.key === "iban" && c.values.value === "DE12345678901234567890")
+    ).toBe(true);
+  });
+
+  it("ignores unknown keys in the body", async () => {
+    await adminRoutes.request("/org-config", { method: "POST", body: formBody({ notAKnownKey: "x" }) });
+    expect(insert).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /backup", () => {
   it("shows the empty-history message when not configured and no runs", async () => {
     backupHistoryFixture = [];
@@ -911,6 +978,8 @@ describe("GET /backup", () => {
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain(t("admin.backup.backupMissing"));
     expect(html).toContain(t("admin.backup.scheduleNextTime"));
+    expect(html).toContain(t("admin.backup.warnLastFailed"));
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it("shows a successful backup after the schedule", async () => {
@@ -919,6 +988,7 @@ describe("GET /backup", () => {
     backupHistoryFixture = [makeBackupEntry({ startedAt: new Date("2024-01-01T01:00:00Z"), status: "success" })];
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain(t("admin.backup.backupAvailable"));
+    expect(html).not.toContain(t("admin.backup.warnLastFailed"));
   });
 
   it("shows a failed backup after the schedule, including its error", async () => {
@@ -927,6 +997,7 @@ describe("GET /backup", () => {
     backupHistoryFixture = [makeBackupEntry({ startedAt: new Date("2024-01-01T01:00:00Z"), status: "failed", errorMessage: "boom" })];
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain(t("admin.backup.backupFailed"));
+    expect(html).toContain(t("admin.backup.warnLastFailed"));
     expect(html).toContain("boom");
   });
 

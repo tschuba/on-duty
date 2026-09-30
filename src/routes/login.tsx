@@ -9,6 +9,7 @@ import { Layout } from "../components/layout.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { env } from "../env.js";
 import { checkRateLimit, recordFailedAttempt, resetRateLimit } from "../lib/ratelimit.js";
+import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
 import { t } from "../i18n/index.js";
 
 export const loginRoutes = new Hono<{ Variables: Variables }>();
@@ -102,6 +103,7 @@ function adminLoginPage(error?: string) {
                   name="username"
                   class="input input-bordered"
                   autocomplete="username"
+                  autofocus
                   required
                 />
               </label>
@@ -142,9 +144,9 @@ loginRoutes.post("/admin/login", async (c) => {
   const username = String(body.username ?? "");
   const password = String(body.password ?? "");
 
-  if (username !== "admin") {
+  if (username !== LOCAL_ADMIN_ACCOUNT_ID) {
     recordFailedAttempt(ip);
-    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), 401);
+    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), HTTP_STATUS.UNAUTHORIZED);
   }
 
   // Master override: if ADMIN_PASSWORD matches directly, re-sync hash so Better Auth accepts it
@@ -154,21 +156,21 @@ loginRoutes.post("/admin/login", async (c) => {
     await db
       .update(accounts)
       .set({ password: hash, updatedAt: new Date() })
-      .where(and(eq(accounts.accountId, "admin"), eq(accounts.providerId, "credential")));
+      .where(and(eq(accounts.accountId, LOCAL_ADMIN_ACCOUNT_ID), eq(accounts.providerId, "credential")));
   }
 
   // Delegate to Better Auth's emailAndPassword handler
   const signInReq = new Request(new URL("/auth/sign-in/email", env.OIDC_APP_URL), {
     method: "POST",
     headers: { "content-type": "application/json", origin: env.OIDC_APP_URL },
-    body: JSON.stringify({ email: "admin@localhost.invalid", password }),
+    body: JSON.stringify({ email: LOCAL_ADMIN_EMAIL, password }),
   });
 
   const response = await auth.handler(signInReq);
 
   if (!response.ok) {
     recordFailedAttempt(ip);
-    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), 401);
+    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), HTTP_STATUS.UNAUTHORIZED);
   }
 
   resetRateLimit(ip);

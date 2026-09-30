@@ -61,6 +61,8 @@ Wo Konstanten ablegen:
 - Modullokal: als `const` exportieren in derselben Datei
 - Projektübergreifend: in `src/lib/constants.ts`
 
+Dasselbe gilt für projektübergreifend genutzte **Funktionen** (nicht nur Konstanten): in eine thematisch benannte `src/lib/*.ts`-Datei (z. B. `flash.ts`, `format.ts`, `list-query.ts`), nicht in eine Catch-all-`utils.ts`/`helpers.ts`.
+
 ```ts
 // ❌
 if (member.age >= 18) { ... }
@@ -92,6 +94,8 @@ Vor jedem PR:
 ```bash
 pnpm test
 ```
+
+Geteilte Test-Helper (z. B. Request-Builder) gehören nach `src/tests/test-utils.ts`, geteilte Daten-Fixtures nach `src/tests/fixtures.ts` — nicht pro Testdatei neu definieren.
 
 ### Coverage
 

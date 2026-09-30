@@ -1,14 +1,32 @@
-import type { FC, PropsWithChildren } from "hono/jsx";
+import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
+import { countOpenApplications } from "../lib/applications.js";
+import { Icon } from "./icon.js";
 
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "admin";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications";
 }>;
 
-export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
+export function ClickToEditHint() {
+  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
+}
+
+function ApplicationsBadge({ count }: { count: number }) {
+  return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
+}
+
+// Async component — hono/jsx resolves Promise children/return values during render,
+// so this stays a self-contained addition (only queries when the viewer actually has
+// the permission) instead of threading a count prop through every route that renders
+// the nav.
+export const Layout = async ({ title, children, user, activeNav }: Props) => {
+  const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
+  const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
+
+  return (
   <html lang="de">
     <head>
       <meta charset="utf-8" />
@@ -22,12 +40,12 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
       <nav class="navbar bg-base-200 shadow-sm px-4">
-        <div class="navbar-start">
+        <div class="navbar-start flex-1">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-duty
           </a>
           {user && (
-            <div class="hidden sm:flex gap-1">
+            <div class="hidden lg:flex gap-1">
               <a
                 href="/members"
                 class={`btn btn-ghost btn-sm${activeNav === "members" ? " btn-active" : ""}`}
@@ -40,6 +58,31 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
               >
                 {t("common.nav.anniversaries")}
               </a>
+              {canReviewApplications && (
+                <a
+                  href="/applications"
+                  class={`btn btn-ghost btn-sm${activeNav === "applications" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.applications")}
+                  <ApplicationsBadge count={openApplicationsCount} />
+                </a>
+              )}
+              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
+                <a
+                  href="/donations"
+                  class={`btn btn-ghost btn-sm${activeNav === "donations" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.donations")}
+                </a>
+              )}
+              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
+                <a
+                  href="/donors"
+                  class={`btn btn-ghost btn-sm${activeNav === "donors" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.donors")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -52,29 +95,28 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
           )}
         </div>
         {user && (
-          <div class="navbar-center sm:hidden">
+          <div class="navbar-center lg:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                <Icon name="bars-3" class="h-5 w-5" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
+                {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<ApplicationsBadge count={openApplicationsCount} /></a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
           </div>
         )}
         {user && (
-          <div class="navbar-end">
+          <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
                 <span>{user.name}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-60" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
+                <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
                 <li>
@@ -93,7 +135,7 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       <script dangerouslySetInnerHTML={{ __html: `
         function showToast(message, type) {
           const el = document.createElement("div");
-          el.className = "alert " + (type === "error" ? "alert-error" : "alert-success") + " shadow-lg";
+          el.className = "alert " + (type === "error" ? "alert-error" : type === "info" ? "alert-info" : "alert-success") + " shadow-lg";
           el.textContent = message;
           const container = document.getElementById("toast-container");
           container.appendChild(el);
@@ -115,4 +157,5 @@ export const Layout: FC<Props> = ({ title, children, user, activeNav }) => (
       ` }} />
     </body>
   </html>
-);
+  );
+};
