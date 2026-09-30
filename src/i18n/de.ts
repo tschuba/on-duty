@@ -99,8 +99,13 @@ export const de = {
   "members.export.sheetAssignments": "Funktionszuweisungen",
   "members.flash.created": "Mitglied erfolgreich angelegt.",
   "members.flash.saved": "Mitglied gespeichert.",
+  "members.flash.deleted": "Mitglied und Person endgültig gelöscht.",
   "members.error.assignmentMissingFrom": "Feld „Von“ ist ein Pflichtfeld.",
   "members.error.duplicateRole": "Funktion „{role}“ ist mehrfach offen zugewiesen.",
+  "members.delete.confirmTitle": "Mitglied endgültig löschen?",
+  "members.delete.confirmBody": "{name} wird inklusive aller Personendaten (Name, Adresse, Kontaktdaten) unwiderruflich gelöscht. Funktionszuweisungen werden mitgelöscht.",
+  "members.delete.blockedDonor": "Person hat noch ein Spenderprofil — dieses muss zuerst separat behandelt werden.",
+  "members.delete.blockedApplication": "Person ist noch mit einem Antrag verknüpft — dieser muss zuerst separat behandelt werden.",
 
   // ── Donations ────────────────────────────────────────────────────────────────
   "donations.title": "Spenden",
@@ -238,6 +243,7 @@ export const de = {
   "admin.permissions.flash.hasAssignments": "Rolle hat bestehende Zuweisungen und kann nicht gelöscht werden.",
   "admin.permissions.key.membersRead": "Mitglieder ansehen",
   "admin.permissions.key.membersWrite": "Mitglieder anlegen und bearbeiten",
+  "admin.permissions.key.membersDelete": "Mitglieder endgültig löschen",
   "admin.permissions.key.systemAdmin": "Systemverwaltung (Benutzer, Rollen, Konfiguration)",
   "admin.permissions.key.donationsRecord": "Spenden erfassen",
   "admin.permissions.key.donationsIssueReceipts": "Zuwendungsbestätigungen ausstellen",

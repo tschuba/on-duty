@@ -7,6 +7,7 @@ import { users } from "./auth";
 export const permissionEnum = pgEnum("permission", [
   "members:read",
   "members:write",
+  "members:delete",
   "system:admin",
   "donations:record",
   "donations:issue-receipts",

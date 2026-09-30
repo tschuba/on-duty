@@ -1,0 +1,1 @@
+ALTER TYPE "public"."permission" ADD VALUE 'members:delete' BEFORE 'system:admin';
