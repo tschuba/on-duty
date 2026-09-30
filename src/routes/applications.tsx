@@ -8,6 +8,7 @@ import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
+import { buildListUrl } from "../lib/list-query.js";
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
 import { sendMail } from "../lib/mail.js";
@@ -148,21 +149,13 @@ applicationRoutes.get("/", guard, async (c) => {
   const canManageForms = user.permissions.has("applications:manage-forms");
 
   function filterUrl(next: ApplicationStatus[]) {
-    const params = new URLSearchParams();
-    for (const s of next) params.append("status", s);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    return `/applications?${params}`;
+    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, { status: next });
   }
 
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
     const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    const params = new URLSearchParams();
-    for (const s of statusFilter) params.append("status", s);
-    params.set("sort", col);
-    params.set("sort_dir", newDir);
-    return `/applications?${params}`;
+    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, { sort: col, sort_dir: newDir });
   }
 
   return c.html(

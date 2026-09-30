@@ -7,6 +7,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
+import { buildListUrl } from "../lib/list-query.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 
@@ -229,17 +230,8 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
     );
   }
 
-  const qs = (extra: Record<string, string | string[]>) => {
-    const p = new URLSearchParams({ start, end, filter });
-    if (gte > 0) p.set("gte", String(gte));
-    for (const m of mods) p.append("mod", m);
-    for (const [k, v] of Object.entries(extra)) {
-      p.delete(k);
-      if (Array.isArray(v)) { for (const x of v) p.append(k, x); }
-      else if (v) p.set(k, v);
-    }
-    return "/anniversaries?" + p.toString();
-  };
+  const qs = (extra: Record<string, string | string[]>) =>
+    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
   const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
   const filterLink = (f: string) => qs({ filter: f });

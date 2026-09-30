@@ -8,7 +8,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
-import { parsePagination } from "../lib/list-query.js";
+import { parsePagination, buildListUrl } from "../lib/list-query.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { sendMail } from "../lib/mail.js";
@@ -200,30 +200,16 @@ export function MembersTable({
   roleFilter: string[];
   isEditor: boolean;
 }) {
+  const currentState = { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize };
+
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
     const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    for (const s of statusFilter) params.append("status", s);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", col);
-    params.set("sort_dir", newDir);
-    params.set("page", "1");
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", currentState, { sort: col, sort_dir: newDir, page: 1 });
   }
 
   function pageUrl(p: number) {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    for (const s of statusFilter) params.append("status", s);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    params.set("page", String(p));
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", currentState, { page: p });
   }
 
   const openRoles = (m: MemberWithStatus) =>
@@ -758,18 +744,10 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   if (isHtmx) return c.html(tableEl);
 
   function filterToggleUrl(s: MemberStatus) {
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
     const next = statusFilter.includes(s)
       ? statusFilter.filter((x) => x !== s)
       : [...statusFilter, s];
-    for (const f of next) params.append("status", f);
-    for (const r of roleFilter) params.append("role", r);
-    params.set("sort", sort);
-    params.set("sort_dir", dir);
-    params.set("page", "1");
-    params.set("pageSize", String(pageSize));
-    return `/members?${params}`;
+    return buildListUrl("/members", { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize }, { status: next, page: 1 });
   }
 
   return c.html(

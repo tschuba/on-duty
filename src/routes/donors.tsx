@@ -7,7 +7,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { parsePagination } from "../lib/list-query.js";
+import { parsePagination, buildListUrl } from "../lib/list-query.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -248,9 +248,7 @@ function parseListQuery(q: Record<string, string>) {
 }
 
 function donorListUrl(base: Record<string, string | number>) {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(base)) if (v !== "" && v != null) params.set(k, String(v));
-  return `/donors?${params}`;
+  return buildListUrl("/donors", {}, base);
 }
 
 // GET /donors — sortable/paginated/searchable list, name + address only (see
