@@ -211,6 +211,12 @@ describe("sortMembers", () => {
     const sorted = sortMembers([a, c, b], "birthDate", "asc");
     expect(sorted.map((m) => m.id)).toEqual(["3", "2", "1"]);
   });
+
+  it("treats a missing birthDate as sorting first", () => {
+    const noBirthDate = withStatus(memberWithAssignments({ id: "4", lastName: "Zorn", firstName: "Zoe", birthDate: null as any, entryDate: "2015-01-01" }));
+    const sorted = sortMembers([a, noBirthDate], "birthDate", "asc");
+    expect(sorted.map((m) => m.id)).toEqual(["4", "1"]);
+  });
 });
 
 describe("parseListQuery", () => {

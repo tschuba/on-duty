@@ -201,6 +201,16 @@ describe("GET /", () => {
     expect(html).toContain("Bauer");
     expect(html).not.toContain("Adler");
   });
+
+  it("sorts by first name descending when requested", async () => {
+    donorsFindManyResult = [
+      { id: "d1", personId: "p1", person: makePerson({ lastName: "Bauer", firstName: "Anna" }) },
+      { id: "d2", personId: "p2", person: makePerson({ lastName: "Adler", firstName: "Ben" }) },
+    ];
+    const res = await donorRoutes.request("/?sort=firstName&sort_dir=desc");
+    const html = await res.text();
+    expect(html.indexOf("Ben")).toBeLessThan(html.indexOf("Anna"));
+  });
 });
 
 // ── POST /new ────────────────────────────────────────────────────────────────

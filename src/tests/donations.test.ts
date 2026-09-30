@@ -169,6 +169,17 @@ describe("GET /", () => {
     expect(html).not.toContain("15.01.2026");
     expect(html).toContain("15.06.2026");
   });
+
+  it("excludes donations after the 'to' cutoff", async () => {
+    donationsFindManyResult = [
+      makeDonation({ id: "don1", date: "2026-01-15" }),
+      makeDonation({ id: "don2", date: "2026-06-15" }),
+    ];
+    const res = await donationRoutes.request("/?to=2026-03-01");
+    const html = await res.text();
+    expect(html).toContain("15.01.2026");
+    expect(html).not.toContain("15.06.2026");
+  });
 });
 
 // ── POST / (create) ──────────────────────────────────────────────────────────
