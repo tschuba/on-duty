@@ -15,6 +15,10 @@ Eintrag in der internen `/applications`-Warteschlange.
 Beide Formulare verlangen Vor-/Nachname, Geburtsdatum, Adresse und mindestens einen
 Kontaktweg (E-Mail oder Telefon).
 
+Beim Einreichen, Annehmen und Ablehnen eines Antrags wird eine Benachrichtigungs-E-Mail
+verschickt, sofern SMTP konfiguriert ist (`src/lib/mail.ts`, siehe `SMTP_*`-Variablen in
+der README).
+
 ## Link teilen
 
 Da diese Routen extern beworben werden (Vereins-Website, Social Media, ...), zeigt die
