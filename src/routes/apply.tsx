@@ -5,6 +5,7 @@ import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
+import { isApplicationFormActive } from "../lib/application-forms.js";
 import { sendMail } from "../lib/mail.js";
 
 export const applyRoutes = new Hono();
@@ -239,6 +240,17 @@ function YouthPage({
   );
 }
 
+function InactivePage() {
+  return (
+    <Layout title={t("apply.inactive.title")}>
+      <div class="max-w-xl mx-auto text-center py-12">
+        <h1 class="text-2xl font-bold mb-2" style="font-family: var(--font-heading)">{t("apply.inactive.title")}</h1>
+        <p class="opacity-70">{t("apply.inactive.body")}</p>
+      </div>
+    </Layout>
+  );
+}
+
 function SuccessPage() {
   return (
     <Layout title={t("apply.success.title")}>
@@ -268,12 +280,14 @@ async function notifySubmission(name: string) {
 
 // ── Routes ───────────────────────────────────────────────────────────────────────
 
-applyRoutes.get("/", (c) => {
+applyRoutes.get("/", async (c) => {
+  if (!(await isApplicationFormActive("membership"))) return c.html(<InactivePage />);
   const empty: ApplicantValues = { lastName: "", firstName: "", birthDate: "", street: "", houseNumber: "", zip: "", city: "", email: "", phone: "", message: "" };
   return c.html(<MembershipPage values={empty} errors={{}} />);
 });
 
 applyRoutes.post("/", async (c) => {
+  if (!(await isApplicationFormActive("membership"))) return c.html(<InactivePage />);
   const ip = clientIp(c);
   if (!checkRateLimit(ip).allowed) {
     const { values } = parseApplicantFields(await c.req.parseBody());
@@ -302,12 +316,14 @@ applyRoutes.post("/", async (c) => {
   return c.redirect("/apply/success");
 });
 
-applyRoutes.get("/youth", (c) => {
+applyRoutes.get("/youth", async (c) => {
+  if (!(await isApplicationFormActive("youth"))) return c.html(<InactivePage />);
   const empty: ApplicantValues = { lastName: "", firstName: "", birthDate: "", street: "", houseNumber: "", zip: "", city: "", email: "", phone: "", message: "" };
   return c.html(<YouthPage values={empty} errors={{}} guardianRows={[]} guardianErrors={[]} />);
 });
 
 applyRoutes.post("/youth", async (c) => {
+  if (!(await isApplicationFormActive("youth"))) return c.html(<InactivePage />);
   const ip = clientIp(c);
   if (!checkRateLimit(ip).allowed) {
     const body = await c.req.parseBody({ all: true });

@@ -36,6 +36,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "donations:record": t("admin.permissions.key.donationsRecord"),
   "donations:issue-receipts": t("admin.permissions.key.donationsIssueReceipts"),
   "applications:review": t("admin.permissions.key.applicationsReview"),
+  "applications:manage-forms": t("admin.permissions.key.applicationsManageForms"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {

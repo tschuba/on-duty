@@ -28,6 +28,11 @@ vi.mock("../lib/org-config.js", () => ({
   loadOrgConfig: vi.fn(() => Promise.resolve(orgConfigFixture)),
 }));
 
+let formActiveFixture: Record<string, boolean> = { membership: true, youth: true };
+vi.mock("../lib/application-forms.js", () => ({
+  isApplicationFormActive: vi.fn((type: string) => Promise.resolve(formActiveFixture[type])),
+}));
+
 const { applyRoutes } = await import("../routes/apply.js");
 
 function formBody(fields: Record<string, string | string[]>) {
@@ -57,6 +62,7 @@ beforeEach(() => {
   insertCalls.length = 0;
   idCounter = 0;
   orgConfigFixture = {};
+  formActiveFixture = { membership: true, youth: true };
 });
 
 describe("GET /apply", () => {
@@ -66,6 +72,14 @@ describe("GET /apply", () => {
     expect(html).toContain('name="lastName"');
     expect(html).toContain('name="website"');
     expect(html).toContain("left:-9999px");
+  });
+
+  it("shows the inactive page instead of the form when membership applications are switched off", async () => {
+    formActiveFixture.membership = false;
+    const res = await applyRoutes.request("/");
+    const html = await res.text();
+    expect(html).not.toContain('name="lastName"');
+    expect(res.status).toBe(200);
   });
 });
 
@@ -121,6 +135,17 @@ describe("POST /apply", () => {
       body: formBody(validMembership()),
     });
     expect(res.status).toBe(302); // never fails even though SMTP isn't configured in tests
+  });
+
+  it("blocks submission and skips inserts when the form is inactive", async () => {
+    formActiveFixture.membership = false;
+    const res = await applyRoutes.request("/", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
+      body: formBody(validMembership()),
+    });
+    expect(res.status).toBe(200);
+    expect(insertCalls.length).toBe(0);
   });
 
   it("rate-limits repeated submissions from the same IP, regardless of validity", async () => {

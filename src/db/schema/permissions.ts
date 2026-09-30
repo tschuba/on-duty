@@ -11,6 +11,7 @@ export const permissionEnum = pgEnum("permission", [
   "donations:record",
   "donations:issue-receipts",
   "applications:review",
+  "applications:manage-forms",
 ]);
 
 export const appRoles = pgTable("app_roles", {

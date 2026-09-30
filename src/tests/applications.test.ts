@@ -63,6 +63,21 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
+let applicationFormsFixture: Record<string, any> = {
+  membership: { type: "membership", isActive: true, startDate: null, endDate: null },
+  youth: { type: "youth", isActive: true, startDate: null, endDate: null },
+};
+const saveApplicationFormCalls: { type: string; values: any }[] = [];
+
+vi.mock("../lib/application-forms.js", () => ({
+  loadApplicationForms: vi.fn(() => Promise.resolve(applicationFormsFixture)),
+  isFormCurrentlyActive: vi.fn((form: any) => !!form?.isActive),
+  saveApplicationForm: vi.fn((type: string, values: any) => {
+    saveApplicationFormCalls.push({ type, values });
+    return Promise.resolve();
+  }),
+}));
+
 const { applicationRoutes } = await import("../routes/applications.js");
 
 beforeEach(() => {
@@ -73,6 +88,11 @@ beforeEach(() => {
   memberDuplicatesFixture = [];
   applicationDuplicatesFixture = [];
   currentUser = { id: "u1", permissions: new Set(["applications:review"]), disabled: false };
+  applicationFormsFixture = {
+    membership: { type: "membership", isActive: true, startDate: null, endDate: null },
+    youth: { type: "youth", isActive: true, startDate: null, endDate: null },
+  };
+  saveApplicationFormCalls.length = 0;
 });
 
 function makePerson(overrides: Record<string, unknown> = {}) {
@@ -107,6 +127,22 @@ describe("GET /", () => {
     const html = await res.text();
     expect(html).toContain("Anna");
     expect(html).toContain("Bauer");
+  });
+
+  it("shows each form's status but hides the settings gear without applications:manage-forms", async () => {
+    applicationFormsFixture.membership = { type: "membership", isActive: false, startDate: null, endDate: "2026-09-01" };
+    const res = await applicationRoutes.request("/");
+    const html = await res.text();
+    expect(html).toContain(t("applications.formStatus.inactiveUntil", { date: "01.09.2026" }));
+    expect(html).not.toContain('id="form-settings-membership"');
+  });
+
+  it("shows the settings gear and modal for a user with applications:manage-forms", async () => {
+    currentUser.permissions = new Set(["applications:review", "applications:manage-forms"]);
+    const res = await applicationRoutes.request("/");
+    const html = await res.text();
+    expect(html).toContain('id="form-settings-membership"');
+    expect(html).toContain('id="form-settings-youth"');
   });
 });
 
@@ -251,5 +287,38 @@ describe("POST /:id/reject", () => {
     const appUpdate = updateCalls.find((c) => c.table === applications);
     expect(appUpdate?.set.status).toBe("rejected");
     expect(appUpdate?.set.rejectedReason).toBe("Kein Bedarf");
+  });
+});
+
+describe("POST /forms/:type", () => {
+  it("saves status and dates for a valid type", async () => {
+    const res = await applicationRoutes.request("/forms/youth", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: formBody({ status: "active", startDate: "2026-09-01", endDate: "2026-10-31" }),
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/applications");
+    expect(saveApplicationFormCalls).toEqual([
+      { type: "youth", values: { isActive: true, startDate: "2026-09-01", endDate: "2026-10-31" } },
+    ]);
+  });
+
+  it("treats a missing status as inactive and blank dates as null", async () => {
+    const res = await applicationRoutes.request("/forms/membership", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: formBody({ status: "inactive" }),
+    });
+    expect(res.status).toBe(302);
+    expect(saveApplicationFormCalls).toEqual([
+      { type: "membership", values: { isActive: false, startDate: null, endDate: null } },
+    ]);
+  });
+
+  it("404s for an unknown form type", async () => {
+    const res = await applicationRoutes.request("/forms/bogus", { method: "POST" });
+    expect(res.status).toBe(404);
+    expect(saveApplicationFormCalls.length).toBe(0);
   });
 });

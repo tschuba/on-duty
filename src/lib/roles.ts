@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   "donations:record",
   "donations:issue-receipts",
   "applications:review",
+  "applications:manage-forms",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

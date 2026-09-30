@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
+import { Icon } from "./icon.js";
 
 type Props = PropsWithChildren<{
   title?: string;
@@ -97,9 +98,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           <div class="navbar-center lg:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
+                <Icon name="bars-3" class="h-5 w-5" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
@@ -117,9 +116,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
                 <span>{user.name}</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 opacity-60" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
+                <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
                 <li>

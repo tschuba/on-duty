@@ -5,11 +5,18 @@ import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
+import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
 import { sendMail } from "../lib/mail.js";
+import {
+  isFormCurrentlyActive,
+  loadApplicationForms,
+  saveApplicationForm,
+  type ApplicationForm,
+} from "../lib/application-forms.js";
 
 export const applicationRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("applications:review");
@@ -104,6 +111,26 @@ const STATUS_BADGE_CLASS: Record<ApplicationStatus, string> = {
   rejected: "badge badge-ghost opacity-60",
 };
 
+// Describes the *configured rule* in plain text (e.g. "Aktiv bis 01.09.2026"),
+// independent of the "active" flag below which reflects whether that rule
+// currently resolves to active — see isFormCurrentlyActive's window semantics.
+function formatFormStatusText(form: ApplicationForm | undefined): { text: string; active: boolean } {
+  const active = isFormCurrentlyActive(form);
+  if (!form) return { text: t("applications.formStatus.inactive"), active };
+  const fmt = (d: string) => new Date(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const { isActive, startDate, endDate } = form;
+  if (!startDate && !endDate) {
+    return { text: t(isActive ? "applications.formStatus.active" : "applications.formStatus.inactive"), active };
+  }
+  if (startDate && !endDate) {
+    return { text: t(isActive ? "applications.formStatus.activeFrom" : "applications.formStatus.inactiveFrom", { date: fmt(startDate) }), active };
+  }
+  if (!startDate && endDate) {
+    return { text: t(isActive ? "applications.formStatus.activeUntil" : "applications.formStatus.inactiveUntil", { date: fmt(endDate) }), active };
+  }
+  return { text: t(isActive ? "applications.formStatus.activeRange" : "applications.formStatus.inactiveRange", { start: fmt(startDate!), end: fmt(endDate!) }), active };
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 const ALL_STATUSES: ApplicationStatus[] = ["open", "approved", "rejected"];
@@ -121,6 +148,8 @@ applicationRoutes.get("/", guard, async (c) => {
   const dir = ((c.req.query("sort_dir") as "asc" | "desc") || "desc");
 
   const rows = sortApplications((await fetchApplications()).filter((a) => statusFilter.includes(a.status)), sort, dir);
+  const forms = await loadApplicationForms();
+  const canManageForms = user.permissions.has("applications:manage-forms");
 
   function filterUrl(next: ApplicationStatus[]) {
     const params = new URLSearchParams();
@@ -146,23 +175,37 @@ applicationRoutes.get("/", guard, async (c) => {
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
         <div class="dropdown dropdown-end">
           <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-circle" title={t("applications.links.title")} aria-label={t("applications.links.title")}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
+            <Icon name="link" class="h-5 w-5" />
           </div>
           <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
             <li class="menu-title">{t("applications.links.title")}</li>
             {(["membership", "youth"] as const).map((type) => {
               const url = new URL(type === "membership" ? "/apply" : "/apply/youth", env.OIDC_APP_URL).toString();
+              const status = formatFormStatusText(forms[type]);
               return (
                 <li key={type}>
-                  <div class="flex items-center justify-between gap-2">
-                    <a href={url} target="_blank" rel="noopener" class="flex-1" onclick="document.activeElement.blur()">{TYPE_LABELS[type]}</a>
-                    <button type="button" class="btn btn-xs btn-ghost btn-square apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
+                  <div class="flex flex-col gap-0.5 px-1 py-1 w-full">
+                    <div class="flex items-center justify-between gap-2 w-full">
+                      <a href={url} target="_blank" rel="noopener" class="flex-1" onclick="document.activeElement.blur()">{TYPE_LABELS[type]}</a>
+                      <button type="button" class="btn btn-md btn-ghost btn-square apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
+                        <Icon name="clipboard-document" class="h-4 w-4" />
+                      </button>
+                      {canManageForms && (
+                        <button
+                          type="button"
+                          class="btn btn-md btn-ghost btn-square"
+                          title={t("applications.links.settings")}
+                          aria-label={t("applications.links.settings")}
+                          onclick={`document.getElementById('form-settings-${type}').showModal();document.activeElement.blur()`}
+                        >
+                          <Icon name="cog-6-tooth" class="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                    <div class="flex items-center gap-1.5 text-xs opacity-60 pl-1 w-full">
+                      <span class={`inline-block h-2 w-2 rounded-full ${status.active ? "bg-success" : "bg-error"}`} />
+                      {status.text}
+                    </div>
                   </div>
                 </li>
               );
@@ -170,6 +213,50 @@ applicationRoutes.get("/", guard, async (c) => {
           </ul>
         </div>
       </div>
+      {canManageForms && (["membership", "youth"] as const).map((type) => {
+        const form = forms[type];
+        return (
+          <dialog id={`form-settings-${type}`} class="modal" key={`form-settings-${type}`}>
+            <div class="modal-box">
+              <h3 class="font-bold text-lg mb-4">{t("applications.formSettings.title", { type: TYPE_LABELS[type] })}</h3>
+              <form method="post" action={`/applications/forms/${type}`} class="space-y-4 form-settings-form">
+                <div class="form-control">
+                  <span class="label-text">{t("applications.formSettings.statusLabel")}</span>
+                  <div class="join w-full mt-1">
+                    <label class="join-item btn flex-1 has-[:checked]:btn-primary">
+                      <input type="radio" name="status" value="active" class="hidden" checked={form?.isActive === true} />
+                      {t("applications.formSettings.active")}
+                    </label>
+                    <label class="join-item btn flex-1 has-[:checked]:btn-primary">
+                      <input type="radio" name="status" value="inactive" class="hidden" checked={form?.isActive !== true} />
+                      {t("applications.formSettings.inactive")}
+                    </label>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div class="form-control">
+                    <label class="label"><span class="label-text form-start-label">{t("applications.formSettings.startDate")}</span></label>
+                    <input type="date" name="startDate" value={form?.startDate ?? ""} class="input input-bordered w-full" />
+                  </div>
+                  <div class="form-control">
+                    <label class="label"><span class="label-text form-end-label">{t("applications.formSettings.endDate")}</span></label>
+                    <input type="date" name="endDate" value={form?.endDate ?? ""} class="input input-bordered w-full" />
+                  </div>
+                </div>
+                <p class="text-sm form-status-preview"></p>
+                <p class="text-xs opacity-60">{t("applications.formSettings.dateHint")}</p>
+                <div class="modal-action">
+                  <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
+                  <button type="submit" class="btn btn-primary">{t("applications.formSettings.save")}</button>
+                </div>
+              </form>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+              <button>{t("common.close")}</button>
+            </form>
+          </dialog>
+        );
+      })}
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
           document.querySelectorAll('.apply-link-copy').forEach(function(btn) {
@@ -178,6 +265,46 @@ applicationRoutes.get("/", guard, async (c) => {
                 document.body.dispatchEvent(new CustomEvent('showToast', { detail: { message: ${JSON.stringify(t("applications.links.copied"))}, type: 'info' } }));
               });
             });
+          });
+
+          var labels = {
+            active: { start: ${JSON.stringify(t("applications.formSettings.startDate"))}, end: ${JSON.stringify(t("applications.formSettings.endDate"))} },
+            inactive: { start: ${JSON.stringify(t("applications.formSettings.inactiveStartDate"))}, end: ${JSON.stringify(t("applications.formSettings.inactiveEndDate"))} },
+          };
+          var statusText = {
+            active: ${JSON.stringify(t("applications.formStatus.active"))},
+            inactive: ${JSON.stringify(t("applications.formStatus.inactive"))},
+            activeFrom: ${JSON.stringify(t("applications.formStatus.activeFrom"))},
+            activeUntil: ${JSON.stringify(t("applications.formStatus.activeUntil"))},
+            activeRange: ${JSON.stringify(t("applications.formStatus.activeRange"))},
+            inactiveFrom: ${JSON.stringify(t("applications.formStatus.inactiveFrom"))},
+            inactiveUntil: ${JSON.stringify(t("applications.formStatus.inactiveUntil"))},
+            inactiveRange: ${JSON.stringify(t("applications.formStatus.inactiveRange"))},
+          };
+          function fmt(iso) {
+            var p = iso.split('-');
+            return p[2] + '.' + p[1] + '.' + p[0];
+          }
+          document.querySelectorAll('.form-settings-form').forEach(function(form) {
+            var startInput = form.querySelector('input[name="startDate"]');
+            var endInput = form.querySelector('input[name="endDate"]');
+            var startLabel = form.querySelector('.form-start-label');
+            var endLabel = form.querySelector('.form-end-label');
+            var preview = form.querySelector('.form-status-preview');
+            function update() {
+              var mode = form.querySelector('input[name="status"]:checked').value;
+              startLabel.textContent = labels[mode].start;
+              endLabel.textContent = labels[mode].end;
+              var start = startInput.value, end = endInput.value;
+              if (!start && !end) preview.textContent = statusText[mode];
+              else if (start && !end) preview.textContent = statusText[mode + 'From'].replace('{date}', fmt(start));
+              else if (!start && end) preview.textContent = statusText[mode + 'Until'].replace('{date}', fmt(end));
+              else preview.textContent = statusText[mode + 'Range'].replace('{start}', fmt(start)).replace('{end}', fmt(end));
+            }
+            form.querySelectorAll('input[name="status"]').forEach(function(r) { r.addEventListener('change', update); });
+            startInput.addEventListener('input', update);
+            endInput.addEventListener('input', update);
+            update();
           });
         })();
       ` }} />
@@ -496,5 +623,22 @@ applicationRoutes.post("/:id/reject", guard, async (c) => {
   }
 
   setFlash(c, t("applications.flash.rejected"), "success");
+  return c.redirect("/applications");
+});
+
+// POST /applications/forms/:type — de-/activate a public application form,
+// gated by its own permission (separate from applications:review).
+applicationRoutes.post("/forms/:type", requireAuth("applications:manage-forms"), async (c) => {
+  const type = c.req.param("type");
+  if (type !== "membership" && type !== "youth") return c.notFound();
+
+  const body = await c.req.parseBody();
+  await saveApplicationForm(type, {
+    isActive: body.status === "active",
+    startDate: String(body.startDate ?? "").trim() || null,
+    endDate: String(body.endDate ?? "").trim() || null,
+  });
+
+  setFlash(c, t("applications.flash.formSettingsSaved"), "success");
   return c.redirect("/applications");
 });

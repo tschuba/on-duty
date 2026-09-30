@@ -1,4 +1,4 @@
-import { boolean, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { persons } from "./persons";
 import { users } from "./auth";
 
@@ -32,5 +32,16 @@ export const applicationGuardians = pgTable("application_guardians", {
     .notNull()
     .references(() => persons.id, { onDelete: "restrict" }),
   consentGiven: boolean("consent_given").notNull(),
+});
+
+// One row per application type, controlling public availability of that type's
+// /apply form. With no dates, isActive applies unconditionally. With a start
+// and/or end date, isActive instead applies only within that window — outside
+// it, the opposite holds (see backlog "Digitale Anträge" § Formular de-/aktivieren).
+export const applicationForms = pgTable("application_forms", {
+  type: applicationTypeEnum("type").primaryKey(),
+  isActive: boolean("is_active").notNull().default(false),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
 });
 /* v8 ignore stop */

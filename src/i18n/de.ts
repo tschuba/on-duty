@@ -242,6 +242,7 @@ export const de = {
   "admin.permissions.key.donationsRecord": "Spenden erfassen",
   "admin.permissions.key.donationsIssueReceipts": "Zuwendungsbestätigungen ausstellen",
   "admin.permissions.key.applicationsReview": "Anträge prüfen",
+  "admin.permissions.key.applicationsManageForms": "Formulare de-/aktivieren",
   "admin.permissions.badge.full": "Unbeschränkter Vollzugriff",
   "admin.permissions.badge.resourceFull": "{resource}: Vollzugriff",
   "admin.permissions.resource.members": "Mitglieder",
@@ -440,6 +441,8 @@ export const de = {
   "apply.youth.error.consentRequired": "Einverständnis ist erforderlich.",
   "apply.success.title": "Antrag eingegangen",
   "apply.success.body": "Vielen Dank für Ihren Antrag. Wir melden uns bei Ihnen.",
+  "apply.inactive.title": "Formular nicht verfügbar",
+  "apply.inactive.body": "Dieses Formular ist derzeit nicht verfügbar.",
 
   // ── Applications (Antrags-Review) ─────────────────────────────────────────────
   "applications.title": "Anträge",
@@ -491,6 +494,28 @@ export const de = {
   "applications.links.title": "Bewerbungslinks",
   "applications.links.copy": "Kopieren",
   "applications.links.copied": "In Zwischenablage kopiert",
+  "applications.links.settings": "Formular-Einstellungen",
+
+  "applications.formSettings.title": "Formular-Einstellungen: {type}",
+  "applications.formSettings.statusLabel": "Status",
+  "applications.formSettings.active": "Aktiv",
+  "applications.formSettings.inactive": "Inaktiv",
+  "applications.formSettings.startDate": "Aktiv ab (optional)",
+  "applications.formSettings.endDate": "Aktiv bis (optional)",
+  "applications.formSettings.inactiveStartDate": "Inaktiv ab (optional)",
+  "applications.formSettings.inactiveEndDate": "Inaktiv bis (optional)",
+  "applications.formSettings.dateHint": "Ohne Datum gilt der Status dauerhaft. Mit Datum(en) gilt er nur in diesem Zeitraum — außerhalb davon automatisch der jeweils andere Status.",
+  "applications.formSettings.save": "Speichern",
+  "applications.flash.formSettingsSaved": "Formular-Einstellungen gespeichert.",
+
+  "applications.formStatus.active": "Aktiv",
+  "applications.formStatus.inactive": "Inaktiv",
+  "applications.formStatus.activeFrom": "Aktiv ab {date}",
+  "applications.formStatus.activeUntil": "Aktiv bis {date}",
+  "applications.formStatus.activeRange": "Aktiv vom {start} bis {end}",
+  "applications.formStatus.inactiveFrom": "Inaktiv ab {date}",
+  "applications.formStatus.inactiveUntil": "Inaktiv bis {date}",
+  "applications.formStatus.inactiveRange": "Inaktiv vom {start} bis {end}",
 
   // ── Members – application linking ─────────────────────────────────────────────
   "members.applicant.notice": "Diese Angaben stammen aus einem eingereichten Antrag. Beim Speichern wird kein neuer Datensatz angelegt, sondern dieser Antrag verknüpft.",
