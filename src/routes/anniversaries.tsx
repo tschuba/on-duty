@@ -113,7 +113,7 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
 
   return (
     <div class="overflow-x-auto">
-      <table class="table table-sm w-full [&_tbody_td]:border-b-0">
+      <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
         <tbody>
           {[...groups.entries()].map(([month, evs], i) => (
             <>
