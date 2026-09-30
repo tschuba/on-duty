@@ -144,24 +144,30 @@ applicationRoutes.get("/", guard, async (c) => {
     <Layout title={t("applications.title")} user={user} activeNav="applications">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
-      </div>
-      <div class="bg-base-200 rounded-box p-4 mb-4">
-        <p class="text-sm font-medium mb-2">{t("applications.links.title")}</p>
-        <div class="flex flex-col gap-2">
-          {(["membership", "youth"] as const).map((type) => {
-            const url = new URL(type === "membership" ? "/apply" : "/apply/youth", env.OIDC_APP_URL).toString();
-            return (
-              <div key={type} class="flex items-center gap-2 flex-wrap">
-                <span class="badge badge-ghost">{TYPE_LABELS[type]}</span>
-                <a href={url} target="_blank" rel="noopener" class="link text-sm break-all">{url}</a>
-                <button type="button" class="btn btn-xs btn-outline apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </button>
-              </div>
-            );
-          })}
+        <div class="dropdown dropdown-end">
+          <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-circle" title={t("applications.links.title")} aria-label={t("applications.links.title")}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </div>
+          <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
+            <li class="menu-title">{t("applications.links.title")}</li>
+            {(["membership", "youth"] as const).map((type) => {
+              const url = new URL(type === "membership" ? "/apply" : "/apply/youth", env.OIDC_APP_URL).toString();
+              return (
+                <li key={type}>
+                  <div class="flex items-center justify-between gap-2">
+                    <a href={url} target="_blank" rel="noopener" class="flex-1" onclick="document.activeElement.blur()">{TYPE_LABELS[type]}</a>
+                    <button type="button" class="btn btn-xs btn-ghost btn-square apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
