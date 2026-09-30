@@ -7,6 +7,7 @@ import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
 import { isApplicationFormActive } from "../lib/application-forms.js";
 import { sendMail } from "../lib/mail.js";
+import { HTTP_STATUS } from "../lib/constants.js";
 
 export const applyRoutes = new Hono();
 
@@ -291,7 +292,7 @@ applyRoutes.post("/", async (c) => {
   const ip = clientIp(c);
   if (!checkRateLimit(ip).allowed) {
     const { values } = parseApplicantFields(await c.req.parseBody());
-    return c.html(<MembershipPage values={values} errors={{ _global: t("apply.error.rateLimited") }} />, 429);
+    return c.html(<MembershipPage values={values} errors={{ _global: t("apply.error.rateLimited") }} />, HTTP_STATUS.TOO_MANY_REQUESTS);
   }
   recordFailedAttempt(ip);
 
@@ -300,7 +301,7 @@ applyRoutes.post("/", async (c) => {
 
   const { values, errors } = parseApplicantFields(body);
   if (Object.keys(errors).length > 0) {
-    return c.html(<MembershipPage values={values} errors={errors} />, 422);
+    return c.html(<MembershipPage values={values} errors={errors} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
   }
 
   await db.transaction(async (tx) => {
@@ -329,7 +330,7 @@ applyRoutes.post("/youth", async (c) => {
     const body = await c.req.parseBody({ all: true });
     const { values } = parseApplicantFields(body);
     const { rows, rowErrors } = parseGuardianRows(body);
-    return c.html(<YouthPage values={values} errors={{ _global: t("apply.error.rateLimited") }} guardianRows={rows} guardianErrors={rowErrors} />, 429);
+    return c.html(<YouthPage values={values} errors={{ _global: t("apply.error.rateLimited") }} guardianRows={rows} guardianErrors={rowErrors} />, HTTP_STATUS.TOO_MANY_REQUESTS);
   }
   recordFailedAttempt(ip);
 

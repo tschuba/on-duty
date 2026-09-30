@@ -9,7 +9,7 @@ import { Layout } from "../components/layout.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { env } from "../env.js";
 import { checkRateLimit, recordFailedAttempt, resetRateLimit } from "../lib/ratelimit.js";
-import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL } from "../lib/constants.js";
+import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
 import { t } from "../i18n/index.js";
 
 export const loginRoutes = new Hono<{ Variables: Variables }>();
@@ -146,7 +146,7 @@ loginRoutes.post("/admin/login", async (c) => {
 
   if (username !== LOCAL_ADMIN_ACCOUNT_ID) {
     recordFailedAttempt(ip);
-    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), 401);
+    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), HTTP_STATUS.UNAUTHORIZED);
   }
 
   // Master override: if ADMIN_PASSWORD matches directly, re-sync hash so Better Auth accepts it
@@ -170,7 +170,7 @@ loginRoutes.post("/admin/login", async (c) => {
 
   if (!response.ok) {
     recordFailedAttempt(ip);
-    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), 401);
+    return c.html(adminLoginPage(t("login.admin.error.invalidCredentials")), HTTP_STATUS.UNAUTHORIZED);
   }
 
   resetRateLimit(ip);

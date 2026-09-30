@@ -5,6 +5,7 @@ import { auth, type AppUser } from "../auth.js";
 import { db } from "../db/index.js";
 import { sessions, userAppRoles, appRolePermissions } from "../db/schema/index.js";
 import type { Permission } from "../lib/roles.js";
+import { HTTP_STATUS } from "../lib/constants.js";
 
 export type { Permission };
 export type AuthedUser = AppUser & { permissions: Set<Permission> };
@@ -35,7 +36,7 @@ export function requireAuth(required?: Permission | Permission[]) {
 
     const requiredList = required ? ([] as Permission[]).concat(required) : [];
     if (requiredList.length > 0 && !requiredList.some((p) => permissions.has(p))) {
-      return c.html("<h1>403 Zugriff verweigert</h1>", 403);
+      return c.html("<h1>403 Zugriff verweigert</h1>", HTTP_STATUS.FORBIDDEN);
     }
 
     c.set("user", { ...user, permissions });
