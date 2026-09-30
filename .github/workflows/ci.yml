@@ -45,7 +45,7 @@ jobs:
       - run: pnpm test:coverage
       # download-artifact defaults to the current run; coverage-master was
       # uploaded in master's push run, so resolve that run's id explicitly.
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v9
         id: baseline-run
         with:
           result-encoding: string

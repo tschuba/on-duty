@@ -985,6 +985,8 @@ describe("GET /backup", () => {
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain(t("admin.backup.backupMissing"));
     expect(html).toContain(t("admin.backup.scheduleNextTime"));
+    expect(html).toContain(t("admin.backup.warnLastFailed"));
+    expect(select).toHaveBeenCalledTimes(1);
   });
 
   it("shows a successful backup after the schedule", async () => {
@@ -993,6 +995,7 @@ describe("GET /backup", () => {
     backupHistoryFixture = [makeBackupEntry({ startedAt: new Date("2024-01-01T01:00:00Z"), status: "success" })];
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain(t("admin.backup.backupAvailable"));
+    expect(html).not.toContain(t("admin.backup.warnLastFailed"));
   });
 
   it("shows a failed backup after the schedule, including its error", async () => {
@@ -1001,6 +1004,7 @@ describe("GET /backup", () => {
     backupHistoryFixture = [makeBackupEntry({ startedAt: new Date("2024-01-01T01:00:00Z"), status: "failed", errorMessage: "boom" })];
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain(t("admin.backup.backupFailed"));
+    expect(html).toContain(t("admin.backup.warnLastFailed"));
     expect(html).toContain("boom");
   });
 
