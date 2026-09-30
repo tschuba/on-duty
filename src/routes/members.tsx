@@ -873,7 +873,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         )}
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table w-full">
             <thead>
               <tr>
                 <th>{t("members.form.role")}</th>
@@ -1008,7 +1008,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           )}
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -1281,7 +1281,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
-          <table class="table table-sm w-full">
+          <table class="table w-full">
             <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
@@ -1358,7 +1358,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
           <MemberFormFields m={m} errors={errors} />
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
@@ -1429,7 +1429,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
             phone: body.phone as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
-            <table class="table table-sm w-full">
+            <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (

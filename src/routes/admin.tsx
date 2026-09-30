@@ -1276,7 +1276,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
 
       <ClickToEditHint />
       <div class="overflow-x-auto mb-6">
-        <table class="table table-zebra w-full max-w-md">
+        <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.anniversaries.table.years")}</th>
@@ -1500,7 +1500,7 @@ adminRoutes.get("/config", guard, async (c) => {
         {t("admin.config.title")}
       </h1>
       <div class="overflow-x-auto">
-        <table class="table w-full max-w-2xl">
+        <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.config.table.variable")}</th>
@@ -1744,7 +1744,7 @@ adminRoutes.get("/backup", guard, async (c) => {
         <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>
       ) : (
         <div class="overflow-x-auto">
-          <table class="table w-full">
+          <table class="table table-zebra w-full">
             <thead>
               <tr>
                 <th>{t("admin.backup.table.timestamp")}</th>
