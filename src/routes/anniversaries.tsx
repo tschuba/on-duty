@@ -8,6 +8,7 @@ import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl } from "../lib/list-query.js";
+import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 
@@ -39,12 +40,6 @@ function addMonths(dateStr: string, months: number): string {
   const dt = new Date(y, m - 1 + months, d);
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
 }
-
-function formatDate(d: string): string {
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 const MONTH_KEYS = [
   "month.january", "month.february", "month.march", "month.april",
   "month.may", "month.june", "month.july", "month.august",

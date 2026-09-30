@@ -8,6 +8,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
+import { formatDate } from "../lib/format.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
 export const donationRoutes = new Hono<{ Variables: Variables }>();
@@ -23,13 +24,6 @@ type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person }; i
 type DonationType = "cash" | "transfer";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}.${m}.${y}`;
-}
-
 function formatAmount(amount: string | number): string {
   return `${Number(amount).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
 }
