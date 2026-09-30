@@ -99,8 +99,13 @@ export const de = {
   "members.export.sheetAssignments": "Funktionszuweisungen",
   "members.flash.created": "Mitglied erfolgreich angelegt.",
   "members.flash.saved": "Mitglied gespeichert.",
+  "members.flash.deleted": "Mitglied und Person endgültig gelöscht.",
   "members.error.assignmentMissingFrom": "Feld „Von“ ist ein Pflichtfeld.",
   "members.error.duplicateRole": "Funktion „{role}“ ist mehrfach offen zugewiesen.",
+  "members.delete.confirmTitle": "Mitglied endgültig löschen?",
+  "members.delete.confirmBody": "{name} wird inklusive aller Personendaten (Name, Adresse, Kontaktdaten) unwiderruflich gelöscht. Funktionszuweisungen werden mitgelöscht.",
+  "members.delete.blockedDonor": "Person hat noch ein Spenderprofil — dieses muss zuerst separat behandelt werden.",
+  "members.delete.blockedApplication": "Person ist noch mit einem Antrag verknüpft — dieser muss zuerst separat behandelt werden.",
 
   // ── Donations ────────────────────────────────────────────────────────────────
   "donations.title": "Spenden",

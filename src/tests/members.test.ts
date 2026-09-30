@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { members, persons, memberRoles, memberRoleAssignments, applications } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -29,6 +29,9 @@ let findFirstResult: any = undefined;
 let personLookupResult: any[] = []; // db.select().from(persons).where(...) — GET/POST /new personId linking
 let memberLookupResult: any[] = []; // db.select().from(members).where(...) — "already a member" guard / linkMemberId target lookup
 let applicationFindFirstResult: any = undefined; // db.query.applications.findFirst(...) — linkMemberId prefill
+let donorLookupResult: any[] = []; // db.select().from(donors).where(...) — delete blocking check
+let applicationLookupResult: any[] = []; // db.select().from(applications).where(...) — delete blocking check
+let applicationGuardianLookupResult: any[] = []; // db.select().from(applicationGuardians).where(...) — delete blocking check
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -40,6 +43,9 @@ const select = vi.fn(() => ({
     if (table === memberRoleAssignments) return chainOf(assignmentRowsFixture);
     if (table === persons) return chainOf(personLookupResult);
     if (table === members) return chainOf(memberLookupResult);
+    if (table === donors) return chainOf(donorLookupResult);
+    if (table === applications) return chainOf(applicationLookupResult);
+    if (table === applicationGuardians) return chainOf(applicationGuardianLookupResult);
     return chainOf([]);
   }),
 }));
@@ -130,6 +136,9 @@ beforeEach(() => {
   personLookupResult = [];
   memberLookupResult = [];
   applicationFindFirstResult = undefined;
+  donorLookupResult = [];
+  applicationLookupResult = [];
+  applicationGuardianLookupResult = [];
   currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
 });
 
@@ -649,6 +658,78 @@ describe("GET /:id", () => {
     const html = await res.text();
     expect(html).toContain("<form");
     expect(html).toContain("role-row-0");
+  });
+
+  it("hides the delete button without the members:delete permission", async () => {
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1");
+    expect(await res.text()).not.toContain("delete-member-modal");
+  });
+
+  it("shows an enabled delete button when unblocked", async () => {
+    currentUser = { id: "u1", permissions: new Set(["members:write", "members:delete"]), disabled: false };
+    findFirstResult = memberWithAssignments();
+    rolesFixture = [roleAktiv];
+    const res = await memberRoutes.request("/m1");
+    const html = await res.text();
+    expect(html).toContain("delete-member-modal");
+    expect(html).toContain("/members/m1/delete");
+  });
+
+  it("shows a disabled delete button with a reason when the person still has a donor profile", async () => {
+    currentUser = { id: "u1", permissions: new Set(["members:write", "members:delete"]), disabled: false };
+    findFirstResult = memberWithAssignments();
+    donorLookupResult = [{ id: "d1" }];
+    const res = await memberRoutes.request("/m1");
+    const html = await res.text();
+    expect(html).not.toContain("delete-member-modal");
+    expect(html).toContain(t("members.delete.blockedDonor"));
+  });
+});
+
+describe("POST /:id/delete", () => {
+  it("returns 404 for an unknown member", async () => {
+    findFirstResult = undefined;
+    const res = await memberRoutes.request("/does-not-exist/delete", { method: "POST" });
+    expect(res.status).toBe(404);
+  });
+
+  it("blocks deletion and redirects back when the person still has a donor profile", async () => {
+    findFirstResult = memberWithAssignments();
+    donorLookupResult = [{ id: "d1" }];
+    const res = await memberRoutes.request("/m1/delete", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members/m1");
+    expect(res.headers.get("set-cookie")).toMatch(/flash=/);
+    expect(deleteCalls.some((c) => c.table === members)).toBe(false);
+  });
+
+  it("blocks deletion when the person still has an application", async () => {
+    findFirstResult = memberWithAssignments();
+    applicationLookupResult = [{ id: "app1" }];
+    const res = await memberRoutes.request("/m1/delete", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members/m1");
+    expect(deleteCalls.some((c) => c.table === members)).toBe(false);
+  });
+
+  it("blocks deletion when the person is a guardian on another application", async () => {
+    findFirstResult = memberWithAssignments();
+    applicationGuardianLookupResult = [{ id: "g1" }];
+    const res = await memberRoutes.request("/m1/delete", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members/m1");
+    expect(deleteCalls.some((c) => c.table === members)).toBe(false);
+  });
+
+  it("deletes the member and its person record, then redirects to the list", async () => {
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1/delete", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members");
+    expect(res.headers.get("set-cookie")).toMatch(/flash=/);
+    expect(deleteCalls.some((c) => c.table === members)).toBe(true);
+    expect(deleteCalls.some((c) => c.table === persons)).toBe(true);
   });
 });
 

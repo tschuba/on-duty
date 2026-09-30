@@ -3,7 +3,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, persons, memberRoles, memberRoleAssignments, applications } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
@@ -61,6 +61,21 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
     assignments: m.assignments as Assignment[],
     status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   };
+}
+
+// Deleting a member also erases its person record (see backlog 19_Mitglieder-loeschen.md),
+// but that record may still be needed elsewhere — donations carry retention duties of
+// their own, and applications are a separate workflow. Block rather than cascade.
+export type PersonBlockingLink = "donor" | "application" | null;
+
+async function findPersonBlockingLink(personId: string): Promise<PersonBlockingLink> {
+  const [donorRow] = await db.select({ id: donors.id }).from(donors).where(eq(donors.personId, personId));
+  if (donorRow) return "donor";
+  const [applicationRow] = await db.select({ id: applications.id }).from(applications).where(eq(applications.personId, personId));
+  if (applicationRow) return "application";
+  const [guardianRow] = await db.select({ id: applicationGuardians.id }).from(applicationGuardians).where(eq(applicationGuardians.personId, personId));
+  if (guardianRow) return "application";
+  return null;
 }
 
 // ── Sort / filter helpers ────────────────────────────────────────────────────
@@ -472,6 +487,58 @@ function ReactivationModal({
         <a href={`/members/${memberId}`}>×</a>
       </form>
     </dialog>
+  );
+}
+
+// ── Delete member ────────────────────────────────────────────────────────────
+
+function DeleteMemberButton({
+  member,
+  blockedBy,
+}: {
+  member: Pick<MemberWithStatus, "id" | "firstName" | "lastName">;
+  blockedBy: PersonBlockingLink;
+}) {
+  if (blockedBy) {
+    return (
+      <button
+        class="btn btn-ghost btn-sm text-base-content/30 ml-auto"
+        disabled
+        title={t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication")}
+      >
+        {t("common.delete")}
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        class="btn btn-ghost btn-sm text-error ml-auto"
+        onclick="document.getElementById('delete-member-modal').showModal()"
+      >
+        {t("common.delete")}
+      </button>
+      <dialog id="delete-member-modal" class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">{t("members.delete.confirmTitle")}</h3>
+          <p class="py-2 opacity-70">
+            {t("members.delete.confirmBody", { name: `${member.firstName} ${member.lastName}` })}
+          </p>
+          <div class="modal-action">
+            <form method="dialog">
+              <button class="btn">{t("common.cancel")}</button>
+            </form>
+            <form method="post" action={`/members/${member.id}/delete`}>
+              <button type="submit" class="btn btn-error">{t("common.delete")}</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button>{t("common.close")}</button>
+        </form>
+      </dialog>
+    </>
   );
 }
 
@@ -1183,6 +1250,9 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const isEditor = user.permissions.has("members:write");
   const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
 
+  const canDelete = user.permissions.has("members:delete");
+  const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
+
   if (!isEditor) {
     // Read-only view
     const openRoles = m.assignments.filter((a) => !a.to);
@@ -1195,6 +1265,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
               {m.firstName} {m.lastName}
             </h1>
             <StatusBadge status={m.status} />
+            {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} />}
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
@@ -1233,6 +1304,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             {m.firstName} {m.lastName}
           </h1>
           <StatusBadge status={m.status} />
+          {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} />}
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
@@ -1481,6 +1553,30 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
 
   setFlash(c, t("members.flash.saved"), "success");
   return c.redirect(`/members/${id}`);
+});
+
+// POST /members/:id/delete — permanently deletes the member AND its person record
+// (name, address, contact data). Role assignments cascade at the DB level. Blocked
+// (not cascaded further) if the same person still has a donor profile or is linked
+// to an application — see findPersonBlockingLink.
+memberRoutes.post("/:id/delete", requireAuth("members:delete"), async (c) => {
+  const id = c.req.param("id");
+  const existing = await fetchMember(id);
+  if (!existing) return c.notFound();
+
+  const blockedBy = await findPersonBlockingLink(existing.personId);
+  if (blockedBy) {
+    setFlash(c, t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication"), "error");
+    return c.redirect(`/members/${id}`);
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(members).where(eq(members.id, id));
+    await tx.delete(persons).where(eq(persons.id, existing.personId));
+  });
+
+  setFlash(c, t("members.flash.deleted"), "success");
+  return c.redirect("/members");
 });
 
 // ── Read-only view field helper ───────────────────────────────────────────────
