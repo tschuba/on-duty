@@ -60,6 +60,11 @@ export const env = {
   S3_SECRET_KEY: process.env.S3_SECRET_KEY,
   S3_REGION: process.env.S3_REGION,
   S3_PREFIX: process.env.S3_PREFIX,
+  SMTP_HOST: process.env.SMTP_HOST,
+  SMTP_PORT: process.env.SMTP_PORT,
+  SMTP_USER: process.env.SMTP_USER,
+  SMTP_PASS: process.env.SMTP_PASS,
+  SMTP_FROM: process.env.SMTP_FROM,
 };
 
 export const ENV_META: { key: keyof typeof env; value: string | number | undefined }[] = [
@@ -74,4 +79,6 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "BACKUP_LOCAL_PATH",         value: env.BACKUP_LOCAL_PATH },
   { key: "S3_ENDPOINT",               value: env.S3_ENDPOINT },
   { key: "S3_BUCKET",                 value: env.S3_BUCKET },
+  { key: "SMTP_HOST",                 value: env.SMTP_HOST },
+  { key: "SMTP_FROM",                 value: env.SMTP_FROM },
 ];

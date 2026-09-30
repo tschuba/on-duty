@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
@@ -14,8 +14,17 @@ export const anniversaryRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+type Person = typeof persons.$inferSelect;
+type MemberRow = typeof members.$inferSelect;
+// birthDate is nullable in `persons` (donor-only persons need none) but every
+// member is guaranteed one at the app layer (members.tsx form validation).
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
+
+function flattenMember({ person, ...m }: { person: Person | null } & MemberRow & Record<string, unknown>): Member {
+  return { ...(person as Person), ...m } as Member;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -197,14 +206,17 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   const mods = c.req.queries("mod") ?? [];
 
   const [memberRows, ayRows] = await Promise.all([
-    db.query.members.findMany({ with: { assignments: { with: { role: true } } } }),
+    db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
     db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
   ]);
 
-  const membersWithStatus = memberRows.map((m) => ({
-    ...m,
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
-  }));
+  const membersWithStatus = memberRows.map((row) => {
+    const m = flattenMember(row as any);
+    return {
+      ...m,
+      status: deriveMemberStatus(m, row.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    };
+  });
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   if (gte > 0) events = events.filter((e) => e.years >= gte);
@@ -264,12 +276,12 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
         {/* Controls */}
         <div class="flex flex-wrap gap-3 items-end">
           {/* Quick buttons */}
-          <div class="flex gap-1">
-            <a href={quickLink(3)} class={`btn btn-sm${is3m ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
-            <a href={quickLink(6)} class={`btn btn-sm${is6m ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
-            <a href={quickLink(12)} class={`btn btn-sm${isDefault ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
-            <a href={yearLink(thisYear)} class={`btn btn-sm${isThisYear ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
-            <a href={yearLink(nextYear)} class={`btn btn-sm${isNextYear ? " btn-primary" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
+          <div class="join">
+            <a href={quickLink(3)} class={`btn btn-sm join-item${is3m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
+            <a href={quickLink(6)} class={`btn btn-sm join-item${is6m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
+            <a href={quickLink(12)} class={`btn btn-sm join-item${isDefault ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
+            <a href={yearLink(thisYear)} class={`btn btn-sm join-item${isThisYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
+            <a href={yearLink(nextYear)} class={`btn btn-sm join-item${isNextYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
           </div>
 
           {/* Manual date range */}
@@ -285,9 +297,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 
           {/* Typ-Filter */}
           <div class="join">
-            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-active" : ""}`}>{t("anniversaries.filter.all")}</a>
-            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-active" : ""}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
-            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-active" : ""}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
+            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
+            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
           </div>
 
           {/* Jahre + Mod */}
@@ -309,9 +321,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
               />
             </form>
             <div class="join">
-              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-active" : ""}`}>{t("anniversaries.filter.all")}</a>
-              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-active" : ""}`}>{t("anniversaries.filter.halfRoundYears")}</a>
-              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-active" : ""}`}>{t("anniversaries.filter.roundYears")}</a>
+              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
+              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>
             </div>
           </div>
         </div>
@@ -352,13 +364,15 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const mod = q.mod || "";
 
   const [memberRows, ayRows] = await Promise.all([
-    db.query.members.findMany({ with: { assignments: { with: { role: true } } } }),
+    db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
     db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
   ]);
 
-  const membersWithStatus = memberRows.map((m) => ({
+  const flatMembers = memberRows.map((row) => flattenMember(row as any));
+
+  const membersWithStatus = flatMembers.map((m, i) => ({
     ...m,
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, memberRows[i].assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   }));
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
@@ -368,7 +382,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
   else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
 
-  const memberMap = new Map(memberRows.map((m) => [m.id, m]));
+  const memberMap = new Map(flatMembers.map((m) => [m.id, m]));
 
   const STATUS_LABEL: Record<string, string> = {
     aktiv: t("status.aktiv"), passiv: t("status.passiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), archiviert: t("status.archiviert"),

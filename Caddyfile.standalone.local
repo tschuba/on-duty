@@ -1,0 +1,14 @@
+{$APP_DOMAIN} {
+	tls internal
+	reverse_proxy app:3000
+}
+
+{$ZITADEL_DOMAIN} {
+	# Login V2 (eigener zitadel-login-Container, Next.js) bedient die
+	# gehostete Login-UI unter /ui/v2/login/*; alles andere (API, gRPC-Web,
+	# Management-Console) geht an zitadel selbst — h2c für HTTP/2-Klartext,
+	# da Zitadel hinter Caddy ohne eigenes TLS läuft (ZITADEL_TLS_ENABLED=false).
+	tls internal
+	reverse_proxy /ui/v2/login/* zitadel-login:3000
+	reverse_proxy h2c://zitadel:8080
+}

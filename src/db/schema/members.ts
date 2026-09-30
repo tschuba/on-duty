@@ -1,20 +1,15 @@
-import { pgEnum, pgTable, text, date, uuid } from "drizzle-orm/pg-core";
+import { pgTable, date, uuid } from "drizzle-orm/pg-core";
+import { persons } from "./persons";
 
-export const genderEnum = pgEnum("gender", ["male", "female"]);
-
+/* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const members = pgTable("members", {
   id: uuid("id").primaryKey().defaultRandom(),
-  lastName: text("last_name").notNull(),
-  firstName: text("first_name").notNull(),
-  street: text("street"),
-  houseNumber: text("house_number"),
-  zip: text("zip"),
-  city: text("city"),
-  gender: genderEnum("gender"),
-  birthDate: date("birth_date").notNull(),
+  personId: uuid("person_id")
+    .notNull()
+    .unique()
+    .references(() => persons.id, { onDelete: "restrict" }),
   entryDate: date("entry_date").notNull(),
   exitDate: date("exit_date"),
   deathDate: date("death_date"),
-  phone: text("phone"),
-  email: text("email"),
 });
+/* v8 ignore stop */

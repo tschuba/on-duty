@@ -14,7 +14,7 @@ Passwort: Wert der Umgebungsvariable `ADMIN_PASSWORD` aus `.env`
 Beim ersten Setup oder nach einem Reset:
 
 ```sh
-pnpm db:seed
+pnpm db:setup
 ```
 
 Das Passwort kann jederzeit in `.env` geändert werden — es wird beim nächsten Login automatisch übernommen, ohne Re-Seed.

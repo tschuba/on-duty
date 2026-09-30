@@ -1,54 +1,65 @@
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { eq, or, ilike, asc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, memberRoles, memberRoleAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
-import { PASSIVE_MEMBER_ROLE_ID } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
+import { sendMail } from "../lib/mail.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Member = typeof members.$inferSelect;
+type Person = typeof persons.$inferSelect;
+type MemberRow = typeof members.$inferSelect;
+// birthDate is nullable in `persons` (donor-only persons need none) but this route's
+// own form validation always requires it for a member — re-asserted non-null here.
+type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
 type Role = typeof memberRoles.$inferSelect;
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };
 
 // ── DB helpers ───────────────────────────────────────────────────────────────
 
+// ponytail: search filters in JS, not SQL — Drizzle's relational query API can't
+// filter the base table by a `with` relation's columns, and the full list is
+// already loaded into memory for stats/sort/pagination either way.
 async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus[]> {
   const rows = await db.query.members.findMany({
-    where: search
-      ? or(ilike(members.lastName, `%${search}%`), ilike(members.firstName, `%${search}%`))
-      : undefined,
-    with: {
-      assignments: { with: { role: true } },
-    },
+    with: { person: true, assignments: { with: { role: true } } },
   });
 
-  return rows.map((m) => ({
-    ...m,
-    assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
-  }));
+  const all = rows.map(({ person, ...m }) => {
+    const member = { ...(person as Person), ...m } as Member;
+    return {
+      ...member,
+      assignments: m.assignments as Assignment[],
+      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    };
+  });
+
+  if (!search) return all;
+  const needle = search.toLowerCase();
+  return all.filter((m) => m.lastName.toLowerCase().includes(needle) || m.firstName.toLowerCase().includes(needle));
 }
 
 async function fetchMember(id: string): Promise<MemberWithStatus | null> {
-  const m = await db.query.members.findFirst({
+  const row = await db.query.members.findFirst({
     where: eq(members.id, id),
-    with: { assignments: { with: { role: true } } },
+    with: { person: true, assignments: { with: { role: true } } },
   });
-  if (!m) return null;
+  if (!row) return null;
+  const { person, ...m } = row;
+  const member = { ...(person as Person), ...m } as Member;
   return {
-    ...m,
+    ...member,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(m, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
   };
 }
 
@@ -57,7 +68,7 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
 type SortKey = "lastName" | "birthDate" | "entryDate";
 const DATE_SORT_KEYS: SortKey[] = ["birthDate", "entryDate"];
 
-function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" | "desc"): MemberWithStatus[] {
+export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" | "desc"): MemberWithStatus[] {
   return [...list].sort((a, b) => {
     let cmp = 0;
     if (sort === "lastName") {
@@ -105,12 +116,12 @@ function formatDate(d: string | null | undefined): string {
   return `${day}.${m}.${y}`;
 }
 
-function SortIcon({ col, active, dir }: { col: SortKey; active: SortKey; dir: "asc" | "desc" }) {
+export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
 
-function StatsCards({ all }: { all: MemberWithStatus[] }) {
+export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, archiviert: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
     const subset = all.filter((m) => m.status === status);
@@ -132,7 +143,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-success">{counts.aktiv}</div>
-          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
@@ -143,14 +154,14 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-info">{counts.jugend}</div>
-          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-warning">{counts.kinder}</div>
-          <div class="stat-desc flex flex-1 gap-x-2 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
@@ -161,7 +172,7 @@ function StatsCards({ all }: { all: MemberWithStatus[] }) {
   );
 }
 
-function MembersTable({
+export function MembersTable({
   items, sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, isEditor,
 }: {
   items: MemberWithStatus[];
@@ -208,6 +219,7 @@ function MembersTable({
   return (
     <div id="members-results">
       <div>
+        <ClickToEditHint />
         <table class="table table-zebra w-full">
           <thead>
             <tr>
@@ -376,7 +388,7 @@ function MemberFormFields({
           type={type}
           name={name as string}
           value={value as string}
-          class={`input input-bordered${err ? " input-error" : ""}`}
+          class={`input input-bordered w-full${err ? " input-error" : ""}`}
           {...(required ? { required: true } : {})}
         />
         {err && <span class="text-error text-sm mt-1">{err}</span>}
@@ -400,7 +412,7 @@ function MemberFormFields({
         {field("city", t("members.form.city"))}
         <div class="form-control">
           <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
-          <select name="gender" class={`select select-bordered${genderErr ? " select-error" : ""}`}>
+          <select name="gender" class={`select select-bordered w-full${genderErr ? " select-error" : ""}`}>
             <option value="" selected={!m?.gender}>{t("members.form.genderNone")}</option>
             <option value="male" selected={m?.gender === "male"}>{t("members.form.genderMale")}</option>
             <option value="female" selected={m?.gender === "female"}>{t("members.form.genderFemale")}</option>
@@ -604,29 +616,47 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
   );
 }
 
-// ── Routes ───────────────────────────────────────────────────────────────────
+// ── List query parsing ──────────────────────────────────────────────────────
 
-// GET /members — list
-memberRoutes.get("/", requireAuth("read"), async (c) => {
-  const user = c.get("user");
-  const q = c.req.query();
+export type ListQuery = {
+  search: string;
+  sort: SortKey;
+  dir: "asc" | "desc";
+  statusFilter: MemberStatus[];
+  roleFilter: string[];
+  page: number;
+  pageSize: number;
+};
+
+export function parseListQuery(q: Record<string, string>, statusRaw: string[], roleFilterRaw: string[]): ListQuery {
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
-  const statusRaw = c.req.queries("status") ?? [];
   const statusParsed = (statusRaw.length === 1 && statusRaw[0]?.includes(",")
     ? statusRaw[0].split(",")
     : statusRaw).filter(Boolean);
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
     : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
-  const roleFilterRaw = c.req.queries("role") ?? [];
   // ponytail: hx-vals sends comma-joined or empty string; normalise to clean array
   const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
     ? roleFilterRaw[0].split(",")
     : roleFilterRaw).filter(Boolean);
   const page = Math.max(1, Number(q.page) || 1);
   const pageSize = [10, 25, 50, 100].includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
+
+  return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
+}
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
+// GET /members — list
+memberRoutes.get("/", requireAuth("members:read"), async (c) => {
+  const user = c.get("user");
+  const q = c.req.query();
+  const { search, sort, dir, statusFilter, roleFilter, page, pageSize } = parseListQuery(
+    q, c.req.queries("status") ?? [], c.req.queries("role") ?? []
+  );
 
   const [all, allRoles] = await Promise.all([
     fetchMembersWithStatus(search || undefined),
@@ -642,7 +672,7 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
 
-  const isEditor = user.appRole === "editor" || user.appRole === "admin";
+  const isEditor = user.permissions.has("members:write");
   const isHtmx = c.req.header("HX-Request") === "true";
 
   const tableEl = (
@@ -708,12 +738,12 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
           hx-include="[name='search']"
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
         />
-        <div class="flex gap-1">
+        <div class="join">
           {(["aktiv", "passiv", "jugend", "kinder", "archiviert"] as MemberStatus[]).map((s) => (
             <a
               key={s}
               href={filterToggleUrl(s)}
-              class={`btn btn-sm${statusFilter.includes(s) ? " btn-primary" : " btn-ghost"}`}
+              class={`btn btn-sm join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
             >
               {STATUS_LABELS[s]}
             </a>
@@ -743,10 +773,48 @@ memberRoutes.get("/", requireAuth("read"), async (c) => {
   );
 });
 
-// GET /members/new — new member form
-memberRoutes.get("/new", requireAuth("editor"), async (c) => {
+// GET /members/new — new member form. ?personId (+?applicationId) links an existing
+// persons row instead of creating a new one — used by the "Annehmen" step of the
+// applications review workflow (see routes/applications.tsx). ?linkMemberId
+// (+?applicationId) instead links a duplicate-matched members row (archived: a
+// reactivation; active: an update), prefilled with the application's (fresher)
+// contact data.
+memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+  const personId = c.req.query("personId");
+  const linkMemberId = c.req.query("linkMemberId");
+  const applicationId = c.req.query("applicationId");
+
+  let prefill: Partial<Member> | undefined;
+  let linkedWasArchived = false;
+  if (personId) {
+    const [alreadyMember] = await db.select({ id: members.id }).from(members).where(eq(members.personId, personId));
+    if (alreadyMember) {
+      setFlash(c, t("members.error.personAlreadyMember"), "error");
+      return c.redirect(applicationId ? `/applications/${applicationId}` : "/members");
+    }
+    const [person] = await db.select().from(persons).where(eq(persons.id, personId));
+    if (person) prefill = { ...person, birthDate: person.birthDate ?? "" };
+  } else if (linkMemberId) {
+    const target = await fetchMember(linkMemberId);
+    if (!target) return c.notFound();
+    linkedWasArchived = !!(target.exitDate || target.deathDate);
+    let contactOverride: Partial<Member> = {};
+    if (applicationId) {
+      const app = await db.query.applications.findFirst({ where: eq(applications.id, applicationId), with: { person: true } });
+      if (app) {
+        contactOverride = {
+          lastName: app.person.lastName, firstName: app.person.firstName, birthDate: app.person.birthDate ?? "",
+          street: app.person.street, houseNumber: app.person.houseNumber, zip: app.person.zip, city: app.person.city,
+          email: app.person.email, phone: app.person.phone,
+        };
+      }
+    }
+    const { assignments: _assignments, status: _status, ...targetMember } = target;
+    prefill = { ...targetMember, ...contactOverride, exitDate: "", deathDate: "" };
+  }
+
   return c.html(
     <Layout title={t("members.newMember")} user={user} activeNav="members">
       <div class="mb-4">
@@ -755,7 +823,18 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
-        <MemberFormFields />
+        {personId && <input type="hidden" name="personId" value={personId} />}
+        {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
+        {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
+        {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+        {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
+        <MemberFormFields m={prefill} />
+        {applicationId && (
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" name="notifyApplicant" class="checkbox" />
+            <span class="label-text">{t("members.form.notifyApplicant")}</span>
+          </label>
+        )}
         <div class="divider">{t("members.form.assignments")}</div>
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
@@ -783,7 +862,7 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">{t("common.saveAndNew")}</button>
+          <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
           <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </form>
@@ -792,52 +871,37 @@ memberRoutes.get("/new", requireAuth("editor"), async (c) => {
           const rows = document.querySelectorAll('#role-rows tr').length;
           e.detail.parameters['index'] = rows;
         });
-
-        // Auto-insert 'Passives Mitglied' row when entry date is set
-        (function() {
-          const PASSIVE_ID = "${PASSIVE_MEMBER_ROLE_ID}";
-          const entryInput = document.querySelector('input[name="entryDate"]');
-          function getRoles() {
-            try { return JSON.parse(document.getElementById('roles-json').value); } catch { return []; }
-          }
-          function hasPassiveRow() {
-            return [...document.querySelectorAll('#role-rows select[name="assignment_role[]"]')].some(s => s.value === PASSIVE_ID);
-          }
-          function escape(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-          function buildRow(date, roles) {
-            const index = document.querySelectorAll('#role-rows tr').length;
-            const opts = roles.map(r => '<option value="' + r.id + '"' + (r.id === PASSIVE_ID ? ' selected' : '') + '>' + escape(r.title) + '</option>').join('');
-            const tr = document.createElement('tr');
-            tr.id = 'role-row-' + index;
-            tr.dataset.autoPassive = 'true';
-            tr.innerHTML = '<td><input type="hidden" name="assignment_id[]" value=""><select name="assignment_role[]" class="select select-bordered select-sm w-full" required><option value="">— Funktion wählen —</option>' + opts + '</select></td><td><input type="date" name="assignment_from[]" class="input input-bordered input-sm w-full" value="' + date + '" required></td><td><input type="date" name="assignment_to[]" class="input input-bordered input-sm w-full" value=""></td><td><button type="button" class="btn btn-ghost btn-sm text-error" onclick="this.closest(\'tr\').remove()">✕</button></td>';
-            return tr;
-          }
-          entryInput.addEventListener('change', function() {
-            const date = this.value;
-            const autoRow = document.querySelector('#role-rows tr[data-auto-passive]');
-            if (!date) { if (autoRow) autoRow.remove(); return; }
-            if (autoRow) { autoRow.querySelector('input[name="assignment_from[]"]').value = date; return; }
-            if (!hasPassiveRow()) document.getElementById('role-rows').appendChild(buildRow(date, getRoles()));
-          });
-        })();
       ` }} />
     </Layout>
   );
 });
 
 // GET /members/role-row — HTMX fragment: one assignment row
-memberRoutes.get("/role-row", requireAuth("editor"), async (c) => {
+memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   const index = Number(c.req.query("index") ?? 0);
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   return c.html(<RoleRow index={index} roles={roles} />);
 });
 
-// POST /members/new — create member
-memberRoutes.post("/new", requireAuth("editor"), async (c) => {
+// POST /members/new — create member (or link an existing person, see GET /new)
+memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
+
+  const personId = String(body.personId ?? "").trim() || undefined;
+  const linkMemberId = String(body.linkMemberId ?? "").trim() || undefined;
+  const applicationId = String(body.applicationId ?? "").trim() || undefined;
+  const notifyApplicant = body.notifyApplicant === "on";
+
+  let targetPersonId: string | undefined;
+  let linkedWasArchived = false;
+  if (linkMemberId) {
+    const [target] = await db.select({ personId: members.personId, exitDate: members.exitDate, deathDate: members.deathDate }).from(members).where(eq(members.id, linkMemberId));
+    if (!target) return c.notFound();
+    targetPersonId = target.personId;
+    linkedWasArchived = !!(target.exitDate || target.deathDate);
+  }
 
   const lastName = String(body.lastName ?? "").trim();
   const firstName = String(body.firstName ?? "").trim();
@@ -894,7 +958,18 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+          {personId && <input type="hidden" name="personId" value={personId} />}
+          {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
+          {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
+          {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
+          {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
           <MemberFormFields m={m} errors={errors} />
+          {applicationId && (
+            <label class="label cursor-pointer justify-start gap-3">
+              <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
+              <span class="label-text">{t("members.form.notifyApplicant")}</span>
+            </label>
+          )}
           <div class="divider">{t("members.form.assignments")}</div>
           <div class="overflow-x-auto">
             <table class="table table-sm w-full">
@@ -920,7 +995,7 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
           </button>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <button type="submit" name="_action" value="save_and_new" class="btn btn-secondary">{t("common.saveAndNew")}</button>
+            <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
             <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
           </div>
         </form>
@@ -929,62 +1004,91 @@ memberRoutes.post("/new", requireAuth("editor"), async (c) => {
     );
   }
 
-  const [newMember] = await db.transaction(async (tx) => {
-    const [m] = await tx.insert(members).values({
-      lastName, firstName,
-      street: (body.street as string) || null,
-      houseNumber: (body.houseNumber as string) || null,
-      zip: (body.zip as string) || null,
-      city: (body.city as string) || null,
-      gender: (body.gender as any) || null,
-      birthDate,
-      entryDate,
-      exitDate: (body.exitDate as string) || null,
-      deathDate: (body.deathDate as string) || null,
-      phone: (body.phone as string) || null,
-      email: (body.email as string) || null,
-    }).returning();
+  const personFields = {
+    lastName, firstName,
+    street: (body.street as string) || null,
+    houseNumber: (body.houseNumber as string) || null,
+    zip: (body.zip as string) || null,
+    city: (body.city as string) || null,
+    gender: (body.gender as any) || null,
+    birthDate,
+    phone: (body.phone as string) || null,
+    email: (body.email as string) || null,
+  };
+
+  const [{ id: newMemberId }] = await db.transaction(async (tx) => {
+    let pid = personId;
+    let memberId: string;
+
+    if (linkMemberId && targetPersonId) {
+      pid = targetPersonId;
+      await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+      await tx.update(members).set({
+        entryDate,
+        exitDate: (body.exitDate as string) || null,
+        deathDate: (body.deathDate as string) || null,
+      }).where(eq(members.id, linkMemberId));
+      memberId = linkMemberId;
+    } else {
+      if (pid) {
+        await tx.update(persons).set(personFields).where(eq(persons.id, pid));
+      } else {
+        const [person] = await tx.insert(persons).values(personFields).returning();
+        pid = person.id;
+      }
+
+      const [m] = await tx.insert(members).values({
+        personId: pid,
+        entryDate,
+        exitDate: (body.exitDate as string) || null,
+        deathDate: (body.deathDate as string) || null,
+      }).returning();
+      memberId = m.id;
+    }
 
     for (let i = 0; i < assignmentRoles.length; i++) {
       if (!assignmentRoles[i]) continue;
       await tx.insert(memberRoleAssignments).values({
-        memberId: m.id,
+        memberId,
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
       });
     }
 
-    // ponytail: safety-net — insert 'Passives Mitglied' if not submitted (e.g. JS disabled)
-    if (!assignmentRoles.includes(PASSIVE_MEMBER_ROLE_ID)) {
-      await tx.insert(memberRoleAssignments).values({
-        memberId: m.id,
-        memberRoleId: PASSIVE_MEMBER_ROLE_ID,
-        from: entryDate,
-        to: null,
-      });
+    // Guarded by status="open" so a double-submit (e.g. two tabs) can't re-approve
+    // an application that already went through this once.
+    if (applicationId) {
+      await tx.update(applications)
+        .set({ status: "approved", reviewedAt: new Date(), reviewedBy: user.id })
+        .where(and(eq(applications.id, applicationId), eq(applications.status, "open")));
     }
 
-    return [m];
+    return [{ id: memberId }];
   });
+
+  if (applicationId && notifyApplicant && personFields.email) {
+    const bodyKey = linkMemberId && linkedWasArchived ? "applications.mail.approvedBodyRejoin" : "applications.mail.approvedBody";
+    await sendMail(personFields.email, t("applications.mail.approvedSubject"), t(bodyKey));
+  }
 
   setFlash(c, t("members.flash.created"), "success");
   const saveAndNew = String(body._action ?? "") === "save_and_new";
   return c.redirect(saveAndNew ? "/members/new" : "/members");
 });
 
-// GET /members/export — xlsx download
-memberRoutes.get("/export", requireAuth("read"), async (c) => {
-  const q = c.req.query();
-  const opts = {
-    addr: q.addr === "1",
-    contact: q.contact === "1",
-    dates: q.dates === "1",
-    gender: q.gender === "1",
-    assignments: q.assignments === "1",
-  };
+// ── Export sheet building ───────────────────────────────────────────────────
 
-  const allMembers = (await db.select().from(members)).sort((a, b) => {
+export type ExportOptions = { addr: boolean; contact: boolean; dates: boolean; gender: boolean; assignments: boolean };
+export type ExportAssignmentRow = { memberId: string; roleTitle: string; from: string | null; to: string | null };
+export type ExportSheet = { name: string; header: string[]; rows: (string | Date | null)[][] };
+
+export function buildExportSheets(
+  rawMembers: Member[],
+  rawAssignments: ExportAssignmentRow[],
+  opts: ExportOptions
+): ExportSheet[] {
+  const allMembers = [...rawMembers].sort((a, b) => {
     const cmp = a.lastName.localeCompare(b.lastName, "de");
     return cmp !== 0 ? cmp : a.firstName.localeCompare(b.firstName, "de");
   });
@@ -1007,21 +1111,11 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
     return row;
   });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...rows]), t("members.export.sheetMembers"));
+  const sheets: ExportSheet[] = [{ name: t("members.export.sheetMembers"), header, rows }];
 
   if (opts.assignments) {
-    const asgns = await db.select({
-      memberId: memberRoleAssignments.memberId,
-      roleTitle: memberRoles.title,
-      from: memberRoleAssignments.from,
-      to: memberRoleAssignments.to,
-    })
-      .from(memberRoleAssignments)
-      .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId));
-
     const nameMap = new Map(allMembers.map((m) => [m.id, m]));
-    asgns.sort((a, b) => {
+    const asgns = [...rawAssignments].sort((a, b) => {
       const ma = nameMap.get(a.memberId)!, mb = nameMap.get(b.memberId)!;
       const cmp = ma.lastName.localeCompare(mb.lastName, "de");
       if (cmp !== 0) return cmp;
@@ -1034,7 +1128,41 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
       const m = nameMap.get(a.memberId);
       return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([asgHeader, ...asgRows]), t("members.export.sheetAssignments"));
+    sheets.push({ name: t("members.export.sheetAssignments"), header: asgHeader, rows: asgRows });
+  }
+
+  return sheets;
+}
+
+// GET /members/export — xlsx download
+memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
+  const q = c.req.query();
+  const opts: ExportOptions = {
+    addr: q.addr === "1",
+    contact: q.contact === "1",
+    dates: q.dates === "1",
+    gender: q.gender === "1",
+    assignments: q.assignments === "1",
+  };
+
+  const memberRows = await db.query.members.findMany({ with: { person: true } });
+  const allMembers: Member[] = memberRows.map(({ person, ...m }) => ({ ...(person as Person), ...m } as Member));
+  const rawAssignments: ExportAssignmentRow[] = opts.assignments
+    ? await db.select({
+        memberId: memberRoleAssignments.memberId,
+        roleTitle: memberRoles.title,
+        from: memberRoleAssignments.from,
+        to: memberRoleAssignments.to,
+      })
+        .from(memberRoleAssignments)
+        .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId))
+    : [];
+
+  const sheets = buildExportSheets(allMembers, rawAssignments, opts);
+
+  const wb = XLSX.utils.book_new();
+  for (const sheet of sheets) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([sheet.header, ...sheet.rows]), sheet.name);
   }
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
@@ -1047,12 +1175,12 @@ memberRoutes.get("/export", requireAuth("read"), async (c) => {
 });
 
 // GET /members/:id — view or edit
-memberRoutes.get("/:id", requireAuth("read"), async (c) => {
+memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const m = await fetchMember(c.req.param("id"));
   if (!m) return c.notFound();
 
-  const isEditor = user.appRole === "editor" || user.appRole === "admin";
+  const isEditor = user.permissions.has("members:write");
   const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
 
   if (!isEditor) {
@@ -1135,7 +1263,7 @@ memberRoutes.get("/:id", requireAuth("read"), async (c) => {
 });
 
 // POST /members/:id — update member
-memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
+memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const reactivateParam = c.req.query("reactivate");
@@ -1292,19 +1420,23 @@ memberRoutes.post("/:id", requireAuth("editor"), async (c) => {
   }
 
   await db.transaction(async (tx) => {
-    // Update member fields
-    await tx.update(members).set({
+    // Update person + member fields
+    await tx.update(persons).set({
       lastName, firstName,
       street: (body.street as string) || null,
       houseNumber: (body.houseNumber as string) || null,
       zip: (body.zip as string) || null,
       city: (body.city as string) || null,
       gender: (body.gender as any) || null,
-      birthDate, entryDate,
-      exitDate: exitDate || null,
-      deathDate: deathDate || null,
+      birthDate,
       phone: (body.phone as string) || null,
       email: (body.email as string) || null,
+    }).where(eq(persons.id, existing.personId));
+
+    await tx.update(members).set({
+      entryDate,
+      exitDate: exitDate || null,
+      deathDate: deathDate || null,
     }).where(eq(members.id, id));
 
     // Archive: close open assignments when exitDate or deathDate set

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, count, asc, desc } from "drizzle-orm";
+import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
 import { setCookie } from "hono/cookie";
 import { db } from "../db/index.js";
 import {
@@ -10,15 +10,41 @@ import {
   memberRoleAssignments,
   anniversaryYears,
   backupHistory,
+  appRoles,
+  appRolePermissions,
+  userAppRoles,
+  orgConfig,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
+import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
-const guard = requireAuth("admin");
+const guard = requireAuth("system:admin");
+
+// system:admin is reserved for the built-in protected `admin` role — never offered
+// as a checkbox when composing a custom role in the "Berechtigungen" UI.
+const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
+
+const PERMISSION_LABELS: Record<Permission, string> = {
+  "members:read": t("admin.permissions.key.membersRead"),
+  "members:write": t("admin.permissions.key.membersWrite"),
+  "system:admin": t("admin.permissions.key.systemAdmin"),
+  "donations:record": t("admin.permissions.key.donationsRecord"),
+  "donations:issue-receipts": t("admin.permissions.key.donationsIssueReceipts"),
+  "applications:review": t("admin.permissions.key.applicationsReview"),
+  "applications:manage-forms": t("admin.permissions.key.applicationsManageForms"),
+};
+
+const RESOURCE_LABELS: Record<string, string> = {
+  members: t("admin.permissions.resource.members"),
+  system: t("admin.permissions.resource.system"),
+  donations: t("admin.permissions.resource.donations"),
+  applications: t("admin.permissions.resource.applications"),
+};
 
 function setFlash(c: any, msg: string, type: "success" | "error") {
   setCookie(c, "flash", JSON.stringify({ message: msg, type }), {
@@ -28,11 +54,14 @@ function setFlash(c: any, msg: string, type: "success" | "error") {
   });
 }
 
-function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
         {t("admin.tabs.users")}
+      </a>
+      <a href="/admin/permissions" role="tab" class={`tab${active === "permissions" ? " tab-active" : ""}`}>
+        {t("admin.tabs.permissions")}
       </a>
       <a href="/admin/roles" role="tab" class={`tab${active === "roles" ? " tab-active" : ""}`}>
         {t("admin.tabs.roles")}
@@ -42,6 +71,9 @@ function AdminTabs({ active }: { active: "users" | "roles" | "anniversaries" | "
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         {t("admin.tabs.config")}
+      </a>
+      <a href="/admin/org-config" role="tab" class={`tab${active === "org-config" ? " tab-active" : ""}`}>
+        {t("admin.tabs.orgConfig")}
       </a>
       <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
         {t("admin.tabs.backup")}
@@ -69,7 +101,7 @@ function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; las
   );
 }
 
-async function backupWarnProps() {
+export async function backupWarnProps() {
   const configured = isBackupConfigured();
   const last = configured ? await getLastBackup() : null;
   const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
@@ -90,18 +122,51 @@ function ModalScaffold() {
   );
 }
 
-const ROLE_RANK: Record<string, number> = { read: 0, editor: 1, admin: 2 };
-
-function RoleBadge({ role }: { role: string }) {
-  const cls =
-    role === "admin" ? "badge-error" : role === "editor" ? "badge-warning" : "badge-ghost";
-  const label =
-    role === "admin" ? t("admin.users.role.adminBadge") : role === "editor" ? t("admin.users.role.editor") : t("admin.users.role.read");
-  return <span class={`badge badge-sm ${cls}`}>{label}</span>;
+function UserRoleBadges({ roles }: { roles: string[] }) {
+  if (roles.length === 0) return <span class="text-base-content/40 text-sm">—</span>;
+  if (roles.length === 1) {
+    return <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>;
+  }
+  return (
+    <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
+      <div tabindex={0} role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">
+        {t("admin.users.roleCount", { count: roles.length })}
+      </div>
+      <div tabindex={0} class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
+        <div class="flex flex-wrap gap-1 max-w-48">
+          {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function ClickToEditHint() {
-  return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
+function PermissionBadges({ permissions }: { permissions: Permission[] }) {
+  return (
+    <div class="flex flex-wrap gap-1">
+      {groupPermissionsForBadges(permissions).map((g) => {
+        if (g.kind === "full") {
+          return (
+            <span key="full" class="badge badge-primary badge-sm whitespace-nowrap">
+              {t("admin.permissions.badge.full")}
+            </span>
+          );
+        }
+        if (g.kind === "resource-full") {
+          return (
+            <span key={g.resource} class="badge badge-outline badge-primary badge-sm whitespace-nowrap">
+              {t("admin.permissions.badge.resourceFull", { resource: RESOURCE_LABELS[g.resource] ?? g.resource })}
+            </span>
+          );
+        }
+        return (
+          <span key={g.permission} class="badge badge-outline badge-sm whitespace-nowrap">
+            {PERMISSION_LABELS[g.permission]}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
@@ -110,10 +175,18 @@ adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 // ── /admin/users ──────────────────────────────────────────────────────────────
 adminRoutes.get("/users", guard, async (c) => {
   const user = c.get("user");
-  const [allUsers, warn] = await Promise.all([
+  const [allUsers, roleAssignments, warn] = await Promise.all([
     db.select().from(users).orderBy(asc(users.name)),
+    db
+      .select({ userId: userAppRoles.userId, roleName: appRoles.name })
+      .from(userAppRoles)
+      .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId)),
     backupWarnProps(),
   ]);
+  const rolesByUser = new Map<string, string[]>();
+  for (const r of roleAssignments) {
+    rolesByUser.set(r.userId, [...(rolesByUser.get(r.userId) ?? []), r.roleName]);
+  }
 
   return c.html(
     <Layout title={t("admin.users.title")} user={user} activeNav="admin">
@@ -164,11 +237,13 @@ adminRoutes.get("/users", guard, async (c) => {
                   </td>
                   <td class="opacity-70">{isLocal ? "–" : u.email}</td>
                   <td>
-                    <RoleBadge role={u.appRole} />
+                    <UserRoleBadges roles={rolesByUser.get(u.id) ?? []} />
                   </td>
                   <td>
                     {u.disabled ? (
                       <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
+                    ) : !isLocal && u.lastLoginAt === null ? (
+                      <span class="badge badge-warning badge-sm">{t("admin.users.statusUnconfirmed")}</span>
                     ) : (
                       <span class="badge badge-success badge-sm">{t("admin.users.statusActive")}</span>
                     )}
@@ -265,8 +340,40 @@ adminRoutes.get("/users", guard, async (c) => {
   );
 });
 
+function RoleCheckboxes({
+  allRoles,
+  permsByRole,
+  checkedIds,
+}: {
+  allRoles: { id: string; name: string; description: string | null }[];
+  permsByRole: Map<string, Permission[]>;
+  checkedIds: Set<string>;
+}) {
+  return (
+    <div class="flex flex-col gap-2">
+      {allRoles.map((r) => (
+        <label key={r.id} class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
+          <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm mt-1" checked={checkedIds.has(r.id)} />
+          <div class="flex flex-col gap-1">
+            <span class="font-medium text-sm">{r.name}</span>
+            {r.description && <span class="text-xs opacity-60">{r.description}</span>}
+            <PermissionBadges permissions={permsByRole.get(r.id) ?? []} />
+          </div>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 // HTMX fragment: create user modal
-adminRoutes.get("/users/new", guard, (c) => {
+adminRoutes.get("/users/new", guard, async (c) => {
+  const [allRoles, permRows] = await Promise.all([
+    db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
+    db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
+  ]);
+  const permsByRole = new Map<string, Permission[]>();
+  for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
+
   return c.html(
     <>
       <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.create")}</h3>
@@ -281,21 +388,7 @@ adminRoutes.get("/users/new", guard, (c) => {
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
-          <div class="flex flex-col gap-2">
-            {([
-              { value: "read", label: t("admin.users.role.read"), desc: t("admin.users.role.readDesc") },
-              { value: "editor", label: t("admin.users.role.editor"), desc: t("admin.users.role.editorDesc") },
-              { value: "admin", label: t("admin.users.role.admin"), desc: t("admin.users.role.adminDesc") },
-            ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => (
-              <label key={value} class="flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
-                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={value === "read"} />
-                <div>
-                  <div class="font-medium text-sm">{label}</div>
-                  <div class="text-xs opacity-60">{desc}</div>
-                </div>
-              </label>
-            ))}
-          </div>
+          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={new Set()} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -318,10 +411,17 @@ adminRoutes.get("/users/new", guard, (c) => {
 // HTMX fragment: edit user modal
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
-  const currentUser = c.get("user");
   const [u] = await db.select().from(users).where(eq(users.id, id));
   if (!u || u.email === "admin@localhost.invalid") return c.html("", 404);
-  const isSelf = u.id === currentUser.id;
+
+  const [allRoles, permRows, assigned] = await Promise.all([
+    db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
+    db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
+    db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id)),
+  ]);
+  const permsByRole = new Map<string, Permission[]>();
+  for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
+  const checkedIds = new Set(assigned.map((a) => a.roleId));
 
   return c.html(
     <>
@@ -342,23 +442,7 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
-          <div class="flex flex-col gap-2">
-            {([
-              { value: "read", label: t("admin.users.role.read"), desc: t("admin.users.role.readDesc") },
-              { value: "editor", label: t("admin.users.role.editor"), desc: t("admin.users.role.editorDesc") },
-              { value: "admin", label: t("admin.users.role.admin"), desc: t("admin.users.role.adminDesc") },
-            ] as { value: string; label: string; desc: string }[]).map(({ value, label, desc }) => {
-              const isDowngrade = isSelf && ROLE_RANK[value] < ROLE_RANK[currentUser.appRole ?? "read"];
-              return (
-              <label key={value} class={`flex items-center gap-3 border border-base-300 rounded-lg px-3 py-2 ${isDowngrade ? "opacity-50 cursor-not-allowed" : "cursor-pointer has-[:checked]:border-primary"}`}>
-                <input type="radio" name="appRole" value={value} class="radio radio-sm" checked={u.appRole === value} disabled={isDowngrade} title={isDowngrade ? t("admin.users.cannotDowngradeRole") : undefined} />
-                <div>
-                  <div class="font-medium text-sm">{label}</div>
-                  <div class="text-xs opacity-60">{desc}</div>
-                </div>
-              </label>
-            );})}
-          </div>
+          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={checkedIds} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -378,19 +462,21 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
   );
 });
 
+async function validRoleIds(requested: string[]): Promise<string[]> {
+  if (requested.length === 0) return [];
+  const found = await db.select({ id: appRoles.id }).from(appRoles).where(inArray(appRoles.id, requested));
+  return found.map((r) => r.id);
+}
+
 // POST /admin/users — create
 adminRoutes.post("/users", guard, async (c) => {
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
-  const appRole = String(body.appRole ?? "read");
+  const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
 
   if (!name || !email) {
     setFlash(c, t("admin.users.flash.missingFields"), "error");
-    return c.redirect("/admin/users");
-  }
-  if (!["read", "editor", "admin"].includes(appRole)) {
-    setFlash(c, t("admin.users.flash.invalidRole"), "error");
     return c.redirect("/admin/users");
   }
 
@@ -404,16 +490,19 @@ adminRoutes.post("/users", guard, async (c) => {
   }
 
   const now = new Date();
+  const id = crypto.randomUUID();
   await db.insert(users).values({
-    id: crypto.randomUUID(),
+    id,
     name,
     email,
-    emailVerified: false,
-    appRole,
+    emailVerified: true,
     disabled: false,
     createdAt: now,
     updatedAt: now,
   });
+  if (roleIds.length > 0) {
+    await db.insert(userAppRoles).values(roleIds.map((roleId) => ({ userId: id, roleId })));
+  }
 
   setFlash(c, t("admin.users.flash.created", { name }), "success");
   return c.redirect("/admin/users");
@@ -425,23 +514,13 @@ adminRoutes.post("/users/:id", guard, async (c) => {
   const [existing] = await db.select().from(users).where(eq(users.id, id));
   if (!existing || existing.email === "admin@localhost.invalid") return c.html("", 404);
 
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
-  const appRole = String(body.appRole ?? "read");
+  const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
 
   if (!name || !email) {
     setFlash(c, t("admin.users.flash.missingFields"), "error");
-    return c.redirect("/admin/users");
-  }
-  if (!["read", "editor", "admin"].includes(appRole)) {
-    setFlash(c, t("admin.users.flash.invalidRole"), "error");
-    return c.redirect("/admin/users");
-  }
-
-  const currentUser = c.get("user");
-  if (id === currentUser.id && ROLE_RANK[appRole] < ROLE_RANK[existing.appRole ?? "read"]) {
-    setFlash(c, t("admin.users.flash.cannotDowngrade"), "error");
     return c.redirect("/admin/users");
   }
 
@@ -459,8 +538,13 @@ adminRoutes.post("/users/:id", guard, async (c) => {
 
   await db
     .update(users)
-    .set({ name, email, appRole, updatedAt: new Date() })
+    .set({ name, email, updatedAt: new Date() })
     .where(eq(users.id, id));
+
+  await db.delete(userAppRoles).where(eq(userAppRoles.userId, id));
+  if (roleIds.length > 0) {
+    await db.insert(userAppRoles).values(roleIds.map((roleId) => ({ userId: id, roleId })));
+  }
 
   setFlash(c, t("admin.users.flash.saved"), "success");
   return c.redirect("/admin/users");
@@ -507,6 +591,340 @@ adminRoutes.post("/users/:id/delete", guard, async (c) => {
   return c.redirect("/admin/users");
 });
 
+// ── /admin/permissions ───────────────────────────────────────────────────────
+adminRoutes.get("/permissions", guard, async (c) => {
+  const user = c.get("user");
+
+  const [roles, permRows, assignmentCounts, warn] = await Promise.all([
+    db.select().from(appRoles).orderBy(asc(appRoles.name)),
+    db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
+    db.select({ roleId: userAppRoles.roleId, cnt: count() }).from(userAppRoles).groupBy(userAppRoles.roleId),
+    backupWarnProps(),
+  ]);
+
+  const permsByRole = new Map<string, Permission[]>();
+  for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
+  const countByRole = new Map(assignmentCounts.map((a) => [a.roleId, a.cnt]));
+
+  return c.html(
+    <Layout title={t("admin.permissions.title")} user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
+      <AdminTabs active="permissions" />
+
+      <div class="max-w-4xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+          {t("admin.permissions.title")}
+        </h1>
+        <button
+          class="btn btn-primary btn-sm"
+          hx-get="/admin/permissions/new"
+          hx-target="#modal-content"
+          hx-swap="innerHTML"
+        >
+          {t("admin.permissions.newRole")}
+        </button>
+      </div>
+
+      <ClickToEditHint />
+      <div class="overflow-x-auto mb-10">
+        <table class="table table-zebra w-full">
+          <thead>
+            <tr>
+              <th>{t("admin.permissions.table.name")}</th>
+              <th>{t("admin.permissions.table.permissions")}</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map((r) => {
+              const assignmentCount = countByRole.get(r.id) ?? 0;
+              const canDelete = !r.isProtected && assignmentCount === 0;
+              return (
+                <tr
+                  key={r.id}
+                  {...(!r.isProtected && {
+                    class: "cursor-pointer hover",
+                    "hx-get": `/admin/permissions/${r.id}/edit`,
+                    "hx-target": "#modal-content",
+                    "hx-swap": "innerHTML",
+                  })}
+                >
+                  <td class="font-medium">
+                    {r.isProtected && (
+                      <span class="mr-1" title={t("admin.roles.systemRole")}>
+                        🔒
+                      </span>
+                    )}
+                    {r.name}
+                  </td>
+                  <td>
+                    <PermissionBadges permissions={permsByRole.get(r.id) ?? []} />
+                  </td>
+                  <td>
+                    <div class="flex gap-2 justify-end">
+                      {canDelete ? (
+                        <>
+                          <button
+                            class="btn btn-ghost btn-xs text-error"
+                            onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`}
+                          >
+                            {t("common.delete")}
+                          </button>
+                          <dialog id={`delete-perm-role-${r.id}`} class="modal" onclick="event.stopPropagation()">
+                            <div class="modal-box">
+                              <h3 class="font-bold text-lg">{t("admin.permissions.confirmDelete.title")}</h3>
+                              <p class="py-2 opacity-70">
+                                {t("admin.permissions.confirmDelete.body", { name: r.name })}
+                              </p>
+                              <div class="modal-action">
+                                <form method="dialog">
+                                  <button class="btn">{t("common.cancel")}</button>
+                                </form>
+                                <form method="post" action={`/admin/permissions/${r.id}/delete`}>
+                                  <button type="submit" class="btn btn-error">
+                                    {t("common.delete")}
+                                  </button>
+                                </form>
+                              </div>
+                            </div>
+                            <form method="dialog" class="modal-backdrop">
+                              <button>{t("common.close")}</button>
+                            </form>
+                          </dialog>
+                        </>
+                      ) : (
+                        <button
+                          class="btn btn-ghost btn-xs text-base-content/30"
+                          disabled
+                          title={
+                            r.isProtected
+                              ? t("admin.permissions.cannotDelete.protected")
+                              : assignmentCount === 1
+                                ? t("admin.permissions.cannotDelete.usedBySingle", { count: assignmentCount })
+                                : t("admin.permissions.cannotDelete.usedByMultiple", { count: assignmentCount })
+                          }
+                        >
+                          {t("common.delete")}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      </div>
+
+      <ModalScaffold />
+    </Layout>
+  );
+});
+
+function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
+  const groups = new Map<string, Permission[]>();
+  for (const p of ASSIGNABLE_PERMISSIONS) {
+    const resource = p.split(":")[0];
+    groups.set(resource, [...(groups.get(resource) ?? []), p]);
+  }
+
+  return (
+    <div class="flex flex-col gap-3">
+      {[...groups].map(([resource, perms]) => (
+        <div key={resource} class="perm-group">
+          <div class="flex items-center justify-between mb-1">
+            <span class="label-text font-semibold">{RESOURCE_LABELS[resource] ?? resource}</span>
+            {perms.length > 1 && (
+              <button
+                type="button"
+                class="btn btn-outline btn-primary btn-xs"
+                onclick="this.closest('.perm-group').querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=true;})"
+              >
+                {t("admin.permissions.modal.selectAllInGroup")}
+              </button>
+            )}
+          </div>
+          <div class="grid grid-cols-1 gap-1">
+            {perms.map((p) => (
+              <label key={p} class="label cursor-pointer justify-start gap-3">
+                <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
+                <span class="label-text">{PERMISSION_LABELS[p]}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// HTMX fragment: new permission-role modal
+adminRoutes.get("/permissions/new", guard, (c) => {
+  return c.html(
+    <>
+      <h3 class="font-bold text-lg mb-4">{t("admin.permissions.modal.create")}</h3>
+      <form method="post" action="/admin/permissions" class="flex flex-col gap-3">
+        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+          <span class="label-text text-right">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
+          <input type="text" name="name" class="input input-bordered w-full" required />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
+          <textarea name="description" rows={2} class="textarea textarea-bordered w-full" />
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
+          <PermissionCheckboxes checked={new Set()} />
+        </div>
+        <div class="modal-action mt-2">
+          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">
+            {t("common.cancel")}
+          </button>
+          <button type="submit" class="btn btn-primary">
+            {t("common.create")}
+          </button>
+        </div>
+      </form>
+      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
+    </>
+  );
+});
+
+// HTMX fragment: edit permission-role modal
+adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
+  const id = c.req.param("id");
+  const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
+  if (!role || role.isProtected) return c.html("", 404);
+
+  const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
+  const hasAssignments = cnt > 0;
+
+  const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
+  const checked = new Set(perms.map((p) => p.permission));
+
+  return c.html(
+    <>
+      <h3 class="font-bold text-lg mb-4">{t("admin.permissions.modal.edit")}</h3>
+      <form method="post" action={`/admin/permissions/${id}`} class="flex flex-col gap-3">
+        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
+          {hasAssignments ? (
+            <div class="flex flex-col gap-1">
+              <input type="text" value={role.name} class="input input-bordered w-full opacity-50" disabled />
+              <span class="label-text-alt opacity-60">
+                {t("admin.permissions.modal.nameLocked")}
+              </span>
+              <input type="hidden" name="name" value={role.name} />
+            </div>
+          ) : (
+            <input type="text" name="name" value={role.name} class="input input-bordered w-full" required />
+          )}
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
+          <textarea name="description" rows={2} class="textarea textarea-bordered w-full">{role.description ?? ""}</textarea>
+        </div>
+        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+          <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
+          <PermissionCheckboxes checked={checked} />
+        </div>
+        <div class="modal-action mt-2">
+          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">
+            {t("common.cancel")}
+          </button>
+          <button type="submit" class="btn btn-primary">
+            {t("common.save")}
+          </button>
+        </div>
+      </form>
+      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
+    </>
+  );
+});
+
+function parsePermissions(body: Record<string, unknown>): Permission[] {
+  const raw = ([] as string[]).concat((body.permissions as string | string[] | undefined) ?? []);
+  return raw.filter((p): p is Permission => (ASSIGNABLE_PERMISSIONS as readonly string[]).includes(p));
+}
+
+// POST /admin/permissions — create
+adminRoutes.post("/permissions", guard, async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  const name = String(body.name ?? "").trim();
+  const description = String(body.description ?? "").trim() || null;
+  const permissions = parsePermissions(body);
+
+  if (!name) {
+    setFlash(c, t("admin.permissions.flash.requiredName"), "error");
+    return c.redirect("/admin/permissions");
+  }
+
+  const id = crypto.randomUUID();
+  await db.insert(appRoles).values({ id, name, description, isProtected: false });
+  if (permissions.length > 0) {
+    await db.insert(appRolePermissions).values(permissions.map((permission) => ({ roleId: id, permission })));
+  }
+
+  setFlash(c, t("admin.permissions.flash.created", { name }), "success");
+  return c.redirect("/admin/permissions");
+});
+
+// POST /admin/permissions/:id — update
+adminRoutes.post("/permissions/:id", guard, async (c) => {
+  const id = c.req.param("id");
+  const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
+  if (!role || role.isProtected) return c.html("", 404);
+
+  const body = await c.req.parseBody({ all: true });
+  const permissions = parsePermissions(body);
+  const description = String(body.description ?? "").trim() || null;
+
+  const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
+
+  const updates: { name?: string; description: string | null } = { description };
+  if (cnt === 0) {
+    const name = String(body.name ?? "").trim();
+    if (!name) {
+      setFlash(c, t("admin.permissions.flash.requiredName"), "error");
+      return c.redirect("/admin/permissions");
+    }
+    updates.name = name;
+  }
+  await db.update(appRoles).set(updates).where(eq(appRoles.id, id));
+
+  await db.delete(appRolePermissions).where(eq(appRolePermissions.roleId, id));
+  if (permissions.length > 0) {
+    await db.insert(appRolePermissions).values(permissions.map((permission) => ({ roleId: id, permission })));
+  }
+
+  setFlash(c, t("admin.permissions.flash.saved"), "success");
+  return c.redirect("/admin/permissions");
+});
+
+// POST /admin/permissions/:id/delete
+adminRoutes.post("/permissions/:id/delete", guard, async (c) => {
+  const id = c.req.param("id");
+  const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
+  if (!role) return c.redirect("/admin/permissions");
+
+  if (role.isProtected) {
+    setFlash(c, t("admin.permissions.flash.protected"), "error");
+    return c.redirect("/admin/permissions");
+  }
+
+  const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
+  if (cnt > 0) {
+    setFlash(c, t("admin.permissions.flash.hasAssignments"), "error");
+    return c.redirect("/admin/permissions");
+  }
+
+  await db.delete(appRoles).where(eq(appRoles.id, id));
+  setFlash(c, t("admin.permissions.flash.deleted", { name: role.name }), "success");
+  return c.redirect("/admin/permissions");
+});
+
 // ── /admin/roles ──────────────────────────────────────────────────────────────
 adminRoutes.get("/roles", guard, async (c) => {
   const user = c.get("user");
@@ -544,10 +962,10 @@ adminRoutes.get("/roles", guard, async (c) => {
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {t("admin.roles.title")}
           </h1>
-          <div class="flex gap-1">
-            <a href="/admin/roles" class={`btn btn-sm${!activeFilter ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
-            <a href="/admin/roles?active=1" class={`btn btn-sm${activeFilter === "1" ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
-            <a href="/admin/roles?active=0" class={`btn btn-sm${activeFilter === "0" ? " btn-primary" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
+          <div class="join">
+            <a href="/admin/roles" class={`btn btn-sm join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
+            <a href="/admin/roles?active=1" class={`btn btn-sm join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
+            <a href="/admin/roles?active=0" class={`btn btn-sm join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
           </div>
         </div>
         <button
@@ -1104,6 +1522,161 @@ adminRoutes.get("/config", guard, async (c) => {
       </div>
     </Layout>
   );
+});
+
+// ── /admin/org-config ────────────────────────────────────────────────────────
+const ORG_CONFIG_FIELDS = [
+  { key: "orgName", type: "text", section: "address" },
+  { key: "orgStreet", type: "text", section: "address" },
+  { key: "orgHouseNumber", type: "text", section: "address" },
+  { key: "orgZip", type: "text", section: "address" },
+  { key: "orgCity", type: "text", section: "address" },
+  { key: "taxExemptionDate", type: "date", section: "tax" },
+  { key: "taxExemptionNumber", type: "text", section: "tax" },
+  { key: "taxOffice", type: "text", section: "tax" },
+  { key: "taxAssessmentPeriodFrom", type: "number", section: "tax" },
+  { key: "taxAssessmentPeriodTo", type: "number", section: "tax" },
+  { key: "charitablePurpose", type: "text", section: "tax" },
+  { key: "iban", type: "text", section: "bank" },
+  { key: "bic", type: "text", section: "bank" },
+  { key: "applicationNotifyEmail", type: "email", section: "applications" },
+] as const;
+
+const ORG_CONFIG_SECTIONS = [
+  { id: "address", title: t("admin.orgConfig.section.address") },
+  { id: "tax", title: t("admin.orgConfig.section.tax") },
+  { id: "bank", title: t("admin.orgConfig.section.bank") },
+  { id: "applications", title: t("admin.orgConfig.section.applications") },
+] as const;
+
+const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
+  orgName: t("admin.orgConfig.field.orgName"),
+  orgStreet: t("admin.orgConfig.field.orgStreet"),
+  orgHouseNumber: t("admin.orgConfig.field.orgHouseNumber"),
+  orgZip: t("admin.orgConfig.field.orgZip"),
+  orgCity: t("admin.orgConfig.field.orgCity"),
+  taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
+  taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
+  taxOffice: t("admin.orgConfig.field.taxOffice"),
+  taxAssessmentPeriodFrom: t("admin.orgConfig.field.taxAssessmentPeriodFrom"),
+  taxAssessmentPeriodTo: t("admin.orgConfig.field.taxAssessmentPeriodTo"),
+  charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
+  iban: t("admin.orgConfig.field.iban"),
+  bic: t("admin.orgConfig.field.bic"),
+  applicationNotifyEmail: t("admin.orgConfig.field.applicationNotifyEmail"),
+};
+
+// iban/bic are normalized (no spaces, uppercase) so consuming features don't
+// each have to re-clean what an admin typed as "DE12 3456 ...".
+function normalizeOrgConfigValue(key: string, value: string): string {
+  if (key === "iban" || key === "bic") return value.replace(/\s+/g, "").toUpperCase();
+  return value;
+}
+
+adminRoutes.get("/org-config", guard, async (c) => {
+  const user = c.get("user");
+  const warn = await backupWarnProps();
+  const rows = await db.select().from(orgConfig);
+  const values = new Map(rows.map((r) => [r.key, r.value]));
+
+  function field(key: (typeof ORG_CONFIG_FIELDS)[number]["key"], type: string) {
+    return (
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">{ORG_CONFIG_FIELD_LABELS[key]}</span>
+        </label>
+        <input type={type} name={key} class="input input-bordered w-full" value={values.get(key) ?? ""} />
+      </div>
+    );
+  }
+
+  return c.html(
+    <Layout title={t("admin.orgConfig.title")} user={user} activeNav="admin">
+      <BackupWarnBanner {...warn} />
+      <AdminTabs active="org-config" />
+      <div class="max-w-4xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+            {t("admin.orgConfig.title")}
+          </h1>
+          <button type="submit" form="org-config-form" class="btn btn-primary btn-sm">
+            {t("common.save")}
+          </button>
+        </div>
+        <form id="org-config-form" method="post" action="/admin/org-config" class="flex flex-col gap-6">
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[0].title}</h2>
+              {field("orgName", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-[3fr_1fr] gap-4">
+                {field("orgStreet", "text")}
+                {field("orgHouseNumber", "text")}
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_3fr] gap-4">
+                {field("orgZip", "text")}
+                {field("orgCity", "text")}
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[1].title}</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4">
+                {field("taxExemptionDate", "date")}
+                {field("taxExemptionNumber", "text")}
+              </div>
+              {field("taxOffice", "text")}
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("taxAssessmentPeriodFrom", "number")}
+                {field("taxAssessmentPeriodTo", "number")}
+              </div>
+              {field("charitablePurpose", "text")}
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[2].title}</h2>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {field("iban", "text")}
+                {field("bic", "text")}
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body gap-4">
+              <h2 class="card-title">{ORG_CONFIG_SECTIONS[3].title}</h2>
+              {field("applicationNotifyEmail", "email")}
+            </div>
+          </div>
+        </form>
+      </div>
+    </Layout>
+  );
+});
+
+adminRoutes.post("/org-config", guard, async (c) => {
+  const body = await c.req.parseBody();
+
+  const periodFrom = String(body.taxAssessmentPeriodFrom ?? "").trim();
+  const periodTo = String(body.taxAssessmentPeriodTo ?? "").trim();
+  if (periodFrom && periodTo && Number(periodTo) < Number(periodFrom)) {
+    setFlash(c, t("admin.orgConfig.flash.invalidPeriod"), "error");
+    return c.redirect("/admin/org-config");
+  }
+
+  for (const field of ORG_CONFIG_FIELDS) {
+    const value = normalizeOrgConfigValue(field.key, String(body[field.key] ?? "").trim());
+    if (value) {
+      await db
+        .insert(orgConfig)
+        .values({ key: field.key, value })
+        .onConflictDoUpdate({ target: orgConfig.key, set: { value } });
+    } else {
+      await db.delete(orgConfig).where(eq(orgConfig.key, field.key));
+    }
+  }
+  setFlash(c, t("admin.orgConfig.flash.saved"), "success");
+  return c.redirect("/admin/org-config");
 });
 
 // ── /admin/backup ──────────────────────────────────────────────────────────────

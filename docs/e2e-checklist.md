@@ -48,3 +48,9 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 - [ ] Funktion anlegen; Anzeigename nach erster Zuweisung read-only
 - [ ] Geschützte Funktionen nicht löschbar
 - [ ] Jubiläumsjahr anlegen / löschen
+
+## Release / Deploy
+
+- [ ] Git-Tag pushen: `git tag v1.2.3 && git push --tags`
+- [ ] CI-Workflow abwarten (~5 min, Multi-Arch Build auf ghcr.io)
+- [ ] In Coolify: `APP_VERSION=1.2.3` setzen → **Redeploy**

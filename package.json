@@ -1,20 +1,29 @@
 {
   "name": "on-duty",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "concurrently \"node --env-file=.env --import=tsx/esm --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
-    "build": "tsc && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
+    "build": "tsup && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=.env --import=tsx/esm scripts/seed.ts",
     "db:setup": "pnpm db:migrate && pnpm db:seed",
     "db:studio": "drizzle-kit studio",
+    "icons:generate": "node scripts/generate-icons.mjs",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "release:patch": "bash scripts/release.sh patch",
+    "release:minor": "bash scripts/release.sh minor",
+    "release:major": "bash scripts/release.sh major"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",
@@ -23,7 +32,9 @@
     "better-auth": "^1.7.5",
     "drizzle-orm": "^0.39.0",
     "hono": "^4.7.0",
+    "n2words": "^6.2.0",
     "node-cron": "^4.6.0",
+    "nodemailer": "^10.0.12",
     "postgres": "^3.4.5",
     "xlsx": "^0.18.5"
   },
@@ -34,10 +45,14 @@
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^22.0.0",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.2",
+    "@vitest/coverage-v8": "^5.0.1",
     "concurrently": "^9.1.0",
     "daisyui": "^5.0.0",
     "drizzle-kit": "^0.30.0",
+    "heroicons": "^2.2.0",
     "tailwindcss": "^4.1.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",
     "vitest": "^5.0.1"

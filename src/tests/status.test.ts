@@ -9,7 +9,8 @@ function age(years: number, daysOffset = 0): string {
   const d = new Date(TODAY);
   d.setFullYear(d.getFullYear() - years);
   d.setDate(d.getDate() + daysOffset);
-  return d.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 const activeRole = { id: "aktives_mitglied", title: "Aktives Mitglied", grantsActiveStatus: true, isProtected: false };

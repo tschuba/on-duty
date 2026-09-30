@@ -1,5 +1,6 @@
 import { boolean, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
+/* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 // Better Auth standard schema — table names match Better Auth's defaults
 export const users = pgTable("user", {
   id: text("id").primaryKey(),
@@ -9,9 +10,8 @@ export const users = pgTable("user", {
   image: text("image"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
-  // App-level role, separate from Better Auth roles
-  appRole: text("app_role").notNull().default("read"), // "read" | "editor" | "admin"
   disabled: boolean("disabled").notNull().default(false),
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 export const sessions = pgTable("session", {
@@ -53,3 +53,4 @@ export const verifications = pgTable("verification", {
   createdAt: timestamp("created_at"),
   updatedAt: timestamp("updated_at"),
 });
+/* v8 ignore stop */

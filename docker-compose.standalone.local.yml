@@ -1,0 +1,27 @@
+services:
+  app:
+    image: on-duty-standalone-local:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Caddy terminiert lokal mit einem selbstsignierten Zertifikat (`tls
+      # internal` statt echtem Let's Encrypt) — ohne diese CA würde der
+      # OIDC-Discovery/Token-Call in src/auth.ts an Zitadel fehlschlagen.
+      NODE_EXTRA_CA_CERTS: /caddy-ca/caddy/pki/authorities/local/root.crt
+    volumes:
+      - caddy_data:/caddy-ca:ro
+
+  caddy:
+    volumes:
+      - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro
+    networks:
+      default:
+        # *.localhost lösen bei App_DOMAIN/ZITADEL_DOMAIN lokal auf Loopback
+        # auf, sowohl im Browser (Host) als auch — ohne diesen Alias — im
+        # app-Container selbst (Loopback zeigt dort auf den Container, nicht
+        # auf Caddy). Der Alias macht die Domains innerhalb des
+        # Compose-Netzwerks stattdessen auf Caddy auflösbar.
+        aliases:
+          - ${APP_DOMAIN}
+          - ${ZITADEL_DOMAIN}
