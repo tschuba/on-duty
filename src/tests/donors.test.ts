@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, donors } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
+import { makePerson } from "./fixtures.js";
 
 // ── DB chain-stub helpers (same philosophy as members.test.ts/admin.test.ts) ──
 
@@ -110,15 +111,6 @@ beforeEach(() => {
   donorLookupResult = [];
   currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
 });
-
-function makePerson(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "p1", firstName: "Anna", lastName: "Bauer",
-    street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt",
-    gender: "female", birthDate: "1985-05-01", phone: "0123", email: "a@b.de",
-    ...overrides,
-  };
-}
 
 // ── Pure functions ───────────────────────────────────────────────────────────
 
