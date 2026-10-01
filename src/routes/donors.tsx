@@ -136,7 +136,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
       <input type="hidden" id="donor-personId" name="personId" value={personId ?? ""} />
       <div id="donor-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
         <DonorPersonFields values={values} errors={errors} />
-        <button type="button" class="btn btn-ghost btn-sm donor-change-selection">
+        <button type="button" class="btn btn-ghost donor-change-selection">
           {t("donations.form.donorChangeSelection")}
         </button>
       </div>
@@ -207,7 +207,7 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
     return c.html(
       <div class="p-2">
         <p class="text-sm opacity-60 mb-1">{t("donations.form.donorNoResults", { query: q })}</p>
-        <button type="button" class="btn btn-ghost btn-xs donor-create-new">{t("donations.form.donorNoMatch")}</button>
+        <button type="button" class="btn btn-ghost btn-sm donor-create-new">{t("donations.form.donorNoMatch")}</button>
       </div>
     );
   }
@@ -231,7 +231,7 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
         </div>
       ))}
       <div class="p-2">
-        <button type="button" class="btn btn-ghost btn-xs donor-create-new">{t("donations.form.donorNoMatch")}</button>
+        <button type="button" class="btn btn-ghost btn-sm donor-create-new">{t("donations.form.donorNoMatch")}</button>
       </div>
     </>
   );
@@ -275,7 +275,7 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
     <Layout title={t("donors.title")} user={user} activeNav="donors">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donors.title")}</h1>
-        <a href="/donors/new" class="btn btn-primary btn-sm">{t("donors.addDonor")}</a>
+        <a href="/donors/new" class="btn btn-primary">{t("donors.addDonor")}</a>
       </div>
 
       <div class="flex flex-wrap gap-3 mb-4 items-center">
@@ -285,12 +285,12 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
             name="search"
             placeholder={t("common.searchPlaceholder")}
             value={search}
-            class="input input-bordered input-sm w-64"
+            class="input input-bordered w-64"
           />
           <input type="hidden" name="sort" value={sort} />
           <input type="hidden" name="sort_dir" value={dir} />
           <input type="hidden" name="pageSize" value={pageSize} />
-          <button type="submit" class="btn btn-sm">{t("common.show")}</button>
+          <button type="submit" class="btn">{t("common.show")}</button>
         </form>
       </div>
 
@@ -319,11 +319,11 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
       <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
         <span class="text-sm opacity-70 mr-auto">{t("donors.table.count", { count: sorted.length })}</span>
         <div class="join">
-          {page > 1 && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: page - 1 })} class="join-item btn btn-sm">«</a>}
+          {page > 1 && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: page - 1 })} class="join-item btn">«</a>}
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <a key={p} href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: p })} class={`join-item btn btn-sm${p === page ? " btn-active" : ""}`}>{p}</a>
+            <a key={p} href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: p })} class={`join-item btn${p === page ? " btn-active" : ""}`}>{p}</a>
           ))}
-          {page < totalPages && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: page + 1 })} class="join-item btn btn-sm">»</a>}
+          {page < totalPages && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: page + 1 })} class="join-item btn">»</a>}
         </div>
       </div>
     </Layout>

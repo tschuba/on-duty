@@ -228,22 +228,22 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
       )}
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>
-        <a href="/donations/new" class="btn btn-primary btn-sm">{t("donations.newDonation")}</a>
+        <a href="/donations/new" class="btn btn-primary">{t("donations.newDonation")}</a>
       </div>
 
       <form method="get" class="flex flex-wrap gap-3 mb-4 items-end">
         <div class="form-control">
-          <input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="input input-bordered input-sm w-64" />
+          <input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="input input-bordered w-64" />
         </div>
         <div class="form-control">
           <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.from")}</span></label>
-          <input type="date" name="from" value={from} class="input input-bordered input-sm" />
+          <input type="date" name="from" value={from} class="input input-bordered" />
         </div>
         <div class="form-control">
           <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.to")}</span></label>
-          <input type="date" name="to" value={to} class="input input-bordered input-sm" />
+          <input type="date" name="to" value={to} class="input input-bordered" />
         </div>
-        <button type="submit" class="btn btn-sm">{t("common.show")}</button>
+        <button type="submit" class="btn">{t("common.show")}</button>
       </form>
 
       <ClickToEditHint />

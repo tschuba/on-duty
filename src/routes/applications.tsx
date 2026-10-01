@@ -103,9 +103,9 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<ApplicationStatus, string> = {
-  open: "badge badge-warning",
-  approved: "badge badge-success",
-  rejected: "badge badge-ghost opacity-60",
+  open: "badge badge-sm badge-warning",
+  approved: "badge badge-sm badge-success",
+  rejected: "badge badge-sm badge-ghost opacity-60",
 };
 
 // Describes the *configured rule* in plain text (e.g. "Aktiv bis 01.09.2026"),
@@ -163,7 +163,7 @@ applicationRoutes.get("/", guard, async (c) => {
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
         <div class="dropdown dropdown-end">
-          <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-circle" title={t("applications.links.title")} aria-label={t("applications.links.title")}>
+          <div tabindex={0} role="button" class="btn btn-ghost btn-circle" title={t("applications.links.title")} aria-label={t("applications.links.title")}>
             <Icon name="link" class="h-5 w-5" />
           </div>
           <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
@@ -303,12 +303,12 @@ applicationRoutes.get("/", guard, async (c) => {
           <a
             key={s}
             href={filterUrl(statusFilter.includes(s) ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
-            class={`btn btn-sm join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
+            class={`btn join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
           >
             {STATUS_LABELS[s]}
           </a>
         ))}
-        <a key="all" href={filterUrl(ALL_STATUSES)} class={`btn btn-sm join-item${allSelected ? " btn-primary btn-outline" : " btn-ghost"}`}>
+        <a key="all" href={filterUrl(ALL_STATUSES)} class={`btn join-item${allSelected ? " btn-primary btn-outline" : " btn-ghost"}`}>
           {t("applications.filter.all")}
         </a>
       </div>

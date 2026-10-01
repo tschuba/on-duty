@@ -115,11 +115,11 @@ const STATUS_LABELS: Record<MemberStatus, string> = {
 };
 
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
-  aktiv: "badge badge-success",
-  passiv: "badge badge-neutral",
-  kinder: "badge badge-warning",
-  jugend: "badge badge-info",
-  archiviert: "badge badge-ghost opacity-60",
+  aktiv: "badge badge-sm badge-success",
+  passiv: "badge badge-sm badge-neutral",
+  kinder: "badge badge-sm badge-warning",
+  jugend: "badge badge-sm badge-info",
+  archiviert: "badge badge-sm badge-ghost opacity-60",
 };
 
 function StatusBadge({ status }: { status: MemberStatus }) {
@@ -273,7 +273,7 @@ export function MembersTable({
         <div class="flex items-center gap-2 text-sm opacity-70">
           <span class="whitespace-nowrap">{t("members.table.pageSize")}</span>
           <select
-            class="select select-bordered select-sm"
+            class="select select-bordered"
             onchange={`
               const v = this.value;
               localStorage.setItem('members_pageSize', v);
@@ -290,17 +290,17 @@ export function MembersTable({
         </div>
 
         <div class="join">
-          {page > 1 && <a href={pageUrl(page - 1)} class="join-item btn btn-sm">«</a>}
+          {page > 1 && <a href={pageUrl(page - 1)} class="join-item btn">«</a>}
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <a
               key={p}
               href={pageUrl(p)}
-              class={`join-item btn btn-sm${p === page ? " btn-active" : ""}`}
+              class={`join-item btn${p === page ? " btn-active" : ""}`}
             >
               {p}
             </a>
           ))}
-          {page < totalPages && <a href={pageUrl(page + 1)} class="join-item btn btn-sm">»</a>}
+          {page < totalPages && <a href={pageUrl(page + 1)} class="join-item btn">»</a>}
         </div>
       </div>
     </div>
@@ -320,7 +320,7 @@ function RoleRow({
     <tr id={`role-row-${index}`}>
       <td>
         <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
-        <select name="assignment_role[]" class="select select-bordered select-sm w-full" required>
+        <select name="assignment_role[]" class="select select-bordered w-full" required>
           <option value="">{t("members.form.roleSelect")}</option>
           {roles.map((r) => (
             <option key={r.id} value={r.id} selected={r.id === assignment?.memberRoleId}>
@@ -333,7 +333,7 @@ function RoleRow({
         <input
           type="date"
           name="assignment_from[]"
-          class="input input-bordered input-sm w-full"
+          class="input input-bordered w-full"
           value={assignment?.from ?? ""}
           required
         />
@@ -342,14 +342,14 @@ function RoleRow({
         <input
           type="date"
           name="assignment_to[]"
-          class="input input-bordered input-sm w-full"
+          class="input input-bordered w-full"
           value={assignment?.to ?? ""}
         />
       </td>
       <td>
         <button
           type="button"
-          class="btn btn-ghost btn-sm text-error"
+          class="btn btn-ghost text-error"
           onclick={`this.closest('tr').remove()`}
         >
           ✕
@@ -482,7 +482,7 @@ function DeleteMemberButton({
   if (blockedBy) {
     return (
       <button
-        class="btn btn-ghost btn-sm text-base-content/30 ml-auto"
+        class="btn btn-ghost text-base-content/30 ml-auto"
         disabled
         title={t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication")}
       >
@@ -494,7 +494,7 @@ function DeleteMemberButton({
   return (
     <>
       <button
-        class="btn btn-ghost btn-sm text-error ml-auto"
+        class="btn btn-ghost text-error ml-auto"
         onclick="document.getElementById('delete-member-modal').showModal()"
       >
         {t("common.delete")}
@@ -596,14 +596,14 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
 
   return (
     <details id="role-filter-dropdown" class="dropdown" ontoggle="if(!this.open)applyRoleFilter()">
-      <summary class="btn btn-sm btn-ghost m-0">
+      <summary class="btn btn-ghost m-0">
         {label} ▾
       </summary>
       <div class="dropdown-content z-10 bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 mt-1">
         <input
           type="text"
           placeholder={t("common.searchPlaceholder")}
-          class="input input-bordered input-xs w-full mb-2"
+          class="input input-bordered w-full mb-2"
           oninput="var v=this.value.toLowerCase();document.querySelectorAll('#role-filter-list li').forEach(function(li){li.hidden=!li.dataset.title.includes(v)})"
         />
         <ul id="role-filter-list" class="space-y-0.5 max-h-64 overflow-y-auto">
@@ -627,14 +627,14 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
         </ul>
         <div class="flex gap-1 mt-2">
           <button
-            class="btn btn-xs btn-primary flex-1"
+            class="btn btn-sm btn-primary flex-1"
             onclick="document.getElementById('role-filter-dropdown').removeAttribute('open')"
           >
             {t("common.apply")}
           </button>
           {roleFilter.length > 0 && (
             <button
-              class="btn btn-xs btn-ghost"
+              class="btn btn-sm btn-ghost"
               onclick="document.querySelectorAll('#role-filter-list input[type=checkbox]').forEach(function(cb){cb.checked=false});document.getElementById('role-filter-dropdown').removeAttribute('open')"
             >
               {t("common.reset")}
@@ -751,11 +751,11 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("members.title")}</h1>
         <div class="flex items-center gap-2">
-          <button class="btn btn-sm btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
+          <button class="btn btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
             {t("common.export")}
           </button>
           {isEditor && (
-            <a href="/members/new" class="btn btn-primary btn-sm">{t("members.addMember")}</a>
+            <a href="/members/new" class="btn btn-primary">{t("members.addMember")}</a>
           )}
         </div>
       </div>
@@ -769,7 +769,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           name="search"
           placeholder={t("common.searchPlaceholder")}
           value={search}
-          class="input input-bordered input-sm w-64"
+          class="input input-bordered w-64"
           hx-get="/members"
           hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#members-results"
@@ -781,7 +781,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
             <a
               key={s}
               href={filterToggleUrl(s)}
-              class={`btn btn-sm join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
+              class={`btn join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
             >
               {STATUS_LABELS[s]}
             </a>
@@ -889,7 +889,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         </div>
         <button
           type="button"
-          class="btn btn-ghost btn-sm"
+          class="btn btn-ghost"
           hx-get="/members/role-row"
           hx-target="#role-rows"
           hx-swap="beforeend"
@@ -1027,7 +1027,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm"
+          <button type="button" class="btn btn-ghost"
             hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
             {t("members.form.addAssignment")}
           </button>
@@ -1292,7 +1292,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             </tbody>
           </table>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm"
+        <button type="button" class="btn btn-ghost"
           hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
           {t("members.form.addAssignment")}
         </button>
@@ -1377,7 +1377,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm"
+          <button type="button" class="btn btn-ghost"
             hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
             {t("members.form.addAssignment")}
           </button>
@@ -1448,7 +1448,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm"
+          <button type="button" class="btn btn-ghost"
             hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
             {t("members.form.addAssignment")}
           </button>
