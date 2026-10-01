@@ -15,6 +15,7 @@ import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
 import { inventoryRoutes } from "./routes/inventory.js";
+import { lendingRoutes } from "./routes/lending.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -67,7 +68,8 @@ app.route("/anniversaries", anniversaryRoutes);
 app.route("/donations", donationRoutes);
 app.route("/donors", donorRoutes);
 
-// Inventory routes
+// Inventory routes — lending mounted first: more specific prefix before /inventory's own :id routes.
+app.route("/inventory/lending", lendingRoutes);
 app.route("/inventory", inventoryRoutes);
 
 // Admin routes

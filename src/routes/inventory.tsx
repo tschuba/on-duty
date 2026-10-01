@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemAssignments, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -10,6 +10,7 @@ import { formatDate } from "../lib/format.js";
 import { trimmed, parseTags } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
+import { countOverdueLoans } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -35,10 +36,10 @@ const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean }[] 
   { category: "ppe", batchCapable: true },
   { category: "other", batchCapable: true },
 ];
-const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
+export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
 const BATCH_CAPABLE_CATEGORIES = new Set(CATEGORY_CONFIG.filter((c) => c.batchCapable).map((c) => c.category));
 
-const CATEGORY_LABELS: Record<InventoryCategory, string> = {
+export const CATEGORY_LABELS: Record<InventoryCategory, string> = {
   vehicle: t("inventory.category.vehicle"),
   scba: t("inventory.category.scba"),
   equipment: t("inventory.category.equipment"),
@@ -59,7 +60,12 @@ const CATEGORY_BADGE: Record<InventoryCategory, string> = {
 // Only members who can actually carry PSA get offered in the assignment picker.
 const ASSIGNABLE_MEMBER_STATUSES = new Set(["aktiv", "jugend"]);
 
-function InventoryTabs({ active, overdueCount }: { active: "stock" | "inspections"; overdueCount: number }) {
+export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLending }: {
+  active: "stock" | "inspections" | "lending" | "lending-overview";
+  overdueCount: number;
+  overdueLoanCount?: number;
+  showLending?: boolean;
+}) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/inventory" role="tab" class={`tab${active === "stock" ? " tab-active" : ""}`}>
@@ -67,13 +73,24 @@ function InventoryTabs({ active, overdueCount }: { active: "stock" | "inspection
       </a>
       <a href="/inventory/inspections" role="tab" class={`tab${active === "inspections" ? " tab-active" : ""}`}>
         {t("inventory.tabs.inspections")}
-        {overdueCount > 0 && <span class="badge badge-sm badge-error ml-1">{overdueCount}</span>}
+        {overdueCount > 0 && <span class="badge badge-sm badge-primary ml-1">{overdueCount}</span>}
       </a>
+      {showLending && (
+        <a href="/inventory/lending" role="tab" class={`tab${active === "lending" ? " tab-active" : ""}`}>
+          {t("inventory.tabs.lending")}
+          {(overdueLoanCount ?? 0) > 0 && <span class="badge badge-sm badge-primary ml-1">{overdueLoanCount}</span>}
+        </a>
+      )}
+      {showLending && (
+        <a href="/inventory/lending/overview" role="tab" class={`tab${active === "lending-overview" ? " tab-active" : ""}`}>
+          {t("inventory.tabs.lendingOverview")}
+        </a>
+      )}
     </div>
   );
 }
 
-function CategoryBadge({ category }: { category: InventoryCategory }) {
+export function CategoryBadge({ category }: { category: InventoryCategory }) {
   return <span class={`${CATEGORY_BADGE[category]} badge-sm`}>{CATEGORY_LABELS[category]}</span>;
 }
 
@@ -81,7 +98,7 @@ function CategoryBadge({ category }: { category: InventoryCategory }) {
 
 type AssignmentInput = { memberId: string; name: string; quantity: number };
 
-type InventoryFieldValues = {
+export type InventoryFieldValues = {
   name: string;
   category: string;
   purchaseDate: string;
@@ -102,7 +119,7 @@ type InventoryFieldValues = {
   assignments: string;
 };
 
-function parseInventoryFields(body: Record<string, any>): { values: InventoryFieldValues; errors: Record<string, string> } {
+export function parseInventoryFields(body: Record<string, any>): { values: InventoryFieldValues; errors: Record<string, string> } {
   const values: InventoryFieldValues = {
     name: trimmed(body, "name"),
     category: trimmed(body, "category"),
@@ -179,7 +196,7 @@ function resolveAssignments(
 // mode — anything else submitted for another category is dropped server-side,
 // not just hidden client-side (see backlog doc's "nur App-Validierung" note). In
 // batch mode (quantity > 1) any BATCH_CAPABLE_CATEGORIES category may assign.
-function toInsertValues(values: InventoryFieldValues) {
+export function toInsertValues(values: InventoryFieldValues) {
   const category = values.category as InventoryCategory;
   const quantity = Math.max(1, Math.round(Number(values.quantity)) || 1);
   const isBatch = BATCH_CAPABLE_CATEGORIES.has(category) && quantity > 1;
@@ -202,7 +219,7 @@ function toInsertValues(values: InventoryFieldValues) {
 
 // ── Tag input (chip UI over a comma-joined hidden field) ────────────────────
 
-function TagInput({ tags }: { tags?: string[] }) {
+export function TagInput({ tags }: { tags?: string[] }) {
   const list = tags ?? [];
   return (
     <div class="form-control">
@@ -415,7 +432,7 @@ const CATEGORY_TOGGLE_SCRIPT = `
   updateInventoryFormVisibility();
 `;
 
-function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
+export function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
   values?: Partial<InventoryFieldValues>;
   errors?: Record<string, string>;
   assignedMemberName?: string;
@@ -589,7 +606,12 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   return c.html(
     <Layout title={t("inventory.title")} user={user} activeNav="inventory">
-      <InventoryTabs active="stock" overdueCount={await countOverdueInspectionItems()} />
+      <InventoryTabs
+        active="stock"
+        overdueCount={await countOverdueInspectionItems()}
+        overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
+        showLending={user.permissions.has("lending:read")}
+      />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("inventory.title")}</h1>
         {user.permissions.has("inventory:manage") && <a href="/inventory/new" class="btn btn-primary">{t("inventory.newItem")}</a>}
@@ -806,6 +828,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
 
   const assignmentList = assignmentDisplayList(item);
   const isBatch = item.quantity > 1;
+  const lendingItem = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, item.id) });
 
   const values: Partial<InventoryFieldValues> & { tagsList?: string[] } = {
     name: item.name,
@@ -826,6 +849,12 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
 
   const assignedTotal = assignmentList.reduce((sum, a) => sum + a.quantity, 0);
   const availableToRetire = item.quantity - item.retiredQuantity - assignedTotal;
+
+  const enableLendingAction = !lendingItem && !item.retiredAt && user.permissions.has("lending:manage") && (
+    <form method="post" action={`/inventory/${item.id}/enable-lending`}>
+      <button type="submit" class="btn btn-outline">{t("inventory.enableLending.button")}</button>
+    </form>
+  );
 
   const retireAction = item.retiredAt ? (
     <form method="post" action={`/inventory/${item.id}/reactivate`} onsubmit={`return confirm('${t("inventory.reactivate.confirm")}')`}>
@@ -878,7 +907,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
         values={values}
         assignedMemberName={!isBatch ? assignmentList[0]?.name : undefined}
         assignments={isBatch ? assignmentList : []}
-        extraActions={retireAction}
+        extraActions={<>{enableLendingAction}{retireAction}</>}
       />
     </Layout>
   );
@@ -966,6 +995,23 @@ inventoryRoutes.post("/:id/reactivate", requireAuth("inventory:manage"), async (
   return c.redirect(`/inventory/${id}/edit`);
 });
 
+// POST /inventory/:id/enable-lending — Markiert ein bestehendes Inventar-Item als
+// verleihbar (inventory_items ist weiter die einzige Bestandswahrheit, siehe
+// db/schema/lending.ts). individualTracking aus quantity abgeleitet (gleiches
+// isBatch-Muster wie beim Retire-Formular), kein Formular nötig.
+inventoryRoutes.post("/:id/enable-lending", requireAuth(["inventory:manage", "lending:manage"]), async (c) => {
+  const id = c.req.param("id");
+  const item = await fetchItem(id);
+  if (!item || item.retiredAt) return c.notFound();
+
+  const existing = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, id) });
+  if (existing) return c.redirect(`/inventory/lending/${existing.id}/loans`);
+
+  const [lendingItem] = await db.insert(lendingItems).values({ inventoryItemId: id, individualTracking: item.quantity <= 1 }).returning();
+  setFlash(c, t("lending.flash.created"), "success");
+  return c.redirect(`/inventory/lending/${lendingItem.id}/loans`);
+});
+
 // GET /inventory/inspections — Prüffristen-Übersicht, filter-UX identisch zu /anniversaries.
 inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
@@ -998,7 +1044,12 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
   return c.html(
     <Layout title={t("inventory.inspections.title")} user={user} activeNav="inventory">
-      <InventoryTabs active="inspections" overdueCount={await countOverdueInspectionItems()} />
+      <InventoryTabs
+        active="inspections"
+        overdueCount={await countOverdueInspectionItems()}
+        overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
+        showLending={user.permissions.has("lending:read")}
+      />
       <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{t("inventory.inspections.title")}</h1>
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -1059,13 +1110,16 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 });
 
 // GET /inventory/search-members — debounced live search for the PSA assignment
-// picker. Own route (not /members' search) so the aktiv/jugend filter is
-// enforced by the query itself. Status is derived app-side (not stored), so
-// every candidate's assignments are loaded to compute it — same approach as
-// anniversaries.tsx.
-inventoryRoutes.get("/search-members", requireAuth("inventory:manage"), async (c) => {
+// picker and (scope=all) the Verleih-Ausleiher-Picker. Own route (not /members'
+// search) so the aktiv/jugend filter is enforced by the query itself. Status is
+// derived app-side (not stored), so every candidate's assignments are loaded to
+// compute it — same approach as anniversaries.tsx.
+// scope=active (default, PSA-Picker): nur aktiv/jugend. scope=all (Verleih-
+// Picker): ungefiltert — auch Passive/Ehemalige können etwas ausleihen.
+inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending:manage"]), async (c) => {
   const q = (c.req.query("q") ?? "").trim();
   if (q.length < 2) return c.html("");
+  const scope = c.req.query("scope") === "all" ? "all" : "active";
 
   // Status is derived app-side (not stored), so every candidate's assignments are
   // loaded to compute it — same approach as anniversaries.tsx. Member counts stay
@@ -1080,7 +1134,7 @@ inventoryRoutes.get("/search-members", requireAuth("inventory:manage"), async (c
       lastName: m.person.lastName,
       status: deriveMemberStatus(m, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
     }))
-    .filter((m) => ASSIGNABLE_MEMBER_STATUSES.has(m.status))
+    .filter((m) => scope === "all" || ASSIGNABLE_MEMBER_STATUSES.has(m.status))
     .sort((a, b) => a.lastName.localeCompare(b.lastName, "de"))
     .slice(0, 10);
 

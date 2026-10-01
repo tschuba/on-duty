@@ -20,7 +20,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Vollzugriff inkl. Benutzerverwaltung und Systemkonfiguration",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "system:admin", "donations:record", "donations:issue-receipts", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage"],
+    permissions: ["members:read", "members:write", "members:delete", "system:admin", "donations:record", "donations:issue-receipts", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage", "lending:read", "lending:manage"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
@@ -41,14 +41,14 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Vorstand",
     description: "Kann Spenden erfassen, Zuwendungsbestätigungen ausstellen und Anträge prüfen",
     isProtected: true,
-    permissions: ["donations:record", "donations:issue-receipts", "applications:review", "inventory:read"],
+    permissions: ["donations:record", "donations:issue-receipts", "applications:review", "inventory:read", "lending:read"],
   },
   {
     id: "c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",
     name: "Führung",
     description: "Kann das Inventar vollständig verwalten",
     isProtected: true,
-    permissions: ["inventory:read", "inventory:manage"],
+    permissions: ["inventory:read", "inventory:manage", "lending:read", "lending:manage"],
   },
 ];
 
