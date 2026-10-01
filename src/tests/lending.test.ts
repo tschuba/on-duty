@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { effectiveRange, rangesOverlap } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, loanStatus } from "../lib/lending.js";
 
 describe("effectiveRange", () => {
   it("prefers the actual date over the planned date per edge", () => {
@@ -28,5 +28,25 @@ describe("rangesOverlap", () => {
 
   it("detects non-overlapping ranges", () => {
     expect(rangesOverlap({ from: "2026-01-01", to: "2026-01-05" }, { from: "2026-01-06", to: "2026-01-10" })).toBe(false);
+  });
+});
+
+describe("loanStatus", () => {
+  const today = "2026-06-15";
+
+  it("is returned once returnedAt is set", () => {
+    expect(loanStatus({ plannedFrom: "2026-06-01", plannedTo: "2026-06-10", pickedUpAt: "2026-06-01", returnedAt: "2026-06-05" }, today)).toBe("returned");
+  });
+
+  it("is overdue when plannedTo is past and not returned", () => {
+    expect(loanStatus({ plannedFrom: "2026-06-01", plannedTo: "2026-06-10", pickedUpAt: "2026-06-01", returnedAt: null }, today)).toBe("overdue");
+  });
+
+  it("is active once picked up and not yet overdue", () => {
+    expect(loanStatus({ plannedFrom: "2026-06-10", plannedTo: "2026-06-20", pickedUpAt: "2026-06-10", returnedAt: null }, today)).toBe("active");
+  });
+
+  it("is planned when not yet picked up", () => {
+    expect(loanStatus({ plannedFrom: "2026-06-20", plannedTo: "2026-06-25", pickedUpAt: null, returnedAt: null }, today)).toBe("planned");
   });
 });

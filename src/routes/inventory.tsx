@@ -61,7 +61,7 @@ const CATEGORY_BADGE: Record<InventoryCategory, string> = {
 const ASSIGNABLE_MEMBER_STATUSES = new Set(["aktiv", "jugend"]);
 
 export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLending }: {
-  active: "stock" | "inspections" | "lending";
+  active: "stock" | "inspections" | "lending" | "lending-overview";
   overdueCount: number;
   overdueLoanCount?: number;
   showLending?: boolean;
@@ -73,12 +73,17 @@ export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLend
       </a>
       <a href="/inventory/inspections" role="tab" class={`tab${active === "inspections" ? " tab-active" : ""}`}>
         {t("inventory.tabs.inspections")}
-        {overdueCount > 0 && <span class="badge badge-sm badge-error ml-1">{overdueCount}</span>}
+        {overdueCount > 0 && <span class="badge badge-sm badge-primary ml-1">{overdueCount}</span>}
       </a>
       {showLending && (
         <a href="/inventory/lending" role="tab" class={`tab${active === "lending" ? " tab-active" : ""}`}>
           {t("inventory.tabs.lending")}
-          {(overdueLoanCount ?? 0) > 0 && <span class="badge badge-sm badge-error ml-1">{overdueLoanCount}</span>}
+          {(overdueLoanCount ?? 0) > 0 && <span class="badge badge-sm badge-primary ml-1">{overdueLoanCount}</span>}
+        </a>
+      )}
+      {showLending && (
+        <a href="/inventory/lending/overview" role="tab" class={`tab${active === "lending-overview" ? " tab-active" : ""}`}>
+          {t("inventory.tabs.lendingOverview")}
         </a>
       )}
     </div>

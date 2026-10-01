@@ -27,3 +27,13 @@ export function effectiveRange(loan: LoanRange): { from: string; to: string } | 
 export function rangesOverlap(a: { from: string; to: string }, b: { from: string; to: string }): boolean {
   return a.from <= b.to && b.from <= a.to;
 }
+
+export type LoanStatus = "planned" | "active" | "overdue" | "returned";
+
+// Gleiche Regel wie der inline `overdue`-Badge in routes/lending.tsx
+// (GET /:id/loans) — hier benannt für die Vorgangsübersicht.
+export function loanStatus(l: LoanRange, today: string): LoanStatus {
+  if (l.returnedAt) return "returned";
+  if (l.plannedTo && l.plannedTo < today) return "overdue";
+  return l.pickedUpAt ? "active" : "planned";
+}
