@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItems } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
@@ -81,6 +81,14 @@ async function findPersonBlockingLink(personId: string): Promise<PersonBlockingL
   const [guardianRow] = await db.select({ id: applicationGuardians.id }).from(applicationGuardians).where(eq(applicationGuardians.personId, personId));
   if (guardianRow) return "application";
   return null;
+}
+
+// Not a blocking link (assignedMemberId uses onDelete: set null, deletion proceeds
+// and PSA items are freed automatically) — just an informational count for the
+// delete confirmation.
+async function countAssignedInventoryItems(memberId: string): Promise<number> {
+  const rows = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(eq(inventoryItems.assignedMemberId, memberId));
+  return rows.length;
 }
 
 // ── Sort / filter helpers ────────────────────────────────────────────────────
@@ -475,9 +483,11 @@ function ReactivationModal({
 function DeleteMemberButton({
   member,
   blockedBy,
+  assignedItemsCount,
 }: {
   member: Pick<MemberWithStatus, "id" | "firstName" | "lastName">;
   blockedBy: PersonBlockingLink;
+  assignedItemsCount: number;
 }) {
   if (blockedBy) {
     return (
@@ -505,6 +515,9 @@ function DeleteMemberButton({
           <p class="py-2 opacity-70">
             {t("members.delete.confirmBody", { name: `${member.firstName} ${member.lastName}` })}
           </p>
+          {assignedItemsCount > 0 && (
+            <p class="alert alert-info text-sm">{t("members.delete.hintInventory", { count: assignedItemsCount })}</p>
+          )}
           <div class="modal-action">
             <form method="dialog">
               <button class="btn">{t("common.cancel")}</button>
@@ -1223,6 +1236,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 
   const canDelete = user.permissions.has("members:delete");
   const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
+  const assignedItemsCount = canDelete ? await countAssignedInventoryItems(m.id) : 0;
 
   if (!isEditor) {
     // Read-only view
@@ -1236,7 +1250,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
               {m.firstName} {m.lastName}
             </h1>
             <StatusBadge status={m.status} />
-            {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} />}
+            {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
@@ -1275,7 +1289,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             {m.firstName} {m.lastName}
           </h1>
           <StatusBadge status={m.status} />
-          {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} />}
+          {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
