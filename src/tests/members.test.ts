@@ -678,6 +678,16 @@ describe("GET /:id", () => {
     expect(html).toContain("/members/m1/delete");
   });
 
+  it("shows an inventory hint in the delete modal when the member has assigned items", async () => {
+    currentUser = { id: "u1", permissions: new Set(["members:write", "members:delete"]), disabled: false };
+    findFirstResult = memberWithAssignments();
+    rolesFixture = [roleAktiv];
+    inventoryAssignmentRowsFixture = [{ quantity: 2 }, { quantity: 1 }];
+    const res = await memberRoutes.request("/m1");
+    const html = await res.text();
+    expect(html).toContain(t("members.delete.hintInventory", { count: 3 }));
+  });
+
   it("shows a disabled delete button with a reason when the person still has a donor profile", async () => {
     currentUser = { id: "u1", permissions: new Set(["members:write", "members:delete"]), disabled: false };
     findFirstResult = memberWithAssignments();

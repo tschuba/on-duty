@@ -129,6 +129,17 @@ describe("GET /", () => {
     expect(html).toContain("Jacke");
     expect(html).not.toContain("Fahrzeugname");
   });
+
+  it("filters by tag (item must carry every selected tag)", async () => {
+    itemsFindManyResult = [
+      makeItem({ id: "a", name: "Mit Tag", tags: [{ tag: "gross" }] }),
+      makeItem({ id: "b", name: "Ohne Tag", tags: [] }),
+    ];
+    const res = await inventoryRoutes.request("/?tag=gross");
+    const html = await res.text();
+    expect(html).toContain("Mit Tag");
+    expect(html).not.toContain("Ohne Tag");
+  });
 });
 
 // ── POST / (create) ──────────────────────────────────────────────────────────
@@ -165,6 +176,29 @@ describe("POST /", () => {
     });
     expect(res.status).toBe(302);
     expect(insertCalls.some((c) => c.table === inventoryItemAssignments)).toBe(false);
+  });
+
+  it("assigns a single ppe item to a member", async () => {
+    const res = await inventoryRoutes.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ name: "Jacke", category: "ppe", quantity: "1", assignedMemberId: "m1" }),
+    });
+    expect(res.status).toBe(302);
+    expect(insertCalls.find((c) => c.table === inventoryItemAssignments)?.values).toEqual([{ inventoryItemId: "new-id", memberId: "m1", quantity: 1 }]);
+  });
+
+  it("rejects a batch assignment total exceeding quantity", async () => {
+    const res = await inventoryRoutes.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({
+        name: "Helme", category: "equipment", quantity: "3",
+        assignments: JSON.stringify([{ memberId: "m1", quantity: 2 }, { memberId: "m2", quantity: 2 }]),
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.length).toBe(0);
   });
 });
 
