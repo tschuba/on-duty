@@ -501,7 +501,11 @@ describe("GET /role-row", () => {
   it("renders one role-row fragment", async () => {
     rolesFixture = [roleAktiv];
     const res = await memberRoutes.request("/role-row?index=2");
-    expect(await res.text()).toContain("role-row-2");
+    const html = await res.text();
+    expect(html).toContain("role-row-2");
+    expect(html).toContain(`data-id="${roleAktiv.id}"`);
+    expect(html).toContain(`data-title="${roleAktiv.title}"`);
+    expect(html).not.toContain("<select");
   });
 });
 
@@ -518,6 +522,33 @@ describe("POST /new", () => {
       body: formBody({
         lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01",
         "assignment_role[]": roleAktiv.id, "assignment_from[]": "", "assignment_to[]": "",
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a role assignment missing its role", async () => {
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01",
+        "assignment_role[]": "", "assignment_from[]": "2020-01-01", "assignment_to[]": "",
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("rejects when an earlier row is incomplete even if a later row is valid (index alignment)", async () => {
+    rolesFixture = [roleAktiv];
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01",
+        "assignment_role[]": ["", roleAktiv.id],
+        "assignment_from[]": ["2020-01-01", "2021-01-01"],
+        "assignment_to[]": ["", ""],
       }),
     });
     expect(res.status).toBe(422);
@@ -809,6 +840,20 @@ describe("POST /:id", () => {
     expect(updateCalls.some((c) => c.table === persons)).toBe(true);
     expect(updateCalls.some((c) => c.table === members)).toBe(true);
     expect(updateCalls.some((c) => c.table === memberRoleAssignments && c.set.autoClosed === true)).toBe(true);
+  });
+
+  it("rejects a role assignment missing its role on edit (same as create)", async () => {
+    findFirstResult = memberWithAssignments({}, []);
+    const res = await memberRoutes.request("/m1", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01",
+        "assignment_role[]": "", "assignment_from[]": "2024-01-01", "assignment_to[]": "",
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(false);
+    expect(updateCalls.some((c) => c.table === memberRoleAssignments)).toBe(false);
   });
 
   it("deletes removed assignments and inserts new ones on reconciliation", async () => {
