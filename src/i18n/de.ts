@@ -595,6 +595,7 @@ export const de = {
   "inventory.flash.saved": "Gegenstand gespeichert.",
   "inventory.flash.retired": "Gegenstand ausgemustert.",
   "inventory.flash.reactivated": "Ausmusterung rückgängig gemacht.",
+  "inventory.enableLending.button": "Als Verleih-Gegenstand freigeben",
   "inventory.retire.button": "Ausmustern",
   "inventory.retire.confirmTitle": "Gegenstand ausmustern?",
   "inventory.retire.confirmBody": "{name} wird als ausgemustert markiert und aus den aktiven Listen/Prüffristen ausgeblendet. Die Daten bleiben erhalten und die Aktion ist jederzeit rückgängig zu machen.",

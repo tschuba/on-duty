@@ -8,6 +8,7 @@ process.env.YOUTH_AGE_LIMIT = "18";
 let itemsFindManyResult: any[] = [];
 let itemsFindFirstResult: any = undefined;
 let membersFindManyResult: any[] = [];
+let lendingItemFindFirstResult: any = undefined;
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -54,6 +55,9 @@ vi.mock("../db/index.js", () => ({
       members: {
         findMany: vi.fn(() => Promise.resolve(membersFindManyResult)),
       },
+      lendingItems: {
+        findFirst: vi.fn(() => Promise.resolve(lendingItemFindFirstResult)),
+      },
     },
     insert,
     update,
@@ -81,6 +85,7 @@ beforeEach(() => {
   itemsFindManyResult = [];
   itemsFindFirstResult = undefined;
   membersFindManyResult = [];
+  lendingItemFindFirstResult = undefined;
   currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage"]), disabled: false };
 });
 
@@ -222,6 +227,39 @@ describe("POST /:id/retire and /:id/reactivate", () => {
     const res = await inventoryRoutes.request("/item1/reactivate", { method: "POST" });
     expect(res.status).toBe(302);
     expect(updateCalls[0].set).toEqual({ retiredAt: null, retiredReason: null, retiredQuantity: 0 });
+  });
+});
+
+// ── Enable lending ──────────────────────────────────────────────────────────
+
+describe("POST /:id/enable-lending", () => {
+  it("creates a lending_items row with individualTracking from quantity and redirects to its loans page", async () => {
+    itemsFindFirstResult = makeItem({ quantity: 1 });
+    const res = await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/inventory/lending/new-id/loans");
+    expect(insertCalls[0].values).toEqual({ inventoryItemId: "item1", individualTracking: true });
+  });
+
+  it("sets individualTracking false for batch items (quantity > 1)", async () => {
+    itemsFindFirstResult = makeItem({ quantity: 5 });
+    await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
+    expect(insertCalls[0].values.individualTracking).toBe(false);
+  });
+
+  it("redirects to the existing lending item without inserting again", async () => {
+    itemsFindFirstResult = makeItem();
+    lendingItemFindFirstResult = { id: "existing-id" };
+    const res = await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/inventory/lending/existing-id/loans");
+    expect(insertCalls.length).toBe(0);
+  });
+
+  it("404s for a retired item", async () => {
+    itemsFindFirstResult = makeItem({ retiredAt: "2024-01-01" });
+    const res = await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
+    expect(res.status).toBe(404);
   });
 });
 

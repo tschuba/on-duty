@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemAssignments, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -823,6 +823,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
 
   const assignmentList = assignmentDisplayList(item);
   const isBatch = item.quantity > 1;
+  const lendingItem = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, item.id) });
 
   const values: Partial<InventoryFieldValues> & { tagsList?: string[] } = {
     name: item.name,
@@ -843,6 +844,12 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
 
   const assignedTotal = assignmentList.reduce((sum, a) => sum + a.quantity, 0);
   const availableToRetire = item.quantity - item.retiredQuantity - assignedTotal;
+
+  const enableLendingAction = !lendingItem && !item.retiredAt && user.permissions.has("lending:manage") && (
+    <form method="post" action={`/inventory/${item.id}/enable-lending`}>
+      <button type="submit" class="btn btn-outline">{t("inventory.enableLending.button")}</button>
+    </form>
+  );
 
   const retireAction = item.retiredAt ? (
     <form method="post" action={`/inventory/${item.id}/reactivate`} onsubmit={`return confirm('${t("inventory.reactivate.confirm")}')`}>
@@ -895,7 +902,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
         values={values}
         assignedMemberName={!isBatch ? assignmentList[0]?.name : undefined}
         assignments={isBatch ? assignmentList : []}
-        extraActions={retireAction}
+        extraActions={<>{enableLendingAction}{retireAction}</>}
       />
     </Layout>
   );
@@ -981,6 +988,23 @@ inventoryRoutes.post("/:id/reactivate", requireAuth("inventory:manage"), async (
   await db.update(inventoryItems).set({ retiredAt: null, retiredReason: null, retiredQuantity: 0 }).where(eq(inventoryItems.id, id));
   setFlash(c, t("inventory.flash.reactivated"), "success");
   return c.redirect(`/inventory/${id}/edit`);
+});
+
+// POST /inventory/:id/enable-lending — Markiert ein bestehendes Inventar-Item als
+// verleihbar (inventory_items ist weiter die einzige Bestandswahrheit, siehe
+// db/schema/lending.ts). individualTracking aus quantity abgeleitet (gleiches
+// isBatch-Muster wie beim Retire-Formular), kein Formular nötig.
+inventoryRoutes.post("/:id/enable-lending", requireAuth(["inventory:manage", "lending:manage"]), async (c) => {
+  const id = c.req.param("id");
+  const item = await fetchItem(id);
+  if (!item || item.retiredAt) return c.notFound();
+
+  const existing = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, id) });
+  if (existing) return c.redirect(`/inventory/lending/${existing.id}/loans`);
+
+  const [lendingItem] = await db.insert(lendingItems).values({ inventoryItemId: id, individualTracking: item.quantity <= 1 }).returning();
+  setFlash(c, t("lending.flash.created"), "success");
+  return c.redirect(`/inventory/lending/${lendingItem.id}/loans`);
 });
 
 // GET /inventory/inspections — Prüffristen-Übersicht, filter-UX identisch zu /anniversaries.
