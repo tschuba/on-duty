@@ -331,6 +331,7 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
       <div id="batch-assign-search">
         <input
           type="text"
+          name="q"
           autocomplete="off"
           placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
           class="input input-bordered w-full"
