@@ -6,6 +6,7 @@ import { donors, donations } from "./donations";
 import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
 import { inventoryItems, inventoryItemTags, inventoryItemAssignments } from "./inventory";
+import { lendingItems, lendingLoans } from "./lending";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
 export const personsRelations = relations(persons, ({ one, many }) => ({
@@ -46,6 +47,17 @@ export const membersRelations = relations(members, ({ one, many }) => ({
 export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => ({
   assignments: many(inventoryItemAssignments),
   tags: many(inventoryItemTags),
+  lendingItem: many(lendingItems),
+}));
+
+export const lendingItemsRelations = relations(lendingItems, ({ one, many }) => ({
+  inventoryItem: one(inventoryItems, { fields: [lendingItems.inventoryItemId], references: [inventoryItems.id] }),
+  loans: many(lendingLoans),
+}));
+
+export const lendingLoansRelations = relations(lendingLoans, ({ one }) => ({
+  lendingItem: one(lendingItems, { fields: [lendingLoans.lendingItemId], references: [lendingItems.id] }),
+  borrowerMember: one(members, { fields: [lendingLoans.borrowerMemberId], references: [members.id] }),
 }));
 
 export const inventoryItemAssignmentsRelations = relations(inventoryItemAssignments, ({ one }) => ({

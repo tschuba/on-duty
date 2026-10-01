@@ -1,0 +1,29 @@
+import { db } from "../db/index.js";
+
+// "Überfällig" = geplantBis in der Vergangenheit und zurückgegebenAm leer —
+// analog zum Prüffristen-Pattern in lib/inventory.ts, für die rote Badge-Zahl
+// am Verleih-Tab (siehe InventoryTabs in routes/inventory.tsx).
+export async function countOverdueLoans(): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  const loans = await db.query.lendingLoans.findMany({
+    columns: { plannedTo: true, returnedAt: true },
+  });
+  return loans.filter((l) => l.plannedTo && l.plannedTo < today && !l.returnedAt).length;
+}
+
+export type LoanRange = { plannedFrom: string | null; plannedTo: string | null; pickedUpAt: string | null; returnedAt: string | null };
+
+// Tatsächliches Datum hat Vorrang pro Rand — siehe Backlog-Doc "Überlappungs-
+// Zeitraum pro Vorgang". Ein Vorgang ganz ohne Datum geht nicht in die Prüfung ein.
+export function effectiveRange(loan: LoanRange): { from: string; to: string } | null {
+  const from = loan.pickedUpAt ?? loan.plannedFrom;
+  const to = loan.returnedAt ?? loan.plannedTo;
+  if (!from && !to) return null;
+  // Ein offenes Ende (nur von oder nur bis gesetzt) blockiert alles vor/nach
+  // dem bekannten Rand — min/max-Sentinel statt Sonderfall-Vergleichslogik.
+  return { from: from ?? "0000-01-01", to: to ?? "9999-12-31" };
+}
+
+export function rangesOverlap(a: { from: string; to: string }, b: { from: string; to: string }): boolean {
+  return a.from <= b.to && b.from <= a.to;
+}

@@ -10,6 +10,7 @@ import { formatDate } from "../lib/format.js";
 import { trimmed, parseTags } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
+import { countOverdueLoans } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -35,10 +36,10 @@ const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean }[] 
   { category: "ppe", batchCapable: true },
   { category: "other", batchCapable: true },
 ];
-const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
+export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
 const BATCH_CAPABLE_CATEGORIES = new Set(CATEGORY_CONFIG.filter((c) => c.batchCapable).map((c) => c.category));
 
-const CATEGORY_LABELS: Record<InventoryCategory, string> = {
+export const CATEGORY_LABELS: Record<InventoryCategory, string> = {
   vehicle: t("inventory.category.vehicle"),
   scba: t("inventory.category.scba"),
   equipment: t("inventory.category.equipment"),
@@ -59,7 +60,12 @@ const CATEGORY_BADGE: Record<InventoryCategory, string> = {
 // Only members who can actually carry PSA get offered in the assignment picker.
 const ASSIGNABLE_MEMBER_STATUSES = new Set(["aktiv", "jugend"]);
 
-function InventoryTabs({ active, overdueCount }: { active: "stock" | "inspections"; overdueCount: number }) {
+export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLending }: {
+  active: "stock" | "inspections" | "lending";
+  overdueCount: number;
+  overdueLoanCount?: number;
+  showLending?: boolean;
+}) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/inventory" role="tab" class={`tab${active === "stock" ? " tab-active" : ""}`}>
@@ -69,11 +75,17 @@ function InventoryTabs({ active, overdueCount }: { active: "stock" | "inspection
         {t("inventory.tabs.inspections")}
         {overdueCount > 0 && <span class="badge badge-sm badge-error ml-1">{overdueCount}</span>}
       </a>
+      {showLending && (
+        <a href="/inventory/lending" role="tab" class={`tab${active === "lending" ? " tab-active" : ""}`}>
+          {t("inventory.tabs.lending")}
+          {(overdueLoanCount ?? 0) > 0 && <span class="badge badge-sm badge-error ml-1">{overdueLoanCount}</span>}
+        </a>
+      )}
     </div>
   );
 }
 
-function CategoryBadge({ category }: { category: InventoryCategory }) {
+export function CategoryBadge({ category }: { category: InventoryCategory }) {
   return <span class={`${CATEGORY_BADGE[category]} badge-sm`}>{CATEGORY_LABELS[category]}</span>;
 }
 
@@ -81,7 +93,7 @@ function CategoryBadge({ category }: { category: InventoryCategory }) {
 
 type AssignmentInput = { memberId: string; name: string; quantity: number };
 
-type InventoryFieldValues = {
+export type InventoryFieldValues = {
   name: string;
   category: string;
   purchaseDate: string;
@@ -102,7 +114,7 @@ type InventoryFieldValues = {
   assignments: string;
 };
 
-function parseInventoryFields(body: Record<string, any>): { values: InventoryFieldValues; errors: Record<string, string> } {
+export function parseInventoryFields(body: Record<string, any>): { values: InventoryFieldValues; errors: Record<string, string> } {
   const values: InventoryFieldValues = {
     name: trimmed(body, "name"),
     category: trimmed(body, "category"),
@@ -179,7 +191,7 @@ function resolveAssignments(
 // mode — anything else submitted for another category is dropped server-side,
 // not just hidden client-side (see backlog doc's "nur App-Validierung" note). In
 // batch mode (quantity > 1) any BATCH_CAPABLE_CATEGORIES category may assign.
-function toInsertValues(values: InventoryFieldValues) {
+export function toInsertValues(values: InventoryFieldValues) {
   const category = values.category as InventoryCategory;
   const quantity = Math.max(1, Math.round(Number(values.quantity)) || 1);
   const isBatch = BATCH_CAPABLE_CATEGORIES.has(category) && quantity > 1;
@@ -202,7 +214,7 @@ function toInsertValues(values: InventoryFieldValues) {
 
 // ── Tag input (chip UI over a comma-joined hidden field) ────────────────────
 
-function TagInput({ tags }: { tags?: string[] }) {
+export function TagInput({ tags }: { tags?: string[] }) {
   const list = tags ?? [];
   return (
     <div class="form-control">
@@ -415,7 +427,7 @@ const CATEGORY_TOGGLE_SCRIPT = `
   updateInventoryFormVisibility();
 `;
 
-function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
+export function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
   values?: Partial<InventoryFieldValues>;
   errors?: Record<string, string>;
   assignedMemberName?: string;
@@ -589,7 +601,12 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   return c.html(
     <Layout title={t("inventory.title")} user={user} activeNav="inventory">
-      <InventoryTabs active="stock" overdueCount={await countOverdueInspectionItems()} />
+      <InventoryTabs
+        active="stock"
+        overdueCount={await countOverdueInspectionItems()}
+        overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
+        showLending={user.permissions.has("lending:read")}
+      />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("inventory.title")}</h1>
         {user.permissions.has("inventory:manage") && <a href="/inventory/new" class="btn btn-primary">{t("inventory.newItem")}</a>}
@@ -998,7 +1015,12 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
   return c.html(
     <Layout title={t("inventory.inspections.title")} user={user} activeNav="inventory">
-      <InventoryTabs active="inspections" overdueCount={await countOverdueInspectionItems()} />
+      <InventoryTabs
+        active="inspections"
+        overdueCount={await countOverdueInspectionItems()}
+        overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
+        showLending={user.permissions.has("lending:read")}
+      />
       <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{t("inventory.inspections.title")}</h1>
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -1059,13 +1081,16 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 });
 
 // GET /inventory/search-members — debounced live search for the PSA assignment
-// picker. Own route (not /members' search) so the aktiv/jugend filter is
-// enforced by the query itself. Status is derived app-side (not stored), so
-// every candidate's assignments are loaded to compute it — same approach as
-// anniversaries.tsx.
-inventoryRoutes.get("/search-members", requireAuth("inventory:manage"), async (c) => {
+// picker and (scope=all) the Verleih-Ausleiher-Picker. Own route (not /members'
+// search) so the aktiv/jugend filter is enforced by the query itself. Status is
+// derived app-side (not stored), so every candidate's assignments are loaded to
+// compute it — same approach as anniversaries.tsx.
+// scope=active (default, PSA-Picker): nur aktiv/jugend. scope=all (Verleih-
+// Picker): ungefiltert — auch Passive/Ehemalige können etwas ausleihen.
+inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending:manage"]), async (c) => {
   const q = (c.req.query("q") ?? "").trim();
   if (q.length < 2) return c.html("");
+  const scope = c.req.query("scope") === "all" ? "all" : "active";
 
   // Status is derived app-side (not stored), so every candidate's assignments are
   // loaded to compute it — same approach as anniversaries.tsx. Member counts stay
@@ -1080,7 +1105,7 @@ inventoryRoutes.get("/search-members", requireAuth("inventory:manage"), async (c
       lastName: m.person.lastName,
       status: deriveMemberStatus(m, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
     }))
-    .filter((m) => ASSIGNABLE_MEMBER_STATUSES.has(m.status))
+    .filter((m) => scope === "all" || ASSIGNABLE_MEMBER_STATUSES.has(m.status))
     .sort((a, b) => a.lastName.localeCompare(b.lastName, "de"))
     .slice(0, 10);
 
