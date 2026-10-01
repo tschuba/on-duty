@@ -255,7 +255,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {t("anniversaries.title")}
           </h1>
-          <button class="btn btn-sm btn-neutral" onclick="document.getElementById('ann-export-modal').showModal()">
+          <button class="btn btn-neutral" onclick="document.getElementById('ann-export-modal').showModal()">
             {t("common.export")}
           </button>
         </div>
@@ -264,29 +264,29 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
         <div class="flex flex-wrap gap-3 items-end">
           {/* Quick buttons */}
           <div class="join">
-            <a href={quickLink(3)} class={`btn btn-sm join-item${is3m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
-            <a href={quickLink(6)} class={`btn btn-sm join-item${is6m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
-            <a href={quickLink(12)} class={`btn btn-sm join-item${isDefault ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
-            <a href={yearLink(thisYear)} class={`btn btn-sm join-item${isThisYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
-            <a href={yearLink(nextYear)} class={`btn btn-sm join-item${isNextYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
+            <a href={quickLink(3)} class={`btn join-item${is3m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
+            <a href={quickLink(6)} class={`btn join-item${is6m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
+            <a href={quickLink(12)} class={`btn join-item${isDefault ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
+            <a href={yearLink(thisYear)} class={`btn join-item${isThisYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
+            <a href={yearLink(nextYear)} class={`btn join-item${isNextYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
           </div>
 
           {/* Manual date range */}
           <form method="get" action="/anniversaries" class="flex gap-2 items-center flex-wrap">
-            <input type="date" name="start" value={start} class="input input-sm input-bordered w-36" />
+            <input type="date" name="start" value={start} class="input input-bordered w-36" />
             <span class="text-base-content/50">–</span>
-            <input type="date" name="end" value={end} class="input input-sm input-bordered w-36" />
+            <input type="date" name="end" value={end} class="input input-bordered w-36" />
             <input type="hidden" name="filter" value={filter} />
             {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
-            <button type="submit" class="btn btn-sm">{t("common.show")}</button>
+            <button type="submit" class="btn">{t("common.show")}</button>
           </form>
 
           {/* Typ-Filter */}
           <div class="join">
-            <a href={filterLink("all")} class={`join-item btn btn-sm${filter === "all" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-            <a href={filterLink("anniversaries")} class={`join-item btn btn-sm${filter === "anniversaries" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
-            <a href={filterLink("birthdays")} class={`join-item btn btn-sm${filter === "birthdays" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
+            <a href={filterLink("all")} class={`join-item btn${filter === "all" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+            <a href={filterLink("anniversaries")} class={`join-item btn${filter === "anniversaries" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
+            <a href={filterLink("birthdays")} class={`join-item btn${filter === "birthdays" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
           </div>
 
           {/* Jahre + Mod */}
@@ -303,14 +303,14 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
                 name="gte"
                 value={gte > 0 ? String(gte) : ""}
                 min="0"
-                class="input input-sm input-bordered w-20"
+                class="input nput-bordered w-20"
                 placeholder="–"
               />
             </form>
             <div class="join">
-              <a href={modReset()} class={`join-item btn btn-sm${mods.length === 0 ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-              <a href={modToggle("5")} class={`join-item btn btn-sm${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
-              <a href={modToggle("10")} class={`join-item btn btn-sm${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>
+              <a href={modReset()} class={`join-item btn${mods.length === 0 ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+              <a href={modToggle("5")} class={`join-item btn${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
+              <a href={modToggle("10")} class={`join-item btn${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>
             </div>
           </div>
         </div>

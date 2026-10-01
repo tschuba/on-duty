@@ -130,15 +130,15 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
     <div class="guardian-row border border-base-300 rounded-box p-4 mb-3">
       <div class="flex items-center justify-between mb-2">
         <span class="font-medium text-sm">{label}</span>
-        <button type="button" class="btn btn-ghost btn-xs guardian-remove" onclick="this.closest('.guardian-row').remove()">
+        <button type="button" class="btn btn-ghost btn-sm guardian-remove" onclick="this.closest('.guardian-row').remove()">
           {t("apply.youth.guardian.remove")}
         </button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input input-bordered input-sm w-full${nameError ? " input-error" : ""}`} />
-        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input input-bordered input-sm w-full${nameError ? " input-error" : ""}`} />
-        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input input-bordered input-sm w-full${contactError ? " input-error" : ""}`} />
-        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input input-bordered input-sm w-full${contactError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input input-bordered w-full${nameError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input input-bordered w-full${nameError ? " input-error" : ""}`} />
+        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input input-bordered w-full${contactError ? " input-error" : ""}`} />
+        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input input-bordered w-full${contactError ? " input-error" : ""}`} />
       </div>
       {nameError && <p class="text-error text-sm mt-1">{nameError}</p>}
       {contactError
@@ -212,7 +212,7 @@ function YouthPage({
               <GuardianRow key={i} index={i} values={g} error={guardianErrors[i]} />
             ))}
           </div>
-          <button type="button" id="add-guardian" class="btn btn-ghost btn-sm">{t("apply.youth.guardian.add")}</button>
+          <button type="button" id="add-guardian" class="btn btn-ghost">{t("apply.youth.guardian.add")}</button>
           <template id="guardian-template">
             <GuardianRow index={-1} />
           </template>

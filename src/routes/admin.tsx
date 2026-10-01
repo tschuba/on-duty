@@ -199,7 +199,7 @@ adminRoutes.get("/users", guard, async (c) => {
           {t("admin.users.title")}
         </h1>
         <button
-          class="btn btn-primary btn-sm"
+          class="btn btn-primary"
           hx-get="/admin/users/new"
           hx-target="#modal-content"
           hx-swap="innerHTML"
@@ -437,7 +437,7 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
           <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
           <div class="flex flex-col gap-1">
             <input type="email" name="email" value={u.email} class="input input-bordered w-full" required />
-            <span class="label-text-alt opacity-60">
+            <span class="label-text-alt text-sm opacity-60">
               {t("admin.users.modal.emailWarning")}
             </span>
           </div>
@@ -619,7 +619,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
           {t("admin.permissions.title")}
         </h1>
         <button
-          class="btn btn-primary btn-sm"
+          class="btn btn-primary"
           hx-get="/admin/permissions/new"
           hx-target="#modal-content"
           hx-swap="innerHTML"
@@ -815,7 +815,7 @@ adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
           {hasAssignments ? (
             <div class="flex flex-col gap-1">
               <input type="text" value={role.name} class="input input-bordered w-full opacity-50" disabled />
-              <span class="label-text-alt opacity-60">
+              <span class="label-text-alt text-sm opacity-60">
                 {t("admin.permissions.modal.nameLocked")}
               </span>
               <input type="hidden" name="name" value={role.name} />
@@ -965,13 +965,13 @@ adminRoutes.get("/roles", guard, async (c) => {
             {t("admin.roles.title")}
           </h1>
           <div class="join">
-            <a href="/admin/roles" class={`btn btn-sm join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
-            <a href="/admin/roles?active=1" class={`btn btn-sm join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
-            <a href="/admin/roles?active=0" class={`btn btn-sm join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
+            <a href="/admin/roles" class={`btn join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
+            <a href="/admin/roles?active=1" class={`btn join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
+            <a href="/admin/roles?active=0" class={`btn join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
           </div>
         </div>
         <button
-          class="btn btn-primary btn-sm"
+          class="btn btn-primary"
           hx-get="/admin/roles/new"
           hx-target="#modal-content"
           hx-swap="innerHTML"
@@ -1134,7 +1134,7 @@ adminRoutes.get("/roles/:id/edit", guard, async (c) => {
           {hasAssignments ? (
             <div class="flex flex-col gap-1">
               <input type="text" value={role.title} class="input input-bordered w-full opacity-50" disabled />
-              <span class="label-text-alt opacity-60">
+              <span class="label-text-alt text-sm opacity-60">
                 {t("admin.roles.modal.nameLocked")}
               </span>
               <input type="hidden" name="title" value={role.title} />
@@ -1266,7 +1266,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
           {t("admin.anniversaries.title")}
         </h1>
         <button
-          class="btn btn-primary btn-sm"
+          class="btn btn-primary"
           hx-get="/admin/anniversaries/new"
           hx-target="#modal-content"
           hx-swap="innerHTML"
@@ -1601,7 +1601,7 @@ adminRoutes.get("/org-config", guard, async (c) => {
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {t("admin.orgConfig.title")}
           </h1>
-          <button type="submit" form="org-config-form" class="btn btn-primary btn-sm">
+          <button type="submit" form="org-config-form" class="btn btn-primary">
             {t("common.save")}
           </button>
         </div>
@@ -1733,7 +1733,7 @@ adminRoutes.get("/backup", guard, async (c) => {
         <form method="post" action="/admin/backup/run">
           <button
             type="submit"
-            class="btn btn-outline btn-sm"
+            class="btn btn-outline"
             onclick={`return confirm('${t("admin.backup.confirmStart")}')`}
           >
             {t("admin.backup.startNow")}
@@ -1775,7 +1775,7 @@ adminRoutes.get("/backup", guard, async (c) => {
                       </div>
                     </td>
                     <td>
-                      <span class={`badge ${e.status === "success" ? "badge-success" : "badge-error"}`}>
+                      <span class={`badge badge-sm ${e.status === "success" ? "badge-success" : "badge-error"}`}>
                         {e.status === "success" ? t("admin.backup.statusSuccess") : t("admin.backup.statusFailed")}
                       </span>
                     </td>

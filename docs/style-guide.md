@@ -13,7 +13,7 @@ Definiert in `src/styles/app.css`. daisyUI liest Tailwind-v4-Farbtokens aus `:ro
 | `--color-primary` | `#cc0000` | Aktiv genutzt — Feuerwehr-Rot, treibt daisyUIs `primary`-Klassen (`btn-primary`, `text-primary`, Badges etc.) |
 | `--color-primary-dark` | `#990000` | Abgeleiteter dunklerer Rotton |
 | `--color-gold` | `#f0a500` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
-| `--color-dark` | `#1c1c1c` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
+| `--color-dark` | `#0f2338` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
 | `--color-surface` | `#f8f8f8` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
 
 **Regel:** `gold`/`dark`/`surface` nicht "weil sie schon da sind" verwenden. Wird ein Anwendungsfall gebraucht, den Zweck hier dokumentieren. Bleiben sie dauerhaft ungenutzt, sind sie Kandidat zum Entfernen aus `app.css`.
@@ -99,6 +99,4 @@ daisyUI-`btn`-Klassen, Bedeutung ist an die Farbe/Outline-Kombination gebunden, 
 | `btn btn-outline btn-primary` (in `join-item`-Gruppe) | Aktiver Zustand in Filter-/Quick-Link-Pillen; inaktive Geschwister nutzen `btn-ghost` |
 | `btn` (ohne Farb-Modifier, `join-item`) | Neutrale Pagination-Controls |
 
-Größen: `btn-sm` ist Standard für Aktionen innerhalb einer Seite (Header-Zeile, Tabellen-Zeilen), `btn-xs` für sehr kompakte Kontexte (z.B. innerhalb einer Tabellenzelle), `btn` ohne Größen-Modifier nur für große, isolierte CTAs (z.B. Login).
-
-⚠️ Abweichung im Code: aktuell nutzt nur `applications.tsx` (Antrag ablehnen) das Outline/Solid-Trigger/Confirm-Muster für eine destruktive Aktion. Andere destruktive Trigger in `admin.tsx` (z.B. Nutzer löschen/deaktivieren) öffnen zwar korrekt ein Bestätigungs-Modal, sind aber als `btn-ghost btn-xs text-error` statt `btn-outline btn-error` gestylt — beim Angleichen auf `btn-outline btn-error` umstellen.
+Größen: `btn` ohne Größen-Modifier nur für große ist Standard für Aktionen innerhalb einer Seite (Header-Zeile, Tabellen-Zeilen), `btn-sm` für kompakte oder `btn-xs` für sehr kompakte Kontexte (z.B. innerhalb einer Tabellenzelle).
