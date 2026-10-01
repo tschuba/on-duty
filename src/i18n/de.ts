@@ -79,8 +79,6 @@ export const de = {
   "members.form.addAssignment": "+ Zuweisung hinzufügen",
   "members.form.roleSelect": "— Funktion wählen —",
   "members.form.roleNoMatch": "Keine Treffer",
-  "members.form.roleTypeToFilter": "Tippen zum Filtern…",
-  "members.form.roleRequired": "Bitte eine Funktion auswählen",
   "members.form.from": "Von",
   "members.form.to": "Bis",
   "members.form.role": "Funktion",
