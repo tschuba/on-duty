@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
+import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { Icon } from "./icon.js";
 
 type Props = PropsWithChildren<{
@@ -18,6 +19,10 @@ function ApplicationsBadge({ count }: { count: number }) {
   return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
 }
 
+function OverdueInspectionsBadge({ count }: { count: number }) {
+  return count > 0 ? <span class="badge badge-sm badge-error ml-1">{count}</span> : null;
+}
+
 // Async component — hono/jsx resolves Promise children/return values during render,
 // so this stays a self-contained addition (only queries when the viewer actually has
 // the permission) instead of threading a count prop through every route that renders
@@ -25,6 +30,8 @@ function ApplicationsBadge({ count }: { count: number }) {
 export const Layout = async ({ title, children, user, activeNav }: Props) => {
   const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
   const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
+  const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
+  const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
 
   return (
   <html lang="de">
@@ -83,12 +90,13 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   {t("common.nav.donors")}
                 </a>
               )}
-              {user.permissions.has("inventory:read") && (
+              {canReadInventory && (
                 <a
                   href="/inventory"
                   class={`btn btn-ghost btn-sm${activeNav === "inventory" ? " btn-active" : ""}`}
                 >
                   {t("common.nav.inventory")}
+                  <OverdueInspectionsBadge count={overdueInspectionsCount} />
                 </a>
               )}
               {user.permissions.has("system:admin") && (
@@ -114,7 +122,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<ApplicationsBadge count={openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
-                {user.permissions.has("inventory:read") && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}</a></li>}
+                {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<OverdueInspectionsBadge count={overdueInspectionsCount} /></a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>

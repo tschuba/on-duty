@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
 import { formBody } from "./test-utils.js";
 
@@ -31,6 +31,7 @@ let personLookupResult: any[] = []; // db.select().from(persons).where(...) — 
 let memberLookupResult: any[] = []; // db.select().from(members).where(...) — "already a member" guard / linkMemberId target lookup
 let applicationFindFirstResult: any = undefined; // db.query.applications.findFirst(...) — linkMemberId prefill
 let donorLookupResult: any[] = []; // db.select().from(donors).where(...) — delete blocking check
+let inventoryAssignmentRowsFixture: { quantity: number }[] = []; // db.select().from(inventoryItemAssignments).where(...) — delete confirmation count
 let applicationLookupResult: any[] = []; // db.select().from(applications).where(...) — delete blocking check
 let applicationGuardianLookupResult: any[] = []; // db.select().from(applicationGuardians).where(...) — delete blocking check
 
@@ -45,6 +46,7 @@ const select = vi.fn(() => ({
     if (table === persons) return chainOf(personLookupResult);
     if (table === members) return chainOf(memberLookupResult);
     if (table === donors) return chainOf(donorLookupResult);
+    if (table === inventoryItemAssignments) return chainOf(inventoryAssignmentRowsFixture);
     if (table === applications) return chainOf(applicationLookupResult);
     if (table === applicationGuardians) return chainOf(applicationGuardianLookupResult);
     return chainOf([]);
@@ -138,6 +140,7 @@ beforeEach(() => {
   memberLookupResult = [];
   applicationFindFirstResult = undefined;
   donorLookupResult = [];
+  inventoryAssignmentRowsFixture = [];
   applicationLookupResult = [];
   applicationGuardianLookupResult = [];
   currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };

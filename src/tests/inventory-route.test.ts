@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemAssignments } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -88,10 +88,10 @@ function makeItem(overrides: Record<string, unknown> = {}) {
   return {
     id: "item1", name: "TSF-W", category: "vehicle",
     purchaseDate: null, purchasePrice: null, notes: null,
-    retiredAt: null, retiredReason: null, assignedMemberId: null,
+    retiredAt: null, retiredReason: null, quantity: 1, retiredQuantity: 0,
     licensePlate: "ABC-123", yearOfManufacture: 2015, vehicleInspectionDue: "2026-06-01",
     serialNumber: null, nextInspectionDue: null, lastInspectionDate: null,
-    tags: [], assignedMember: null,
+    tags: [], assignments: [],
     ...overrides,
   };
 }
@@ -157,14 +157,14 @@ describe("POST /", () => {
     expect(insertCalls[1].values).toEqual([{ inventoryItemId: "new-id", tag: "schnell" }, { inventoryItemId: "new-id", tag: "gross" }]);
   });
 
-  it("drops assignedMemberId for a non-ppe category", async () => {
+  it("drops assignedMemberId for a non-ppe category (no assignment row is inserted)", async () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formBody({ name: "Helm", category: "equipment", assignedMemberId: "m1" }),
     });
     expect(res.status).toBe(302);
-    expect(insertCalls[0].values.assignedMemberId).toBeNull();
+    expect(insertCalls.some((c) => c.table === inventoryItemAssignments)).toBe(false);
   });
 });
 
@@ -172,6 +172,7 @@ describe("POST /", () => {
 
 describe("POST /:id/retire and /:id/reactivate", () => {
   it("sets retiredAt (and an optional reason) on retire", async () => {
+    itemsFindFirstResult = makeItem();
     const res = await inventoryRoutes.request("/item1/retire", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -179,13 +180,14 @@ describe("POST /:id/retire and /:id/reactivate", () => {
     });
     expect(res.status).toBe(302);
     expect(updateCalls[0].set.retiredReason).toBe("kaputt");
+    expect(updateCalls[0].set.retiredQuantity).toBe(1);
     expect(typeof updateCalls[0].set.retiredAt).toBe("string");
   });
 
-  it("clears retiredAt/retiredReason on reactivate", async () => {
+  it("clears retiredAt/retiredReason/retiredQuantity on reactivate", async () => {
     const res = await inventoryRoutes.request("/item1/reactivate", { method: "POST" });
     expect(res.status).toBe(302);
-    expect(updateCalls[0].set).toEqual({ retiredAt: null, retiredReason: null });
+    expect(updateCalls[0].set).toEqual({ retiredAt: null, retiredReason: null, retiredQuantity: 0 });
   });
 });
 
@@ -195,6 +197,16 @@ describe("GET /inspections", () => {
   it("marks an overdue item", async () => {
     itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
     const res = await inventoryRoutes.request("/inspections?start=1999-01-01&end=2100-01-01");
+    const html = await res.text();
+    expect(html).toContain("TÜV fällig");
+    expect(html).toContain("überfällig");
+  });
+
+  it("shows an overdue item even outside the selected date range", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
+    // No start/end query params → route defaults to today..+12 months, which
+    // would otherwise hide this item entirely.
+    const res = await inventoryRoutes.request("/inspections");
     const html = await res.text();
     expect(html).toContain("TÜV fällig");
     expect(html).toContain("überfällig");
@@ -248,8 +260,8 @@ describe("GET /:id/edit", () => {
 
   it("renders the ppe assignment picker with the current member pre-filled", async () => {
     itemsFindFirstResult = makeItem({
-      category: "ppe", serialNumber: "SN-1", assignedMemberId: "m1",
-      assignedMember: { id: "m1", person: { firstName: "Anna", lastName: "Bauer" } },
+      category: "ppe", serialNumber: "SN-1",
+      assignments: [{ id: "a1", inventoryItemId: "item1", memberId: "m1", quantity: 1, member: { id: "m1", person: { firstName: "Anna", lastName: "Bauer" } } }],
     });
     const res = await inventoryRoutes.request("/item1/edit");
     const html = await res.text();

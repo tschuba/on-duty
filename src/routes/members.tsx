@@ -3,7 +3,7 @@ import { getCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItems } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
@@ -83,12 +83,12 @@ async function findPersonBlockingLink(personId: string): Promise<PersonBlockingL
   return null;
 }
 
-// Not a blocking link (assignedMemberId uses onDelete: set null, deletion proceeds
-// and PSA items are freed automatically) — just an informational count for the
-// delete confirmation.
+// Not a blocking link (the assignment row is cascade-deleted, the inventory item
+// itself survives and just loses this assignment) — just an informational count
+// for the delete confirmation.
 async function countAssignedInventoryItems(memberId: string): Promise<number> {
-  const rows = await db.select({ id: inventoryItems.id }).from(inventoryItems).where(eq(inventoryItems.assignedMemberId, memberId));
-  return rows.length;
+  const rows = await db.select({ quantity: inventoryItemAssignments.quantity }).from(inventoryItemAssignments).where(eq(inventoryItemAssignments.memberId, memberId));
+  return rows.reduce((sum, r) => sum + r.quantity, 0);
 }
 
 // ── Sort / filter helpers ────────────────────────────────────────────────────

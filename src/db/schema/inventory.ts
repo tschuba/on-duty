@@ -13,9 +13,12 @@ export const inventoryItems = pgTable("inventory_items", {
   notes: text("notes"),
   retiredAt: date("retired_at"),
   retiredReason: text("retired_reason"),
-  // nullable, app-validated to category=ppe only (see routes/inventory.tsx) — no
-  // DB check-constraint for this, the schema has none of that kind so far.
-  assignedMemberId: uuid("assigned_member_id").references(() => members.id, { onDelete: "set null" }),
+  // 1 = Einzelstück (default), >1 = Batch — app-validated per category, see
+  // BATCH_CAPABLE_CATEGORIES in routes/inventory.tsx.
+  quantity: integer("quantity").notNull().default(1),
+  // Teilmengen-Ausmusterung bei Batches; retiredAt wird gesetzt sobald
+  // retiredQuantity == quantity (siehe routes/inventory.tsx retire-Handler).
+  retiredQuantity: integer("retired_quantity").notNull().default(0),
   // Fahrzeuge
   licensePlate: text("license_plate"),
   yearOfManufacture: integer("year_of_manufacture"),
@@ -24,6 +27,20 @@ export const inventoryItems = pgTable("inventory_items", {
   serialNumber: text("serial_number"),
   nextInspectionDue: date("next_inspection_due"),
   lastInspectionDate: date("last_inspection_date"),
+});
+
+// Replaces the old single assignedMemberId FK — a batch item can be split across
+// several members, each holding `quantity` of the total. Single-item PPE just
+// ends up with at most one row here (quantity 1 of a quantity-1 item).
+export const inventoryItemAssignments = pgTable("inventory_item_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  inventoryItemId: uuid("inventory_item_id")
+    .notNull()
+    .references(() => inventoryItems.id, { onDelete: "cascade" }),
+  memberId: uuid("member_id")
+    .notNull()
+    .references(() => members.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull().default(1),
 });
 
 // Join table, not text[] — no Postgres-array precedent in this schema, every other

@@ -1,3 +1,5 @@
+import { db } from "../db/index.js";
+
 export type InventoryCategory = "vehicle" | "scba" | "equipment" | "ppe" | "other";
 
 export type InspectionDueItem = {
@@ -29,4 +31,16 @@ export function generateInspectionDueItems(items: InventoryItemInput[], start: s
   }
   result.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, "de"));
   return result;
+}
+
+// Own minimal query (not routes/inventory.tsx's fetchItems with its joins) to
+// avoid a circular import: that route imports Layout, Layout needs this count.
+// Same db.query.inventoryItems.findMany shape routes/inventory.tsx uses, so it
+// goes through the same mock in tests.
+export async function countOverdueInspectionItems(): Promise<number> {
+  const rows = (await db.query.inventoryItems.findMany({
+    columns: { id: true, name: true, category: true, retiredAt: true, vehicleInspectionDue: true, nextInspectionDue: true },
+  })) as InventoryItemInput[];
+  const today = new Date().toISOString().slice(0, 10);
+  return generateInspectionDueItems(rows, "0000-01-01", today).length;
 }
