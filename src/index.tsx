@@ -14,6 +14,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
+import { inventoryRoutes } from "./routes/inventory.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -65,6 +66,9 @@ app.route("/anniversaries", anniversaryRoutes);
 // Donation routes
 app.route("/donations", donationRoutes);
 app.route("/donors", donorRoutes);
+
+// Inventory routes
+app.route("/inventory", inventoryRoutes);
 
 // Admin routes
 app.route("/admin", adminRoutes);

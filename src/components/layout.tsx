@@ -7,7 +7,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications" | "inventory";
 }>;
 
 export function ClickToEditHint() {
@@ -83,6 +83,14 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   {t("common.nav.donors")}
                 </a>
               )}
+              {user.permissions.has("inventory:read") && (
+                <a
+                  href="/inventory"
+                  class={`btn btn-ghost btn-sm${activeNav === "inventory" ? " btn-active" : ""}`}
+                >
+                  {t("common.nav.inventory")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -106,6 +114,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<ApplicationsBadge count={openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
+                {user.permissions.has("inventory:read") && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
