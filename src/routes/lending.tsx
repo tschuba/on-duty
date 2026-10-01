@@ -9,7 +9,7 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed, parseTags } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
-import { effectiveRange, rangesOverlap, countOverdueLoans } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, countOverdueLoans, loanStatus, type LoanRange, type LoanStatus } from "../lib/lending.js";
 import { InventoryTabs, CATEGORIES, CATEGORY_LABELS, CategoryBadge, InventoryFormFields, TagInput, parseInventoryFields, toInsertValues, type InventoryFieldValues } from "./inventory.js";
 import { countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -141,6 +141,141 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           ))}
         </tbody>
       </table>
+    </Layout>
+  );
+});
+
+// ── Übersicht aller Vorgänge (GET /inventory/lending/overview) ─────────────
+// Analog zu routes/anniversaries.tsx: flache, zeitlich sortierte Sicht quer
+// über alle Items statt Item-für-Item. Kein Kategorie/Tag-Filter (YAGNI,
+// Hauptnutzen ist die Zeitachse, nicht Objektfilterung).
+
+const LOAN_STATUS_BADGE: Record<LoanStatus, string> = {
+  planned: "badge badge-ghost badge-sm",
+  active: "badge badge-info badge-sm",
+  overdue: "badge badge-error badge-sm",
+  returned: "badge badge-success badge-sm",
+};
+const LOAN_STATUS_LABEL: Record<LoanStatus, string> = {
+  planned: t("lending.overview.status.planned"),
+  active: t("lending.overview.status.active"),
+  overdue: t("lending.overview.status.overdue"),
+  returned: t("lending.overview.status.returned"),
+};
+
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+}
+
+async function fetchAllLoans(): Promise<(LoanWithBorrower & { lendingItem: LendingItemWithRelations })[]> {
+  return db.query.lendingLoans.findMany({
+    with: {
+      borrowerMember: { with: { person: true } },
+      lendingItem: { with: { inventoryItem: { with: { tags: true } } } },
+    },
+  }) as unknown as Promise<(LoanWithBorrower & { lendingItem: LendingItemWithRelations })[]>;
+}
+
+function formatMonth(yyyymm: string): string {
+  const [y, m] = yyyymm.split("-");
+  const names = ["month.january", "month.february", "month.march", "month.april", "month.may", "month.june",
+    "month.july", "month.august", "month.september", "month.october", "month.november", "month.december"] as const;
+  return `${t(names[parseInt(m, 10) - 1])} ${y}`;
+}
+
+lendingRoutes.get("/overview", requireAuth("lending:read"), async (c) => {
+  const user = c.get("user")!;
+  const today = new Date().toISOString().slice(0, 10);
+  const start = c.req.query("start") ?? "";
+  const end = c.req.query("end") ?? "";
+  const rangeMode = Boolean(start || end);
+
+  const all = await fetchAllLoans();
+
+  const filtered = rangeMode
+    ? all.filter((l) => {
+        const date = l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "";
+        return (!start || date >= start) && (!end || date <= end);
+      })
+    : all.filter((l) => {
+        if (!l.returnedAt) return true;
+        const nearDate = l.plannedFrom ?? l.pickedUpAt ?? "";
+        return nearDate >= addDays(today, -14) && nearDate <= addDays(today, 30);
+      });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const da = a.plannedFrom ?? a.pickedUpAt ?? "";
+    const db_ = b.plannedFrom ?? b.pickedUpAt ?? "";
+    return da.localeCompare(db_);
+  });
+
+  const groups = new Map<string, typeof sorted>();
+  for (const l of sorted) {
+    const date = l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "0000-00";
+    const key = date.slice(0, 7);
+    let bucket = groups.get(key);
+    if (!bucket) { bucket = []; groups.set(key, bucket); }
+    bucket.push(l);
+  }
+
+  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/lending/overview", { start, end }, extra);
+
+  return c.html(
+    <Layout title={t("lending.overview.title")} user={user} activeNav="inventory">
+      <InventoryTabs
+        active="lending-overview"
+        overdueCount={await countOverdueInspectionItems()}
+        overdueLoanCount={await countOverdueLoans()}
+        showLending
+      />
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("lending.overview.title")}</h1>
+      </div>
+
+      <form method="get" action="/inventory/lending/overview" class="flex gap-2 items-center flex-wrap mb-4">
+        <input type="date" name="start" value={start} class="input input-bordered w-36" placeholder={t("lending.overview.rangeStart")} />
+        <span class="text-base-content/50">–</span>
+        <input type="date" name="end" value={end} class="input input-bordered w-36" placeholder={t("lending.overview.rangeEnd")} />
+        <button type="submit" class="btn btn-outline">{t("lending.overview.rangeApply")}</button>
+        {rangeMode && <a href={qs({ start: undefined, end: undefined })} class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
+      </form>
+
+      {sorted.length === 0 ? (
+        <p class="text-base-content/60 py-8">{t("lending.overview.empty")}</p>
+      ) : (
+        <div class="overflow-x-auto">
+          <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
+            <tbody>
+              {[...groups.entries()].map(([month, loans], i) => (
+                <>
+                  <tr>
+                    <td colspan={5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
+                      {formatMonth(month)}
+                    </td>
+                  </tr>
+                  {loans.map((l, idx) => {
+                    const status = loanStatus(l, today);
+                    const borrower = l.borrowerMember ? `${l.borrowerMember.person.firstName} ${l.borrowerMember.person.lastName}` : l.borrowerName || "—";
+                    const date = l.plannedFrom ?? l.pickedUpAt ?? "";
+                    const border = idx > 0 ? " border-t border-base-300" : "";
+                    return (
+                      <tr key={l.id} class={`cursor-pointer hover${status === "overdue" ? " text-error" : ""}`} onclick={`window.location='/inventory/lending/${l.lendingItem.id}/loans'`}>
+                        <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(date)}</td>
+                        <td class={border}>{l.lendingItem.inventoryItem.name}</td>
+                        <td class={border}>{borrower}</td>
+                        <td class={border}><span class={LOAN_STATUS_BADGE[status]}>{LOAN_STATUS_LABEL[status]}</span></td>
+                        <td class={`text-sm${border}`}>{formatDate(l.plannedFrom)} – {formatDate(l.plannedTo)}</td>
+                      </tr>
+                    );
+                  })}
+                </>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Layout>
   );
 });
@@ -303,17 +438,18 @@ function BorrowerPickerFields({ memberId, memberName, name, contact }: {
   );
 }
 
-function LoanForm({ action, item, values, errors, maxQuantity }: {
+function LoanForm({ action, item, values, errors, maxQuantity, memberName }: {
   action: string;
   item: LendingItemWithRelations;
   values?: Partial<{ quantity: string; plannedFrom: string; plannedTo: string; pickedUpAt: string; returnedAt: string; borrowerMemberId: string; borrowerName: string; borrowerContact: string }>;
   errors?: Record<string, string>;
   maxQuantity: number;
+  memberName?: string;
 }) {
   const v = values ?? {};
   return (
     <form method="post" action={action} class="space-y-4 max-w-xl border border-base-300 rounded-box p-4">
-      <BorrowerPickerFields memberId={v.borrowerMemberId} name={v.borrowerName} contact={v.borrowerContact} />
+      <BorrowerPickerFields memberId={v.borrowerMemberId} memberName={memberName} name={v.borrowerName} contact={v.borrowerContact} />
       {errors?.borrower && <span class="text-error text-sm">{errors.borrower}</span>}
 
       {!item.individualTracking && (
@@ -494,6 +630,7 @@ lendingRoutes.post("/:id/loans", requireAuth("lending:manage"), async (c) => {
           maxQuantity={maxQuantity}
           values={{ quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerMemberId, borrowerName, borrowerContact }}
           errors={errors}
+          memberName={memberName}
         />
       </Layout>,
       422
