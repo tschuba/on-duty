@@ -315,6 +315,38 @@ export function MembersTable({
   );
 }
 
+// "Zeile hinzufügen"-Button: liest/schreibt data-next-index auf #role-rows statt
+// querySelectorAll(...).length zu zählen — letzteres kollidiert nach Löschen einer
+// Zwischenzeile (gleicher index für zwei Zeilen), was mit popovertarget (eindeutige
+// id-Referenz) sichtbar würde statt wie bisher eine folgenlose doppelte DOM-id zu sein.
+function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
+  return (
+    <>
+      <button
+        type="button"
+        class="btn btn-ghost"
+        hx-get="/members/role-row"
+        hx-target="#role-rows"
+        hx-swap="beforeend"
+        hx-include="[id='role-rows'] input[name='assignment_id[]']"
+      >
+        {t("members.form.addAssignment")}
+      </button>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function () {
+          var rows = document.getElementById('role-rows');
+          if (!rows.dataset.nextIndex) rows.dataset.nextIndex = '${initialCount}';
+          document.querySelector('[hx-get="/members/role-row"]').addEventListener('htmx:configRequest', function (e) {
+            var next = parseInt(rows.dataset.nextIndex, 10);
+            e.detail.parameters['index'] = next;
+            rows.dataset.nextIndex = String(next + 1);
+          });
+        })();
+      ` }} />
+    </>
+  );
+}
+
 function RoleRow({
   index,
   roles,
@@ -324,18 +356,60 @@ function RoleRow({
   roles: Role[];
   assignment?: Assignment;
 }) {
+  const selectedTitle = assignment ? (roles.find((r) => r.id === assignment.memberRoleId)?.title ?? "") : "";
   return (
     <tr id={`role-row-${index}`}>
       <td>
         <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
-        <select name="assignment_role[]" class="select select-bordered w-full" required>
-          <option value="">{t("members.form.roleSelect")}</option>
-          {roles.map((r) => (
-            <option key={r.id} value={r.id} selected={r.id === assignment?.memberRoleId}>
-              {r.title}
-            </option>
-          ))}
-        </select>
+        <input type="hidden" name="assignment_role[]" class="role-combobox-value" value={assignment?.memberRoleId ?? ""} />
+        <div class="relative">
+          <button
+            type="button"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls={`role-combobox-popover-${index}`}
+            class={`role-combobox-trigger btn btn-outline justify-start font-normal min-w-48${selectedTitle ? "" : " opacity-50"}`}
+            style={`anchor-name:--role-combobox-anchor-${index}`}
+            data-placeholder={t("members.form.roleSelect")}
+          >
+            {selectedTitle || t("members.form.roleSelect")}
+          </button>
+          <div
+            id={`role-combobox-popover-${index}`}
+            popover="auto"
+            class="role-combobox-popover dropdown-content bg-base-100 rounded-box shadow p-2"
+            style={`position-anchor:--role-combobox-anchor-${index}`}
+          >
+            <input
+              type="text"
+              autocomplete="off"
+              role="searchbox"
+              aria-autocomplete="list"
+              aria-controls={`role-combobox-list-${index}`}
+              class="role-combobox-search input input-bordered input-sm w-full mb-1"
+              placeholder={t("common.searchPlaceholder")}
+            />
+            <ul id={`role-combobox-list-${index}`} role="listbox" class="role-combobox-list menu p-0">
+              {roles.map((r) => (
+                <li
+                  key={r.id}
+                  id={`role-combobox-option-${index}-${r.id}`}
+                  role="option"
+                  data-id={r.id}
+                  data-title={r.title}
+                  aria-selected={r.id === assignment?.memberRoleId ? "true" : "false"}
+                >
+                  <a class="min-h-11 flex items-center">{r.title}</a>
+                </li>
+              ))}
+              <li class="role-combobox-no-match hidden"><a class="disabled pointer-events-none opacity-50 min-h-11 flex items-center">{t("members.form.roleNoMatch")}</a></li>
+            </ul>
+            <button type="button" class={`role-combobox-reset btn btn-sm btn-ghost w-full mt-1${selectedTitle ? "" : " hidden"}`}>
+              {t("common.reset")}
+            </button>
+          </div>
+        </div>
       </td>
       <td>
         <input
@@ -363,6 +437,149 @@ function RoleRow({
           ✕
         </button>
       </td>
+      <script dangerouslySetInnerHTML={{ __html: `
+        if (!window.__roleComboboxBound) {
+          window.__roleComboboxBound = true;
+
+          function rcWrap(trigger) { return trigger.closest('.relative'); }
+          function rcPopover(trigger) { return rcWrap(trigger).querySelector('.role-combobox-popover'); }
+          function rcSearch(trigger) { return rcPopover(trigger).querySelector('.role-combobox-search'); }
+          function rcList(trigger) { return rcPopover(trigger).querySelector('.role-combobox-list'); }
+          function rcHidden(trigger) { return trigger.closest('td').querySelector('.role-combobox-value'); }
+          function rcResetBtn(trigger) { return rcPopover(trigger).querySelector('.role-combobox-reset'); }
+          function rcOptions(list) { return Array.from(list.querySelectorAll('li[role=option]')); }
+          function rcNoMatch(list) { return list.querySelector('.role-combobox-no-match'); }
+
+          function rcClearActive(list) {
+            rcOptions(list).forEach(function (li) { li.classList.remove('menu-active'); });
+          }
+
+          function rcSetActive(trigger, li) {
+            var list = rcList(trigger);
+            rcClearActive(list);
+            if (li) li.classList.add('menu-active');
+          }
+
+          function rcVisibleOptions(list) {
+            return rcOptions(list).filter(function (li) { return li.style.display !== 'none'; });
+          }
+
+          function rcFilter(trigger) {
+            var list = rcList(trigger);
+            var needle = rcSearch(trigger).value.trim().toLowerCase();
+            var anyVisible = false;
+            rcOptions(list).forEach(function (li) {
+              var match = li.dataset.title.toLowerCase().includes(needle);
+              li.style.display = match ? '' : 'none';
+              if (match) anyVisible = true;
+            });
+            rcNoMatch(list).classList.toggle('hidden', anyVisible);
+            rcClearActive(list);
+          }
+
+          function rcIsOpen(trigger) { return rcPopover(trigger).matches(':popover-open'); }
+
+          function rcOpen(trigger) {
+            rcPopover(trigger).showPopover();
+            trigger.setAttribute('aria-expanded', 'true');
+            rcSearch(trigger).value = '';
+            rcFilter(trigger);
+            rcSearch(trigger).focus();
+          }
+
+          function rcClose(trigger) {
+            rcPopover(trigger).hidePopover();
+            trigger.setAttribute('aria-expanded', 'false');
+            rcClearActive(rcList(trigger));
+          }
+
+          function rcSetValue(trigger, id, title) {
+            rcHidden(trigger).value = id;
+            trigger.textContent = title || trigger.dataset.placeholder;
+            trigger.classList.toggle('opacity-50', !id);
+            trigger.classList.remove('btn-error');
+            trigger.removeAttribute('aria-invalid');
+            rcResetBtn(trigger).classList.toggle('hidden', !id);
+          }
+
+          function rcSelect(trigger, li) {
+            rcSetValue(trigger, li.dataset.id, li.dataset.title);
+            rcOptions(rcList(trigger)).forEach(function (o) { o.setAttribute('aria-selected', o === li ? 'true' : 'false'); });
+            rcClose(trigger);
+            trigger.focus();
+          }
+
+          document.body.addEventListener('click', function (e) {
+            var trigger = e.target.closest('.role-combobox-trigger');
+            if (trigger) {
+              if (rcIsOpen(trigger)) { rcClose(trigger); } else { rcOpen(trigger); }
+              return;
+            }
+            var resetBtn = e.target.closest('.role-combobox-reset');
+            if (resetBtn) {
+              var t = rcWrap(resetBtn).querySelector('.role-combobox-trigger');
+              rcSetValue(t, '', '');
+              rcOptions(rcList(t)).forEach(function (o) { o.setAttribute('aria-selected', 'false'); });
+              rcClose(t);
+              t.focus();
+              return;
+            }
+            var li = e.target.closest('.role-combobox-list li[role=option]');
+            if (li) {
+              var trig = rcWrap(li.closest('.role-combobox-popover')).querySelector('.role-combobox-trigger');
+              rcSelect(trig, li);
+              return;
+            }
+            var openTrigger = document.querySelector('.role-combobox-trigger[aria-expanded=true]');
+            if (openTrigger && !rcPopover(openTrigger).contains(e.target)) rcClose(openTrigger);
+          });
+
+          document.body.addEventListener('input', function (e) {
+            var trigger = e.target.closest('.role-combobox-search') && rcWrap(e.target).querySelector('.role-combobox-trigger');
+            if (!trigger) return;
+            rcFilter(trigger);
+          });
+
+          document.body.addEventListener('keydown', function (e) {
+            var trigger = e.target.closest('.role-combobox-trigger');
+            if (trigger && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown')) {
+              e.preventDefault();
+              if (!rcIsOpen(trigger)) rcOpen(trigger);
+              return;
+            }
+            var searchInput = e.target.closest('.role-combobox-search');
+            if (!searchInput) return;
+            var trig = rcWrap(searchInput).querySelector('.role-combobox-trigger');
+            var list = rcList(trig);
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              var visible = rcVisibleOptions(list);
+              if (!visible.length) return;
+              var current = visible.findIndex(function (li) { return li.classList.contains('menu-active'); });
+              var next = e.key === 'ArrowDown' ? current + 1 : current - 1;
+              if (next < 0) next = 0;
+              if (next > visible.length - 1) next = visible.length - 1;
+              rcSetActive(trig, visible[next]);
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              var active = list.querySelector('li.menu-active');
+              if (active) rcSelect(trig, active);
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              rcClose(trig);
+              trig.focus();
+            }
+          });
+
+          document.currentScript.closest('form').addEventListener('submit', function (e) {
+            var missing = Array.from(document.querySelectorAll('.role-combobox-trigger')).filter(function (trig) {
+              return !rcHidden(trig).value;
+            });
+            missing.forEach(function (trig) { trig.classList.add('btn-error'); trig.setAttribute('aria-invalid', 'true'); });
+            if (missing.length) { e.preventDefault(); missing[0].focus(); }
+          });
+        }
+      ` }} />
     </tr>
   );
 }
@@ -624,7 +841,7 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
             const hasActive = activeRoleIds.has(r.id);
             return (
               <li key={r.id} data-title={r.title.toLowerCase()}>
-                <label class={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-base-200${!hasActive ? " opacity-50" : ""}`}>
+                <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${!hasActive ? " opacity-50" : ""}`}>
                   <input
                     type="checkbox"
                     class="checkbox checkbox-xs"
@@ -670,6 +887,19 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
         document.addEventListener('click', function(e) {
           var dd = document.getElementById('role-filter-dropdown');
           if (dd && dd.open && !dd.contains(e.target)) dd.removeAttribute('open');
+        });
+        document.addEventListener('keydown', function(e) {
+          var cb = e.target.closest('#role-filter-list input[type=checkbox]');
+          if (!cb) return;
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            var visible = Array.from(document.querySelectorAll('#role-filter-list li:not([hidden]) input[type=checkbox]'));
+            var next = visible.indexOf(cb) + (e.key === 'ArrowDown' ? 1 : -1);
+            if (next >= 0 && next < visible.length) visible[next].focus();
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('role-filter-dropdown').removeAttribute('open');
+          }
         });
       ` }} />
     </details>
@@ -900,16 +1130,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
             <tbody id="role-rows"></tbody>
           </table>
         </div>
-        <button
-          type="button"
-          class="btn btn-ghost"
-          hx-get="/members/role-row"
-          hx-target="#role-rows"
-          hx-swap="beforeend"
-          hx-include="[id='role-rows'] input[name='assignment_id[]']"
-        >
-          {t("members.form.addAssignment")}
-        </button>
+        <RoleRowsAddButton initialCount={0} />
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
@@ -917,12 +1138,6 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: `
-        document.querySelector('[hx-get="/members/role-row"]').addEventListener('htmx:configRequest', function(e) {
-          const rows = document.querySelectorAll('#role-rows tr').length;
-          e.detail.parameters['index'] = rows;
-        });
-      ` }} />
     </Layout>
   );
 });
@@ -964,18 +1179,18 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   if (!birthDate) errors.birthDate = t("common.required");
   if (!entryDate) errors.entryDate = t("common.required");
 
-  // Parse assignments
-  const assignmentRoles = [body["assignment_role[]"]].flat().filter(Boolean) as string[];
+  // Parse assignments (keep rows unfiltered so index i stays aligned across role/from/to)
+  const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
 
-  // Validate that every role assignment has a from date
-  if (assignmentRoles.some((r, i) => r && !assignmentFroms[i])) {
-    errors._assignments = t("members.error.assignmentMissingFrom");
+  // Validate that every non-empty row has both a role and a from date
+  if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
+    errors._assignments = t("members.error.assignmentIncomplete");
   }
 
   // Check for duplicate open assignments (same role without to-date)
-  const openRoles = assignmentRoles.filter((_, i) => !assignmentTos[i]);
+  const openRoles = assignmentRoles.filter((r, i) => r && !assignmentTos[i]);
   const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
   if (dupRole && !errors._assignments) {
     const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
@@ -1040,10 +1255,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-ghost"
-            hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-            {t("members.form.addAssignment")}
-          </button>
+          <RoleRowsAddButton initialCount={assignmentRoles.length} />
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
@@ -1306,10 +1518,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             </tbody>
           </table>
         </div>
-        <button type="button" class="btn btn-ghost"
-          hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-          {t("members.form.addAssignment")}
-        </button>
+        <RoleRowsAddButton initialCount={m.assignments.length} />
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
@@ -1344,13 +1553,19 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   if (!entryDate) errors.entryDate = t("common.required");
 
   const assignmentIds = [body["assignment_id[]"]].flat() as string[];
-  const assignmentRoles = [body["assignment_role[]"]].flat().filter(Boolean) as string[];
+  // Keep rows unfiltered so index i stays aligned across role/from/to
+  const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
 
-  const openRoles = assignmentRoles.filter((_, i) => !assignmentTos[i]);
+  // Validate that every non-empty row has both a role and a from date
+  if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
+    errors._assignments = t("members.error.assignmentIncomplete");
+  }
+
+  const openRoles = assignmentRoles.filter((r, i) => r && !assignmentTos[i]);
   const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
-  if (dupRole) {
+  if (dupRole && !errors._assignments) {
     const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
     errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
   }
@@ -1391,10 +1606,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-ghost"
-            hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-            {t("members.form.addAssignment")}
-          </button>
+          <RoleRowsAddButton initialCount={assignmentRoles.length} />
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
@@ -1462,10 +1674,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
               </tbody>
             </table>
           </div>
-          <button type="button" class="btn btn-ghost"
-            hx-get="/members/role-row" hx-target="#role-rows" hx-swap="beforeend">
-            {t("members.form.addAssignment")}
-          </button>
+          <RoleRowsAddButton initialCount={assignmentRoles.length} />
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>

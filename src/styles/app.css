@@ -43,3 +43,32 @@
   --color-dark: #0f2337;
   --color-surface: #f8f8f8;
 }
+
+/* Rollensuche-Combobox (members.tsx RoleRow): popover[auto] braucht eigenes
+   position:fixed + position-anchor, da das Popover hier eigenstaendig positioniert
+   wird statt relativ zu einem .dropdown-Wrapper (daisyUI's .dropdown[popover]-Regel
+   setzt Wrapper/Child voraus, hier aber ist der Trigger ein eigenstaendiger Button).
+   width:anchor-size(width) statt w-full, da w-full unter position:fixed gegen den
+   Viewport statt gegen den Trigger-Button auflöst. */
+.role-combobox-popover[popover] {
+  position: fixed;
+  position-area: block-end span-inline-end;
+  position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  width: max-content;
+  min-width: anchor-size(width);
+  max-width: min(24rem, calc(anchor-size(width) * 4));
+  margin-top: 0.25rem;
+}
+
+.role-combobox-list {
+  max-height: 16rem;
+  overflow-y: auto;
+  flex-wrap: nowrap; /* daisyUI's .menu defaults to flex-wrap:wrap, which splits a
+    too-tall list into side-by-side columns instead of scrolling vertically */
+}
+
+/* daisyUI's .menu{display:flex} (author CSS) overrides the UA's
+   [popover]:not(:popover-open){display:none}, since author always beats UA. */
+.role-combobox-popover:not(:popover-open) {
+  display: none;
+}
