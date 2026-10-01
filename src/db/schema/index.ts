@@ -8,3 +8,4 @@ export * from "./backup";
 export * from "./org-config";
 export * from "./donations";
 export * from "./applications";
+export * from "./inventory";

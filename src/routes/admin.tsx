@@ -39,6 +39,8 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "donations:issue-receipts": t("admin.permissions.key.donationsIssueReceipts"),
   "applications:review": t("admin.permissions.key.applicationsReview"),
   "applications:manage-forms": t("admin.permissions.key.applicationsManageForms"),
+  "inventory:read": t("admin.permissions.key.inventoryRead"),
+  "inventory:manage": t("admin.permissions.key.inventoryManage"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -46,6 +48,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   system: t("admin.permissions.resource.system"),
   donations: t("admin.permissions.resource.donations"),
   applications: t("admin.permissions.resource.applications"),
+  inventory: t("admin.permissions.resource.inventory"),
 };
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {

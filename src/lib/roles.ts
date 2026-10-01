@@ -10,6 +10,8 @@ export const PERMISSIONS = [
   "donations:issue-receipts",
   "applications:review",
   "applications:manage-forms",
+  "inventory:read",
+  "inventory:manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
