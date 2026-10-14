@@ -52,3 +52,12 @@ export function availableQuantity(
   }, 0);
   return item.quantity - item.retiredQuantity - used;
 }
+
+export type ItemStatus = "retired" | "lendable" | "active";
+
+// Ausgemustert gewinnt vor verleihbar; ohne lending:read ist Verleihbarkeit
+// unbekannt (`lendable` = false) und das Item gilt als aktiv.
+export function itemStatus(item: { retiredAt: unknown }, lendable: boolean): ItemStatus {
+  if (item.retiredAt) return "retired";
+  return lendable ? "lendable" : "active";
+}

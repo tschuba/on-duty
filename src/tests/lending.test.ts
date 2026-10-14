@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { effectiveRange, rangesOverlap, loanStatus, availableQuantity } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, loanStatus, availableQuantity, itemStatus } from "../lib/lending.js";
 
 describe("effectiveRange", () => {
   it("prefers the actual date over the planned date per edge", () => {
@@ -73,5 +73,13 @@ describe("availableQuantity", () => {
       loan({ plannedFrom: "2026-07-01", plannedTo: "2026-07-05" }),
       loan({}),
     ], today)).toBe(4);
+  });
+});
+
+describe("itemStatus", () => {
+  it("retired beats lendable, lendable beats active", () => {
+    expect(itemStatus({ retiredAt: new Date() }, true)).toBe("retired");
+    expect(itemStatus({ retiredAt: null }, true)).toBe("lendable");
+    expect(itemStatus({ retiredAt: null }, false)).toBe("active");
   });
 });

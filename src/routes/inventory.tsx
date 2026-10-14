@@ -10,7 +10,7 @@ import { formatDate } from "../lib/format.js";
 import { trimmed, parseTags } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
-import { countOverdueLoans, availableQuantity } from "../lib/lending.js";
+import { countOverdueLoans, availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -723,6 +723,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           ) : filtered.map((item) => {
             const due = item.category === "vehicle" ? item.vehicleInspectionDue : item.nextInspectionDue;
             const lending = lendingByItem.get(item.id);
+            const status = itemStatus(item, !!lending);
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
                 <td>{item.name}</td>
@@ -734,12 +735,12 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                   </div>
                 </td>
                 <td>
-                  {item.retiredAt
-                    ? <span class="badge badge-neutral badge-sm">{t("inventory.status.retired")}</span>
-                    : <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
+                  {status === "retired" && <span class="badge badge-neutral badge-sm">{t("inventory.status.retired")}</span>}
+                  {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
+                  {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
                 </td>
                 {canSeeLending && (
-                  <td>{lending ? <span class="badge badge-ghost badge-sm">{t("inventory.lending.available", { count: lending.available })}</span> : "—"}</td>
+                  <td>{lending ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-ghost"}`}>{t("inventory.lending.available", { count: lending.available })}</span> : "—"}</td>
                 )}
                 {canLend && (
                   <td>

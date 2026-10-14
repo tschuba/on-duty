@@ -563,6 +563,7 @@ export const de = {
   "inventory.category.other": "Sonstiges",
   "inventory.status.active": "Aktiv",
   "inventory.status.retired": "Ausgemustert",
+  "inventory.status.lendable": "Verleihbar",
   "inventory.form.name": "Name",
   "inventory.form.category": "Kategorie",
   "inventory.form.categoryPlaceholder": "Bitte wählen…",
