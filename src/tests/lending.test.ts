@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { effectiveRange, rangesOverlap, loanStatus } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, loanStatus, availableQuantity } from "../lib/lending.js";
 
 describe("effectiveRange", () => {
   it("prefers the actual date over the planned date per edge", () => {
@@ -55,5 +55,23 @@ describe("loanStatus", () => {
 
   it("is planned when not yet picked up", () => {
     expect(loanStatus({ plannedFrom: "2026-06-20", plannedTo: "2026-06-25", pickedUpAt: null, returnedAt: null }, today)).toBe("planned");
+  });
+});
+
+describe("availableQuantity", () => {
+  const today = "2026-06-15";
+  const item = { quantity: 5, retiredQuantity: 1 };
+  const loan = (o: Record<string, unknown>) => ({ quantity: 1, plannedFrom: null, plannedTo: null, pickedUpAt: null, returnedAt: null, ...o }) as any;
+
+  it("subtracts retired and currently running loan quantities", () => {
+    expect(availableQuantity(item, [loan({ quantity: 2, plannedFrom: "2026-06-10", plannedTo: "2026-06-20" })], today)).toBe(2);
+  });
+
+  it("ignores returned and future loans and loans without dates", () => {
+    expect(availableQuantity(item, [
+      loan({ plannedFrom: "2026-06-01", plannedTo: "2026-06-10", returnedAt: "2026-06-05" }),
+      loan({ plannedFrom: "2026-07-01", plannedTo: "2026-07-05" }),
+      loan({}),
+    ], today)).toBe(4);
   });
 });

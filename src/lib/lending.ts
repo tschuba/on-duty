@@ -37,3 +37,18 @@ export function loanStatus(l: LoanRange, today: string): LoanStatus {
   if (l.plannedTo && l.plannedTo < today) return "overdue";
   return l.pickedUpAt ? "active" : "planned";
 }
+
+// Verfügbare Menge zum Stichtag — siehe Backlog-Doc "Einzel-Tracking vs. Stückzahl":
+// verfügbar = quantity - retiredQuantity - Σ(Menge aller am Stichtag laufenden Vorgänge).
+export function availableQuantity(
+  item: { quantity: number; retiredQuantity: number },
+  loans: (LoanRange & { quantity: number })[],
+  today: string,
+): number {
+  const day = { from: today, to: today };
+  const used = loans.reduce((sum, l) => {
+    const range = effectiveRange(l);
+    return range && rangesOverlap(range, day) ? sum + l.quantity : sum;
+  }, 0);
+  return item.quantity - item.retiredQuantity - used;
+}
