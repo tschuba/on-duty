@@ -61,3 +61,19 @@ export function itemStatus(item: { retiredAt: unknown }, lendable: boolean): Ite
   if (item.retiredAt) return "retired";
   return lendable ? "lendable" : "active";
 }
+
+export type LoanDateError = "returnedWithoutPickup" | "returnedBeforePickup";
+
+// Tatsachen müssen zueinander passen: Rückgabe setzt Abholung voraus und liegt
+// nicht davor. plannedTo < plannedFrom wird bewusst nicht geprüft.
+export function validateLoanDates(l: { pickedUpAt: string | null; returnedAt: string | null }): LoanDateError | null {
+  if (!l.returnedAt) return null;
+  if (!l.pickedUpAt) return "returnedWithoutPickup";
+  return l.returnedAt < l.pickedUpAt ? "returnedBeforePickup" : null;
+}
+
+// returnTo kommt vom Client: nur Pfade unter /inventory/lending (Open-Redirect-
+// Schutz, kein CR/LF im Header), sonst Fallback.
+export function safeReturnTo(value: string | undefined, fallback: string): string {
+  return value && /^\/inventory\/lending(?:[/?][^\r\n]*)?$/.test(value) ? value : fallback;
+}

@@ -13,6 +13,7 @@ let membersFindFirstResult: any = undefined;
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
+const deleteCalls: { table: any }[] = [];
 
 function makeInsert() {
   return vi.fn((table: any) => ({
@@ -33,6 +34,13 @@ function makeUpdate() {
     }),
   }));
 }
+
+const deleteFn = vi.fn((table: any) => ({
+  where: vi.fn(() => {
+    deleteCalls.push({ table });
+    return Promise.resolve(undefined);
+  }),
+}));
 
 const insert = makeInsert();
 const update = makeUpdate();
@@ -58,6 +66,7 @@ vi.mock("../db/index.js", () => ({
     },
     insert,
     update,
+    delete: deleteFn,
     transaction,
   },
 }));
@@ -77,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   insertCalls.length = 0;
   updateCalls.length = 0;
+  deleteCalls.length = 0;
   lendingItemsFindManyResult = [];
   lendingItemsFindFirstResult = undefined;
   lendingLoansFindManyResult = [];
@@ -455,5 +465,127 @@ describe("POST /inventory/lending/loans/:loanId", () => {
     });
     expect(res.status).toBe(302);
     expect(updateCalls[0].set).toMatchObject({ pickedUpAt: "2026-01-01", returnedAt: "2026-01-05" });
+  });
+});
+
+// ── Aktions-Popup ────────────────────────────────────────────────────────────
+
+describe("loan dialog", () => {
+  const planned = { id: "loan1", lendingItemId: "li1", quantity: 1, plannedFrom: "2026-01-01", plannedTo: "2026-01-05", pickedUpAt: null, returnedAt: null, borrowerMember: null, borrowerName: "Externer" };
+  const post = (path: string, fields: Record<string, string>, htmx = false) =>
+    lendingRoutes.request(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...(htmx ? { "HX-Request": "true" } : {}) },
+      body: formBody(fields),
+    });
+
+  beforeEach(() => {
+    lendingLoansFindFirstResult = planned;
+    lendingItemsFindFirstResult = makeLendingItem();
+    lendingLoansFindManyResult = [planned];
+  });
+
+  it("offers pickup, edit and delete for a planned loan", async () => {
+    const html = await (await lendingRoutes.request("/loans/loan1/actions?returnTo=/inventory/lending%3Fstatus%3Dplanned")).text();
+    expect(html).toContain("Abgeholt eintragen");
+    expect(html).not.toContain("Zurückgegeben eintragen");
+    expect(html).toContain("Bearbeiten");
+    expect(html).toContain("Löschen");
+    expect(html).toContain("Alle Vorgänge dieses Items");
+  });
+
+  it("offers return (not pickup) for a picked-up loan", async () => {
+    lendingLoansFindFirstResult = { ...planned, pickedUpAt: "2026-01-01" };
+    const html = await (await lendingRoutes.request("/loans/loan1/actions")).text();
+    expect(html).toContain("Zurückgegeben eintragen");
+    expect(html).not.toContain("Abgeholt eintragen");
+  });
+
+  it("offers only edit and delete for a returned loan", async () => {
+    lendingLoansFindFirstResult = { ...planned, pickedUpAt: "2026-01-01", returnedAt: "2026-01-04" };
+    const html = await (await lendingRoutes.request("/loans/loan1/actions")).text();
+    expect(html).not.toContain("eintragen");
+    expect(html).toContain("Bearbeiten");
+  });
+
+  it("prefills the pickup date and 404s for unknown views/loans", async () => {
+    const html = await (await lendingRoutes.request("/loans/loan1/pickup")).text();
+    expect(html).toContain(`value="${new Date().toISOString().slice(0, 10)}"`);
+    expect((await lendingRoutes.request("/loans/loan1/bogus")).status).toBe(404);
+    lendingLoansFindFirstResult = undefined;
+    expect((await lendingRoutes.request("/loans/missing/actions")).status).toBe(404);
+  });
+
+  it("pickup only touches pickedUpAt and keeps planned dates", async () => {
+    const res = await post("/loans/loan1/pickup", { pickedUpAt: "2026-01-02", returnTo: "/inventory/lending?status=planned" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/inventory/lending?status=planned");
+    expect(updateCalls[0].set).toEqual({ pickedUpAt: "2026-01-02" });
+  });
+
+  it("uses HX-Redirect for htmx posts", async () => {
+    const res = await post("/loans/loan1/pickup", { pickedUpAt: "2026-01-02", returnTo: "/inventory/lending" }, true);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("HX-Redirect")).toBe("/inventory/lending");
+  });
+
+  it("ignores a foreign returnTo", async () => {
+    const res = await post("/loans/loan1/pickup", { pickedUpAt: "2026-01-02", returnTo: "https://evil.example/" });
+    expect(res.headers.get("location")).toBe("/inventory/lending/li1/loans");
+  });
+
+  it("rejects a return before pickup inline in the dialog", async () => {
+    lendingLoansFindFirstResult = { ...planned, pickedUpAt: "2026-01-03" };
+    const res = await post("/loans/loan1/return", { returnedAt: "2026-01-02" }, true);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("liegt vor dem Abholdatum");
+    expect(updateCalls.length).toBe(0);
+  });
+
+  it("rejects a return without pickup", async () => {
+    const res = await post("/loans/loan1/return", { returnedAt: "2026-01-02" }, true);
+    expect(await res.text()).toContain("ohne Abholdatum");
+    expect(updateCalls.length).toBe(0);
+  });
+
+  it("never blocks a pickup on availability", async () => {
+    lendingLoansFindManyResult = [planned, { id: "loan2", quantity: 1, plannedFrom: "2026-01-02", plannedTo: "2026-01-04", pickedUpAt: null, returnedAt: null }];
+    const res = await post("/loans/loan1/pickup", { pickedUpAt: "2026-01-03" });
+    expect(res.status).toBe(302);
+    expect(updateCalls[0].set).toEqual({ pickedUpAt: "2026-01-03" });
+  });
+
+  it("edit keeps fields missing from the body", async () => {
+    const res = await post("/loans/loan1", { pickedUpAt: "2026-01-02" });
+    expect(res.status).toBe(302);
+    expect(updateCalls[0].set).toMatchObject({ plannedFrom: "2026-01-01", plannedTo: "2026-01-05", pickedUpAt: "2026-01-02", quantity: 1 });
+  });
+
+  it("deletes the loan and redirects", async () => {
+    const res = await post("/loans/loan1/delete", { returnTo: "/inventory/lending" });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.length).toBe(1);
+  });
+
+  it("404s delete for an unknown loan", async () => {
+    lendingLoansFindFirstResult = undefined;
+    expect((await post("/loans/missing/delete", {})).status).toBe(404);
+    expect(deleteCalls.length).toBe(0);
+  });
+
+  it("applies the date rules when creating", async () => {
+    lendingItemsFindFirstResult = makeLendingItem();
+    const res = await post("/li1/loans", { borrowerType: "external", borrowerName: "X", returnedAt: "2026-01-02" });
+    expect(res.status).toBe(422);
+    expect(insertCalls.length).toBe(0);
+  });
+
+  it("shows the dialog trigger only for managers", async () => {
+    lendingLoansFindManyResult = [{ ...planned, lendingItem: makeLendingItem() }];
+    expect(await (await lendingRoutes.request("/")).text()).toContain("hx-get");
+    currentUser = { ...currentUser, permissions: new Set(["lending:read"]) };
+    const html = await (await lendingRoutes.request("/")).text();
+    expect(html).not.toContain("hx-get");
+    expect(html).toContain("window.location");
   });
 });

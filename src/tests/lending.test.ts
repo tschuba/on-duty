@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { effectiveRange, rangesOverlap, loanStatus, availableQuantity, itemStatus } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, loanStatus, availableQuantity, itemStatus, validateLoanDates, safeReturnTo } from "../lib/lending.js";
 
 describe("effectiveRange", () => {
   it("prefers the actual date over the planned date per edge", () => {
@@ -81,5 +81,31 @@ describe("itemStatus", () => {
     expect(itemStatus({ retiredAt: new Date() }, true)).toBe("retired");
     expect(itemStatus({ retiredAt: null }, true)).toBe("lendable");
     expect(itemStatus({ retiredAt: null }, false)).toBe("active");
+  });
+});
+
+describe("validateLoanDates", () => {
+  it("accepts no return, or a return on/after pickup", () => {
+    expect(validateLoanDates({ pickedUpAt: null, returnedAt: null })).toBeNull();
+    expect(validateLoanDates({ pickedUpAt: "2026-01-02", returnedAt: null })).toBeNull();
+    expect(validateLoanDates({ pickedUpAt: "2026-01-02", returnedAt: "2026-01-02" })).toBeNull();
+  });
+  it("flags a return without pickup or before pickup", () => {
+    expect(validateLoanDates({ pickedUpAt: null, returnedAt: "2026-01-02" })).toBe("returnedWithoutPickup");
+    expect(validateLoanDates({ pickedUpAt: "2026-01-03", returnedAt: "2026-01-02" })).toBe("returnedBeforePickup");
+  });
+});
+
+describe("safeReturnTo", () => {
+  const fb = "/inventory/lending/x/loans";
+  it("keeps paths under /inventory/lending", () => {
+    expect(safeReturnTo("/inventory/lending", fb)).toBe("/inventory/lending");
+    expect(safeReturnTo("/inventory/lending?status=active", fb)).toBe("/inventory/lending?status=active");
+    expect(safeReturnTo("/inventory/lending/abc/loans", fb)).toBe("/inventory/lending/abc/loans");
+  });
+  it("falls back for everything else", () => {
+    for (const bad of [undefined, "", "https://evil.example", "//evil.example", "/inventory/lendingx", "/admin", "/inventory/lending\r\nX: y"]) {
+      expect(safeReturnTo(bad, fb)).toBe(fb);
+    }
   });
 });

@@ -8,7 +8,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { effectiveRange, rangesOverlap, countOverdueLoans, loanStatus, type LoanRange, type LoanStatus } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, countOverdueLoans, loanStatus, validateLoanDates, safeReturnTo, type LoanRange, type LoanStatus } from "../lib/lending.js";
 import { InventoryTabs, CATEGORIES, CATEGORY_LABELS } from "./inventory.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -56,6 +56,13 @@ async function fetchLoans(lendingItemId: string): Promise<LoanWithBorrower[]> {
     where: eq(lendingLoans.lendingItemId, lendingItemId),
     with: { borrowerMember: { with: { person: true } } },
   }) as unknown as Promise<LoanWithBorrower[]>;
+}
+
+async function fetchLoan(id: string): Promise<LoanWithBorrower | undefined> {
+  return db.query.lendingLoans.findFirst({
+    where: eq(lendingLoans.id, id),
+    with: { borrowerMember: { with: { person: true } } },
+  }) as unknown as Promise<LoanWithBorrower | undefined>;
 }
 
 // ── Vorgangsliste (GET /inventory/lending) ──────────────────────────────────
@@ -144,6 +151,8 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   }
 
   const hasFilter = Boolean(search || status || category || rangeMode);
+  const canManage = user.permissions.has("lending:manage");
+  const returnTo = currentPath(c.req.url);
 
   return c.html(
     <Layout title={t("lending.title")} user={user} activeNav="inventory">
@@ -197,7 +206,11 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
                     const date = l.plannedFrom ?? l.pickedUpAt ?? "";
                     const border = idx > 0 ? " border-t border-base-300" : "";
                     return (
-                      <tr key={l.id} class={`cursor-pointer hover${loanState === "overdue" ? " text-error" : ""}`} onclick={`window.location='/inventory/lending/${l.lendingItem.id}/loans'`}>
+                      <tr
+                        key={l.id}
+                        class={`cursor-pointer hover${loanState === "overdue" ? " text-error" : ""}`}
+                        {...(canManage ? loanDialogTrigger(l.id, returnTo) : { onclick: `window.location='/inventory/lending/${l.lendingItem.id}/loans'` })}
+                      >
                         <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(date)}</td>
                         <td class={border}>{l.lendingItem.inventoryItem.name}</td>
                         <td class={border}>{borrowerLabel(l)}</td>
@@ -212,9 +225,148 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           </table>
         </div>
       )}
+      {canManage && <LoanDialog />}
     </Layout>
   );
 });
+
+// ── Aktions-Popup ────────────────────────────────────────────────────────────
+// Ein geteilter <dialog> pro Seite; Inhalt kommt als HTMX-Fragment von
+// GET /loans/:loanId/:view. returnTo (Allowlist in safeReturnTo) bestimmt, wohin
+// nach Erfolg zurückgeleitet wird.
+
+const LOAN_DIALOG_ID = "loan-dialog";
+const LOAN_DIALOG_BODY_ID = "loan-dialog-body";
+
+function currentPath(url: string): string {
+  const u = new URL(url);
+  return u.pathname + u.search;
+}
+
+function loanDialogTrigger(loanId: string, returnTo: string) {
+  return {
+    "hx-get": `/inventory/lending/loans/${loanId}/actions?returnTo=${encodeURIComponent(returnTo)}`,
+    "hx-target": `#${LOAN_DIALOG_BODY_ID}`,
+    "hx-on::after-request": `document.getElementById('${LOAN_DIALOG_ID}').showModal()`,
+  };
+}
+
+function LoanDialog() {
+  return (
+    <dialog id={LOAN_DIALOG_ID} class="modal">
+      <div class="modal-box">
+        <div id={LOAN_DIALOG_BODY_ID} hx-target={`#${LOAN_DIALOG_BODY_ID}`} />
+      </div>
+      <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+    </dialog>
+  );
+}
+
+type LoanDialogView = "actions" | "pickup" | "return" | "edit" | "delete";
+const LOAN_DIALOG_VIEWS: LoanDialogView[] = ["actions", "pickup", "return", "edit", "delete"];
+
+function LoanDialogContent({ loan, item, returnTo, view, values, error }: {
+  loan: LoanWithBorrower;
+  item: LendingItemWithRelations;
+  returnTo: string;
+  view: LoanDialogView;
+  values?: Partial<Record<"date" | "quantity" | "plannedFrom" | "plannedTo" | "pickedUpAt" | "returnedAt", string>>;
+  error?: string;
+}) {
+  const base = `/inventory/lending/loans/${loan.id}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const state = loanStatus(loan, today);
+  const v = values ?? {};
+  const q = `?returnTo=${encodeURIComponent(returnTo)}`;
+  const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
+  const closeDialog = `document.getElementById('${LOAN_DIALOG_ID}').close()`;
+  const back = (
+    <button type="button" class="btn" hx-get={`${base}/actions${q}`}>{t("lending.loans.actions.back")}</button>
+  );
+  const returnToField = <input type="hidden" name="returnTo" value={returnTo} />;
+  const errorLine = error && <p class="text-error text-sm mt-2">{error}</p>;
+  const dateForm = (name: "pickedUpAt" | "returnedAt", action: "pickup" | "return") => (
+    <form hx-post={`${base}/${action}`} class="space-y-2">
+      {returnToField}
+      <label class="label"><span class="label-text">{t(name === "pickedUpAt" ? "lending.loans.form.pickedUpAt" : "lending.loans.form.returnedAt")}</span></label>
+      <input type="date" name={name} value={v.date ?? today} required class="input input-bordered w-full" />
+      {errorLine}
+      <div class="modal-action">
+        {back}
+        <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
+      </div>
+    </form>
+  );
+
+  return (
+    <div>
+      <h3 class="font-bold text-lg">{item.inventoryItem.name}</h3>
+      <p class="py-1 opacity-70">
+        {borrowerLabel(loan)} · <span class={LOAN_STATUS_BADGE[state]}>{LOAN_STATUS_LABEL[state]}</span>
+      </p>
+
+      {view === "actions" && (
+        <>
+          <div class="flex flex-col gap-2 mt-2">
+            {!loan.pickedUpAt && !loan.returnedAt && (
+              <button type="button" class="btn btn-outline" hx-get={`${base}/pickup${q}`}>{t("lending.loans.actions.pickup")}</button>
+            )}
+            {loan.pickedUpAt && !loan.returnedAt && (
+              <button type="button" class="btn btn-outline" hx-get={`${base}/return${q}`}>{t("lending.loans.actions.return")}</button>
+            )}
+            <button type="button" class="btn btn-outline" hx-get={`${base}/edit${q}`}>{t("lending.loans.actions.edit")}</button>
+            <button type="button" class="btn btn-outline btn-error" hx-get={`${base}/delete${q}`}>{t("lending.loans.actions.delete")}</button>
+            {!returnTo.startsWith(`/inventory/lending/${item.id}/loans`) && (
+              <a href={`/inventory/lending/${item.id}/loans`} class="link link-hover text-sm">{t("lending.loans.actions.allLoans")}</a>
+            )}
+          </div>
+          <div class="modal-action">
+            <button type="button" class="btn" onclick={closeDialog}>{t("common.close")}</button>
+          </div>
+        </>
+      )}
+
+      {view === "pickup" && dateForm("pickedUpAt", "pickup")}
+      {view === "return" && dateForm("returnedAt", "return")}
+
+      {view === "edit" && (
+        <form hx-post={base} class="space-y-2">
+          {returnToField}
+          {!item.individualTracking && (
+            <div class="form-control max-w-32">
+              <label class="label"><span class="label-text">{t("lending.loans.form.quantity")}</span></label>
+              <input type="number" name="quantity" min="1" max={maxQuantity} value={v.quantity ?? String(loan.quantity)} class="input input-bordered w-full" />
+            </div>
+          )}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(["plannedFrom", "plannedTo", "pickedUpAt", "returnedAt"] as const).map((f) => (
+              <div class="form-control">
+                <label class="label"><span class="label-text">{t(`lending.loans.form.${f}`)}</span></label>
+                <input type="date" name={f} value={v[f] ?? loan[f] ?? ""} class="input input-bordered w-full" />
+              </div>
+            ))}
+          </div>
+          {errorLine}
+          <div class="modal-action">
+            {back}
+            <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
+          </div>
+        </form>
+      )}
+
+      {view === "delete" && (
+        <form hx-post={`${base}/delete`}>
+          {returnToField}
+          <p class="py-2">{t("lending.loans.actions.deleteBody", { borrower: borrowerLabel(loan), name: item.inventoryItem.name })}</p>
+          <div class="modal-action">
+            {back}
+            <button type="submit" class="btn btn-error">{t("lending.loans.actions.deleteConfirm")}</button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
 
 // ── Verleihvorgänge zu einem Gegenstand ─────────────────────────────────────
 
@@ -364,6 +516,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity, memberName
           </button>
         </div>
       </div>
+      {errors?.dates && <span class="text-error text-sm">{errors.dates}</span>}
       {errors?.conflict && <span class="text-error text-sm">{errors.conflict}</span>}
 
       <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
@@ -381,6 +534,8 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
     .filter((l) => !l.returnedAt)
     .reduce((sum, l) => sum + l.quantity, 0);
   const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
+  const canManage = user.permissions.has("lending:manage");
+  const returnTo = currentPath(c.req.url);
 
   const sorted = [...loans].sort((a, b) => (b.plannedFrom ?? b.pickedUpAt ?? "").localeCompare(a.plannedFrom ?? a.pickedUpAt ?? ""));
 
@@ -395,7 +550,7 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
         <div class="alert alert-warning max-w-2xl mb-4">{t("lending.retired.notice")}</div>
       )}
 
-      {!item.inventoryItem.retiredAt && user.permissions.has("lending:manage") && (
+      {!item.inventoryItem.retiredAt && canManage && (
         <div class="mb-6">
           <LoanForm action={`/inventory/lending/${item.id}/loans`} item={item} maxQuantity={maxQuantity} />
         </div>
@@ -411,11 +566,12 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
             <th>{t("lending.loans.table.plannedTo")}</th>
             <th>{t("lending.loans.table.pickedUpAt")}</th>
             <th>{t("lending.loans.table.returnedAt")}</th>
+            {canManage && <th />}
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <tr><td colspan={item.individualTracking ? 5 : 6} class="text-center opacity-50 py-8">{t("lending.loans.table.empty")}</td></tr>
+            <tr><td colspan={(item.individualTracking ? 5 : 6) + (canManage ? 1 : 0)} class="text-center opacity-50 py-8">{t("lending.loans.table.empty")}</td></tr>
           ) : sorted.map((l) => {
             const overdue = Boolean(l.plannedTo && l.plannedTo < today && !l.returnedAt);
             const borrower = l.borrowerMember ? `${l.borrowerMember.person.firstName} ${l.borrowerMember.person.lastName}` : l.borrowerName || "—";
@@ -427,11 +583,17 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
                 <td>{formatDate(l.plannedTo)}</td>
                 <td>{formatDate(l.pickedUpAt)}</td>
                 <td>{formatDate(l.returnedAt)}</td>
+                {canManage && (
+                  <td class="text-right">
+                    <button type="button" class="btn btn-ghost btn-sm" {...loanDialogTrigger(l.id, returnTo)}>{t("lending.loans.actions.open")}</button>
+                  </td>
+                )}
               </tr>
             );
           })}
         </tbody>
       </table>
+      {canManage && <LoanDialog />}
     </Layout>
   );
 });
@@ -495,6 +657,8 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string, 
   if (!item) errors.item = t("lending.loans.error.itemRequired");
   if (!borrowerMemberId && !borrowerName) errors.borrower = t("lending.loans.error.borrowerRequired");
   if (item && !item.individualTracking && (!Number.isInteger(quantity) || quantity < 1)) errors.quantity = t("lending.loans.error.invalidQuantity");
+  const dateError = validateLoanDates({ pickedUpAt, returnedAt });
+  if (dateError) errors.dates = t(`lending.loans.error.${dateError}`);
 
   if (item) {
     const existingLoans = await fetchLoans(item.id);
@@ -578,33 +742,89 @@ lendingRoutes.post("/loans", requireAuth("lending:manage"), async (c) => {
 
 lendingRoutes.post("/:id/loans", requireAuth("lending:manage"), (c) => createLoan(c, c.req.param("id"), false));
 
-// POST /inventory/lending/loans/:loanId — Ab-/Rückgabedatum eintragen, Plandatum
-// übernehmen (clientseitig). Re-prüft Verfügbarkeit gegen die übrigen Vorgänge.
-lendingRoutes.post("/loans/:loanId", requireAuth("lending:manage"), async (c) => {
-  const loanId = c.req.param("loanId");
-  const loan = await db.query.lendingLoans.findFirst({ where: eq(lendingLoans.id, loanId) });
-  if (!loan) return c.notFound();
-  const item = await fetchLendingItem(loan.lendingItemId);
-  if (!item) return c.notFound();
+const isHtmx = (c: Context) => c.req.header("HX-Request") === "true";
+
+// Erfolg: HTMX-Formulare im Popup folgen keinem 302 sinnvoll, daher HX-Redirect.
+function finish(c: Context, returnTo: string) {
+  if (isHtmx(c)) {
+    c.header("HX-Redirect", returnTo);
+    return c.body(null, 200);
+  }
+  return c.redirect(returnTo);
+}
+
+async function loadLoanWithItem(loanId: string) {
+  const loan = await fetchLoan(loanId);
+  const item = loan ? await fetchLendingItem(loan.lendingItemId) : undefined;
+  return loan && item ? { loan, item } : undefined;
+}
+
+// GET /inventory/lending/loans/:loanId/:view — Popup-Fragment (HTMX).
+lendingRoutes.get("/loans/:loanId/:view", requireAuth("lending:manage"), async (c) => {
+  const view = c.req.param("view") as LoanDialogView;
+  if (!LOAN_DIALOG_VIEWS.includes(view)) return c.notFound();
+  const found = await loadLoanWithItem(c.req.param("loanId"));
+  if (!found) return c.notFound();
+  const returnTo = safeReturnTo(c.req.query("returnTo"), `/inventory/lending/${found.item.id}/loans`);
+  return c.html(<LoanDialogContent {...found} returnTo={returnTo} view={view} />);
+});
+
+// Gemeinsamer Schreibpfad für Abholen, Zurückgeben und Bearbeiten. Datumsregeln
+// gelten immer; die Verfügbarkeit nur, wenn sich Plan oder Menge ändern
+// (Abholung/Rückgabe sind Tatsachen und werden nie blockiert).
+async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string, view: "pickup" | "return" | "edit") {
+  const found = await loadLoanWithItem(loanId);
+  if (!found) return c.notFound();
+  const { loan, item } = found;
 
   const body = await c.req.parseBody();
-  const plannedFrom = trimmed(body, "plannedFrom") || null;
-  const plannedTo = trimmed(body, "plannedTo") || null;
-  const pickedUpAt = trimmed(body, "pickedUpAt") || null;
-  const returnedAt = trimmed(body, "returnedAt") || null;
-  const quantity = item.individualTracking ? 1 : Math.max(1, Math.round(Number(trimmed(body, "quantity"))) || 1);
+  const returnTo = safeReturnTo(trimmed(body, "returnTo"), `/inventory/lending/${item.id}/loans`);
+  const pick = (key: "plannedFrom" | "plannedTo" | "pickedUpAt" | "returnedAt") =>
+    key in body ? trimmed(body, key) || null : loan[key];
 
-  const errors: Record<string, string> = {};
-  const existingLoans = await fetchLoans(item.id);
-  const conflict = checkAvailability(item, existingLoans, { plannedFrom, plannedTo, pickedUpAt, returnedAt, quantity }, loan.id);
-  if (conflict) errors.conflict = conflict;
+  const patch =
+    view === "pickup" ? { pickedUpAt: trimmed(body, "pickedUpAt") || null }
+    : view === "return" ? { returnedAt: trimmed(body, "returnedAt") || null }
+    : {
+        plannedFrom: pick("plannedFrom"),
+        plannedTo: pick("plannedTo"),
+        pickedUpAt: pick("pickedUpAt"),
+        returnedAt: pick("returnedAt"),
+        quantity: item.individualTracking ? 1 : "quantity" in body ? Math.max(1, Math.round(Number(trimmed(body, "quantity"))) || 1) : loan.quantity,
+      };
+  const next = { ...loan, ...patch };
 
-  if (Object.keys(errors).length > 0) {
-    setFlash(c, conflict!, "error");
-    return c.redirect(`/inventory/lending/${item.id}/loans`);
+  let error: string | null = null;
+  const dateError = validateLoanDates(next);
+  if (dateError) error = t(`lending.loans.error.${dateError}`);
+  else if (next.plannedFrom !== loan.plannedFrom || next.plannedTo !== loan.plannedTo || next.quantity !== loan.quantity) {
+    error = checkAvailability(item, await fetchLoans(item.id), next, loan.id);
   }
 
-  await db.update(lendingLoans).set({ plannedFrom, plannedTo, pickedUpAt, returnedAt, quantity }).where(eq(lendingLoans.id, loanId));
+  if (error) {
+    if (!isHtmx(c)) {
+      setFlash(c, error, "error");
+      return c.redirect(returnTo);
+    }
+    // Status 200: HTMX tauscht 4xx-Antworten nicht ein, der Dialog soll offen bleiben.
+    const values = { date: String(view === "pickup" ? next.pickedUpAt ?? "" : next.returnedAt ?? ""), quantity: String(next.quantity), plannedFrom: next.plannedFrom ?? "", plannedTo: next.plannedTo ?? "", pickedUpAt: next.pickedUpAt ?? "", returnedAt: next.returnedAt ?? "" };
+    return c.html(<LoanDialogContent loan={loan} item={item} returnTo={returnTo} view={view} values={values} error={error} />);
+  }
+
+  await db.update(lendingLoans).set(patch).where(eq(lendingLoans.id, loan.id));
   setFlash(c, t("lending.loans.flash.updated"), "success");
-  return c.redirect(`/inventory/lending/${item.id}/loans`);
+  return finish(c, returnTo);
+}
+
+lendingRoutes.post("/loans/:loanId", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId"), "edit"));
+lendingRoutes.post("/loans/:loanId/pickup", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId"), "pickup"));
+lendingRoutes.post("/loans/:loanId/return", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId"), "return"));
+
+lendingRoutes.post("/loans/:loanId/delete", requireAuth("lending:manage"), async (c) => {
+  const found = await loadLoanWithItem(c.req.param("loanId"));
+  if (!found) return c.notFound();
+  const body = await c.req.parseBody();
+  await db.delete(lendingLoans).where(eq(lendingLoans.id, found.loan.id));
+  setFlash(c, t("lending.loans.flash.deleted"), "success");
+  return finish(c, safeReturnTo(trimmed(body, "returnTo"), `/inventory/lending/${found.item.id}/loans`));
 });
