@@ -271,6 +271,18 @@ describe("POST /inventory/lending/:id/loans", () => {
     expect(res.status).toBe(422);
   });
 
+  it("blocks a quantity above stock even without dates", async () => {
+    lendingItemsFindFirstResult = makeLendingItem({ individualTracking: false, inventoryItem: { ...makeLendingItem().inventoryItem, quantity: 1, retiredQuantity: 0 } });
+    lendingLoansFindManyResult = [];
+    const res = await lendingRoutes.request("/li1/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ borrowerType: "external", borrowerName: "Externer", quantity: "5" }),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.find((c) => c.table === lendingLoans)).toBeUndefined();
+  });
+
   it("404s for a retired item", async () => {
     lendingItemsFindFirstResult = makeLendingItem({ inventoryItem: { ...makeLendingItem().inventoryItem, retiredAt: "2026-01-01" } });
     const res = await lendingRoutes.request("/li1/loans", {

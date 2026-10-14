@@ -670,5 +670,6 @@ export const de = {
   "lending.loans.error.borrowerRequired": "Mitglied oder Name angeben.",
   "lending.loans.error.conflict": "Zeitraum überschneidet sich mit einem bestehenden Vorgang (nicht genug verfügbar).",
   "lending.loans.error.invalidQuantity": "Ungültige Menge (mindestens 1).",
+  "lending.loans.error.exceedsStock": "Menge übersteigt den Bestand (höchstens {max}).",
   "lending.retired.notice": "Zugehöriges Inventar-Item ist ausgemustert — kein neuer Vorgang anlegbar.",
 } as const;

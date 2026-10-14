@@ -446,6 +446,13 @@ function checkAvailability(
   candidate: { plannedFrom: string | null; plannedTo: string | null; pickedUpAt: string | null; returnedAt: string | null; quantity: number },
   excludeLoanId?: string,
 ): string | null {
+  // Menge gegen den Bestand prüfen, auch ohne Datum (sonst umgeht ein Vorgang
+  // ganz ohne Zeitraum jede Prüfung).
+  if (!item.individualTracking) {
+    const stock = item.inventoryItem.quantity - item.inventoryItem.retiredQuantity;
+    if (stock > 0 && candidate.quantity > stock) return t("lending.loans.error.exceedsStock", { max: stock });
+  }
+
   const candidateRange = effectiveRange(candidate);
   if (!candidateRange) return null;
 
