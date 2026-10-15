@@ -37,3 +37,43 @@ export function loanStatus(l: LoanRange, today: string): LoanStatus {
   if (l.plannedTo && l.plannedTo < today) return "overdue";
   return l.pickedUpAt ? "active" : "planned";
 }
+
+// Verfügbare Menge zum Stichtag — siehe Backlog-Doc "Einzel-Tracking vs. Stückzahl":
+// verfügbar = quantity - retiredQuantity - Σ(Menge aller am Stichtag laufenden Vorgänge).
+export function availableQuantity(
+  item: { quantity: number; retiredQuantity: number },
+  loans: (LoanRange & { quantity: number })[],
+  today: string,
+): number {
+  const day = { from: today, to: today };
+  const used = loans.reduce((sum, l) => {
+    const range = effectiveRange(l);
+    return range && rangesOverlap(range, day) ? sum + l.quantity : sum;
+  }, 0);
+  return item.quantity - item.retiredQuantity - used;
+}
+
+export type ItemStatus = "retired" | "lendable" | "active";
+
+// Ausgemustert gewinnt vor verleihbar; ohne lending:read ist Verleihbarkeit
+// unbekannt (`lendable` = false) und das Item gilt als aktiv.
+export function itemStatus(item: { retiredAt: unknown }, lendable: boolean): ItemStatus {
+  if (item.retiredAt) return "retired";
+  return lendable ? "lendable" : "active";
+}
+
+export type LoanDateError = "returnedWithoutPickup" | "returnedBeforePickup";
+
+// Tatsachen müssen zueinander passen: Rückgabe setzt Abholung voraus und liegt
+// nicht davor. plannedTo < plannedFrom wird bewusst nicht geprüft.
+export function validateLoanDates(l: { pickedUpAt: string | null; returnedAt: string | null }): LoanDateError | null {
+  if (!l.returnedAt) return null;
+  if (!l.pickedUpAt) return "returnedWithoutPickup";
+  return l.returnedAt < l.pickedUpAt ? "returnedBeforePickup" : null;
+}
+
+// returnTo kommt vom Client: nur Pfade unter /inventory/lending (Open-Redirect-
+// Schutz, kein CR/LF im Header), sonst Fallback.
+export function safeReturnTo(value: string | undefined, fallback: string): string {
+  return value && /^\/inventory\/lending(?:[/?][^\r\n]*)?$/.test(value) ? value : fallback;
+}

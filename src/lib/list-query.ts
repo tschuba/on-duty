@@ -24,3 +24,8 @@ export function parsePagination(q: Record<string, string>): { page: number; page
   const pageSize = (PAGE_SIZE_OPTIONS as readonly number[]).includes(Number(q.pageSize)) ? Number(q.pageSize) : 25;
   return { page, pageSize };
 }
+
+// Wiederholte Query-Parameter → saubere Liste; unbekannte Werte fallen weg.
+export function parseMulti(raw: string[] | undefined, allowed: readonly string[]): string[] {
+  return (raw ?? []).filter((v) => allowed.includes(v));
+}
