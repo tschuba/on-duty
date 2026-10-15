@@ -317,8 +317,8 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
             <tr><td colspan={3} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageItems.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donors/${d.id}/edit'`}>
-              <td class="font-medium"><MemberMark memberId={d.person.member?.id} canLink={canLink} />{d.person.lastName}</td>
-              <td>{d.person.firstName}</td>
+              <td class="font-medium">{d.person.lastName}</td>
+              <td>{d.person.firstName}<MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
               <td>{formatAddress(d.person)}</td>
             </tr>
           ))}
@@ -413,7 +413,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
     <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberMark memberId={donor.person.member?.id} canLink={canLink} />{donor.person.firstName} {donor.person.lastName}</h1>
+        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} /></h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
@@ -442,7 +442,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
       <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberMark memberId={donor.person.member?.id} canLink={canLink} />{donor.person.firstName} {donor.person.lastName}</h1>
+          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} /></h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
