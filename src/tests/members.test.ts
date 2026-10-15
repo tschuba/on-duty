@@ -311,7 +311,7 @@ describe("StatsCards", () => {
       { ...makeMember(), status: "aktiv", gender: "female" },
       { ...makeMember(), status: "aktiv", gender: null },
       { ...makeMember(), status: "passiv", gender: "male" },
-      { ...makeMember(), status: "archiviert", gender: "male" },
+      { ...makeMember(), status: "ausgetreten", gender: "male" },
     ] as any;
     const res = await renderApp(StatsCards({ all }));
     const html = await res.text();

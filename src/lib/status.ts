@@ -9,7 +9,12 @@ type Assignment = typeof memberRoleAssignments.$inferSelect & {
   role: typeof memberRoles.$inferSelect;
 };
 
-export type MemberStatus = "archiviert" | "kinder" | "jugend" | "aktiv" | "passiv";
+export type MemberStatus = "ausgetreten" | "verstorben" | "kinder" | "jugend" | "aktiv" | "passiv";
+
+/** Ausgeschieden = ausgetreten oder verstorben. */
+export function isFormer(status: MemberStatus): status is "ausgetreten" | "verstorben" {
+  return status === "ausgetreten" || status === "verstorben";
+}
 
 // Local date components, not new Date(str).getTime() — avoids UTC/local timezone
 // shift on the day-of-birthday boundary.
@@ -30,7 +35,8 @@ export function deriveMemberStatus(
   childrenAgeLimit: number,
   youthAgeLimit: number
 ): MemberStatus {
-  if (member.exitDate || member.deathDate) return "archiviert";
+  if (member.deathDate) return "verstorben";
+  if (member.exitDate) return "ausgetreten";
 
   const hasActiveRole = assignments.some(
     (a) => a.role.grantsActiveStatus && !a.to
