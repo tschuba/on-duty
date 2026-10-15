@@ -4,6 +4,8 @@ import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
+import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
@@ -112,8 +114,8 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
   const search = (c.req.query("q") ?? "").trim();
-  const status = (c.req.query("status") ?? "") as LoanStatus | "";
-  const category = c.req.query("category") ?? "";
+  const statusFilter = parseMulti(c.req.queries("status"), Object.keys(LOAN_STATUS_LABEL)) as LoanStatus[];
+  const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const start = c.req.query("start") ?? "";
   const end = c.req.query("end") ?? "";
   const rangeMode = Boolean(start || end);
@@ -129,8 +131,8 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
       const nearDate = l.plannedFrom ?? l.pickedUpAt ?? "";
       if (nearDate < addDays(today, -14) || nearDate > addDays(today, 30)) return false;
     }
-    if (status && loanStatus(l, today) !== status) return false;
-    if (category && l.lendingItem.inventoryItem.category !== category) return false;
+    if (statusFilter.length > 0 && !statusFilter.includes(loanStatus(l, today))) return false;
+    if (categoryFilter.length > 0 && !categoryFilter.includes(l.lendingItem.inventoryItem.category)) return false;
     if (needle && !`${l.lendingItem.inventoryItem.name} ${borrowerLabel(l)}`.toLowerCase().includes(needle)) return false;
     return true;
   });
@@ -150,7 +152,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
     bucket.push(l);
   }
 
-  const hasFilter = Boolean(search || status || category || rangeMode);
+  const hasFilter = Boolean(search || statusFilter.length || categoryFilter.length || rangeMode);
   const canManage = user.permissions.has("lending:manage");
   const returnTo = currentPath(c.req.url);
 
@@ -169,18 +171,24 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
 
       <form method="get" action="/inventory/lending" class="flex gap-2 items-center flex-wrap mb-4">
         <input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="input input-bordered w-56" />
-        <select name="status" class="select select-bordered">
-          <option value="">{t("lending.filter.allStatus")}</option>
-          {(Object.keys(LOAN_STATUS_LABEL) as LoanStatus[]).map((s) => (
-            <option value={s} selected={status === s}>{LOAN_STATUS_LABEL[s]}</option>
-          ))}
-        </select>
-        <select name="category" class="select select-bordered">
-          <option value="">{t("lending.filter.allCategories")}</option>
-          {CATEGORIES.map((cat) => (
-            <option value={cat} selected={category === cat}>{CATEGORY_LABELS[cat]}</option>
-          ))}
-        </select>
+        <MultiSelectFilter
+          param="status"
+          options={(Object.keys(LOAN_STATUS_LABEL) as LoanStatus[]).map((s) => ({ value: s, label: LOAN_STATUS_LABEL[s] }))}
+          selected={statusFilter}
+          allLabel={t("lending.filter.allStatus")}
+          countLabel={(count) => t("lending.filter.statusCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
+        <MultiSelectFilter
+          param="category"
+          options={CATEGORIES.map((cat) => ({ value: cat, label: CATEGORY_LABELS[cat] }))}
+          selected={categoryFilter}
+          allLabel={t("lending.filter.allCategories")}
+          countLabel={(count) => t("lending.filter.categoryCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
         <input type="date" name="start" value={start} class="input input-bordered w-36" placeholder={t("lending.overview.rangeStart")} />
         <span class="text-base-content/50">–</span>
         <input type="date" name="end" value={end} class="input input-bordered w-36" placeholder={t("lending.overview.rangeEnd")} />

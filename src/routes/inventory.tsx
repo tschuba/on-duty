@@ -8,7 +8,8 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed, parseTags } from "../lib/forms.js";
-import { buildListUrl } from "../lib/list-query.js";
+import { buildListUrl, parseMulti } from "../lib/list-query.js";
+import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
 import { countOverdueLoans, availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -582,7 +583,7 @@ async function resolveAssignmentNames(assignments: { memberId: string; quantity:
 inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
   const q = c.req.query();
-  const category = q.category ?? "";
+  const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const tagFilter = c.req.queries("tag") ?? [];
   const showArchived = q.archived === "1";
   const canSeeLending = user.permissions.has("lending:read");
@@ -606,14 +607,14 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   const filtered = all.filter((item) => {
     if (!showArchived && item.retiredAt) return false;
-    if (category && item.category !== category) return false;
+    if (categoryFilter.length > 0 && !categoryFilter.includes(item.category)) return false;
     if (tagFilter.length > 0 && !tagFilter.every((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
     return true;
   });
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { category, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
+    buildListUrl("/inventory", { category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
   const columnCount = 5 + (canSeeLending ? 1 : 0) + (canLend ? 1 : 0);
 
   return c.html(
@@ -630,70 +631,29 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
-        <div class="join">
-          <a href={qs({ category: undefined })} class={`join-item btn ${category === "" ? "btn-outline btn-primary" : ""}`}>{t("inventory.filter.allCategories")}</a>
-          {CATEGORIES.map((cat) => (
-            <a href={qs({ category: cat })} class={`join-item btn ${category === cat ? "btn-outline btn-primary" : ""}`}>{CATEGORY_LABELS[cat]}</a>
-          ))}
-        </div>
-
-        <details id="tag-filter-dropdown" class="dropdown" ontoggle="if(!this.open)applyTagFilter()">
-          <summary class="btn btn-ghost m-0">
-            {tagFilter.length === 0 ? t("inventory.filter.allTags") : t("inventory.filter.tagCount", { count: tagFilter.length })} ▾
-          </summary>
-          <div class="dropdown-content z-10 bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 mt-1">
-            <input
-              type="text"
-              placeholder={t("common.searchPlaceholder")}
-              class="input input-bordered w-full mb-2"
-              oninput="var v=this.value.toLowerCase();document.querySelectorAll('#tag-filter-list li').forEach(function(li){li.hidden=!li.dataset.tag.includes(v)})"
-            />
-            <ul id="tag-filter-list" class="space-y-0.5 max-h-64 overflow-y-auto">
-              {allTags.length === 0 && <li class="text-sm opacity-50 px-2 py-1">{t("inventory.filter.noTags")}</li>}
-              {allTags.map((tag) => (
-                <li data-tag={tag.toLowerCase()}>
-                  <label class="flex items-center gap-2 px-2 py-1 rounded cursor-pointer hover:bg-base-200">
-                    <input type="checkbox" class="checkbox checkbox-xs" value={tag} checked={tagFilter.includes(tag)} />
-                    <span class="text-sm flex-1">{tag}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-            <div class="flex gap-1 mt-2">
-              <button
-                class="btn btn-sm btn-primary flex-1"
-                onclick="document.getElementById('tag-filter-dropdown').removeAttribute('open')"
-              >
-                {t("common.apply")}
-              </button>
-              {tagFilter.length > 0 && (
-                <button
-                  class="btn btn-sm btn-ghost"
-                  onclick="document.querySelectorAll('#tag-filter-list input[type=checkbox]').forEach(function(cb){cb.checked=false});document.getElementById('tag-filter-dropdown').removeAttribute('open')"
-                >
-                  {t("common.reset")}
-                </button>
-              )}
-            </div>
-          </div>
-          <script dangerouslySetInnerHTML={{ __html: `
-            function applyTagFilter() {
-              var checked = Array.from(document.querySelectorAll('#tag-filter-list input[type=checkbox]:checked')).map(function(el){return el.value});
-              var url = new URL(window.location.href);
-              var current = url.searchParams.getAll('tag').slice().sort().join(',');
-              var next = checked.slice().sort().join(',');
-              if (current === next) return;
-              url.searchParams.delete('tag');
-              checked.forEach(function(v){ url.searchParams.append('tag', v) });
-              url.searchParams.set('page', '1');
-              window.location.href = url.toString();
-            }
-            document.addEventListener('click', function(e) {
-              var dd = document.getElementById('tag-filter-dropdown');
-              if (dd && dd.open && !dd.contains(e.target)) dd.removeAttribute('open');
-            });
-          ` }} />
-        </details>
+        <MultiSelectFilter
+          param="category"
+          autoApply
+          options={CATEGORIES.map((cat) => ({ value: cat, label: CATEGORY_LABELS[cat] }))}
+          selected={categoryFilter}
+          allLabel={t("inventory.filter.allCategories")}
+          countLabel={(count) => t("inventory.filter.categoryCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
+        <MultiSelectFilter
+          param="tag"
+          autoApply
+          searchable
+          options={allTags.map((tag) => ({ value: tag, label: tag }))}
+          selected={tagFilter}
+          allLabel={t("inventory.filter.allTags")}
+          countLabel={(count) => t("inventory.filter.tagCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+          searchPlaceholder={t("common.searchPlaceholder")}
+          emptyLabel={t("inventory.filter.noTags")}
+        />
 
         <a href={qs({ archived: showArchived ? undefined : "1" })} class={`btn ${showArchived ? "btn-outline btn-primary" : "btn-ghost"}`}>
           {t("inventory.filter.showArchived")}
@@ -1100,7 +1060,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
   const start = c.req.query("start") || today;
   const end = c.req.query("end") || addMonths(today, 12);
-  const category = c.req.query("category") || "";
+  const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
 
   const all = await fetchItems();
   // Überfällige Posten immer anzeigen, unabhängig vom Zeitraum-Filter — sonst
@@ -1111,9 +1071,9 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
   let due = [...overdueItems, ...dueInRange.filter((d) => !seen.has(d.id))].sort(
     (a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, "de"),
   );
-  if (category) due = due.filter((d) => d.category === category);
+  if (categoryFilter.length > 0) due = due.filter((d) => categoryFilter.includes(d.category));
 
-  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { start, end, category: category || undefined }, extra);
+  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { start, end, category: categoryFilter }, extra);
   const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
   const thisYear = today.slice(0, 4);
   const nextYear = String(Number(thisYear) + 1);
@@ -1130,7 +1090,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <form method="get" class="flex items-end gap-2">
-          <input type="hidden" name="category" value={category} />
+          {categoryFilter.map((cat) => <input type="hidden" name="category" value={cat} />)}
           <div class="form-control">
             <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.from")}</span></label>
             <input type="date" name="start" value={start} class="input input-bordered" />
@@ -1148,11 +1108,17 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
           <a href={qs({ start: `${thisYear}-01-01`, end: `${thisYear}-12-31` })} class="join-item btn">{t("anniversaries.quick.thisYear")}</a>
           <a href={qs({ start: `${nextYear}-01-01`, end: `${nextYear}-12-31` })} class="join-item btn">{t("anniversaries.quick.nextYear")}</a>
         </div>
-        <div class="join self-end">
-          <a href={qs({ category: undefined })} class={`join-item btn ${category === "" ? "btn-outline btn-primary" : ""}`}>{t("inventory.filter.allCategories")}</a>
-          {CATEGORIES.filter((c) => c !== "other").map((cat) => (
-            <a href={qs({ category: cat })} class={`join-item btn ${category === cat ? "btn-outline btn-primary" : ""}`}>{CATEGORY_LABELS[cat]}</a>
-          ))}
+        <div class="self-end">
+          <MultiSelectFilter
+            param="category"
+            autoApply
+            options={CATEGORIES.filter((c) => c !== "other").map((cat) => ({ value: cat, label: CATEGORY_LABELS[cat] }))}
+            selected={categoryFilter}
+            allLabel={t("inventory.filter.allCategories")}
+            countLabel={(count) => t("inventory.filter.categoryCount", { count })}
+            applyLabel={t("common.apply")}
+            resetLabel={t("common.reset")}
+          />
         </div>
       </div>
 
