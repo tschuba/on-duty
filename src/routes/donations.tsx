@@ -388,7 +388,7 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
       <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}></form>
       <div class="flex gap-2 pt-4 max-w-xl">
         <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
-        <button type="submit" form="donation-delete-form" class="btn btn-primary btn-outline">{t("common.delete")}</button>
+        <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>
         <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
       </div>
     </Layout>
@@ -418,7 +418,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
         <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}></form>
         <div class="flex gap-2 pt-4 max-w-xl">
           <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
-          <button type="submit" form="donation-delete-form" class="btn btn-primary btn-outline">{t("common.delete")}</button>
+          <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>
           <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </Layout>,
