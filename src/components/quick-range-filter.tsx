@@ -26,6 +26,16 @@ export function QuickRangeFilter({ presets, start, end, href }: {
           ))}
         </ul>
       </div>
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.getElementById('${id}').addEventListener('toggle', function(e) {
+          if (e.newState !== 'open') return;
+          var p = e.target, r = p.previousElementSibling.getBoundingClientRect();
+          p.style.position = 'fixed';
+          p.style.inset = 'auto';
+          p.style.top = (r.bottom + 4) + 'px';
+          p.style.left = Math.max(4, Math.min(r.left, window.innerWidth - p.offsetWidth - 4)) + 'px';
+        });
+      ` }} />
     </div>
   );
 }
