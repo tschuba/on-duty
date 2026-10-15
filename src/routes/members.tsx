@@ -6,7 +6,8 @@ import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
-import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
+import { Icon } from "../components/icon.js";
+import { deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
@@ -120,7 +121,8 @@ const STATUS_LABELS: Record<MemberStatus, string> = {
   passiv: t("status.passiv"),
   kinder: t("status.kinder"),
   jugend: t("status.jugend"),
-  archiviert: t("status.archiviert"),
+  ausgetreten: t("status.ausgetreten"),
+  verstorben: t("status.verstorben"),
 };
 
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
@@ -128,10 +130,20 @@ const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   passiv: "badge badge-sm badge-neutral",
   kinder: "badge badge-sm badge-warning",
   jugend: "badge badge-sm badge-info",
-  archiviert: "badge badge-sm badge-ghost opacity-60",
+  ausgetreten: "badge badge-sm badge-ghost opacity-60",
+  verstorben: "",
 };
 
-function StatusBadge({ status }: { status: MemberStatus }) {
+// Verstorbene: Kreuz statt Badge; compact (Tabellen) nur Icon im Badge-Format, sonst Icon + Text.
+function StatusBadge({ status, compact = false }: { status: MemberStatus; compact?: boolean }) {
+  if (status === "verstorben") {
+    const label = STATUS_LABELS.verstorben;
+    return compact ? (
+      <span class="badge badge-sm badge-ghost opacity-60" title={label} role="img" aria-label={label}><Icon name="cross" class="w-3.5 h-3.5" /></span>
+    ) : (
+      <span class="badge badge-sm badge-ghost opacity-60 gap-1"><Icon name="cross" class="w-3.5 h-3.5" />{label}</span>
+    );
+  }
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;
 }
 export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
@@ -140,7 +152,7 @@ export function SortIcon<T extends string>({ col, active, dir }: { col: T; activ
 }
 
 export function StatsCards({ all }: { all: MemberWithStatus[] }) {
-  const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, archiviert: 0 };
+  const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
     const subset = all.filter((m) => m.status === status);
     return {
@@ -183,8 +195,8 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.archived")}</div>
-        <div class="stat-value text-base-content/40">{counts.archiviert}</div>
+        <div class="stat-title">{t("members.stats.former")}</div>
+        <div class="stat-value text-base-content/40">{counts.ausgetreten + counts.verstorben}</div>
       </div>
     </div>
   );
@@ -269,7 +281,7 @@ export function MembersTable({
                     );
                   })()}
                 </td>
-                <td><StatusBadge status={m.status} /></td>
+                <td><StatusBadge status={m.status} compact /></td>
               </tr>
             ))}
           </tbody>
@@ -851,7 +863,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
-  const statusParsed = statusRaw.filter(Boolean);
+  const statusParsed = statusRaw.filter((s) => STATUS_LABELS[s as MemberStatus]); // unbekannte (z. B. altes "archiviert") ignorieren
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
     : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
@@ -944,13 +956,13 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
         />
         <div class="join">
-          {(["aktiv", "passiv", "jugend", "kinder", "archiviert"] as MemberStatus[]).map((s) => (
+          {(["aktiv", "passiv", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
             <a
               key={s}
               href={filterToggleUrl(s)}
               class={`btn join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
             >
-              {STATUS_LABELS[s]}
+              {s === "verstorben" && <Icon name="cross" class="w-4 h-4 inline-block align-middle mr-1" />}{STATUS_LABELS[s]}
             </a>
           ))}
         </div>
@@ -1542,7 +1554,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
   }
 
   // Reactivation check: was archived before, will not be after save
-  const wasArchived = existing.status === "archiviert";
+  const wasArchived = isFormer(existing.status);
   const willBeArchived = !!(exitDate || deathDate);
   const isReactivation = wasArchived && !willBeArchived;
   const autoClosedAssignments = existing.assignments.filter((a) => a.autoClosed);

@@ -38,16 +38,16 @@ function member(overrides: Partial<{ exitDate: string | null; deathDate: string 
 }
 
 describe("deriveMemberStatus", () => {
-  it("archiviert when exitDate set", () => {
-    expect(deriveMemberStatus(member({ exitDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("archiviert");
+  it("ausgetreten when exitDate set", () => {
+    expect(deriveMemberStatus(member({ exitDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("ausgetreten");
   });
 
-  it("archiviert when deathDate set", () => {
-    expect(deriveMemberStatus(member({ deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("archiviert");
+  it("verstorben when deathDate set", () => {
+    expect(deriveMemberStatus(member({ deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("verstorben");
   });
 
-  it("archiviert takes priority over active role", () => {
-    expect(deriveMemberStatus(member({ exitDate: "2023-01-01", deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("archiviert");
+  it("verstorben takes priority over exitDate and active role", () => {
+    expect(deriveMemberStatus(member({ exitDate: "2023-01-01", deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("verstorben");
   });
 
   it("aktiv when open active-role assignment and age >= youth limit", () => {

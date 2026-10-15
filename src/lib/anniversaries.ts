@@ -1,4 +1,4 @@
-import type { MemberStatus } from "./status.js";
+import { isFormer, type MemberStatus } from "./status.js";
 
 export type EventKind = "birthday" | "anniversary";
 
@@ -46,9 +46,9 @@ export function generateEvents(
   const endYear = parseInt(end.slice(0, 4), 10);
 
   for (const m of members) {
-    if (m.status === "archiviert") continue;
+    if (isFormer(m.status)) continue;
 
-    // Birthdays: all non-archived members
+    // Birthdays: all members who have not left
     const birthMD = m.birthDate.slice(5);
     const birthYear = parseInt(m.birthDate.slice(0, 4), 10);
     for (let y = startYear; y <= endYear; y++) {

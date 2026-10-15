@@ -49,7 +49,7 @@ describe("getCeremonyYear", () => {
 describe("generateEvents scope filtering", () => {
   const ay = [{ year: 25, title: null }];
 
-  const mkMember = (status: "aktiv" | "jugend" | "kinder" | "passiv" | "archiviert") => ({
+  const mkMember = (status: "aktiv" | "jugend" | "kinder" | "passiv" | "ausgetreten" | "verstorben") => ({
     id: status,
     firstName: "Max",
     lastName: "Muster",
@@ -58,9 +58,11 @@ describe("generateEvents scope filtering", () => {
     status,
   });
 
-  it("archiviert: no events", () => {
-    const evs = generateEvents([mkMember("archiviert")], ay, CUTOFF, "2025-01-01", "2027-12-31");
-    expect(evs).toHaveLength(0);
+  it("ausgeschieden: no events", () => {
+    for (const st of ["ausgetreten", "verstorben"] as const) {
+      const evs = generateEvents([mkMember(st)], ay, CUTOFF, "2025-01-01", "2027-12-31");
+      expect(evs).toHaveLength(0);
+    }
   });
 
   it("passiv: birthday only, no anniversary", () => {

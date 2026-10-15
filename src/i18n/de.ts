@@ -42,7 +42,8 @@ export const de = {
   "status.passiv": "Passiv",
   "status.jugend": "Jugend",
   "status.kinder": "Kinder",
-  "status.archiviert": "Archiviert",
+  "status.ausgetreten": "Ausgetreten",
+  "status.verstorben": "Verstorben",
 
   // ── Members ──────────────────────────────────────────────────────────────────
   "members.title": "Mitglieder",
@@ -62,7 +63,7 @@ export const de = {
   "members.stats.passive": "Passiv",
   "members.stats.youth": "Jugend",
   "members.stats.children": "Kinderfeuerwehr",
-  "members.stats.archived": "Archiviert",
+  "members.stats.former": "Ausgeschieden",
   "members.filter.allRoles": "Alle Funktionen",
   "members.form.lastName": "Nachname",
   "members.form.firstName": "Vorname",

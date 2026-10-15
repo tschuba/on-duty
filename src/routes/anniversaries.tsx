@@ -43,15 +43,15 @@ function formatMonth(yyyymm: string): string {
   return `${t(MONTH_KEYS[parseInt(m, 10) - 1])} ${y}`;
 }
 
-const STATUS_BADGE: Record<MemberStatus, string> = {
+const STATUS_BADGE: Partial<Record<MemberStatus, string>> = {
   aktiv: "badge badge-success badge-sm",
   kinder: "badge badge-warning badge-sm",
   jugend: "badge badge-info badge-sm",
   passiv: "badge badge-ghost badge-sm",
-  archiviert: "badge badge-neutral badge-sm",
 };
-const STATUS_LABEL: Record<MemberStatus, string> = {
-  aktiv: t("status.aktiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), passiv: t("status.passiv"), archiviert: t("status.archiviert"),
+// Ausgeschiedene werden nie aufgelistet, daher kein Eintrag für ausgetreten/verstorben.
+const STATUS_LABEL: Partial<Record<MemberStatus, string>> = {
+  aktiv: t("status.aktiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), passiv: t("status.passiv"),
 };
 
 // ── Components ────────────────────────────────────────────────────────────────
@@ -348,7 +348,7 @@ anniversaryRoutes.get("/export", requireAuth(), async (c) => {
   const memberMap = new Map(flatMembers.map((m) => [m.id, m]));
 
   const STATUS_LABEL: Record<string, string> = {
-    aktiv: t("status.aktiv"), passiv: t("status.passiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), archiviert: t("status.archiviert"),
+    aktiv: t("status.aktiv"), passiv: t("status.passiv"), kinder: t("status.kinder"), jugend: t("status.jugend"),
   };
 
   const header: string[] = [
