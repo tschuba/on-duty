@@ -160,11 +160,28 @@ applicationRoutes.get("/", guard, async (c) => {
 
   return c.html(
     <Layout title={t("applications.title")} user={user} activeNav="applications">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
         <div class="dropdown dropdown-end">
-          <div tabindex={0} role="button" class="btn btn-ghost btn-circle" title={t("applications.links.title")} aria-label={t("applications.links.title")}>
+          <div
+            tabindex={0}
+            role="button"
+            class="btn btn-ghost gap-2"
+            aria-label={`${t("applications.links.title")}: ${(["membership", "youth"] as const).map((type) => `${TYPE_LABELS[type]}: ${formatFormStatusText(forms[type]).text}`).join(", ")}`}
+          >
             <Icon name="link" class="h-5 w-5" />
+            <span class="hidden sm:inline">{t("applications.links.title")}</span>
+            <span class="flex items-center gap-2 border-l border-base-content/20 pl-2">
+              {(["membership", "youth"] as const).map((type) => {
+                const status = formatFormStatusText(forms[type]);
+                return (
+                  <span key={type} class={`flex items-center gap-1 ${status.active ? "text-success" : "text-error opacity-40"}`} title={`${TYPE_LABELS[type]}: ${status.text}`}>
+                    <Icon name={type === "membership" ? "users" : "user-group"} class="h-5 w-5" />
+                    <span class="hidden md:inline text-xs text-base-content/70">{TYPE_LABELS[type]}</span>
+                  </span>
+                );
+              })}
+            </span>
           </div>
           <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
             <li class="menu-title">{t("applications.links.title")}</li>

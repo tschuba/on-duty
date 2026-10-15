@@ -125,6 +125,13 @@ describe("GET /", () => {
     expect(html).not.toContain('id="form-settings-membership"');
   });
 
+  it("shows form status on the links button without opening the dropdown", async () => {
+    applicationFormsFixture.membership = { type: "membership", isActive: false, startDate: null, endDate: null };
+    const html = await (await applicationRoutes.request("/")).text();
+    expect(html).toContain('class="flex items-center gap-1 text-error opacity-40"');
+    expect(html).toContain('class="flex items-center gap-1 text-success"');
+  });
+
   it("shows the settings gear and modal for a user with applications:manage-forms", async () => {
     currentUser.permissions = new Set(["applications:review", "applications:manage-forms"]);
     const res = await applicationRoutes.request("/");

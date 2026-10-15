@@ -12,6 +12,8 @@ const ICONS = {
   link: "24/outline/link.svg",
   "clipboard-document": "24/outline/clipboard-document.svg",
   "cog-6-tooth": "24/outline/cog-6-tooth.svg",
+  users: "24/outline/users.svg",
+  "user-group": "24/outline/user-group.svg",
   "bars-3": "24/outline/bars-3.svg",
   "chevron-down": "20/solid/chevron-down.svg",
 };
