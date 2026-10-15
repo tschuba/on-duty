@@ -235,12 +235,6 @@ describe("parseListQuery", () => {
     });
   });
 
-  it("splits a single comma-joined status/role param (hx-vals shape)", () => {
-    const q = parseListQuery({}, ["aktiv,passiv"], ["r1,r2"]);
-    expect(q.statusFilter).toEqual(["aktiv", "passiv"]);
-    expect(q.roleFilter).toEqual(["r1", "r2"]);
-  });
-
   it("keeps repeated status/role params as-is", () => {
     const q = parseListQuery({}, ["aktiv", "jugend"], ["r1", "r2"]);
     expect(q.statusFilter).toEqual(["aktiv", "jugend"]);

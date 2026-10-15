@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags, inventoryItemAssignments } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -9,6 +9,8 @@ let itemsFindManyResult: any[] = [];
 let itemsFindFirstResult: any = undefined;
 let membersFindManyResult: any[] = [];
 let lendingItemFindFirstResult: any = undefined;
+let lendingItemsFindManyResult: any[] = [];
+let lendingLoanFindFirstResult: any = undefined;
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -57,6 +59,11 @@ vi.mock("../db/index.js", () => ({
       },
       lendingItems: {
         findFirst: vi.fn(() => Promise.resolve(lendingItemFindFirstResult)),
+        findMany: vi.fn(() => Promise.resolve(lendingItemsFindManyResult)),
+      },
+      lendingLoans: {
+        findFirst: vi.fn(() => Promise.resolve(lendingLoanFindFirstResult)),
+        findMany: vi.fn(() => Promise.resolve([])),
       },
     },
     insert,
@@ -86,6 +93,8 @@ beforeEach(() => {
   itemsFindFirstResult = undefined;
   membersFindManyResult = [];
   lendingItemFindFirstResult = undefined;
+  lendingItemsFindManyResult = [];
+  lendingLoanFindFirstResult = undefined;
   currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage"]), disabled: false };
 });
 
@@ -230,36 +239,127 @@ describe("POST /:id/retire and /:id/reactivate", () => {
   });
 });
 
-// ── Enable lending ──────────────────────────────────────────────────────────
+// ── Verleih-Flag im Formular ────────────────────────────────────────────────
 
-describe("POST /:id/enable-lending", () => {
-  it("creates a lending_items row with individualTracking from quantity and redirects to its loans page", async () => {
-    itemsFindFirstResult = makeItem({ quantity: 1 });
-    const res = await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
+const lendingManager = () => ({ id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "lending:read", "lending:manage"]), disabled: false });
+const post = (path: string, fields: Record<string, string>) =>
+  inventoryRoutes.request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: formBody(fields),
+  });
+
+describe("lendable flag on POST /", () => {
+  it("creates a lending_items row in the same transaction, individualTracking from quantity", async () => {
+    currentUser = lendingManager();
+    const res = await post("/", { name: "Helm", category: "equipment", lendable: "1" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/inventory/lending/new-id/loans");
-    expect(insertCalls[0].values).toEqual({ inventoryItemId: "item1", individualTracking: true });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: true });
   });
 
-  it("sets individualTracking false for batch items (quantity > 1)", async () => {
-    itemsFindFirstResult = makeItem({ quantity: 5 });
-    await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
-    expect(insertCalls[0].values.individualTracking).toBe(false);
+  it("uses batch tracking for quantity > 1", async () => {
+    currentUser = lendingManager();
+    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5" });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values.individualTracking).toBe(false);
   });
 
-  it("redirects to the existing lending item without inserting again", async () => {
+  it("ignores the flag without lending:manage (server-side)", async () => {
+    await post("/", { name: "Helm", category: "equipment", lendable: "1" });
+    expect(insertCalls.find((c) => c.table === lendingItems)).toBeUndefined();
+  });
+});
+
+describe("lendable flag on POST /:id", () => {
+  const base = { name: "TSF-W", category: "vehicle", licensePlate: "ABC-123" };
+
+  it("marks an existing item lendable", async () => {
+    currentUser = lendingManager();
     itemsFindFirstResult = makeItem();
-    lendingItemFindFirstResult = { id: "existing-id" };
-    const res = await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
+    const res = await post("/item1", { ...base, lendable: "1" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/inventory/lending/existing-id/loans");
-    expect(insertCalls.length).toBe(0);
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "item1", individualTracking: true });
   });
 
-  it("404s for a retired item", async () => {
-    itemsFindFirstResult = makeItem({ retiredAt: "2024-01-01" });
-    const res = await inventoryRoutes.request("/item1/enable-lending", { method: "POST" });
-    expect(res.status).toBe(404);
+  it("refuses to make a retired item lendable", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem({ retiredAt: "2026-01-01" });
+    const res = await post("/item1", { ...base, lendable: "1" });
+    expect(res.status).toBe(422);
+    expect(insertCalls.find((c) => c.table === lendingItems)).toBeUndefined();
+  });
+
+  it("removes the flag when no loans exist", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem();
+    lendingItemFindFirstResult = { id: "li1" };
+    const res = await post("/item1", base);
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === lendingItems)).toBe(true);
+  });
+
+  it("refuses to remove the flag while loans exist", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem();
+    lendingItemFindFirstResult = { id: "li1" };
+    lendingLoanFindFirstResult = { id: "loan1" };
+    const res = await post("/item1", base);
+    expect(res.status).toBe(422);
+    expect(deleteCalls.some((c) => c.table === lendingItems)).toBe(false);
+  });
+
+  it("leaves lending untouched without lending:manage", async () => {
+    itemsFindFirstResult = makeItem();
+    lendingItemFindFirstResult = { id: "li1" };
+    const res = await post("/item1", base);
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === lendingItems)).toBe(false);
+    expect(insertCalls.find((c) => c.table === lendingItems)).toBeUndefined();
+  });
+});
+
+describe("GET /:id/edit lendable checkbox", () => {
+  it("is editable for lending:manage and read-only (disabled) otherwise", async () => {
+    itemsFindFirstResult = makeItem();
+    currentUser = lendingManager();
+    const editable = await (await inventoryRoutes.request("/item1/edit")).text();
+    expect(editable).toContain('name="lendable"');
+    expect(editable).not.toMatch(/name="lendable"[^>]*disabled/);
+
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "lending:read"]), disabled: false };
+    const readonly = await (await inventoryRoutes.request("/item1/edit")).text();
+    expect(readonly).toMatch(/name="lendable"[^>]*disabled/);
+  });
+
+  it("is locked while loans exist", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem();
+    lendingItemFindFirstResult = { id: "li1" };
+    lendingLoanFindFirstResult = { id: "loan1" };
+    const html = await (await inventoryRoutes.request("/item1/edit")).text();
+    expect(html).toMatch(/name="lendable"[^>]*disabled/);
+    expect(html).toContain('type="hidden" name="lendable"');
+  });
+});
+
+describe("GET / lending columns", () => {
+  it("shows availability, 'Verleihen' action and the lendable filter", async () => {
+    currentUser = lendingManager();
+    itemsFindManyResult = [makeItem({ id: "a", name: "Verleihbar", quantity: 3 }), makeItem({ id: "b", name: "Normal" })];
+    lendingItemsFindManyResult = [{ id: "li1", inventoryItemId: "a", individualTracking: false, loans: [] }];
+    const html = await (await inventoryRoutes.request("/")).text();
+    expect(html).toContain("3 verfügbar");
+    expect(html).toContain("/inventory/lending/loans/new?item=li1");
+
+    const filtered = await (await inventoryRoutes.request("/?lendable=1")).text();
+    expect(filtered).toContain("Verleihbar");
+    expect(filtered).not.toContain("Normal");
+  });
+
+  it("hides lending UI without lending:read", async () => {
+    itemsFindManyResult = [makeItem()];
+    const html = await (await inventoryRoutes.request("/")).text();
+    expect(html).not.toContain("verfügbar");
+    expect(html).not.toContain("loans/new");
   });
 });
 
