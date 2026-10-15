@@ -26,10 +26,17 @@
 }
 
 @theme {
-  --color-primary: #cc0000;
-  --color-primary-dark: #990000;
-  --color-gold: #f0a500;
-  --color-dark: #0f2338;
+  --color-primary: #2a5280;
+  --color-primary-content: #ffffff;
+  --color-error: #cc0000;
+  --color-error-content: #ffffff;
+  --color-neutral: #556070;
+  --color-neutral-content: #ffffff;
+  --color-secondary: #7a64b0;
+  --color-secondary-content: #ffffff;
+  --color-accent: #2a8c94;
+  --color-accent-content: #ffffff;
+  --color-gold: #ffc107;
   --color-surface: #f8f8f8;
   --font-heading: "Oswald", sans-serif;
   --font-body: "Inter", sans-serif;
@@ -37,11 +44,36 @@
 
 /* ponytail: @layer theme < @layer base — daisyUI overwrites color tokens; unlayered :root wins */
 :root {
-  --color-primary: #cc0000;
-  --color-primary-dark: #990000;
-  --color-gold: #f0a500;
-  --color-dark: #0f2337;
+  --color-primary: #2a5280;
+  --color-primary-content: #ffffff;
+  --color-error: #cc0000;
+  --color-error-content: #ffffff;
+  --color-neutral: #556070;
+  --color-neutral-content: #ffffff;
+  --color-secondary: #7a64b0;
+  --color-secondary-content: #ffffff;
+  --color-accent: #2a8c94;
+  --color-accent-content: #ffffff;
+  --color-gold: #ffc107;
   --color-surface: #f8f8f8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #5b8fd0;
+    --color-primary-content: #ffffff;
+    --color-error: #ff6b6b;
+    --color-error-content: #1a0000;
+    --color-neutral: #8b97a8;
+    --color-neutral-content: #10151b;
+    --color-secondary: #a592dc;
+    --color-secondary-content: #14101f;
+    --color-accent: #4cc2cb;
+    --color-accent-content: #06191b;
+    --color-base-100: #27313e;
+    --color-base-200: #1b222c;
+    --color-base-300: #0c1015;
+  }
 }
 
 /* Rollensuche-Combobox (members.tsx RoleRow): popover[auto] braucht eigenes

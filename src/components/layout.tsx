@@ -15,6 +15,10 @@ export function ClickToEditHint() {
   return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
 }
 
+// Desktop-Nav: Textlinks, aktive Seite fett + Unterstrich, andere gedämpft.
+const navLink = (active: boolean) =>
+  `text-sm px-1 py-1 border-b-2 ${active ? "font-semibold border-primary text-base-content" : "border-transparent text-base-content/60 hover:text-base-content"}`;
+
 function ApplicationsBadge({ count }: { count: number }) {
   return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
 }
@@ -46,29 +50,29 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       {/* Toast container — filled by HX-Trigger: showToast */}
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
-      <nav class="navbar bg-base-200 shadow-sm px-4">
+      <nav class="navbar bg-base-200 shadow-sm px-4 border-b-[3px] border-gold">
         <div class="navbar-start flex-1">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-duty
           </a>
           {user && (
-            <div class="hidden lg:flex gap-1">
+            <div class="hidden lg:flex gap-4 items-center">
               <a
                 href="/members"
-                class={`btn btn-ghost btn-sm${activeNav === "members" ? " btn-active" : ""}`}
+                class={navLink(activeNav === "members")}
               >
                 {t("common.nav.members")}
               </a>
               <a
                 href="/anniversaries"
-                class={`btn btn-ghost btn-sm${activeNav === "anniversaries" ? " btn-active" : ""}`}
+                class={navLink(activeNav === "anniversaries")}
               >
                 {t("common.nav.anniversaries")}
               </a>
               {canReviewApplications && (
                 <a
                   href="/applications"
-                  class={`btn btn-ghost btn-sm${activeNav === "applications" ? " btn-active" : ""}`}
+                  class={navLink(activeNav === "applications")}
                 >
                   {t("common.nav.applications")}
                   <ApplicationsBadge count={openApplicationsCount} />
@@ -77,7 +81,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
-                  class={`btn btn-ghost btn-sm${activeNav === "donations" ? " btn-active" : ""}`}
+                  class={navLink(activeNav === "donations")}
                 >
                   {t("common.nav.donations")}
                 </a>
@@ -85,7 +89,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donors"
-                  class={`btn btn-ghost btn-sm${activeNav === "donors" ? " btn-active" : ""}`}
+                  class={navLink(activeNav === "donors")}
                 >
                   {t("common.nav.donors")}
                 </a>
@@ -93,7 +97,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               {canReadInventory && (
                 <a
                   href="/inventory"
-                  class={`btn btn-ghost btn-sm${activeNav === "inventory" ? " btn-active" : ""}`}
+                  class={navLink(activeNav === "inventory")}
                 >
                   {t("common.nav.inventory")}
                   <OverdueInspectionsBadge count={overdueInspectionsCount} />
@@ -102,7 +106,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
-                  class={`btn btn-ghost btn-sm${activeNav === "admin" ? " btn-active" : ""}`}
+                  class={navLink(activeNav === "admin")}
                 >
                   {t("common.nav.admin")}
                 </a>
@@ -114,7 +118,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           <div class="navbar-center lg:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
-                <Icon name="bars-3" class="h-5 w-5" />
+                <Icon name="bars-3" class="h-5 w-5 text-gold" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
