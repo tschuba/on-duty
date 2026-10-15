@@ -134,14 +134,14 @@ const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   verstorben: "",
 };
 
-// Verstorbene: Kreuz statt Badge; compact (Tabellen) nur Icon, sonst Icon + Text.
+// Verstorbene: Kreuz statt Badge; compact (Tabellen) nur Icon im Badge-Format, sonst Icon + Text.
 function StatusBadge({ status, compact = false }: { status: MemberStatus; compact?: boolean }) {
   if (status === "verstorben") {
     const label = STATUS_LABELS.verstorben;
     return compact ? (
-      <span class="inline-block align-middle opacity-70" title={label} role="img" aria-label={label}><Icon name="cross" class="w-4 h-4" /></span>
+      <span class="badge badge-sm badge-ghost opacity-60" title={label} role="img" aria-label={label}><Icon name="cross" class="w-3.5 h-3.5" /></span>
     ) : (
-      <span class="inline-flex items-center gap-1 align-middle opacity-70"><Icon name="cross" class="w-4 h-4" />{label}</span>
+      <span class="badge badge-sm badge-ghost opacity-60 gap-1"><Icon name="cross" class="w-3.5 h-3.5" />{label}</span>
     );
   }
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;
@@ -962,7 +962,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
               href={filterToggleUrl(s)}
               class={`btn join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
             >
-              {s === "verstorben" ? <StatusBadge status={s} /> : STATUS_LABELS[s]}
+              {s === "verstorben" && <Icon name="cross" class="w-4 h-4 inline-block align-middle mr-1" />}{STATUS_LABELS[s]}
             </a>
           ))}
         </div>
