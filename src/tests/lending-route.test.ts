@@ -142,6 +142,25 @@ describe("GET /inventory/lending", () => {
     expect(html).toContain("Max Muster");
   });
 
+  it("marks member borrowers, links only with members:read, filters by member", async () => {
+    lendingLoansFindManyResult = [
+      makeLoan({ id: "l1", borrowerMember: { id: "m1", person: { firstName: "Max", lastName: "Muster" } }, borrowerName: null }),
+      makeLoan({ id: "l2", borrowerName: "Externer" }),
+    ];
+    let html = await (await lendingRoutes.request("/")).text();
+    expect(html.match(/title="Mitglied"/g)).toHaveLength(1);
+    expect(html).not.toContain("/members/m1");
+    html = await (await lendingRoutes.request("/?member=yes")).text();
+    expect(html).toContain("Max Muster");
+    expect(html).not.toContain("Externer");
+    html = await (await lendingRoutes.request("/?member=no&start=2026-01-01")).text();
+    expect(html).toContain("Externer");
+    expect(html).not.toContain("Max Muster");
+    currentUser = { ...currentUser, permissions: new Set(["lending:read", "members:read"]) };
+    html = await (await lendingRoutes.request("/")).text();
+    expect(html).toContain('href="/members/m1"');
+  });
+
   it("marks overdue loans and groups multiple months with multiple loans each", async () => {
     lendingLoansFindManyResult = [
       makeLoan({ id: "loan1", plannedFrom: "2026-01-01", plannedTo: "1999-01-01", borrowerName: "Erster" }),

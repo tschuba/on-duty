@@ -202,6 +202,35 @@ describe("GET /", () => {
     expect(html).not.toContain("Adler");
   });
 
+  const mixed = () => {
+    donorsFindManyResult = [
+      { id: "d1", personId: "p1", person: { ...makePerson({ lastName: "Bauer", firstName: "Anna" }), member: { id: "m1" } } },
+      { id: "d2", personId: "p2", person: { ...makePerson({ lastName: "Adler", firstName: "Ben" }), member: null } },
+    ];
+  };
+
+  it("marks members; icon is a link only with members:read", async () => {
+    mixed();
+    let html = await (await donorRoutes.request("/")).text();
+    expect(html.match(/title="Mitglied"/g)).toHaveLength(1);
+    expect(html).not.toContain("/members/m1");
+    currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts", "members:read"]) };
+    html = await (await donorRoutes.request("/")).text();
+    expect(html).toContain('href="/members/m1"');
+  });
+
+  it("filters by membership, combined with search", async () => {
+    mixed();
+    let html = await (await donorRoutes.request("/?member=yes")).text();
+    expect(html).toContain("Bauer");
+    expect(html).not.toContain("Adler");
+    html = await (await donorRoutes.request("/?member=no")).text();
+    expect(html).toContain("Adler");
+    expect(html).not.toContain("Bauer");
+    html = await (await donorRoutes.request("/?member=yes&search=adl")).text();
+    expect(html).not.toContain("Adler");
+  });
+
   it("sorts by first name descending when requested", async () => {
     donorsFindManyResult = [
       { id: "d1", personId: "p1", person: makePerson({ lastName: "Bauer", firstName: "Anna" }) },
