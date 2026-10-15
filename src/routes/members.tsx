@@ -8,6 +8,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
+import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
@@ -818,91 +819,19 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
   roleFilter: string[];
   activeRoleIds: Set<string>;
 }) {
-  const label = roleFilter.length === 0
-    ? t("members.filter.allRoles")
-    : roleFilter.length === 1
-    ? (roles.find((r) => r.id === roleFilter[0])?.title ?? t("members.table.roleCount", { count: 1 }))
-    : t("members.table.roleCount", { count: roleFilter.length });
-
   return (
-    <details id="role-filter-dropdown" class="dropdown" ontoggle="if(!this.open)applyRoleFilter()">
-      <summary class="btn btn-ghost m-0">
-        {label} ▾
-      </summary>
-      <div class="dropdown-content z-10 bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 mt-1">
-        <input
-          type="text"
-          placeholder={t("common.searchPlaceholder")}
-          class="input input-bordered w-full mb-2"
-          oninput="var v=this.value.toLowerCase();document.querySelectorAll('#role-filter-list li').forEach(function(li){li.hidden=!li.dataset.title.includes(v)})"
-        />
-        <ul id="role-filter-list" class="space-y-0.5 max-h-64 overflow-y-auto">
-          {roles.map((r) => {
-            const hasActive = activeRoleIds.has(r.id);
-            return (
-              <li key={r.id} data-title={r.title.toLowerCase()}>
-                <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${!hasActive ? " opacity-50" : ""}`}>
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-xs"
-                    value={r.id}
-                    checked={roleFilter.includes(r.id)}
-                  />
-                  <span class="text-sm flex-1">{r.title}</span>
-                  {!hasActive && <span class="text-xs opacity-60">(0)</span>}
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-        <div class="flex gap-1 mt-2">
-          <button
-            class="btn btn-sm btn-primary flex-1"
-            onclick="document.getElementById('role-filter-dropdown').removeAttribute('open')"
-          >
-            {t("common.apply")}
-          </button>
-          {roleFilter.length > 0 && (
-            <button
-              class="btn btn-sm btn-ghost"
-              onclick="document.querySelectorAll('#role-filter-list input[type=checkbox]').forEach(function(cb){cb.checked=false});document.getElementById('role-filter-dropdown').removeAttribute('open')"
-            >
-              {t("common.reset")}
-            </button>
-          )}
-        </div>
-      </div>
-      <script dangerouslySetInnerHTML={{ __html: `
-        function applyRoleFilter() {
-          var checked = Array.from(document.querySelectorAll('#role-filter-list input[type=checkbox]:checked')).map(function(el){return el.value});
-          var params = new URLSearchParams(window.location.search);
-          var current = params.getAll('role').slice().sort().join(',');
-          var next = checked.slice().sort().join(',');
-          if (current === next) return;
-          params.delete('role');
-          checked.forEach(function(r){params.append('role',r)});
-          params.set('page','1');
-          window.location.href = '/members?' + params.toString();
-        }
-        document.addEventListener('click', function(e) {
-          var dd = document.getElementById('role-filter-dropdown');
-          if (dd && dd.open && !dd.contains(e.target)) dd.removeAttribute('open');
-        });
-        document.addEventListener('keydown', function(e) {
-          var cb = e.target.closest('#role-filter-list input[type=checkbox]');
-          if (!cb) return;
-          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-            e.preventDefault();
-            var visible = Array.from(document.querySelectorAll('#role-filter-list li:not([hidden]) input[type=checkbox]'));
-            var next = visible.indexOf(cb) + (e.key === 'ArrowDown' ? 1 : -1);
-            if (next >= 0 && next < visible.length) visible[next].focus();
-          } else if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('role-filter-dropdown').removeAttribute('open');
-          }
-        });
-      ` }} />
-    </details>
+    <MultiSelectFilter
+      param="role"
+      autoApply
+      searchable
+      options={roles.map((r) => ({ value: r.id, label: r.title, dim: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" }))}
+      selected={roleFilter}
+      allLabel={t("members.filter.allRoles")}
+      countLabel={(count) => t("members.table.roleCount", { count })}
+      applyLabel={t("common.apply")}
+      resetLabel={t("common.reset")}
+      searchPlaceholder={t("common.searchPlaceholder")}
+    />
   );
 }
 
@@ -922,16 +851,11 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
-  const statusParsed = (statusRaw.length === 1 && statusRaw[0]?.includes(",")
-    ? statusRaw[0].split(",")
-    : statusRaw).filter(Boolean);
+  const statusParsed = statusRaw.filter(Boolean);
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
     : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
-  // ponytail: hx-vals sends comma-joined or empty string; normalise to clean array
-  const roleFilter = (roleFilterRaw.length === 1 && roleFilterRaw[0]?.includes(",")
-    ? roleFilterRaw[0].split(",")
-    : roleFilterRaw).filter(Boolean);
+  const roleFilter = roleFilterRaw.filter(Boolean);
   const { page, pageSize } = parsePagination(q);
 
   return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
@@ -1017,7 +941,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
           hx-target="#members-results"
           hx-include="[name='search']"
-          hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter.join(","), role: roleFilter.join(","), page: 1, pageSize })}
+          hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
         />
         <div class="join">
           {(["aktiv", "passiv", "jugend", "kinder", "archiviert"] as MemberStatus[]).map((s) => (
