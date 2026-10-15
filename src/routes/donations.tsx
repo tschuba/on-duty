@@ -8,6 +8,9 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
+import { QuickRangeFilter } from "../components/quick-range-filter.js";
+import { rangePresets, todayStr } from "../lib/quick-range.js";
+import { buildListUrl } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
@@ -212,6 +215,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
   });
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
+  const presets = rangePresets(todayStr(), "past");
   const config = await loadOrgConfig();
   const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
 
@@ -235,6 +239,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
         <div class="form-control">
           <input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="input input-bordered w-64" />
         </div>
+        <QuickRangeFilter presets={presets} start={from} end={to} href={(p) => buildListUrl("/donations", { search }, { from: p.start, to: p.end })} />
         <div class="form-control">
           <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.from")}</span></label>
           <input type="date" name="from" value={from} class="input input-bordered" />

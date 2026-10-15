@@ -9,6 +9,8 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed, parseTags } from "../lib/forms.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
+import { QuickRangeFilter } from "../components/quick-range-filter.js";
+import { addMonths, rangePresets } from "../lib/quick-range.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
 import { countOverdueLoans, availableQuantity, itemStatus } from "../lib/lending.js";
@@ -1052,11 +1054,6 @@ inventoryRoutes.post("/:id/reactivate", requireAuth("inventory:manage"), async (
 inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
-  const addMonths = (dateStr: string, months: number) => {
-    const [y, m, d] = dateStr.split("-").map(Number);
-    const dt = new Date(y, m - 1 + months, d);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-  };
 
   const start = c.req.query("start") || today;
   const end = c.req.query("end") || addMonths(today, 12);
@@ -1074,9 +1071,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
   if (categoryFilter.length > 0) due = due.filter((d) => categoryFilter.includes(d.category));
 
   const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { start, end, category: categoryFilter }, extra);
-  const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
-  const thisYear = today.slice(0, 4);
-  const nextYear = String(Number(thisYear) + 1);
+  const presets = rangePresets(today, "future");
 
   return c.html(
     <Layout title={t("inventory.inspections.title")} user={user} activeNav="inventory">
@@ -1101,12 +1096,8 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
           </div>
           <button type="submit" class="btn">{t("common.show")}</button>
         </form>
-        <div class="join self-end">
-          <a href={quickLink(3)} class="join-item btn">{t("anniversaries.quick.3months")}</a>
-          <a href={quickLink(6)} class="join-item btn">{t("anniversaries.quick.6months")}</a>
-          <a href={quickLink(12)} class="join-item btn">{t("anniversaries.quick.12months")}</a>
-          <a href={qs({ start: `${thisYear}-01-01`, end: `${thisYear}-12-31` })} class="join-item btn">{t("anniversaries.quick.thisYear")}</a>
-          <a href={qs({ start: `${nextYear}-01-01`, end: `${nextYear}-12-31` })} class="join-item btn">{t("anniversaries.quick.nextYear")}</a>
+        <div class="self-end">
+          <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
         </div>
         <div class="self-end">
           <MultiSelectFilter

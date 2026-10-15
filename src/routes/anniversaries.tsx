@@ -8,6 +8,8 @@ import { Layout } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl } from "../lib/list-query.js";
+import { QuickRangeFilter } from "../components/quick-range-filter.js";
+import { addMonths, rangePresets, todayStr } from "../lib/quick-range.js";
 import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
@@ -30,16 +32,6 @@ function flattenMember({ person, ...m }: { person: Person | null } & MemberRow &
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function addMonths(dateStr: string, months: number): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(y, m - 1 + months, d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-}
 const MONTH_KEYS = [
   "month.january", "month.february", "month.march", "month.april",
   "month.may", "month.june", "month.july", "month.august",
@@ -228,9 +220,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   const qs = (extra: Record<string, string | string[]>) =>
     buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
-  const quickLink = (months: number) => qs({ start: today, end: addMonths(today, months) });
   const filterLink = (f: string) => qs({ filter: f });
-  const yearLink = (y: string) => qs({ start: `${y}-01-01`, end: `${y}-12-31` });
   // toggle a mod value in/out of the active set
   const modToggle = (m: string) => {
     const next = mods.includes(m) ? mods.filter((x) => x !== m) : [...mods, m];
@@ -238,14 +228,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   };
   const modReset = () => qs({ mod: [] });
 
-  const isDefault = start === today && end === addMonths(today, 12);
-  const is3m = start === today && end === addMonths(today, 3);
-  const is6m = start === today && end === addMonths(today, 6);
-
-  const thisYear = today.slice(0, 4);
-  const nextYear = String(parseInt(thisYear, 10) + 1);
-  const isThisYear = start === `${thisYear}-01-01` && end === `${thisYear}-12-31`;
-  const isNextYear = start === `${nextYear}-01-01` && end === `${nextYear}-12-31`;
+  const presets = rangePresets(today, "future");
 
   return c.html(
     <Layout title={t("anniversaries.title")} user={user} activeNav="anniversaries">
@@ -262,14 +245,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 
         {/* Controls */}
         <div class="flex flex-wrap gap-3 items-end">
-          {/* Quick buttons */}
-          <div class="join">
-            <a href={quickLink(3)} class={`btn join-item${is3m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.3months")}</a>
-            <a href={quickLink(6)} class={`btn join-item${is6m ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.6months")}</a>
-            <a href={quickLink(12)} class={`btn join-item${isDefault ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.12months")}</a>
-            <a href={yearLink(thisYear)} class={`btn join-item${isThisYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.thisYear")}</a>
-            <a href={yearLink(nextYear)} class={`btn join-item${isNextYear ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.quick.nextYear")}</a>
-          </div>
+          <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
 
           {/* Manual date range */}
           <form method="get" action="/anniversaries" class="flex gap-2 items-center flex-wrap">
