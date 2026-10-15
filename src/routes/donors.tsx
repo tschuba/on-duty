@@ -413,7 +413,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
     <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} /></h1>
+        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
@@ -442,7 +442,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
       <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} /></h1>
+          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">

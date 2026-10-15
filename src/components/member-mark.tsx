@@ -3,9 +3,9 @@ import { t } from "../i18n/index.js";
 
 // "Ist Mitglied"-Markierung; Link auf die Mitgliederseite nur mit members:read.
 // stopPropagation: Klick soll nicht die Zeilennavigation (onclick am <tr>) auslösen.
-export function MemberMark({ memberId, canLink }: { memberId: string | null | undefined; canLink: boolean }) {
+export function MemberMark({ memberId, canLink, class: size = "w-4 h-4" }: { memberId: string | null | undefined; canLink: boolean; class?: string }) {
   if (!memberId) return null;
-  const cls = "inline-block w-4 h-4 align-text-bottom ml-1";
+  const cls = `inline-block ${size} align-middle ml-2`;
   return canLink ? (
     <a href={`/members/${memberId}`} title={t("common.member")} aria-label={t("common.member")} onclick="event.stopPropagation()">
       <Icon name="users" class={cls} />
