@@ -317,8 +317,8 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
             <tr><td colspan={3} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageItems.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donors/${d.id}/edit'`}>
-              <td class="font-medium">{d.person.lastName}</td>
-              <td>{d.person.firstName}<MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
+              <td class="font-medium">{d.person.lastName}<MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
+              <td>{d.person.firstName}</td>
               <td>{formatAddress(d.person)}</td>
             </tr>
           ))}
