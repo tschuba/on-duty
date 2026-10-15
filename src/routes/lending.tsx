@@ -4,8 +4,10 @@ import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
+import { QuickRangeFilter } from "../components/quick-range-filter.js";
+import { rangePresets, todayStr } from "../lib/quick-range.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { parseMulti } from "../lib/list-query.js";
+import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
@@ -152,6 +154,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
     bucket.push(l);
   }
 
+  const presets = rangePresets(today, "future");
   const hasFilter = Boolean(search || statusFilter.length || categoryFilter.length || rangeMode);
   const canManage = user.permissions.has("lending:manage");
   const returnTo = currentPath(c.req.url);
@@ -189,6 +192,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           applyLabel={t("common.apply")}
           resetLabel={t("common.reset")}
         />
+        <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter }, { start: p.start, end: p.end })} />
         <input type="date" name="start" value={start} class="input input-bordered w-36" placeholder={t("lending.overview.rangeStart")} />
         <span class="text-base-content/50">–</span>
         <input type="date" name="end" value={end} class="input input-bordered w-36" placeholder={t("lending.overview.rangeEnd")} />
