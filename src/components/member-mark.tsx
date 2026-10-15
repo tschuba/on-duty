@@ -5,13 +5,13 @@ import { t } from "../i18n/index.js";
 // stopPropagation: Klick soll nicht die Zeilennavigation (onclick am <tr>) auslösen.
 export function MemberMark({ memberId, canLink, class: size = "w-4 h-4" }: { memberId: string | null | undefined; canLink: boolean; class?: string }) {
   if (!memberId) return null;
-  const cls = `inline-block ${size} align-middle ml-2`;
+  const cls = `inline-block ${size} align-middle`;
   return canLink ? (
-    <a href={`/members/${memberId}`} title={t("common.member")} aria-label={t("common.member")} onclick="event.stopPropagation()">
+    <a href={`/members/${memberId}`} class="inline-block align-middle ml-1 p-1 rounded text-primary hover:bg-primary/10 cursor-pointer" title={t("common.member")} aria-label={t("common.member")} onclick="event.stopPropagation()">
       <Icon name="users" class={cls} />
     </a>
   ) : (
-    <span title={t("common.member")} role="img" aria-label={t("common.member")}><Icon name="users" class={cls} /></span>
+    <span class="inline-block align-middle ml-1 p-1 opacity-70" title={t("common.member")} role="img" aria-label={t("common.member")}><Icon name="users" class={cls} /></span>
   );
 }
 
