@@ -6,6 +6,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { rangePresets, todayStr } from "../lib/quick-range.js";
+import { MemberMark, MemberFilter } from "../components/member-mark.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
@@ -120,6 +121,8 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const start = c.req.query("start") ?? "";
   const end = c.req.query("end") ?? "";
+  const member = c.req.query("member") === "yes" || c.req.query("member") === "no" ? c.req.query("member")! : "";
+  const canLink = user.permissions.has("members:read");
   const rangeMode = Boolean(start || end);
   const needle = search.toLowerCase();
 
@@ -135,6 +138,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
     }
     if (statusFilter.length > 0 && !statusFilter.includes(loanStatus(l, today))) return false;
     if (categoryFilter.length > 0 && !categoryFilter.includes(l.lendingItem.inventoryItem.category)) return false;
+    if (member && Boolean(l.borrowerMember) !== (member === "yes")) return false;
     if (needle && !`${l.lendingItem.inventoryItem.name} ${borrowerLabel(l)}`.toLowerCase().includes(needle)) return false;
     return true;
   });
@@ -155,7 +159,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   }
 
   const presets = rangePresets(today, "future");
-  const hasFilter = Boolean(search || statusFilter.length || categoryFilter.length || rangeMode);
+  const hasFilter = Boolean(search || statusFilter.length || categoryFilter.length || member || rangeMode);
   const canManage = user.permissions.has("lending:manage");
   const returnTo = currentPath(c.req.url);
 
@@ -192,7 +196,13 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           applyLabel={t("common.apply")}
           resetLabel={t("common.reset")}
         />
-        <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter }, { start: p.start, end: p.end })} />
+        <input type="hidden" name="member" value={member} />
+        <MemberFilter
+          value={member}
+          options={[{ value: "", label: t("common.filter.all") }, { value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }]}
+          href={(m) => buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, start, end }, { member: m })}
+        />
+        <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member }, { start: p.start, end: p.end })} />
         <input type="date" name="start" value={start} class="input input-bordered w-36" placeholder={t("lending.overview.rangeStart")} />
         <span class="text-base-content/50">–</span>
         <input type="date" name="end" value={end} class="input input-bordered w-36" placeholder={t("lending.overview.rangeEnd")} />
@@ -225,7 +235,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
                       >
                         <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(date)}</td>
                         <td class={border}>{l.lendingItem.inventoryItem.name}</td>
-                        <td class={border}>{borrowerLabel(l)}</td>
+                        <td class={border}><MemberMark memberId={l.borrowerMember?.id} canLink={canLink} />{borrowerLabel(l)}</td>
                         <td class={border}><span class={LOAN_STATUS_BADGE[loanState]}>{LOAN_STATUS_LABEL[loanState]}</span></td>
                         <td class={`text-sm${border}`}>{formatDate(l.plannedFrom)} – {formatDate(l.plannedTo)}</td>
                       </tr>
@@ -547,6 +557,7 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
     .reduce((sum, l) => sum + l.quantity, 0);
   const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
   const canManage = user.permissions.has("lending:manage");
+  const canLink = user.permissions.has("members:read");
   const returnTo = currentPath(c.req.url);
 
   const sorted = [...loans].sort((a, b) => (b.plannedFrom ?? b.pickedUpAt ?? "").localeCompare(a.plannedFrom ?? a.pickedUpAt ?? ""));
@@ -586,10 +597,10 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
             <tr><td colspan={(item.individualTracking ? 5 : 6) + (canManage ? 1 : 0)} class="text-center opacity-50 py-8">{t("lending.loans.table.empty")}</td></tr>
           ) : sorted.map((l) => {
             const overdue = Boolean(l.plannedTo && l.plannedTo < today && !l.returnedAt);
-            const borrower = l.borrowerMember ? `${l.borrowerMember.person.firstName} ${l.borrowerMember.person.lastName}` : l.borrowerName || "—";
+            const borrower = borrowerLabel(l);
             return (
               <tr key={l.id} class={overdue ? "text-error font-semibold" : ""}>
-                <td>{borrower}{overdue && <span class="badge badge-error badge-sm ml-1">{t("lending.loans.overdue")}</span>}</td>
+                <td><MemberMark memberId={l.borrowerMember?.id} canLink={canLink} />{borrower}{overdue && <span class="badge badge-error badge-sm ml-1">{t("lending.loans.overdue")}</span>}</td>
                 {!item.individualTracking && <td>{l.quantity}</td>}
                 <td>{formatDate(l.plannedFrom)}</td>
                 <td>{formatDate(l.plannedTo)}</td>

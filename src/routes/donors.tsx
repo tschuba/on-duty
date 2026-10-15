@@ -4,6 +4,7 @@ import { db } from "../db/index.js";
 import { persons, donors } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
+import { MemberMark, MemberFilter } from "../components/member-mark.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -17,7 +18,7 @@ export const donorRoutes = new Hono<{ Variables: Variables }>();
 
 type Person = typeof persons.$inferSelect;
 type DonorRow = typeof donors.$inferSelect;
-type DonorWithPerson = DonorRow & { person: Person };
+type DonorWithPerson = DonorRow & { person: Person & { member?: { id: string } | null } };
 
 // Narrow field set the donations:record permission is allowed to see/edit on a
 // person — never gender/birthDate/phone/email, which belong to the members
@@ -246,7 +247,8 @@ function parseListQuery(q: Record<string, string>) {
   const sort: SortKey = q.sort === "firstName" ? "firstName" : "lastName";
   const dir: "asc" | "desc" = q.sort_dir === "desc" ? "desc" : "asc";
   const { page, pageSize } = parsePagination(q);
-  return { search, sort, dir, page, pageSize };
+  const member = q.member === "yes" || q.member === "no" ? q.member : "";
+  return { search, sort, dir, page, pageSize, member };
 }
 
 function donorListUrl(base: Record<string, string | number>) {
@@ -257,13 +259,14 @@ function donorListUrl(base: Record<string, string | number>) {
 // Berechtigungsgrenze in the backlog note — no member-only data here).
 donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
-  const { search, sort, dir, page, pageSize } = parseListQuery(c.req.query());
+  const { search, sort, dir, page, pageSize, member } = parseListQuery(c.req.query());
+  const canLink = Boolean(user.permissions.has("members:read"));
 
-  const all = (await db.query.donors.findMany({ with: { person: true } })) as DonorWithPerson[];
+  const all = (await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as DonorWithPerson[];
   const needle = search.toLowerCase();
-  const filtered = search
-    ? all.filter((d) => `${d.person.firstName} ${d.person.lastName}`.toLowerCase().includes(needle))
-    : all;
+  const filtered = all
+    .filter((d) => !search || `${d.person.firstName} ${d.person.lastName}`.toLowerCase().includes(needle))
+    .filter((d) => !member || Boolean(d.person.member) === (member === "yes"));
   const sorted = [...filtered].sort((a, b) => {
     const cmp = a.person[sort].localeCompare(b.person[sort], "de");
     return dir === "asc" ? cmp : -cmp;
@@ -290,16 +293,22 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
           <input type="hidden" name="sort" value={sort} />
           <input type="hidden" name="sort_dir" value={dir} />
           <input type="hidden" name="pageSize" value={pageSize} />
+          <input type="hidden" name="member" value={member} />
           <button type="submit" class="btn">{t("common.show")}</button>
         </form>
+        <MemberFilter
+          value={member}
+          options={[{ value: "", label: t("common.filter.all") }, { value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.nonMembers") }]}
+          href={(m) => donorListUrl({ search, sort, sort_dir: dir, pageSize, member: m })}
+        />
       </div>
 
       <ClickToEditHint />
       <table class="table table-zebra w-full">
         <thead>
           <tr>
-            <th><a href={donorListUrl({ search, sort: "lastName", sort_dir: sort === "lastName" && dir === "asc" ? "desc" : "asc", pageSize })} class="link link-hover">{t("donors.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
-            <th><a href={donorListUrl({ search, sort: "firstName", sort_dir: sort === "firstName" && dir === "asc" ? "desc" : "asc", pageSize })} class="link link-hover">{t("donors.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
+            <th><a href={donorListUrl({ search, sort: "lastName", sort_dir: sort === "lastName" && dir === "asc" ? "desc" : "asc", pageSize, member })} class="link link-hover">{t("donors.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
+            <th><a href={donorListUrl({ search, sort: "firstName", sort_dir: sort === "firstName" && dir === "asc" ? "desc" : "asc", pageSize, member })} class="link link-hover">{t("donors.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
             <th>{t("donors.table.address")}</th>
           </tr>
         </thead>
@@ -308,7 +317,7 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
             <tr><td colspan={3} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageItems.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donors/${d.id}/edit'`}>
-              <td class="font-medium">{d.person.lastName}</td>
+              <td class="font-medium"><MemberMark memberId={d.person.member?.id} canLink={canLink} />{d.person.lastName}</td>
               <td>{d.person.firstName}</td>
               <td>{formatAddress(d.person)}</td>
             </tr>
@@ -319,11 +328,11 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
       <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
         <span class="text-sm opacity-70 mr-auto">{t("donors.table.count", { count: sorted.length })}</span>
         <div class="join">
-          {page > 1 && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: page - 1 })} class="join-item btn">«</a>}
+          {page > 1 && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: page - 1 })} class="join-item btn">«</a>}
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <a key={p} href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: p })} class={`join-item btn${p === page ? " btn-active" : ""}`}>{p}</a>
+            <a key={p} href={donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: p })} class={`join-item btn${p === page ? " btn-active" : ""}`}>{p}</a>
           ))}
-          {page < totalPages && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, page: page + 1 })} class="join-item btn">»</a>}
+          {page < totalPages && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: page + 1 })} class="join-item btn">»</a>}
         </div>
       </div>
     </Layout>
@@ -396,14 +405,15 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
 // GET/POST /donors/:id/edit — name + address only, even if the person is also a member
 donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
-  const donor = await db.query.donors.findFirst({ where: eq(donors.id, c.req.param("id")), with: { person: true } }) as DonorWithPerson | undefined;
+  const donor = await db.query.donors.findFirst({ where: eq(donors.id, c.req.param("id")), with: { person: { with: { member: true } } } }) as DonorWithPerson | undefined;
   if (!donor) return c.notFound();
+  const canLink = Boolean(user.permissions.has("members:read"));
 
   return c.html(
     <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}</h1>
+        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberMark memberId={donor.person.member?.id} canLink={canLink} />{donor.person.firstName} {donor.person.lastName}</h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
@@ -420,8 +430,9 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
 donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: true } }) as DonorWithPerson | undefined;
+  const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: { with: { member: true } } } }) as DonorWithPerson | undefined;
   if (!donor) return c.notFound();
+  const canLink = Boolean(user.permissions.has("members:read"));
 
   const body = await c.req.parseBody();
   const { values, errors } = parseDonorPersonFields(body);
@@ -431,7 +442,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
       <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}</h1>
+          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberMark memberId={donor.person.member?.id} canLink={canLink} />{donor.person.firstName} {donor.person.lastName}</h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
