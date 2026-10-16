@@ -4,7 +4,7 @@ import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
+import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, canReadOrgTab, ORG_TABS, type OrgTab } from "../lib/org-config.js";
@@ -242,6 +242,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
 
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
+      <DonationTabs active="donations" openReceiptsCount={openReceipts} />
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>

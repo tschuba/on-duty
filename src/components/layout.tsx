@@ -10,7 +10,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications" | "inventory" | "organisation";
+  activeNav?: "members" | "anniversaries" | "donations" | "admin" | "applications" | "inventory" | "organisation";
 }>;
 
 export function ClickToEditHint() {
@@ -20,6 +20,9 @@ export function ClickToEditHint() {
 // Desktop-Nav: Textlinks, aktive Seite fett + Unterstrich, andere gedämpft.
 const navLink = (active: boolean) =>
   `text-sm px-1 py-1 border-b-2 ${active ? "font-semibold border-primary text-base-content" : "border-transparent text-base-content/60 hover:text-base-content"}`;
+
+// Platzhalter: künftige Spender-Zähler (z. B. unvollständige Adressen) hier einrechnen.
+export const DONORS_TAB_COUNT = 0;
 
 export function CountBadge({ count }: { count: number }) {
   return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
@@ -34,6 +37,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
   const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
   const canIssueReceipts = Boolean(user?.permissions.has("donations:issue-receipts"));
   const openReceiptsCount = canIssueReceipts ? await countOpenReceipts() : 0;
+  // Menüpunkt "Spenden" zeigt die Summe der Reiter-Zähler (Spender hat noch keinen).
+  const donationsNavCount = openReceiptsCount + DONORS_TAB_COUNT;
   const canSeeOrganisation = ["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"].some((p) => user?.permissions.has(p as never));
   let orgMissingCount = 0;
   if (canSeeOrganisation && user) {
@@ -90,15 +95,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "donations")}
                 >
                   {t("common.nav.donations")}
-                  <CountBadge count={openReceiptsCount} />
-                </a>
-              )}
-              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
-                <a
-                  href="/donors"
-                  class={navLink(activeNav === "donors")}
-                >
-                  {t("common.nav.donors")}
+                  <CountBadge count={donationsNavCount} />
                 </a>
               )}
               {canReadInventory && (
@@ -140,8 +137,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
                 {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<CountBadge count={openApplicationsCount} /></a></li>}
-                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={openReceiptsCount} /></a></li>}
-                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={orgMissingCount} /></a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
@@ -202,3 +198,20 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
   </html>
   );
 };
+
+export function DonationTabs({ active, openReceiptsCount }: { active: "donations" | "donors"; openReceiptsCount: number }) {
+  const tabs = [
+    { key: "donations", href: "/donations", count: openReceiptsCount },
+    { key: "donors", href: "/donors", count: DONORS_TAB_COUNT },
+  ] as const;
+  return (
+    <div role="tablist" class="tabs tabs-lifted mb-6">
+      {tabs.map((tab) => (
+        <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
+          {t(`donations.tabs.${tab.key}`)}
+          <CountBadge count={tab.count} />
+        </a>
+      ))}
+    </div>
+  );
+}
