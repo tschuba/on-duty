@@ -16,7 +16,6 @@ const ICONS = {
   "user-group": "24/outline/user-group.svg",
   "bars-3": "24/outline/bars-3.svg",
   "chevron-down": "20/solid/chevron-down.svg",
-  "user-circle": "24/outline/user-circle.svg",
 };
 
 function attr(str, name) {

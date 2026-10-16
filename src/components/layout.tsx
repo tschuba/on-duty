@@ -57,7 +57,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
             on-duty
           </a>
           {user && (
-            <div class="hidden xl:flex gap-4 items-center">
+            <div class="hidden lg:flex gap-4 items-center">
               <a
                 href="/members"
                 class={navLink(activeNav === "members")}
@@ -124,7 +124,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           )}
         </div>
         {user && (
-          <div class="navbar-center xl:hidden">
+          <div class="navbar-center lg:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
@@ -146,7 +146,11 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1 tooltip tooltip-bottom" data-tip={user.name} aria-label={user.name}>
-                <Icon name="user-circle" class="h-5 w-5 xl:hidden" />
+                <div class="avatar avatar-placeholder xl:hidden">
+                  <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
+                    <span>{(user.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+                  </div>
+                </div>
                 <span class="hidden xl:inline">{user.name}</span>
                 <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
