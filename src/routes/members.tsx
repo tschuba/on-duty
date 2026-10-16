@@ -1,3 +1,4 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
@@ -1375,6 +1376,15 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
 });
 
 // GET /members/:id — view or edit
+// Zurück zur Herkunftsseite (Referer, same-origin); Mitgliederseiten selbst ausgenommen.
+function backHref(c: Context): string {
+  try {
+    const ref = new URL(c.req.header("referer") ?? "");
+    if (ref.host === new URL(c.req.url).host && !ref.pathname.startsWith("/members/")) return ref.pathname + ref.search;
+  } catch {}
+  return "/members";
+}
+
 memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const m = await fetchMember(c.req.param("id"));
@@ -1393,7 +1403,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
         <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+          <a href={backHref(c)} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <div class="flex items-center gap-3 mt-1">
             <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
               {m.firstName} {m.lastName}
@@ -1432,7 +1442,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
       <div class="mb-4">
-        <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+        <a href={backHref(c)} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <div class="flex items-center gap-3 mt-1">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {m.firstName} {m.lastName}

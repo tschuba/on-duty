@@ -8,6 +8,7 @@ import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, canReadOrgTab, ORG_TABS, type OrgTab } from "../lib/org-config.js";
+import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl } from "../lib/list-query.js";
@@ -43,7 +44,7 @@ type Person = typeof persons.$inferSelect;
 type DonorRow = typeof donors.$inferSelect;
 type DonationRow = typeof donations.$inferSelect;
 type Issuer = typeof users.$inferSelect;
-type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person }; issuer: Issuer | null };
+type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person & { member: { id: string } | null } }; issuer: Issuer | null };
 
 type DonationType = "cash" | "transfer";
 
@@ -130,11 +131,11 @@ const TYPE_LABELS: Record<DonationType, string> = {
 };
 
 async function fetchDonations(): Promise<DonationWithDonor[]> {
-  return db.query.donations.findMany({ with: { donor: { with: { person: true } }, issuer: true } }) as Promise<DonationWithDonor[]>;
+  return db.query.donations.findMany({ with: { donor: { with: { person: { with: { member: true } } } }, issuer: true } }) as Promise<DonationWithDonor[]>;
 }
 
 async function fetchDonation(id: string): Promise<DonationWithDonor | undefined> {
-  return db.query.donations.findFirst({ where: eq(donations.id, id), with: { donor: { with: { person: true } }, issuer: true } }) as Promise<DonationWithDonor | undefined>;
+  return db.query.donations.findFirst({ where: eq(donations.id, id), with: { donor: { with: { person: { with: { member: true } } } }, issuer: true } }) as Promise<DonationWithDonor | undefined>;
 }
 
 type DonationFieldValues = { amount: string; date: string; type: string; purpose: string };
@@ -238,6 +239,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
   const presets = rangePresets(todayStr(), "past");
   const config = await loadOrgConfig();
   const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
+  const canLink = user.permissions.has("members:read");
   const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   return c.html(
@@ -285,7 +287,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
           ) : sorted.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}/edit'`}>
               <td>{formatDate(d.date)}</td>
-              <td>{d.donor.person.firstName} {d.donor.person.lastName}</td>
+              <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
               <td>{TYPE_LABELS[d.type]}</td>
               <td>{d.purpose ?? "—"}</td>
@@ -388,12 +390,13 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
+  const canLink = user.permissions.has("members:read");
 
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
       <div class="mb-4">
         <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{d.donor.person.firstName} {d.donor.person.lastName}</h1>
+        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
       {d.receiptIssuedAt && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
@@ -415,6 +418,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const id = c.req.param("id");
   const d = await fetchDonation(id);
   if (!d) return c.notFound();
+  const canLink = user.permissions.has("members:read");
 
   const body = await c.req.parseBody();
   const { values, errors } = parseDonationFields(body);
@@ -424,7 +428,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
       <Layout title={t("donations.title")} user={user} activeNav="donations">
         <div class="mb-4">
           <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{d.donor.person.firstName} {d.donor.person.lastName}</h1>
+          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
