@@ -67,7 +67,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
             on-duty
           </a>
           {user && (
-            <div class="hidden lg:flex gap-4 items-center">
+            <div class="hidden md:flex gap-4 items-center">
               <a
                 href="/members"
                 class={navLink(activeNav === "members")}
@@ -114,7 +114,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           )}
         </div>
         {user && (
-          <div class="navbar-center lg:hidden">
+          <div class="navbar-center md:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
@@ -133,12 +133,12 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
-                <div class="avatar avatar-placeholder tooltip tooltip-left xl:hidden" data-tip={user.name}>
+                <div class="avatar avatar-placeholder tooltip tooltip-left lg:hidden" data-tip={user.name}>
                   <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
                     <span>{(user.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
                   </div>
                 </div>
-                <span class="hidden xl:inline">{user.name}</span>
+                <span class="hidden lg:inline">{user.name}</span>
                 <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
