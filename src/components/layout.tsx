@@ -57,7 +57,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
             on-duty
           </a>
           {user && (
-            <div class="hidden lg:flex gap-4 items-center">
+            <div class="hidden xl:flex gap-4 items-center">
               <a
                 href="/members"
                 class={navLink(activeNav === "members")}
@@ -124,7 +124,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           )}
         </div>
         {user && (
-          <div class="navbar-center lg:hidden">
+          <div class="navbar-center xl:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
