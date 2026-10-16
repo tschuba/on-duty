@@ -145,8 +145,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         {user && (
           <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
-              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1 tooltip tooltip-bottom" data-tip={user.name} aria-label={user.name}>
-                <div class="avatar avatar-placeholder xl:hidden">
+              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
+                <div class="avatar avatar-placeholder tooltip tooltip-left xl:hidden" data-tip={user.name}>
                   <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
                     <span>{(user.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
                   </div>
