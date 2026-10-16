@@ -241,7 +241,7 @@ describe("GET /:id/receipt", () => {
     donationsFindFirstResult = makeDonation();
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
-    expect(html).toContain("/admin/org-config");
+    expect(html).toContain("/organisation/steuerdaten");
     expect(html).not.toContain(t("donations.receipt.explanation"));
   });
 

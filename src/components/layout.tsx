@@ -8,7 +8,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications" | "inventory";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications" | "inventory" | "organisation";
 }>;
 
 export function ClickToEditHint() {
@@ -34,6 +34,7 @@ function OverdueInspectionsBadge({ count }: { count: number }) {
 export const Layout = async ({ title, children, user, activeNav }: Props) => {
   const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
   const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
+  const canSeeOrganisation = ["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"].some((p) => user?.permissions.has(p as never));
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
   const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
 
@@ -103,6 +104,14 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   <OverdueInspectionsBadge count={overdueInspectionsCount} />
                 </a>
               )}
+              {canSeeOrganisation && (
+                <a
+                  href="/organisation"
+                  class={navLink(activeNav === "organisation")}
+                >
+                  {t("common.nav.organisation")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -127,6 +136,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<OverdueInspectionsBadge count={overdueInspectionsCount} /></a></li>}
+                {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
@@ -135,8 +145,13 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         {user && (
           <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
-              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
-                <span>{user.name}</span>
+              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
+                <div class="avatar avatar-placeholder tooltip tooltip-left xl:hidden" data-tip={user.name}>
+                  <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
+                    <span>{(user.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+                  </div>
+                </div>
+                <span class="hidden xl:inline">{user.name}</span>
                 <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">

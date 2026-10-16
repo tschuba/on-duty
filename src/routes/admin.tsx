@@ -12,7 +12,6 @@ import {
   appRoles,
   appRolePermissions,
   userAppRoles,
-  orgConfig,
 } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
@@ -43,6 +42,10 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "inventory:manage": t("admin.permissions.key.inventoryManage"),
   "lending:read": t("admin.permissions.key.lendingRead"),
   "lending:manage": t("admin.permissions.key.lendingManage"),
+  "org:read": t("admin.permissions.key.orgRead"),
+  "org:write": t("admin.permissions.key.orgWrite"),
+  "org:tax-data:read": t("admin.permissions.key.orgTaxDataRead"),
+  "org:tax-data:write": t("admin.permissions.key.orgTaxDataWrite"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -52,9 +55,10 @@ const RESOURCE_LABELS: Record<string, string> = {
   applications: t("admin.permissions.resource.applications"),
   inventory: t("admin.permissions.resource.inventory"),
   lending: t("admin.permissions.resource.lending"),
+  org: t("admin.permissions.resource.org"),
 };
 
-function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "org-config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -71,9 +75,6 @@ function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "an
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         {t("admin.tabs.config")}
-      </a>
-      <a href="/admin/org-config" role="tab" class={`tab${active === "org-config" ? " tab-active" : ""}`}>
-        {t("admin.tabs.orgConfig")}
       </a>
       <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
         {t("admin.tabs.backup")}
@@ -1530,161 +1531,6 @@ adminRoutes.get("/config", guard, async (c) => {
       </div>
     </Layout>
   );
-});
-
-// ── /admin/org-config ────────────────────────────────────────────────────────
-const ORG_CONFIG_FIELDS = [
-  { key: "orgName", type: "text", section: "address" },
-  { key: "orgStreet", type: "text", section: "address" },
-  { key: "orgHouseNumber", type: "text", section: "address" },
-  { key: "orgZip", type: "text", section: "address" },
-  { key: "orgCity", type: "text", section: "address" },
-  { key: "taxExemptionDate", type: "date", section: "tax" },
-  { key: "taxExemptionNumber", type: "text", section: "tax" },
-  { key: "taxOffice", type: "text", section: "tax" },
-  { key: "taxAssessmentPeriodFrom", type: "number", section: "tax" },
-  { key: "taxAssessmentPeriodTo", type: "number", section: "tax" },
-  { key: "charitablePurpose", type: "text", section: "tax" },
-  { key: "iban", type: "text", section: "bank" },
-  { key: "bic", type: "text", section: "bank" },
-  { key: "applicationNotifyEmail", type: "email", section: "applications" },
-] as const;
-
-const ORG_CONFIG_SECTIONS = [
-  { id: "address", title: t("admin.orgConfig.section.address") },
-  { id: "tax", title: t("admin.orgConfig.section.tax") },
-  { id: "bank", title: t("admin.orgConfig.section.bank") },
-  { id: "applications", title: t("admin.orgConfig.section.applications") },
-] as const;
-
-const ORG_CONFIG_FIELD_LABELS: Record<string, string> = {
-  orgName: t("admin.orgConfig.field.orgName"),
-  orgStreet: t("admin.orgConfig.field.orgStreet"),
-  orgHouseNumber: t("admin.orgConfig.field.orgHouseNumber"),
-  orgZip: t("admin.orgConfig.field.orgZip"),
-  orgCity: t("admin.orgConfig.field.orgCity"),
-  taxExemptionDate: t("admin.orgConfig.field.taxExemptionDate"),
-  taxExemptionNumber: t("admin.orgConfig.field.taxExemptionNumber"),
-  taxOffice: t("admin.orgConfig.field.taxOffice"),
-  taxAssessmentPeriodFrom: t("admin.orgConfig.field.taxAssessmentPeriodFrom"),
-  taxAssessmentPeriodTo: t("admin.orgConfig.field.taxAssessmentPeriodTo"),
-  charitablePurpose: t("admin.orgConfig.field.charitablePurpose"),
-  iban: t("admin.orgConfig.field.iban"),
-  bic: t("admin.orgConfig.field.bic"),
-  applicationNotifyEmail: t("admin.orgConfig.field.applicationNotifyEmail"),
-};
-
-// iban/bic are normalized (no spaces, uppercase) so consuming features don't
-// each have to re-clean what an admin typed as "DE12 3456 ...".
-function normalizeOrgConfigValue(key: string, value: string): string {
-  if (key === "iban" || key === "bic") return value.replace(/\s+/g, "").toUpperCase();
-  return value;
-}
-
-adminRoutes.get("/org-config", guard, async (c) => {
-  const user = c.get("user");
-  const warn = await backupWarnProps();
-  const rows = await db.select().from(orgConfig);
-  const values = new Map(rows.map((r) => [r.key, r.value]));
-
-  function field(key: (typeof ORG_CONFIG_FIELDS)[number]["key"], type: string) {
-    return (
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text">{ORG_CONFIG_FIELD_LABELS[key]}</span>
-        </label>
-        <input type={type} name={key} class="input input-bordered w-full" value={values.get(key) ?? ""} />
-      </div>
-    );
-  }
-
-  return c.html(
-    <Layout title={t("admin.orgConfig.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
-      <AdminTabs active="org-config" />
-      <div class="max-w-4xl mx-auto">
-        <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            {t("admin.orgConfig.title")}
-          </h1>
-          <button type="submit" form="org-config-form" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
-        <form id="org-config-form" method="post" action="/admin/org-config" class="flex flex-col gap-6">
-          <div class="card bg-base-200 shadow">
-            <div class="card-body gap-4">
-              <h2 class="card-title">{ORG_CONFIG_SECTIONS[0].title}</h2>
-              {field("orgName", "text")}
-              <div class="grid grid-cols-1 sm:grid-cols-[3fr_1fr] gap-4">
-                {field("orgStreet", "text")}
-                {field("orgHouseNumber", "text")}
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-[1fr_3fr] gap-4">
-                {field("orgZip", "text")}
-                {field("orgCity", "text")}
-              </div>
-            </div>
-          </div>
-          <div class="card bg-base-200 shadow">
-            <div class="card-body gap-4">
-              <h2 class="card-title">{ORG_CONFIG_SECTIONS[1].title}</h2>
-              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4">
-                {field("taxExemptionDate", "date")}
-                {field("taxExemptionNumber", "text")}
-              </div>
-              {field("taxOffice", "text")}
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {field("taxAssessmentPeriodFrom", "number")}
-                {field("taxAssessmentPeriodTo", "number")}
-              </div>
-              {field("charitablePurpose", "text")}
-            </div>
-          </div>
-          <div class="card bg-base-200 shadow">
-            <div class="card-body gap-4">
-              <h2 class="card-title">{ORG_CONFIG_SECTIONS[2].title}</h2>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {field("iban", "text")}
-                {field("bic", "text")}
-              </div>
-            </div>
-          </div>
-          <div class="card bg-base-200 shadow">
-            <div class="card-body gap-4">
-              <h2 class="card-title">{ORG_CONFIG_SECTIONS[3].title}</h2>
-              {field("applicationNotifyEmail", "email")}
-            </div>
-          </div>
-        </form>
-      </div>
-    </Layout>
-  );
-});
-
-adminRoutes.post("/org-config", guard, async (c) => {
-  const body = await c.req.parseBody();
-
-  const periodFrom = String(body.taxAssessmentPeriodFrom ?? "").trim();
-  const periodTo = String(body.taxAssessmentPeriodTo ?? "").trim();
-  if (periodFrom && periodTo && Number(periodTo) < Number(periodFrom)) {
-    setFlash(c, t("admin.orgConfig.flash.invalidPeriod"), "error");
-    return c.redirect("/admin/org-config");
-  }
-
-  for (const field of ORG_CONFIG_FIELDS) {
-    const value = normalizeOrgConfigValue(field.key, String(body[field.key] ?? "").trim());
-    if (value) {
-      await db
-        .insert(orgConfig)
-        .values({ key: field.key, value })
-        .onConflictDoUpdate({ target: orgConfig.key, set: { value } });
-    } else {
-      await db.delete(orgConfig).where(eq(orgConfig.key, field.key));
-    }
-  }
-  setFlash(c, t("admin.orgConfig.flash.saved"), "success");
-  return c.redirect("/admin/org-config");
 });
 
 // ── /admin/backup ──────────────────────────────────────────────────────────────
