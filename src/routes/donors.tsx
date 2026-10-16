@@ -3,7 +3,8 @@ import { eq, or, ilike, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, donors } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
+import { countOpenReceipts } from "../lib/donations.js";
+import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { MemberMark, MemberFilter } from "../components/member-mark.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
@@ -261,6 +262,7 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
   const user = c.get("user");
   const { search, sort, dir, page, pageSize, member } = parseListQuery(c.req.query());
   const canLink = Boolean(user.permissions.has("members:read"));
+  const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   const all = (await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as DonorWithPerson[];
   const needle = search.toLowerCase();
@@ -275,7 +277,8 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return c.html(
-    <Layout title={t("donors.title")} user={user} activeNav="donors">
+    <Layout title={t("donors.title")} user={user} activeNav="donations">
+      <DonationTabs active="donors" openReceiptsCount={openReceipts} />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donors.title")}</h1>
         <a href="/donors/new" class="btn btn-primary">{t("donors.addDonor")}</a>
@@ -343,7 +346,7 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
 donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
-    <Layout title={t("donors.newDonor")} user={user} activeNav="donors">
+    <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.newDonor")}</h1>
@@ -369,7 +372,7 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donors.newDonor")} user={user} activeNav="donors">
+      <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.newDonor")}</h1>
@@ -410,7 +413,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const canLink = Boolean(user.permissions.has("members:read"));
 
   return c.html(
-    <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
+    <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
       <div class="mb-4">
         <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
@@ -439,7 +442,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donors.editDonor")} user={user} activeNav="donors">
+      <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
         <div class="mb-4">
           <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{donor.person.firstName} {donor.person.lastName}<MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
