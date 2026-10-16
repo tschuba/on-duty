@@ -23,8 +23,8 @@ export type OrgTab = "master" | "tax";
 
 // Single source of truth for tab → fields and tab → read permissions (write implies read; OR check, no implies mechanism in RBAC).
 export const ORG_TABS = {
-  master: { path: "stammdaten", read: ["org:read", "org:write"], write: "org:write" },
-  tax: { path: "steuerdaten", read: ["org:tax-data:read", "org:tax-data:write"], write: "org:tax-data:write" },
+  master: { path: "master-data", read: ["org:read", "org:write"], write: "org:write" },
+  tax: { path: "tax-data", read: ["org:tax-data:read", "org:tax-data:write"], write: "org:tax-data:write" },
 } as const;
 
 export const TAB_FIELDS: Record<OrgTab, { key: string; type: string }[]> = {

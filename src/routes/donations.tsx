@@ -245,11 +245,11 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
       <DonationTabs active="donations" openReceiptsCount={openReceipts} />
-      {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>
         <a href="/donations/new" class="btn btn-primary">{t("donations.newDonation")}</a>
       </div>
+      {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
       <form method="get" class="flex flex-wrap gap-3 mb-4 items-end">
         <div class="form-control">
@@ -267,7 +267,6 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
         <button type="submit" class="btn">{t("common.show")}</button>
       </form>
 
-      {openReceipts > 0 && <p class="text-sm mb-2">{t("donations.openReceipts", { count: openReceipts })}</p>}
       <ClickToEditHint />
       <table class="table table-zebra w-full">
         <thead>

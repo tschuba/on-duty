@@ -103,6 +103,7 @@ async function fetchAllLoans(): Promise<(LoanWithBorrower & { lendingItem: Lendi
 }
 
 function formatMonth(yyyymm: string): string {
+  if (!yyyymm) return "—";
   const [y, m] = yyyymm.split("-");
   const names = ["month.january", "month.february", "month.march", "month.april", "month.may", "month.june",
     "month.july", "month.august", "month.september", "month.october", "month.november", "month.december"] as const;
@@ -151,7 +152,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
 
   const groups = new Map<string, typeof sorted>();
   for (const l of sorted) {
-    const date = l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "0000-00";
+    const date = l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "";
     const key = date.slice(0, 7);
     let bucket = groups.get(key);
     if (!bucket) { bucket = []; groups.set(key, bucket); }

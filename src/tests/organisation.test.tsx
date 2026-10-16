@@ -47,7 +47,7 @@ beforeEach(() => {
 describe("organisation", () => {
   it("marks receipt fields as required and warns about missing ones, but stays saveable", async () => {
     config = { orgName: "FF" };
-    const html = await (await organisationRoutes.request("/stammdaten")).text();
+    const html = await (await organisationRoutes.request("/master-data")).text();
     expect(html).toContain("alert-warning");
     expect(html).toContain("text-error");
     expect(html).not.toContain(" required");
@@ -55,42 +55,42 @@ describe("organisation", () => {
 
   it("shows no warning when the tab's required fields are filled", async () => {
     config = { orgName: "a", orgStreet: "b", orgHouseNumber: "1", orgZip: "2", orgCity: "c" };
-    const html = await (await organisationRoutes.request("/stammdaten")).text();
+    const html = await (await organisationRoutes.request("/master-data")).text();
     expect(html).not.toContain("alert-warning");
   });
 
   it("redirects / to the first readable tab", async () => {
     currentUser.permissions = new Set(["org:tax-data:read"]);
     const res = await organisationRoutes.request("/");
-    expect(res.headers.get("location")).toBe("/organisation/steuerdaten");
+    expect(res.headers.get("location")).toBe("/organisation/tax-data");
   });
 
   it("renders stammdaten values, editable with org:write", async () => {
     config = { orgName: "FF Altenhammer" };
-    const html = await (await organisationRoutes.request("/stammdaten")).text();
+    const html = await (await organisationRoutes.request("/master-data")).text();
     expect(html).toContain("FF Altenhammer");
     expect(html).not.toContain("disabled");
   });
 
   it("renders steuerdaten read-only with only org:tax-data:read", async () => {
-    const html = await (await organisationRoutes.request("/steuerdaten")).text();
+    const html = await (await organisationRoutes.request("/tax-data")).text();
     expect(html).toContain("disabled");
   });
 
   it("403s a tab without its read permission", async () => {
     currentUser.permissions = new Set(["org:read"]);
-    expect((await organisationRoutes.request("/steuerdaten")).status).toBe(403);
+    expect((await organisationRoutes.request("/tax-data")).status).toBe(403);
   });
 
   it("upserts submitted and deletes empty fields, only for the tab's own keys", async () => {
-    await organisationRoutes.request("/stammdaten", { method: "POST", body: formBody({ orgName: "FF", orgCity: "" }) });
+    await organisationRoutes.request("/master-data", { method: "POST", body: formBody({ orgName: "FF", orgCity: "" }) });
     expect(insertCalls.some((c) => c.table === orgConfig && c.values.key === "orgName")).toBe(true);
     expect(deleteCalls.length).toBeGreaterThan(0);
     expect(insertCalls.some((c) => c.values.key === "taxOffice")).toBe(false);
   });
 
   it("rejects an inverted assessment period", async () => {
-    await organisationRoutes.request("/steuerdaten", {
+    await organisationRoutes.request("/tax-data", {
       method: "POST",
       body: formBody({ taxAssessmentPeriodFrom: "2024", taxAssessmentPeriodTo: "2020" }),
     });
@@ -102,7 +102,7 @@ describe("tab badges", () => {
   it("shows missing-field count per readable tab", async () => {
     currentUser.permissions = new Set(["org:read", "org:tax-data:read"]);
     config = { orgName: "X", orgStreet: "S", orgHouseNumber: "1", orgZip: "1", orgCity: "C" };
-    const html = await (await organisationRoutes.request("/steuerdaten")).text();
+    const html = await (await organisationRoutes.request("/tax-data")).text();
     expect(html).toContain('<span class="badge">6</span>');
     expect(html).not.toContain('<span class="badge">5</span>');
   });

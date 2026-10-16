@@ -50,7 +50,11 @@ for (const tab of ["master", "tax"] as const) {
     return c.html(
       <Layout title={t(`organisation.tabs.${tab}`)} user={user} activeNav="organisation">
         <OrganisationTabs active={tab} perms={user.permissions} counts={{ master: missingByTab.master.length, tax: missingByTab.tax.length }} />
-        <div class="max-w-4xl mx-auto">
+        <form method="post" action={`/organisation/${path}`} class="max-w-4xl mx-auto">
+          <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t(`organisation.tabs.${tab}`)}</h1>
+            {editable && <button type="submit" class="btn btn-primary">{t("common.save")}</button>}
+          </div>
           {missing.length > 0 && (
             <div class="alert alert-warning mb-4">
               <div>
@@ -59,14 +63,8 @@ for (const tab of ["master", "tax"] as const) {
               </div>
             </div>
           )}
-          <form method="post" action={`/organisation/${path}`} class="card bg-base-200 shadow">
+          <div class="card bg-base-200 shadow">
             <div class="card-body gap-4">
-              <div class="flex items-center justify-between">
-                <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-                  {t(`organisation.tabs.${tab}`)}
-                </h1>
-                {editable && <button type="submit" class="btn btn-primary">{t("common.save")}</button>}
-              </div>
               {TAB_FIELDS[tab].map(({ key, type }) => (
                 <div class="form-control">
                   <label class="label">
@@ -85,8 +83,8 @@ for (const tab of ["master", "tax"] as const) {
                 </div>
               ))}
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </Layout>,
     );
   });
