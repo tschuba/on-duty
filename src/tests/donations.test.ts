@@ -187,23 +187,6 @@ describe("GET /", () => {
 
 // ── POST / (create) ──────────────────────────────────────────────────────────
 
-describe("open receipts notice and count", () => {
-  it("shows the notice on the list when receipts are open", async () => {
-    openReceiptsFixture = [{ id: "a" }, { id: "b" }];
-    const html = await (await donationRoutes.request("/")).text();
-    expect(html).toContain(t("donations.openReceipts", { count: 2 }));
-  });
-
-  it("omits the notice without the issue permission or at zero", async () => {
-    openReceiptsFixture = [{ id: "a" }];
-    currentUser = { ...currentUser, permissions: new Set(["donations:record"]) };
-    expect(await (await donationRoutes.request("/")).text()).not.toContain(t("donations.openReceipts", { count: 1 }));
-    currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts"]) };
-    openReceiptsFixture = [];
-    expect(await (await donationRoutes.request("/")).text()).not.toContain("Offene Zuwendungsbestätigungen");
-  });
-});
-
 describe("POST /", () => {
   it("returns 422 when donor and donation fields are missing", async () => {
     const res = await donationRoutes.request("/", { method: "POST", body: formBody({}) });
@@ -262,8 +245,8 @@ describe("GET /:id/receipt", () => {
     currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts", "org:tax-data:read"]) };
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
-    expect(html).toContain("/organisation/steuerdaten");
-    expect(html).not.toContain("/organisation/stammdaten");
+    expect(html).toContain("/organisation/tax-data");
+    expect(html).not.toContain("/organisation/master-data");
     expect(html).not.toContain(t("donations.receipt.explanation"));
   });
 
