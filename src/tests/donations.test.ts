@@ -17,6 +17,7 @@ let donationsFindManyResult: any[] = [];
 let donationsFindFirstResult: any = undefined;
 let donorLookupResult: any[] = [];
 let orgConfigFixture: any[] = [];
+let openReceiptsFixture: any[] = [];
 
 const insertCalls: { table: any; values: any }[] = [];
 const updateCalls: { table: any; set: any }[] = [];
@@ -25,6 +26,7 @@ const deleteCalls: { table: any }[] = [];
 const select = vi.fn(() => ({
   from: vi.fn((table: any) => {
     if (table === donors) return chainOf(donorLookupResult);
+    if (table === donations) return chainOf(openReceiptsFixture);
     return chainOf([]);
   }),
 }));
@@ -106,6 +108,7 @@ beforeEach(() => {
   donationsFindFirstResult = undefined;
   donorLookupResult = [];
   orgConfigFixture = [];
+  openReceiptsFixture = [];
   currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
 });
 
@@ -183,6 +186,23 @@ describe("GET /", () => {
 });
 
 // ── POST / (create) ──────────────────────────────────────────────────────────
+
+describe("open receipts notice and count", () => {
+  it("shows the notice on the list when receipts are open", async () => {
+    openReceiptsFixture = [{ id: "a" }, { id: "b" }];
+    const html = await (await donationRoutes.request("/")).text();
+    expect(html).toContain(t("donations.openReceipts", { count: 2 }));
+  });
+
+  it("omits the notice without the issue permission or at zero", async () => {
+    openReceiptsFixture = [{ id: "a" }];
+    currentUser = { ...currentUser, permissions: new Set(["donations:record"]) };
+    expect(await (await donationRoutes.request("/")).text()).not.toContain(t("donations.openReceipts", { count: 1 }));
+    currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts"]) };
+    openReceiptsFixture = [];
+    expect(await (await donationRoutes.request("/")).text()).not.toContain("Offene Zuwendungsbestätigungen");
+  });
+});
 
 describe("POST /", () => {
   it("returns 422 when donor and donation fields are missing", async () => {

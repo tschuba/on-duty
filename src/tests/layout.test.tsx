@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { applications } from "../db/schema/index.js";
+import { applications, donations } from "../db/schema/index.js";
 
 function chainOf(rows: unknown) {
   const chain: any = Object.assign(Promise.resolve(rows), {
@@ -11,11 +11,12 @@ function chainOf(rows: unknown) {
 }
 
 let openApplicationsFixture: any[] = [];
+let openDonationsFixture: any[] = [];
 
 vi.mock("../db/index.js", () => ({
   db: {
     select: vi.fn(() => ({
-      from: vi.fn((table: any) => (table === applications ? chainOf(openApplicationsFixture) : chainOf([]))),
+      from: vi.fn((table: any) => (table === applications ? chainOf(openApplicationsFixture) : table === donations ? chainOf(openDonationsFixture) : chainOf([]))),
     })),
   },
 }));
@@ -24,6 +25,7 @@ const { Layout } = await import("../components/layout.js");
 
 beforeEach(() => {
   openApplicationsFixture = [];
+  openDonationsFixture = [];
 });
 
 function userWith(...permissions: string[]) {
@@ -61,5 +63,27 @@ describe("Layout — Anträge nav", () => {
     app.get("/", (c) => c.html(<Layout user={userWith("members:write")}>x</Layout>));
     await app.request("/");
     expect((db as any).select).not.toHaveBeenCalled();
+  });
+});
+
+describe("Layout — Spenden badge", () => {
+  const render = async (...perms: string[]) => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout user={userWith(...perms)}>x</Layout>));
+    return (await app.request("/")).text();
+  };
+
+  it("shows open receipts count with donations:issue-receipts", async () => {
+    openDonationsFixture = [{ id: "d1" }, { id: "d2" }];
+    expect(await render("donations:issue-receipts")).toContain('badge-primary ml-1">2<');
+  });
+
+  it("hides the badge without the permission", async () => {
+    openDonationsFixture = [{ id: "d1" }];
+    expect(await render("donations:record")).not.toContain("badge-primary");
+  });
+
+  it("hides the badge at zero", async () => {
+    expect(await render("donations:issue-receipts")).not.toContain("badge-primary");
   });
 });

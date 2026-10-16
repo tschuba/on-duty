@@ -6,7 +6,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { loadOrgConfig } from "../lib/org-config.js";
+import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 export const organisationRoutes = new Hono<{ Variables: Variables }>();
@@ -86,10 +86,20 @@ for (const tab of ["master", "tax"] as const) {
     if (!canRead(user.permissions, tab)) return c.html("<h1>403 Zugriff verweigert</h1>", HTTP_STATUS.FORBIDDEN);
     const values = await loadOrgConfig();
     const editable = user.permissions.has(write);
+    // Per tab: a viewer only sees (and can only fix) the fields of the tabs they may read.
+    const missing = TAB_FIELDS[tab].map((f) => f.key).filter((k) => (REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(k) && !values[k]);
     return c.html(
       <Layout title={t(`organisation.tabs.${tab}`)} user={user} activeNav="organisation">
         <OrganisationTabs active={tab} perms={user.permissions} />
         <div class="max-w-4xl mx-auto">
+          {missing.length > 0 && (
+            <div class="alert alert-warning mb-4">
+              <div>
+                <h3 class="font-bold">{t("organisation.receiptIncomplete.title")}</h3>
+                <p>{t("organisation.receiptIncomplete.body")}</p>
+              </div>
+            </div>
+          )}
           <form method="post" action={`/organisation/${path}`} class="card bg-base-200 shadow">
             <div class="card-body gap-4">
               <div class="flex items-center justify-between">
@@ -101,7 +111,10 @@ for (const tab of ["master", "tax"] as const) {
               {TAB_FIELDS[tab].map(({ key, type }) => (
                 <div class="form-control">
                   <label class="label">
-                    <span class="label-text">{t(FIELD_LABEL_KEYS[key])}</span>
+                    <span class="label-text">
+                      {t(FIELD_LABEL_KEYS[key])}
+                      {(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key) && <span class="text-error" title={t("organisation.receiptRequired")}> *</span>}
+                    </span>
                   </label>
                   <input
                     type={type}

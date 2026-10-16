@@ -11,6 +11,7 @@ import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl } from "../lib/list-query.js";
+import { countOpenReceipts } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
@@ -218,6 +219,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
   const presets = rangePresets(todayStr(), "past");
   const config = await loadOrgConfig();
   const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
+  const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
@@ -251,6 +253,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
         <button type="submit" class="btn">{t("common.show")}</button>
       </form>
 
+      {openReceipts > 0 && <p class="text-sm mb-2">{t("donations.openReceipts", { count: openReceipts })}</p>}
       <ClickToEditHint />
       <table class="table table-zebra w-full">
         <thead>

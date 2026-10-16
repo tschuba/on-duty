@@ -38,6 +38,9 @@ export const de = {
   "common.nav.organisation": "Organisation",
   "organisation.tabs.master": "Stammdaten",
   "organisation.tabs.tax": "Steuerdaten",
+  "organisation.receiptRequired": "Pflichtangabe für Zuwendungsbestätigungen",
+  "organisation.receiptIncomplete.title": "Angaben für Zuwendungsbestätigungen unvollständig",
+  "organisation.receiptIncomplete.body": "Mit * markierte Felder sind für Zuwendungsbestätigungen nötig. Speichern ist weiterhin möglich, Bestätigungen können aber erst mit vollständigen Angaben ausgestellt werden.",
   "common.remove": "Entfernen",
 
   // ── Status ───────────────────────────────────────────────────────────────────
@@ -132,6 +135,7 @@ export const de = {
   "donations.table.empty": "Keine Spenden gefunden.",
   "donations.table.receiptIssued": "Ausgestellt",
   "donations.table.receiptOpen": "Offen",
+  "donations.openReceipts": "Offene Zuwendungsbestätigungen: {count}",
   "donations.table.actions": "Aktionen",
   "donations.filter.from": "Von",
   "donations.filter.to": "Bis",
