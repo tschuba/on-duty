@@ -233,7 +233,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   return c.html(
     <Layout title={t("anniversaries.title")} user={user} activeNav="members">
       <div class="max-w-4xl mx-auto">
-      <MemberTabs active="anniversaries" />
+      <MemberTabs active="anniversaries" user={user} />
       <div class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">

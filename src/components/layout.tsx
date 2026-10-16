@@ -10,7 +10,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "donations" | "admin" | "applications" | "inventory" | "organisation";
+  activeNav?: "members" | "donations" | "admin" | "inventory" | "organisation";
 }>;
 
 export function ClickToEditHint() {
@@ -73,16 +73,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 class={navLink(activeNav === "members")}
               >
                 {t("common.nav.members")}
+                <CountBadge count={openApplicationsCount} />
               </a>
-              {canReviewApplications && (
-                <a
-                  href="/applications"
-                  class={navLink(activeNav === "applications")}
-                >
-                  {t("common.nav.applications")}
-                  <CountBadge count={openApplicationsCount} />
-                </a>
-              )}
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
@@ -128,8 +120,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
-                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
-                {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<CountBadge count={openApplicationsCount} /></a></li>}
+                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={openApplicationsCount} /></a></li>
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={orgMissingCount} /></a></li>}
@@ -209,12 +200,20 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
   );
 }
 
-export function MemberTabs({ active }: { active: "members" | "anniversaries" }) {
+// Async like Layout: the Applications tab (permission + open count) is resolved here.
+export async function MemberTabs({ active, user }: { active: "members" | "anniversaries" | "applications"; user: AuthedUser }) {
+  const canReviewApplications = user.permissions.has("applications:review");
+  const tabs = [
+    { key: "members", href: "/members", count: 0 },
+    { key: "anniversaries", href: "/anniversaries", count: 0 },
+    ...(canReviewApplications ? [{ key: "applications", href: "/applications", count: await countOpenApplications() }] : []),
+  ] as const;
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
-      {(["members", "anniversaries"] as const).map((key) => (
-        <a href={key === "members" ? "/members" : "/anniversaries"} role="tab" class={`tab${active === key ? " tab-active" : ""}`}>
-          {t(`common.nav.${key}`)}
+      {tabs.map((tab) => (
+        <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
+          {t(`common.nav.${tab.key}` as "common.nav.members")}
+          <CountBadge count={tab.count} />
         </a>
       ))}
     </div>

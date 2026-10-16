@@ -927,7 +927,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={t("members.title")} user={user} activeNav="members">
-      <MemberTabs active="members" />
+      <MemberTabs active="members" user={user} />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("members.title")}</h1>
         <div class="flex items-center gap-2">

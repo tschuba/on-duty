@@ -3,7 +3,7 @@ import { eq, and, ne, ilike, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
@@ -169,7 +169,8 @@ applicationRoutes.get("/", guard, async (c) => {
   }
 
   return c.html(
-    <Layout title={t("applications.title")} user={user} activeNav="applications">
+    <Layout title={t("applications.title")} user={user} activeNav="members">
+      <MemberTabs active="applications" user={user} />
       <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
         <div class="dropdown dropdown-end">
@@ -395,7 +396,8 @@ applicationRoutes.get("/:id", guard, async (c) => {
   const ageWarning = app.type === "youth" && app.person.birthDate ? ageInYears(app.person.birthDate) >= env.YOUTH_AGE_LIMIT : false;
 
   return c.html(
-    <Layout title={`${app.person.firstName} ${app.person.lastName}`} user={user} activeNav="applications">
+    <Layout title={`${app.person.firstName} ${app.person.lastName}`} user={user} activeNav="members">
+      <MemberTabs active="applications" user={user} />
       <div class="mb-4">
         <a href="/applications" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
         <div class="flex items-center gap-3 mt-1">
