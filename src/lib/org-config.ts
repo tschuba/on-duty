@@ -5,7 +5,7 @@ import { orgConfig } from "../db/schema/index.js";
 // is a free key/value store (nothing required in the admin form), so a fresh
 // install could otherwise print a receipt with blank tax data — callers must
 // check completeness before rendering.
-const REQUIRED_RECEIPT_FIELDS = [
+export const REQUIRED_RECEIPT_FIELDS = [
   "orgName", "orgStreet", "orgHouseNumber", "orgZip", "orgCity",
   "taxExemptionDate", "taxExemptionNumber", "taxOffice", "taxAssessmentPeriodFrom", "taxAssessmentPeriodTo", "charitablePurpose",
 ] as const;

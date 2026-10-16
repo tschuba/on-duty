@@ -38,6 +38,9 @@ export const de = {
   "common.nav.organisation": "Organisation",
   "organisation.tabs.master": "Stammdaten",
   "organisation.tabs.tax": "Steuerdaten",
+  "organisation.receiptRequired": "Pflichtangabe für Zuwendungsbestätigungen",
+  "organisation.receiptIncomplete.title": "Angaben für Zuwendungsbestätigungen unvollständig",
+  "organisation.receiptIncomplete.body": "Fehlend: {fields}. Speichern ist weiterhin möglich, Zuwendungsbestätigungen können aber erst mit vollständigen Angaben ausgestellt werden.",
   "common.remove": "Entfernen",
 
   // ── Status ───────────────────────────────────────────────────────────────────

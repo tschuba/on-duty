@@ -22,7 +22,7 @@ vi.mock("../db/index.js", () => ({
     })),
   },
 }));
-vi.mock("../lib/org-config.js", () => ({ loadOrgConfig: vi.fn(() => Promise.resolve(config)) }));
+vi.mock("../lib/org-config.js", () => ({ REQUIRED_RECEIPT_FIELDS: ["orgName", "orgStreet", "orgHouseNumber", "orgZip", "orgCity", "taxExemptionDate", "taxExemptionNumber", "taxOffice", "taxAssessmentPeriodFrom", "taxAssessmentPeriodTo", "charitablePurpose"], loadOrgConfig: vi.fn(() => Promise.resolve(config)) }));
 vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => <div>{children}</div> }));
 let currentUser: any;
 vi.mock("../middleware/auth.js", () => ({
@@ -42,6 +42,21 @@ beforeEach(() => {
 });
 
 describe("organisation", () => {
+  it("marks receipt fields as required and warns about missing ones, but stays saveable", async () => {
+    config = { orgName: "FF" };
+    const html = await (await organisationRoutes.request("/stammdaten")).text();
+    expect(html).toContain("alert-warning");
+    expect(html).toContain("Straße");
+    expect(html).toContain("text-error");
+    expect(html).not.toContain(" required");
+  });
+
+  it("shows no warning when the tab's required fields are filled", async () => {
+    config = { orgName: "a", orgStreet: "b", orgHouseNumber: "1", orgZip: "2", orgCity: "c" };
+    const html = await (await organisationRoutes.request("/stammdaten")).text();
+    expect(html).not.toContain("alert-warning");
+  });
+
   it("redirects / to the first readable tab", async () => {
     currentUser.permissions = new Set(["org:tax-data:read"]);
     const res = await organisationRoutes.request("/");
