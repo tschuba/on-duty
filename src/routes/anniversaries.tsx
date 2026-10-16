@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { Layout, MemberTabs } from "../components/layout.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl } from "../lib/list-query.js";
@@ -231,8 +231,9 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
   const presets = rangePresets(today, "future");
 
   return c.html(
-    <Layout title={t("anniversaries.title")} user={user} activeNav="anniversaries">
+    <Layout title={t("anniversaries.title")} user={user} activeNav="members">
       <div class="max-w-4xl mx-auto">
+      <MemberTabs active="anniversaries" user={user} />
       <div class="mb-6">
         <div class="flex justify-between items-center mb-4">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">

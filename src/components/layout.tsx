@@ -10,7 +10,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "admin" | "applications" | "inventory" | "organisation";
+  activeNav?: "members" | "donations" | "admin" | "inventory" | "organisation";
 }>;
 
 export function ClickToEditHint() {
@@ -67,28 +67,14 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
             on-duty
           </a>
           {user && (
-            <div class="hidden xl:flex gap-4 items-center">
+            <div class="hidden md:flex gap-4 items-center">
               <a
                 href="/members"
                 class={navLink(activeNav === "members")}
               >
                 {t("common.nav.members")}
+                <CountBadge count={openApplicationsCount} />
               </a>
-              <a
-                href="/anniversaries"
-                class={navLink(activeNav === "anniversaries")}
-              >
-                {t("common.nav.anniversaries")}
-              </a>
-              {canReviewApplications && (
-                <a
-                  href="/applications"
-                  class={navLink(activeNav === "applications")}
-                >
-                  {t("common.nav.applications")}
-                  <CountBadge count={openApplicationsCount} />
-                </a>
-              )}
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
@@ -128,15 +114,13 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           )}
         </div>
         {user && (
-          <div class="navbar-center xl:hidden">
+          <div class="navbar-center md:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
               <button tabindex={0} class="btn btn-ghost btn-sm">
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
-                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
-                <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
-                {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<CountBadge count={openApplicationsCount} /></a></li>}
+                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={openApplicationsCount} /></a></li>
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={orgMissingCount} /></a></li>}
@@ -149,12 +133,12 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
-                <div class="avatar avatar-placeholder tooltip tooltip-left xl:hidden" data-tip={user.name}>
+                <div class="avatar avatar-placeholder tooltip tooltip-left lg:hidden" data-tip={user.name}>
                   <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
                     <span>{(user.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
                   </div>
                 </div>
-                <span class="hidden xl:inline">{user.name}</span>
+                <span class="hidden lg:inline">{user.name}</span>
                 <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
@@ -209,6 +193,26 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
       {tabs.map((tab) => (
         <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
           {t(`donations.tabs.${tab.key}`)}
+          <CountBadge count={tab.count} />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+// Async like Layout: the Applications tab (permission + open count) is resolved here.
+export async function MemberTabs({ active, user }: { active: "members" | "anniversaries" | "applications"; user: AuthedUser }) {
+  const canReviewApplications = user.permissions.has("applications:review");
+  const tabs = [
+    { key: "members", href: "/members", count: 0 },
+    { key: "anniversaries", href: "/anniversaries", count: 0 },
+    ...(canReviewApplications ? [{ key: "applications", href: "/applications", count: await countOpenApplications() }] : []),
+  ] as const;
+  return (
+    <div role="tablist" class="tabs tabs-lifted mb-6">
+      {tabs.map((tab) => (
+        <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
+          {t(`common.nav.${tab.key}` as "common.nav.members")}
           <CountBadge count={tab.count} />
         </a>
       ))}

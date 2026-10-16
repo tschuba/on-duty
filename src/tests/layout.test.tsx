@@ -21,7 +21,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-const { Layout } = await import("../components/layout.js");
+const { Layout, MemberTabs } = await import("../components/layout.js");
 
 beforeEach(() => {
   openApplicationsFixture = [];
@@ -32,10 +32,10 @@ function userWith(...permissions: string[]) {
   return { id: "u1", name: "Test User", permissions: new Set(permissions), disabled: false } as any;
 }
 
-describe("Layout — Anträge nav", () => {
+describe("Anträge tab (MemberTabs)", () => {
   it("hides the nav entry for a user without applications:review", async () => {
     const app = new Hono();
-    app.get("/", (c) => c.html(<Layout user={userWith("members:write")}>x</Layout>));
+    app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith("members:write")} />));
     const html = await (await app.request("/")).text();
     expect(html).not.toContain("Anträge");
   });
@@ -43,7 +43,7 @@ describe("Layout — Anträge nav", () => {
   it("shows the nav entry with no badge when there are no open applications", async () => {
     openApplicationsFixture = [];
     const app = new Hono();
-    app.get("/", (c) => c.html(<Layout user={userWith("applications:review")}>x</Layout>));
+    app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith("applications:review")} />));
     const html = await (await app.request("/")).text();
     expect(html).toContain("Anträge");
     expect(html).not.toContain("badge-primary");

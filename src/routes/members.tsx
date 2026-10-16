@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
@@ -927,6 +927,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={t("members.title")} user={user} activeNav="members">
+      <MemberTabs active="members" user={user} />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("members.title")}</h1>
         <div class="flex items-center gap-2">
