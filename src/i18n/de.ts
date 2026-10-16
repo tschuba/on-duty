@@ -132,6 +132,7 @@ export const de = {
   "donations.table.empty": "Keine Spenden gefunden.",
   "donations.table.receiptIssued": "Ausgestellt",
   "donations.table.receiptOpen": "Offen",
+  "donations.openReceipts": "Offene Zuwendungsbestätigungen: {count}",
   "donations.table.actions": "Aktionen",
   "donations.filter.from": "Von",
   "donations.filter.to": "Bis",

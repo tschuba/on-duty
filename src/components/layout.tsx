@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
+import { countOpenReceipts } from "../lib/donations.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { Icon } from "./icon.js";
 
@@ -19,11 +20,7 @@ export function ClickToEditHint() {
 const navLink = (active: boolean) =>
   `text-sm px-1 py-1 border-b-2 ${active ? "font-semibold border-primary text-base-content" : "border-transparent text-base-content/60 hover:text-base-content"}`;
 
-function ApplicationsBadge({ count }: { count: number }) {
-  return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
-}
-
-function OverdueInspectionsBadge({ count }: { count: number }) {
+function CountBadge({ count }: { count: number }) {
   return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
 }
 
@@ -34,6 +31,8 @@ function OverdueInspectionsBadge({ count }: { count: number }) {
 export const Layout = async ({ title, children, user, activeNav }: Props) => {
   const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
   const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
+  const canIssueReceipts = Boolean(user?.permissions.has("donations:issue-receipts"));
+  const openReceiptsCount = canIssueReceipts ? await countOpenReceipts() : 0;
   const canSeeOrganisation = ["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"].some((p) => user?.permissions.has(p as never));
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
   const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
@@ -76,7 +75,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "applications")}
                 >
                   {t("common.nav.applications")}
-                  <ApplicationsBadge count={openApplicationsCount} />
+                  <CountBadge count={openApplicationsCount} />
                 </a>
               )}
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
@@ -85,6 +84,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "donations")}
                 >
                   {t("common.nav.donations")}
+                  <CountBadge count={openReceiptsCount} />
                 </a>
               )}
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
@@ -101,7 +101,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "inventory")}
                 >
                   {t("common.nav.inventory")}
-                  <OverdueInspectionsBadge count={overdueInspectionsCount} />
+                  <CountBadge count={overdueInspectionsCount} />
                 </a>
               )}
               {canSeeOrganisation && (
@@ -132,10 +132,10 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
                 <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
-                {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<ApplicationsBadge count={openApplicationsCount} /></a></li>}
-                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
+                {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<CountBadge count={openApplicationsCount} /></a></li>}
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={openReceiptsCount} /></a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
-                {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<OverdueInspectionsBadge count={overdueInspectionsCount} /></a></li>}
+                {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
