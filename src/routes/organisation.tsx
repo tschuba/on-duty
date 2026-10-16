@@ -3,69 +3,27 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { orgConfig } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout } from "../components/layout.js";
+import { CountBadge, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS } from "../lib/org-config.js";
+import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 export const organisationRoutes = new Hono<{ Variables: Variables }>();
 
-type Tab = "master" | "tax";
-type FieldKey = keyof typeof FIELD_LABEL_KEYS;
-
-// Each tab is gated as a whole; write implies read (OR check, no implies mechanism in RBAC).
-const TABS = {
-  master: { path: "stammdaten", read: ["org:read", "org:write"], write: "org:write" },
-  tax: { path: "steuerdaten", read: ["org:tax-data:read", "org:tax-data:write"], write: "org:tax-data:write" },
-} as const;
-
-const FIELD_LABEL_KEYS = {
-  orgName: "admin.orgConfig.field.orgName",
-  orgStreet: "admin.orgConfig.field.orgStreet",
-  orgHouseNumber: "admin.orgConfig.field.orgHouseNumber",
-  orgZip: "admin.orgConfig.field.orgZip",
-  orgCity: "admin.orgConfig.field.orgCity",
-  applicationNotifyEmail: "admin.orgConfig.field.applicationNotifyEmail",
-  taxExemptionDate: "admin.orgConfig.field.taxExemptionDate",
-  taxExemptionNumber: "admin.orgConfig.field.taxExemptionNumber",
-  taxOffice: "admin.orgConfig.field.taxOffice",
-  taxAssessmentPeriodFrom: "admin.orgConfig.field.taxAssessmentPeriodFrom",
-  taxAssessmentPeriodTo: "admin.orgConfig.field.taxAssessmentPeriodTo",
-  charitablePurpose: "admin.orgConfig.field.charitablePurpose",
-} as const;
-
-const TAB_FIELDS: Record<Tab, { key: FieldKey; type: string }[]> = {
-  master: [
-    { key: "orgName", type: "text" },
-    { key: "orgStreet", type: "text" },
-    { key: "orgHouseNumber", type: "text" },
-    { key: "orgZip", type: "text" },
-    { key: "orgCity", type: "text" },
-    { key: "applicationNotifyEmail", type: "email" },
-  ],
-  tax: [
-    { key: "taxExemptionDate", type: "date" },
-    { key: "taxExemptionNumber", type: "text" },
-    { key: "taxOffice", type: "text" },
-    { key: "taxAssessmentPeriodFrom", type: "number" },
-    { key: "taxAssessmentPeriodTo", type: "number" },
-    { key: "charitablePurpose", type: "text" },
-  ],
-};
+type Tab = OrgTab;
 
 const guard = requireAuth(["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"]);
 
-function canRead(perms: Set<string>, tab: Tab) {
-  return TABS[tab].read.some((p) => perms.has(p));
-}
+const canRead = canReadOrgTab;
 
-function OrganisationTabs({ active, perms }: { active: Tab; perms: Set<string> }) {
+function OrganisationTabs({ active, perms, counts }: { active: Tab; perms: Set<string>; counts: Record<Tab, number> }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       {(["master", "tax"] as const).filter((tab) => canRead(perms, tab)).map((tab) => (
         <a href={`/organisation/${TABS[tab].path}`} role="tab" class={`tab${active === tab ? " tab-active" : ""}`}>
           {t(`organisation.tabs.${tab}`)}
+          <CountBadge count={counts[tab]} />
         </a>
       ))}
     </div>
@@ -87,10 +45,11 @@ for (const tab of ["master", "tax"] as const) {
     const values = await loadOrgConfig();
     const editable = user.permissions.has(write);
     // Per tab: a viewer only sees (and can only fix) the fields of the tabs they may read.
-    const missing = TAB_FIELDS[tab].map((f) => f.key).filter((k) => (REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(k) && !values[k]);
+    const missingByTab = missingReceiptFields(values);
+    const missing = missingByTab[tab];
     return c.html(
       <Layout title={t(`organisation.tabs.${tab}`)} user={user} activeNav="organisation">
-        <OrganisationTabs active={tab} perms={user.permissions} />
+        <OrganisationTabs active={tab} perms={user.permissions} counts={{ master: missingByTab.master.length, tax: missingByTab.tax.length }} />
         <div class="max-w-4xl mx-auto">
           {missing.length > 0 && (
             <div class="alert alert-warning mb-4">
@@ -112,7 +71,7 @@ for (const tab of ["master", "tax"] as const) {
                 <div class="form-control">
                   <label class="label">
                     <span class="label-text">
-                      {t(FIELD_LABEL_KEYS[key])}
+                      {t(`admin.orgConfig.field.${key}` as never)}
                       {(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key) && <span class="text-error" title={t("organisation.receiptRequired")}> *</span>}
                     </span>
                   </label>

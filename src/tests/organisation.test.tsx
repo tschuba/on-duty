@@ -22,8 +22,11 @@ vi.mock("../db/index.js", () => ({
     })),
   },
 }));
-vi.mock("../lib/org-config.js", () => ({ REQUIRED_RECEIPT_FIELDS: ["orgName", "orgStreet", "orgHouseNumber", "orgZip", "orgCity", "taxExemptionDate", "taxExemptionNumber", "taxOffice", "taxAssessmentPeriodFrom", "taxAssessmentPeriodTo", "charitablePurpose"], loadOrgConfig: vi.fn(() => Promise.resolve(config)) }));
-vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => <div>{children}</div> }));
+vi.mock("../lib/org-config.js", async () => ({
+  ...(await vi.importActual<typeof import("../lib/org-config.js")>("../lib/org-config.js")),
+  loadOrgConfig: vi.fn(() => Promise.resolve(config)),
+}));
+vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => <div>{children}</div>, CountBadge: ({ count }: any) => (count > 0 ? <span class="badge">{count}</span> : null) }));
 let currentUser: any;
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -92,5 +95,15 @@ describe("organisation", () => {
       body: formBody({ taxAssessmentPeriodFrom: "2024", taxAssessmentPeriodTo: "2020" }),
     });
     expect(insertCalls).toHaveLength(0);
+  });
+});
+
+describe("tab badges", () => {
+  it("shows missing-field count per readable tab", async () => {
+    currentUser.permissions = new Set(["org:read", "org:tax-data:read"]);
+    config = { orgName: "X", orgStreet: "S", orgHouseNumber: "1", orgZip: "1", orgCity: "C" };
+    const html = await (await organisationRoutes.request("/steuerdaten")).text();
+    expect(html).toContain('<span class="badge">6</span>');
+    expect(html).not.toContain('<span class="badge">5</span>');
   });
 });
