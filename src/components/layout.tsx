@@ -145,8 +145,9 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         {user && (
           <div class="navbar-end w-auto">
             <div class="dropdown dropdown-end">
-              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">
-                <span>{user.name}</span>
+              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1 tooltip tooltip-bottom" data-tip={user.name} aria-label={user.name}>
+                <Icon name="user-circle" class="h-5 w-5 xl:hidden" />
+                <span class="hidden xl:inline">{user.name}</span>
                 <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
