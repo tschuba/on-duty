@@ -1,6 +1,6 @@
-import { date, integer, pgTable, text, uuid, boolean } from "drizzle-orm/pg-core";
+import { date, integer, pgTable, uuid, boolean } from "drizzle-orm/pg-core";
 import { inventoryItems } from "./inventory";
-import { members } from "./members";
+import { persons } from "./persons";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 // Verleihfähigkeit einer bestehenden inventory_items-Zeile — siehe
@@ -25,9 +25,9 @@ export const lendingLoans = pgTable("lending_loans", {
   // Nur > 1 relevant bei !individualTracking (Stückzahl-Objekte); Server erzwingt
   // 1 bei Einzel-Tracking.
   quantity: integer("quantity").notNull().default(1),
-  borrowerMemberId: uuid("borrower_member_id").references(() => members.id),
-  borrowerName: text("borrower_name"),
-  borrowerContact: text("borrower_contact"),
+  // Mitglieder und Externe sind gleichermaßen Personen; Mitgliedschaft ergibt sich
+  // aus persons -> members. Kontakt steht in persons.phone/email.
+  borrowerPersonId: uuid("borrower_person_id").notNull().references(() => persons.id),
   plannedFrom: date("planned_from"),
   plannedTo: date("planned_to"),
   pickedUpAt: date("picked_up_at"),
