@@ -73,7 +73,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 class={navLink(activeNav === "members")}
               >
                 {t("common.nav.members")}
-                <CountBadge count={openApplicationsCount} />
+                <CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} />
               </a>
               {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
@@ -81,7 +81,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "donations")}
                 >
                   {t("common.nav.donations")}
-                  <CountBadge count={donationsNavCount} />
+                  <CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} />
                 </a>
               )}
               {canReadInventory && (
@@ -90,7 +90,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "inventory")}
                 >
                   {t("common.nav.inventory")}
-                  <CountBadge count={overdueInspectionsCount} />
+                  <CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} />
                 </a>
               )}
               {canSeeOrganisation && (
@@ -99,7 +99,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "organisation")}
                 >
                   {t("common.nav.organisation")}
-                  <CountBadge count={orgMissingCount} />
+                  <CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} />
                 </a>
               )}
               {user.permissions.has("system:admin") && (
@@ -120,10 +120,10 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
-                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={openApplicationsCount} /></a></li>
-                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={donationsNavCount} /></a></li>}
-                {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={overdueInspectionsCount} /></a></li>}
-                {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={orgMissingCount} /></a></li>}
+                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>
+                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
+                {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}
+                {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} /></a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>

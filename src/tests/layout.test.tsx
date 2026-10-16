@@ -87,3 +87,23 @@ describe("Layout — Spenden badge", () => {
     expect(await render("donations:issue-receipts")).not.toContain("badge-primary");
   });
 });
+
+describe("Layout — Hauptmenü-Badge im aktiven Bereich", () => {
+  const render = async (activeNav: any, ...perms: string[]) => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout user={userWith(...perms)} activeNav={activeNav}>x</Layout>));
+    return (await app.request("/")).text();
+  };
+
+  it("hides the Spenden badge when donations is active, shows it otherwise", async () => {
+    openDonationsFixture = [{ id: "d1" }];
+    expect(await render("donations", "donations:issue-receipts")).not.toContain("badge-primary");
+    expect(await render("members", "donations:issue-receipts")).toContain('badge-primary ml-1">1<');
+  });
+
+  it("hides the Mitglieder badge when members is active, shows it otherwise", async () => {
+    openApplicationsFixture = [{ id: "a1" }];
+    expect(await render("members", "applications:review")).not.toContain("badge-primary");
+    expect(await render("donations", "applications:review")).toContain('badge-primary ml-1">1<');
+  });
+});
