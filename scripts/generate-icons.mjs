@@ -16,6 +16,10 @@ const ICONS = {
   "user-group": "24/outline/user-group.svg",
   "bars-3": "24/outline/bars-3.svg",
   "chevron-down": "20/solid/chevron-down.svg",
+  sun: "24/outline/sun.svg",
+  moon: "24/outline/moon.svg",
+  clock: "24/outline/clock.svg",
+  "arrow-right-start-on-rectangle": "24/outline/arrow-right-start-on-rectangle.svg",
 };
 
 function attr(str, name) {

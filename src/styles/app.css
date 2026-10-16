@@ -59,7 +59,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-primary: #5b8fd0;
     --color-primary-content: #ffffff;
     --color-error: #ff6b6b;
@@ -74,6 +74,23 @@
     --color-base-200: #1b222c;
     --color-base-300: #0c1015;
   }
+}
+
+/* Manuelle Wahl (Theme-Switcher) — Werte identisch zum Media-Block oben */
+:root[data-theme="dark"] {
+  --color-primary: #5b8fd0;
+  --color-primary-content: #ffffff;
+  --color-error: #ff6b6b;
+  --color-error-content: #1a0000;
+  --color-neutral: #8b97a8;
+  --color-neutral-content: #10151b;
+  --color-secondary: #a592dc;
+  --color-secondary-content: #14101f;
+  --color-accent: #4cc2cb;
+  --color-accent-content: #06191b;
+  --color-base-100: #27313e;
+  --color-base-200: #1b222c;
+  --color-base-300: #0c1015;
 }
 
 /* Rollensuche-Combobox (members.tsx RoleRow): popover[auto] braucht eigenes
@@ -103,4 +120,13 @@
    [popover]:not(:popover-open){display:none}, since author always beats UA. */
 .role-combobox-popover:not(:popover-open) {
   display: none;
+}
+
+/* Theme-Switcher: aktive Option hervorheben (Zustand steckt in <html data-theme>) */
+:root:not([data-theme]) .theme-opt[data-theme-opt="auto"],
+:root[data-theme="light"] .theme-opt[data-theme-opt="light"],
+:root[data-theme="dark"] .theme-opt[data-theme-opt="dark"] {
+  background-color: color-mix(in oklab, var(--color-primary) 22%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  font-weight: 600;
 }

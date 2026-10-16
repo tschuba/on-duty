@@ -54,6 +54,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>{title ? `${title} · on-duty` : "on-duty"}</title>
+      <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}` }} />
       <link rel="stylesheet" href="/css/app.css" />
       <script src="/js/htmx.min.js" />
     </head>
@@ -64,7 +65,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <nav class="navbar bg-base-200 shadow-sm px-4 border-b-[3px] border-gold">
         <div class="navbar-start flex-1">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
-            on-duty
+            on-<span class="text-error">duty</span>
           </a>
           {user && (
             <div class="hidden md:flex gap-4 items-center">
@@ -142,9 +143,25 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
-                <li>
+                <li class="menu-title">{t("common.theme")}</li>
+                <li class="flex flex-row gap-1 lg:flex-col hover:bg-transparent">
+                  {([["auto", "clock"], ["light", "sun"], ["dark", "moon"]] as const).map(([m, icon]) => (
+                    <button
+                      type="button"
+                      data-theme-opt={m}
+                      title={t(`common.theme.${m}`)}
+                      aria-label={t(`common.theme.${m}`)}
+                      class="theme-opt flex flex-1 items-center justify-center gap-2 rounded-field px-3 py-2 lg:w-full lg:flex-none lg:justify-start"
+                      onclick={`var m="${m}",d=document.documentElement;try{m==="auto"?(localStorage.removeItem("theme"),delete d.dataset.theme):(localStorage.setItem("theme",m),d.dataset.theme=m)}catch(e){}document.activeElement.blur()`}
+                    >
+                      <Icon name={icon} class="h-5 w-5" />
+                      <span class="hidden lg:inline">{t(`common.theme.${m}`)}</span>
+                    </button>
+                  ))}
+                </li>
+                <li class="mt-2 border-t border-base-content/20 pt-2">
                   <form action="/logout" method="post" class="p-0">
-                    <button type="submit" class="w-full text-left px-4 py-2">{t("common.logout")}</button>
+                    <button type="submit" class="flex w-full items-center gap-2 px-3 py-2"><Icon name="arrow-right-start-on-rectangle" class="h-5 w-5" />{t("common.logout")}</button>
                   </form>
                 </li>
               </ul>
