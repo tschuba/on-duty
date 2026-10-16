@@ -10,7 +10,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "admin" | "applications" | "inventory" | "organisation";
+  activeNav?: "members" | "donations" | "admin" | "applications" | "inventory" | "organisation";
 }>;
 
 export function ClickToEditHint() {
@@ -74,12 +74,6 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               >
                 {t("common.nav.members")}
               </a>
-              <a
-                href="/anniversaries"
-                class={navLink(activeNav === "anniversaries")}
-              >
-                {t("common.nav.anniversaries")}
-              </a>
               {canReviewApplications && (
                 <a
                   href="/applications"
@@ -135,7 +129,6 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}</a></li>
-                <li><a href="/anniversaries" class={activeNav === "anniversaries" ? "active" : ""}>{t("common.nav.anniversaries")}</a></li>
                 {canReviewApplications && <li><a href="/applications" class={activeNav === "applications" ? "active" : ""}>{t("common.nav.applications")}<CountBadge count={openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={overdueInspectionsCount} /></a></li>}
@@ -210,6 +203,18 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
         <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
           {t(`donations.tabs.${tab.key}`)}
           <CountBadge count={tab.count} />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+export function MemberTabs({ active }: { active: "members" | "anniversaries" }) {
+  return (
+    <div role="tablist" class="tabs tabs-lifted mb-6">
+      {(["members", "anniversaries"] as const).map((key) => (
+        <a href={key === "members" ? "/members" : "/anniversaries"} role="tab" class={`tab${active === key ? " tab-active" : ""}`}>
+          {t(`common.nav.${key}`)}
         </a>
       ))}
     </div>
