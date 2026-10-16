@@ -6,7 +6,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { rangePresets, todayStr } from "../lib/quick-range.js";
-import { MemberMark, MemberFilter } from "../components/member-mark.js";
+import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
@@ -235,7 +235,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
                       >
                         <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(date)}</td>
                         <td class={border}>{l.lendingItem.inventoryItem.name}</td>
-                        <td class={border}>{borrowerLabel(l)}<MemberMark memberId={l.borrowerMember?.id} canLink={canLink} /></td>
+                        <td class={border}><MemberLink memberId={l.borrowerMember?.id} canLink={canLink}>{borrowerLabel(l)}</MemberLink><MemberMark memberId={l.borrowerMember?.id} canLink={canLink} /></td>
                         <td class={border}><span class={LOAN_STATUS_BADGE[loanState]}>{LOAN_STATUS_LABEL[loanState]}</span></td>
                         <td class={`text-sm${border}`}>{formatDate(l.plannedFrom)} – {formatDate(l.plannedTo)}</td>
                       </tr>
@@ -600,7 +600,7 @@ lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
             const borrower = borrowerLabel(l);
             return (
               <tr key={l.id} class={overdue ? "text-error font-semibold" : ""}>
-                <td>{borrower}<MemberMark memberId={l.borrowerMember?.id} canLink={canLink} />{overdue && <span class="badge badge-error badge-sm ml-1">{t("lending.loans.overdue")}</span>}</td>
+                <td><MemberLink memberId={l.borrowerMember?.id} canLink={canLink}>{borrower}</MemberLink><MemberMark memberId={l.borrowerMember?.id} canLink={canLink} />{overdue && <span class="badge badge-error badge-sm ml-1">{t("lending.loans.overdue")}</span>}</td>
                 {!item.individualTracking && <td>{l.quantity}</td>}
                 <td>{formatDate(l.plannedFrom)}</td>
                 <td>{formatDate(l.plannedTo)}</td>
