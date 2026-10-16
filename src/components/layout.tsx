@@ -63,12 +63,12 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
       <nav class="navbar bg-base-200 shadow-sm px-4 border-b-[3px] border-gold">
-        <div class="navbar-start flex-1">
+        <div class="navbar-start flex-1 items-baseline">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-<span class="text-error">duty</span>
           </a>
           {user && (
-            <div class="hidden md:flex gap-4 items-center">
+            <div class="hidden md:flex gap-4 items-baseline">
               <a
                 href="/members"
                 class={navLink(activeNav === "members")}
