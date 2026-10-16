@@ -31,7 +31,7 @@ export function rangesOverlap(a: { from: string; to: string }, b: { from: string
 export type LoanStatus = "planned" | "active" | "overdue" | "returned";
 
 // Gleiche Regel wie der inline `overdue`-Badge in routes/lending.tsx
-// (GET /:id/loans) — hier benannt für die Vorgangsübersicht.
+// (Vorgangsseite) — hier benannt für die Vorgangsübersicht.
 export function loanStatus(l: LoanRange, today: string): LoanStatus {
   if (l.returnedAt) return "returned";
   if (l.plannedTo && l.plannedTo < today) return "overdue";
@@ -62,18 +62,14 @@ export function itemStatus(item: { retiredAt: unknown }, lendable: boolean): Ite
   return lendable ? "lendable" : "active";
 }
 
-export type LoanDateError = "returnedWithoutPickup" | "returnedBeforePickup";
+export type LoanDateError = "noDates" | "plannedToBeforeFrom" | "returnedWithoutPickup" | "returnedBeforePickup";
 
 // Tatsachen müssen zueinander passen: Rückgabe setzt Abholung voraus und liegt
-// nicht davor. plannedTo < plannedFrom wird bewusst nicht geprüft.
-export function validateLoanDates(l: { pickedUpAt: string | null; returnedAt: string | null }): LoanDateError | null {
+// nicht davor; geplantes Ende nicht vor geplantem Start; mindestens ein Datum ist Pflicht.
+export function validateLoanDates(l: LoanRange): LoanDateError | null {
+  if (!l.plannedFrom && !l.plannedTo && !l.pickedUpAt && !l.returnedAt) return "noDates";
+  if (l.plannedFrom && l.plannedTo && l.plannedTo < l.plannedFrom) return "plannedToBeforeFrom";
   if (!l.returnedAt) return null;
   if (!l.pickedUpAt) return "returnedWithoutPickup";
   return l.returnedAt < l.pickedUpAt ? "returnedBeforePickup" : null;
-}
-
-// returnTo kommt vom Client: nur Pfade unter /inventory/lending (Open-Redirect-
-// Schutz, kein CR/LF im Header), sonst Fallback.
-export function safeReturnTo(value: string | undefined, fallback: string): string {
-  return value && /^\/inventory\/lending(?:[/?][^\r\n]*)?$/.test(value) ? value : fallback;
 }

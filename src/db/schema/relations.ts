@@ -57,7 +57,7 @@ export const lendingItemsRelations = relations(lendingItems, ({ one, many }) => 
 
 export const lendingLoansRelations = relations(lendingLoans, ({ one }) => ({
   lendingItem: one(lendingItems, { fields: [lendingLoans.lendingItemId], references: [lendingItems.id] }),
-  borrowerMember: one(members, { fields: [lendingLoans.borrowerMemberId], references: [members.id] }),
+  borrower: one(persons, { fields: [lendingLoans.borrowerPersonId], references: [persons.id] }),
 }));
 
 export const inventoryItemAssignmentsRelations = relations(inventoryItemAssignments, ({ one }) => ({

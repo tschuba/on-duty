@@ -162,6 +162,13 @@
       "when": 1792156225541,
       "tag": "0022_org_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792300000000,
+      "tag": "0023_lending_borrower_person",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
@@ -13,7 +13,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { effectiveRange, rangesOverlap, countOverdueLoans, loanStatus, validateLoanDates, safeReturnTo, type LoanRange, type LoanStatus } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, countOverdueLoans, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
 import { InventoryTabs, CATEGORIES, CATEGORY_LABELS } from "./inventory.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -26,12 +26,11 @@ type InventoryItemRow = typeof inventoryItems.$inferSelect;
 type LendingItemRow = typeof lendingItems.$inferSelect;
 type LoanRow = typeof lendingLoans.$inferSelect;
 type Tag = typeof inventoryItemTags.$inferSelect;
-type MemberRow = typeof members.$inferSelect;
-type Person = { firstName: string; lastName: string };
+type Person = typeof persons.$inferSelect & { member: { id: string } | null };
 type LendingItemWithRelations = LendingItemRow & {
   inventoryItem: InventoryItemRow & { tags: Tag[] };
 };
-type LoanWithBorrower = LoanRow & { borrowerMember: (MemberRow & { person: Person }) | null };
+type LoanWithBorrower = LoanRow & { borrower: Person };
 
 // ── Data access ──────────────────────────────────────────────────────────────
 
@@ -59,14 +58,14 @@ async function fetchLendingItem(id: string): Promise<LendingItemWithRelations | 
 async function fetchLoans(lendingItemId: string): Promise<LoanWithBorrower[]> {
   return db.query.lendingLoans.findMany({
     where: eq(lendingLoans.lendingItemId, lendingItemId),
-    with: { borrowerMember: { with: { person: true } } },
+    with: { borrower: { with: { member: true } } },
   }) as unknown as Promise<LoanWithBorrower[]>;
 }
 
 async function fetchLoan(id: string): Promise<LoanWithBorrower | undefined> {
   return db.query.lendingLoans.findFirst({
     where: eq(lendingLoans.id, id),
-    with: { borrowerMember: { with: { person: true } } },
+    with: { borrower: { with: { member: true } } },
   }) as unknown as Promise<LoanWithBorrower | undefined>;
 }
 
@@ -96,7 +95,7 @@ function addDays(dateStr: string, days: number): string {
 async function fetchAllLoans(): Promise<(LoanWithBorrower & { lendingItem: LendingItemWithRelations })[]> {
   return db.query.lendingLoans.findMany({
     with: {
-      borrowerMember: { with: { person: true } },
+      borrower: { with: { member: true } },
       lendingItem: { with: { inventoryItem: { with: { tags: true } } } },
     },
   }) as unknown as Promise<(LoanWithBorrower & { lendingItem: LendingItemWithRelations })[]>;
@@ -110,8 +109,25 @@ function formatMonth(yyyymm: string): string {
   return `${t(names[parseInt(m, 10) - 1])} ${y}`;
 }
 
+// E-Mail und Telefon sind getrennte Felder in persons und werden direkt verlinkt.
+function BorrowerContact({ person, inline }: { person: { email: string | null; phone: string | null }; inline?: boolean }) {
+  if (!person.email && !person.phone) return null;
+  const links = (
+    <>
+      {person.email && <a href={`mailto:${person.email}`} class="link link-hover" onclick="event.stopPropagation()">{person.email}</a>}
+      {person.email && person.phone && " · "}
+      {person.phone && <a href={`tel:${person.phone.replace(/[^\d+]/g, "")}`} class="link link-hover" onclick="event.stopPropagation()">{person.phone}</a>}
+    </>
+  );
+  return inline ? links : <div class="text-sm opacity-60">{links}</div>;
+}
+
+function personName(p: { firstName: string; lastName: string }): string {
+  return `${p.firstName} ${p.lastName}`.trim();
+}
+
 function borrowerLabel(l: LoanWithBorrower): string {
-  return l.borrowerMember ? `${l.borrowerMember.person.firstName} ${l.borrowerMember.person.lastName}` : l.borrowerName || "—";
+  return personName(l.borrower) || "—";
 }
 
 lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
@@ -120,26 +136,28 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const search = (c.req.query("q") ?? "").trim();
   const statusFilter = parseMulti(c.req.queries("status"), Object.keys(LOAN_STATUS_LABEL)) as LoanStatus[];
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
-  const start = c.req.query("start") ?? "";
-  const end = c.req.query("end") ?? "";
+  // Ohne start/end in der URL gilt das Standardfenster; leere Felder heben es auf.
+  const start = c.req.query("start") ?? addDays(today, -14);
+  const end = c.req.query("end") ?? addDays(today, 30);
+  const itemFilter = c.req.query("item") ?? "";
   const member = c.req.query("member") === "yes" || c.req.query("member") === "no" ? c.req.query("member")! : "";
   const canLink = user.permissions.has("members:read");
-  const rangeMode = Boolean(start || end);
   const needle = search.toLowerCase();
 
   const all = await fetchAllLoans();
 
   const filtered = all.filter((l) => {
-    if (rangeMode) {
-      const date = l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "";
-      if ((start && date < start) || (end && date > end)) return false;
-    } else if (l.returnedAt) {
-      const nearDate = l.plannedFrom ?? l.pickedUpAt ?? "";
-      if (nearDate < addDays(today, -14) || nearDate > addDays(today, 30)) return false;
+    if (start || end) {
+      // Überlappung mit dem Filterzeitraum; Vorgänge ganz ohne Datum fallen raus.
+      // Überfällige sind noch draußen: offenes Ende statt plannedTo.
+      const r = effectiveRange(l);
+      if (r && loanStatus(l, today) === "overdue") r.to = "9999-12-31";
+      if (!r || !rangesOverlap(r, { from: start || "0000-01-01", to: end || "9999-12-31" })) return false;
     }
+    if (itemFilter && l.lendingItem.id !== itemFilter) return false;
     if (statusFilter.length > 0 && !statusFilter.includes(loanStatus(l, today))) return false;
     if (categoryFilter.length > 0 && !categoryFilter.includes(l.lendingItem.inventoryItem.category)) return false;
-    if (member && Boolean(l.borrowerMember) !== (member === "yes")) return false;
+    if (member && Boolean(l.borrower.member) !== (member === "yes")) return false;
     if (needle && !`${l.lendingItem.inventoryItem.name} ${borrowerLabel(l)}`.toLowerCase().includes(needle)) return false;
     return true;
   });
@@ -160,9 +178,8 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   }
 
   const presets = rangePresets(today, "future");
-  const hasFilter = Boolean(search || statusFilter.length || categoryFilter.length || member || rangeMode);
+  const hasFilter = Boolean(itemFilter || search || statusFilter.length || categoryFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
   const canManage = user.permissions.has("lending:manage");
-  const returnTo = currentPath(c.req.url);
 
   return c.html(
     <Layout title={t("lending.title")} user={user} activeNav="inventory">
@@ -198,12 +215,14 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           resetLabel={t("common.reset")}
         />
         <input type="hidden" name="member" value={member} />
+        <input type="hidden" name="item" value={itemFilter} />
+        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member, start, end })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
         <MemberFilter
           value={member}
           options={[{ value: "", label: t("common.filter.all") }, { value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }]}
-          href={(m) => buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, start, end }, { member: m })}
+          href={(m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, start, end }, { member: m })}
         />
-        <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member }, { start: p.start, end: p.end })} />
+        <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, member }, { start: p.start, end: p.end })} />
         <input type="date" name="start" value={start} class="input input-bordered w-36" placeholder={t("lending.overview.rangeStart")} />
         <span class="text-base-content/50">–</span>
         <input type="date" name="end" value={end} class="input input-bordered w-36" placeholder={t("lending.overview.rangeEnd")} />
@@ -215,6 +234,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         <p class="text-base-content/60 py-8">{t("lending.overview.empty")}</p>
       ) : (
         <div class="overflow-x-auto">
+          {canManage && <p class="text-sm text-base-content/60 mb-2">{t("lending.overview.editHint")}</p>}
           <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
             <tbody>
               {[...groups.entries()].map(([month, loans], i) => (
@@ -231,12 +251,12 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
                     return (
                       <tr
                         key={l.id}
-                        class={`cursor-pointer hover${loanState === "overdue" ? " text-error" : ""}`}
-                        {...(canManage ? loanDialogTrigger(l.id, returnTo) : { onclick: `window.location='/inventory/lending/${l.lendingItem.id}/loans'` })}
+                        class={`${canManage ? "cursor-pointer hover" : ""}${loanState === "overdue" ? " text-error" : ""}`}
+                        {...(canManage ? { onclick: `window.location='/inventory/lending/loans/${l.id}'` } : {})}
                       >
                         <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(date)}</td>
                         <td class={border}>{l.lendingItem.inventoryItem.name}</td>
-                        <td class={border}><MemberLink memberId={l.borrowerMember?.id} canLink={canLink}>{borrowerLabel(l)}</MemberLink><MemberMark memberId={l.borrowerMember?.id} canLink={canLink} /></td>
+                        <td class={border}><MemberLink memberId={l.borrower.member?.id} canLink={canLink}>{borrowerLabel(l)}</MemberLink><MemberMark memberId={l.borrower.member?.id} canLink={canLink} /><BorrowerContact person={l.borrower} /></td>
                         <td class={border}><span class={LOAN_STATUS_BADGE[loanState]}>{LOAN_STATUS_LABEL[loanState]}</span></td>
                         <td class={`text-sm${border}`}>{formatDate(l.plannedFrom)} – {formatDate(l.plannedTo)}</td>
                       </tr>
@@ -248,228 +268,154 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           </table>
         </div>
       )}
-      {canManage && <LoanDialog />}
     </Layout>
   );
 });
 
-// ── Aktions-Popup ────────────────────────────────────────────────────────────
-// Ein geteilter <dialog> pro Seite; Inhalt kommt als HTMX-Fragment von
-// GET /loans/:loanId/:view. returnTo (Allowlist in safeReturnTo) bestimmt, wohin
-// nach Erfolg zurückgeleitet wird.
+// ── Vorgangsseite (GET /loans/:loanId) ───────────────────────────────────────
+// Abholen, Zurückgeben, Bearbeiten, Löschen als einfache POST-Formulare.
 
-const LOAN_DIALOG_ID = "loan-dialog";
-const LOAN_DIALOG_BODY_ID = "loan-dialog-body";
-
-function currentPath(url: string): string {
-  const u = new URL(url);
-  return u.pathname + u.search;
-}
-
-function loanDialogTrigger(loanId: string, returnTo: string) {
-  return {
-    "hx-get": `/inventory/lending/loans/${loanId}/actions?returnTo=${encodeURIComponent(returnTo)}`,
-    "hx-target": `#${LOAN_DIALOG_BODY_ID}`,
-    "hx-on::after-request": `document.getElementById('${LOAN_DIALOG_ID}').showModal()`,
-  };
-}
-
-function LoanDialog() {
-  return (
-    <dialog id={LOAN_DIALOG_ID} class="modal">
-      <div class="modal-box">
-        <div id={LOAN_DIALOG_BODY_ID} hx-target={`#${LOAN_DIALOG_BODY_ID}`} />
-      </div>
-      <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
-    </dialog>
-  );
-}
-
-type LoanDialogView = "actions" | "pickup" | "return" | "edit" | "delete";
-const LOAN_DIALOG_VIEWS: LoanDialogView[] = ["actions", "pickup", "return", "edit", "delete"];
-
-function LoanDialogContent({ loan, item, returnTo, view, values, error }: {
-  loan: LoanWithBorrower;
-  item: LendingItemWithRelations;
-  returnTo: string;
-  view: LoanDialogView;
-  values?: Partial<Record<"date" | "quantity" | "plannedFrom" | "plannedTo" | "pickedUpAt" | "returnedAt", string>>;
-  error?: string;
-}) {
+function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWithRelations }) {
   const base = `/inventory/lending/loans/${loan.id}`;
   const today = new Date().toISOString().slice(0, 10);
   const state = loanStatus(loan, today);
-  const v = values ?? {};
-  const q = `?returnTo=${encodeURIComponent(returnTo)}`;
   const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
-  const closeDialog = `document.getElementById('${LOAN_DIALOG_ID}').close()`;
-  const back = (
-    <button type="button" class="btn" hx-get={`${base}/actions${q}`}>{t("lending.loans.actions.back")}</button>
-  );
-  const returnToField = <input type="hidden" name="returnTo" value={returnTo} />;
-  const errorLine = error && <p class="text-error text-sm mt-2">{error}</p>;
-  const dateForm = (name: "pickedUpAt" | "returnedAt", action: "pickup" | "return") => (
-    <form hx-post={`${base}/${action}`} class="space-y-2">
-      {returnToField}
-      <label class="label"><span class="label-text">{t(name === "pickedUpAt" ? "lending.loans.form.pickedUpAt" : "lending.loans.form.returnedAt")}</span></label>
-      <input type="date" name={name} value={v.date ?? today} required class="input input-bordered w-full" />
-      {errorLine}
-      <div class="modal-action">
-        {back}
-        <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
-      </div>
-    </form>
-  );
-
   return (
-    <div>
-      <h3 class="font-bold text-lg">{item.inventoryItem.name}</h3>
-      <p class="py-1 opacity-70">
-        {borrowerLabel(loan)} · <span class={LOAN_STATUS_BADGE[state]}>{LOAN_STATUS_LABEL[state]}</span>
-      </p>
+    <>
+      <div class="mb-4">
+        <a href="/inventory/lending" class="link link-hover text-sm opacity-70">{t("lending.loans.backToList")}</a>
+        <div class="flex items-center justify-between gap-2 mt-1">
+          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{item.inventoryItem.name}</h1>
+          <button type="button" class="btn btn-outline btn-error" onclick="document.getElementById('delete-loan-modal').showModal()">
+            {t("common.delete")}
+          </button>
+        </div>
+        <dl class="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+          <dt class="opacity-60">{t("lending.loans.table.borrower")}</dt>
+          <dd>{borrowerLabel(loan)}</dd>
+          {(loan.borrower.email || loan.borrower.phone) && (
+            <>
+              <dt class="opacity-60">{t("lending.loans.form.borrowerContact")}</dt>
+              <dd><BorrowerContact person={loan.borrower} inline /></dd>
+            </>
+          )}
+          <dt class="opacity-60">{t("lending.loans.table.status")}</dt>
+          <dd><span class={LOAN_STATUS_BADGE[state]}>{LOAN_STATUS_LABEL[state]}</span></dd>
+        </dl>
+      </div>
 
-      {view === "actions" && (
-        <>
-          <div class="flex flex-col gap-2 mt-2">
-            {!loan.pickedUpAt && !loan.returnedAt && (
-              <button type="button" class="btn btn-outline" hx-get={`${base}/pickup${q}`}>{t("lending.loans.actions.pickup")}</button>
-            )}
-            {loan.pickedUpAt && !loan.returnedAt && (
-              <button type="button" class="btn btn-outline" hx-get={`${base}/return${q}`}>{t("lending.loans.actions.return")}</button>
-            )}
-            <button type="button" class="btn btn-outline" hx-get={`${base}/edit${q}`}>{t("lending.loans.actions.edit")}</button>
-            <button type="button" class="btn btn-outline btn-error" hx-get={`${base}/delete${q}`}>{t("lending.loans.actions.delete")}</button>
-            {!returnTo.startsWith(`/inventory/lending/${item.id}/loans`) && (
-              <a href={`/inventory/lending/${item.id}/loans`} class="link link-hover text-sm">{t("lending.loans.actions.allLoans")}</a>
-            )}
-          </div>
-          <div class="modal-action">
-            <button type="button" class="btn" onclick={closeDialog}>{t("common.close")}</button>
-          </div>
-        </>
-      )}
-
-      {view === "pickup" && dateForm("pickedUpAt", "pickup")}
-      {view === "return" && dateForm("returnedAt", "return")}
-
-      {view === "edit" && (
-        <form hx-post={base} class="space-y-2">
-          {returnToField}
+      <div class="space-y-4 max-w-xl">
+        <form method="post" action={base} class="space-y-4 border border-base-300 rounded-box p-4">
           {!item.individualTracking && (
             <div class="form-control max-w-32">
               <label class="label"><span class="label-text">{t("lending.loans.form.quantity")}</span></label>
-              <input type="number" name="quantity" min="1" max={maxQuantity} value={v.quantity ?? String(loan.quantity)} class="input input-bordered w-full" />
+              <input type="number" name="quantity" min="1" max={maxQuantity} value={String(loan.quantity)} class="input input-bordered w-full" />
             </div>
           )}
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {(["plannedFrom", "plannedTo", "pickedUpAt", "returnedAt"] as const).map((f) => (
               <div class="form-control">
                 <label class="label"><span class="label-text">{t(`lending.loans.form.${f}`)}</span></label>
-                <input type="date" name={f} value={v[f] ?? loan[f] ?? ""} class="input input-bordered w-full" />
+                <input type="date" name={f} value={loan[f] ?? ""} class="input input-bordered w-full" />
               </div>
             ))}
           </div>
-          {errorLine}
-          <div class="modal-action">
-            {back}
-            <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
+          <div class="flex gap-2 pt-2">
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+            <button type="reset" class="btn btn-ghost">{t("common.reset")}</button>
           </div>
         </form>
-      )}
+      </div>
 
-      {view === "delete" && (
-        <form hx-post={`${base}/delete`}>
-          {returnToField}
-          <p class="py-2">{t("lending.loans.actions.deleteBody", { borrower: borrowerLabel(loan), name: item.inventoryItem.name })}</p>
+      <dialog id="delete-loan-modal" class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">{t("lending.loans.actions.deleteTitle")}</h3>
+          <p class="py-2 opacity-70">{t("lending.loans.actions.deleteBody", { borrower: borrowerLabel(loan), name: item.inventoryItem.name })}</p>
           <div class="modal-action">
-            {back}
-            <button type="submit" class="btn btn-error">{t("lending.loans.actions.deleteConfirm")}</button>
+            <form method="dialog"><button class="btn">{t("common.cancel")}</button></form>
+            <form method="post" action={`${base}/delete`}><button type="submit" class="btn btn-error">{t("common.delete")}</button></form>
           </div>
-        </form>
-      )}
-    </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+      </dialog>
+    </>
   );
 }
 
 // ── Verleihvorgänge zu einem Gegenstand ─────────────────────────────────────
 
-function BorrowerPickerFields({ memberId, memberName, name, contact }: {
-  memberId?: string;
-  memberName?: string;
-  name?: string;
-  contact?: string;
+// Wie DonorPickerFields: Suche über Personen (Mitglieder und frühere Ausleiher),
+// Treffer oder "neu erfassen" öffnen dieselben editierbaren Felder; Kontaktdaten
+// werden so an der Person ergänzt oder korrigiert.
+type BorrowerValues = Partial<Record<"firstName" | "lastName" | "email" | "phone", string>>;
+
+function BorrowerPickerFields({ personId, values, errors }: {
+  personId?: string;
+  values?: BorrowerValues;
+  errors?: Record<string, string>;
 }) {
-  const isMember = Boolean(memberId);
+  const v = values ?? {};
+  const showFields = Boolean(personId) || Object.values(v).some(Boolean);
+  const field = (name: keyof BorrowerValues, label: string, type = "text", required = false) => (
+    <div class="form-control">
+      <label class="label"><span class="label-text">{label}{required && <span class="text-error ml-1">*</span>}</span></label>
+      <input type={type} id={`borrower-${name}`} name={name} value={v[name] ?? ""} class={`input input-bordered w-full${errors?.[name] ? " input-error" : ""}`} />
+      {errors?.[name] && <span class="text-error text-sm mt-1">{errors[name]}</span>}
+    </div>
+  );
   return (
-    <div class="form-control space-y-2">
-      <label class="label"><span class="label-text">{t("lending.loans.form.borrowerType")}</span></label>
-      <div class="join">
-        <label class="join-item btn has-[:checked]:btn-outline has-[:checked]:btn-primary">
-          <input type="radio" name="borrowerType" value="member" checked={isMember || (!name && !contact)} class="hidden" onchange="updateBorrowerTypeVisibility()" />
-          {t("lending.loans.form.borrowerTypeMember")}
+    <div class="space-y-3">
+      <div id="borrower-picker-search" class={showFields ? "hidden" : ""}>
+        <label class="label">
+          <span class="label-text">{t("lending.loans.form.borrowerType")}<span class="text-error ml-1">*</span></span>
         </label>
-        <label class="join-item btn has-[:checked]:btn-outline has-[:checked]:btn-primary">
-          <input type="radio" name="borrowerType" value="external" checked={!isMember && Boolean(name || contact)} class="hidden" onchange="updateBorrowerTypeVisibility()" />
-          {t("lending.loans.form.borrowerTypeExternal")}
-        </label>
+        <input
+          type="text"
+          name="q"
+          autocomplete="off"
+          placeholder={t("lending.loans.form.borrowerSearchPlaceholder")}
+          class={`input input-bordered w-full${errors?.borrower ? " input-error" : ""}`}
+          hx-get="/inventory/lending/search-persons"
+          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+          hx-target="#borrower-picker-results"
+        />
+        <div id="borrower-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+        {errors?.borrower && <p class="text-error text-sm mt-1">{errors.borrower}</p>}
       </div>
-
-      <div id="borrower-member-fields" class="space-y-2">
-        <div id="borrower-picker-search" class={isMember ? "hidden" : ""}>
-          <input
-            type="text"
-            name="q"
-            autocomplete="off"
-            placeholder={t("lending.loans.form.borrowerSearchPlaceholder")}
-            class="input input-bordered w-full"
-            hx-get="/inventory/search-members?scope=all"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-            hx-target="#borrower-picker-results"
-          />
-          <div id="borrower-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+      <input type="hidden" id="borrower-personId" name="borrowerPersonId" value={personId ?? ""} />
+      <div id="borrower-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {field("lastName", t("members.form.lastName"), "text", true)}
+          {field("firstName", t("members.form.firstName"))}
         </div>
-        <input type="hidden" id="borrowerMemberId" name="borrowerMemberId" value={memberId ?? ""} />
-        <div id="borrower-picker-selected" class={isMember ? "flex items-center gap-2" : "hidden flex items-center gap-2"}>
-          <span id="borrower-picker-selected-name">{memberName ?? ""}</span>
-          <button type="button" class="btn btn-ghost btn-sm borrower-picker-change">{t("inventory.form.assignedMemberChangeSelection")}</button>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {field("email", t("members.form.email"), "email")}
+          {field("phone", t("members.form.phone"), "tel")}
         </div>
+        {errors?.contact && <p class="text-error text-sm" role="alert">{errors.contact}</p>}
+        <button type="button" class="btn btn-ghost borrower-change-selection">{t("lending.loans.form.borrowerChangeSelection")}</button>
       </div>
-
-      <div id="borrower-external-fields" class="space-y-2">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("lending.loans.form.borrowerName")}</span></label>
-          <input type="text" name="borrowerName" value={name ?? ""} class="input input-bordered w-full" />
-        </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("lending.loans.form.borrowerContact")}</span></label>
-          <input type="text" name="borrowerContact" value={contact ?? ""} class="input input-bordered w-full" />
-        </div>
-      </div>
-
       <script dangerouslySetInnerHTML={{ __html: `
-        function updateBorrowerTypeVisibility() {
-          var isMember = document.querySelector('input[name=borrowerType]:checked')?.value !== 'external';
-          document.getElementById('borrower-member-fields').classList.toggle('hidden', !isMember);
-          document.getElementById('borrower-external-fields').classList.toggle('hidden', isMember);
-        }
-        updateBorrowerTypeVisibility();
         if (!window.__borrowerPickerBound) {
           window.__borrowerPickerBound = true;
+          var fields = ['firstName', 'lastName', 'email', 'phone'];
+          var $ = function(id) { return document.getElementById(id); };
+          var fill = function(d) {
+            $('borrower-personId').value = d.id || '';
+            fields.forEach(function(f) { $('borrower-' + f).value = d[f] || ''; });
+            $('borrower-fields').classList.remove('hidden');
+            $('borrower-picker-search').classList.add('hidden');
+          };
           document.body.addEventListener('click', function(e) {
-            var resEl = e.target.closest('#borrower-picker-results .member-result');
-            if (resEl) {
-              document.getElementById('borrowerMemberId').value = resEl.dataset.id;
-              document.getElementById('borrower-picker-selected-name').textContent = resEl.dataset.name;
-              document.getElementById('borrower-picker-selected').classList.remove('hidden');
-              document.getElementById('borrower-picker-search').classList.add('hidden');
-              return;
-            }
-            if (e.target.closest('.borrower-picker-change')) {
-              document.getElementById('borrowerMemberId').value = '';
-              document.getElementById('borrower-picker-selected').classList.add('hidden');
-              document.getElementById('borrower-picker-search').classList.remove('hidden');
-              document.getElementById('borrower-picker-results').innerHTML = '';
-              var input = document.querySelector('#borrower-picker-search input[type=text]');
+            var resEl = e.target.closest('.borrower-result');
+            if (resEl) { fill(resEl.dataset); return; }
+            if (e.target.closest('.borrower-create-new')) { fill({}); $('borrower-lastName').focus(); return; }
+            if (e.target.closest('.borrower-change-selection')) {
+              $('borrower-personId').value = '';
+              $('borrower-fields').classList.add('hidden');
+              $('borrower-picker-search').classList.remove('hidden');
+              $('borrower-picker-results').innerHTML = '';
+              var input = document.querySelector('#borrower-picker-search input[name=q]');
               if (input) { input.value = ''; input.focus(); }
             }
           });
@@ -479,15 +425,14 @@ function BorrowerPickerFields({ memberId, memberName, name, contact }: {
   );
 }
 
-function LoanForm({ action, item, items, values, errors, maxQuantity, memberName }: {
+function LoanForm({ action, item, items, values, errors, maxQuantity }: {
   action: string;
   item?: LendingItemWithRelations;
   // Gesetzt = Gegenstand-Auswahl im Formular (Einstieg ohne Item im Pfad).
   items?: LendingItemWithRelations[];
-  values?: Partial<{ quantity: string; plannedFrom: string; plannedTo: string; pickedUpAt: string; returnedAt: string; borrowerMemberId: string; borrowerName: string; borrowerContact: string }>;
+  values?: Partial<{ quantity: string; plannedFrom: string; plannedTo: string; pickedUpAt: string; returnedAt: string; borrowerPersonId: string }> & BorrowerValues;
   errors?: Record<string, string>;
   maxQuantity?: number;
-  memberName?: string;
 }) {
   const v = values ?? {};
   return (
@@ -504,8 +449,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity, memberName
           {errors?.item && <span class="text-error text-sm mt-1">{errors.item}</span>}
         </div>
       )}
-      <BorrowerPickerFields memberId={v.borrowerMemberId} memberName={memberName} name={v.borrowerName} contact={v.borrowerContact} />
-      {errors?.borrower && <span class="text-error text-sm">{errors.borrower}</span>}
+      <BorrowerPickerFields personId={v.borrowerPersonId} values={v} errors={errors} />
 
       {(items || !item?.individualTracking) && (
         <div class="form-control max-w-32">
@@ -517,12 +461,14 @@ function LoanForm({ action, item, items, values, errors, maxQuantity, memberName
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="form-control">
-          <label class="label"><span class="label-text">{t("lending.loans.form.plannedFrom")}</span></label>
-          <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} class="input input-bordered w-full" />
+          <label class="label"><span class="label-text">{t("lending.loans.form.plannedFrom")}<span class="text-error ml-1">*</span></span></label>
+          <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} required class={`input input-bordered w-full${errors?.plannedFrom ? " input-error" : ""}`} />
+          {errors?.plannedFrom && <span class="text-error text-sm mt-1">{errors.plannedFrom}</span>}
         </div>
         <div class="form-control">
-          <label class="label"><span class="label-text">{t("lending.loans.form.plannedTo")}</span></label>
-          <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} class="input input-bordered w-full" />
+          <label class="label"><span class="label-text">{t("lending.loans.form.plannedTo")}<span class="text-error ml-1">*</span></span></label>
+          <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} required class={`input input-bordered w-full${errors?.plannedTo ? " input-error" : ""}`} />
+          {errors?.plannedTo && <span class="text-error text-sm mt-1">{errors.plannedTo}</span>}
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">{t("lending.loans.form.pickedUpAt")}</span></label>
@@ -539,88 +485,13 @@ function LoanForm({ action, item, items, values, errors, maxQuantity, memberName
           </button>
         </div>
       </div>
-      {errors?.dates && <span class="text-error text-sm">{errors.dates}</span>}
-      {errors?.conflict && <span class="text-error text-sm">{errors.conflict}</span>}
+      {errors?.dates && <p class="text-error text-sm" role="alert">{errors.dates}</p>}
+      {errors?.conflict && <p class="text-error text-sm" role="alert">{errors.conflict}</p>}
 
       <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
     </form>
   );
 }
-
-lendingRoutes.get("/:id/loans", requireAuth("lending:read"), async (c) => {
-  const user = c.get("user")!;
-  const item = await fetchLendingItem(c.req.param("id"));
-  if (!item) return c.notFound();
-  const loans = await fetchLoans(item.id);
-  const today = new Date().toISOString().slice(0, 10);
-  const assignedTotal = loans
-    .filter((l) => !l.returnedAt)
-    .reduce((sum, l) => sum + l.quantity, 0);
-  const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
-  const canManage = user.permissions.has("lending:manage");
-  const canLink = user.permissions.has("members:read");
-  const returnTo = currentPath(c.req.url);
-
-  const sorted = [...loans].sort((a, b) => (b.plannedFrom ?? b.pickedUpAt ?? "").localeCompare(a.plannedFrom ?? a.pickedUpAt ?? ""));
-
-  return c.html(
-    <Layout title={item.inventoryItem.name} user={user} activeNav="inventory">
-      <div class="mb-4">
-        <a href="/inventory/lending" class="link link-hover text-sm opacity-70">{t("lending.loans.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{item.inventoryItem.name}</h1>
-      </div>
-
-      {item.inventoryItem.retiredAt && (
-        <div class="alert alert-warning max-w-2xl mb-4">{t("lending.retired.notice")}</div>
-      )}
-
-      {!item.inventoryItem.retiredAt && canManage && (
-        <div class="mb-6">
-          <LoanForm action={`/inventory/lending/${item.id}/loans`} item={item} maxQuantity={maxQuantity} />
-        </div>
-      )}
-
-      <h2 class="text-lg font-semibold mb-2">{t("lending.loans.title")}</h2>
-      <table class="table table-zebra w-full">
-        <thead>
-          <tr>
-            <th>{t("lending.loans.table.borrower")}</th>
-            {!item.individualTracking && <th>{t("lending.loans.table.quantity")}</th>}
-            <th>{t("lending.loans.table.plannedFrom")}</th>
-            <th>{t("lending.loans.table.plannedTo")}</th>
-            <th>{t("lending.loans.table.pickedUpAt")}</th>
-            <th>{t("lending.loans.table.returnedAt")}</th>
-            {canManage && <th />}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.length === 0 ? (
-            <tr><td colspan={(item.individualTracking ? 5 : 6) + (canManage ? 1 : 0)} class="text-center opacity-50 py-8">{t("lending.loans.table.empty")}</td></tr>
-          ) : sorted.map((l) => {
-            const overdue = Boolean(l.plannedTo && l.plannedTo < today && !l.returnedAt);
-            const borrower = borrowerLabel(l);
-            return (
-              <tr key={l.id} class={overdue ? "text-error font-semibold" : ""}>
-                <td><MemberLink memberId={l.borrowerMember?.id} canLink={canLink}>{borrower}</MemberLink><MemberMark memberId={l.borrowerMember?.id} canLink={canLink} />{overdue && <span class="badge badge-error badge-sm ml-1">{t("lending.loans.overdue")}</span>}</td>
-                {!item.individualTracking && <td>{l.quantity}</td>}
-                <td>{formatDate(l.plannedFrom)}</td>
-                <td>{formatDate(l.plannedTo)}</td>
-                <td>{formatDate(l.pickedUpAt)}</td>
-                <td>{formatDate(l.returnedAt)}</td>
-                {canManage && (
-                  <td class="text-right">
-                    <button type="button" class="btn btn-ghost btn-sm" {...loanDialogTrigger(l.id, returnTo)}>{t("lending.loans.actions.open")}</button>
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {canManage && <LoanDialog />}
-    </Layout>
-  );
-});
 
 // Verfügbarkeitsprüfung beim Anlegen — hart blockierend, siehe Backlog-Doc
 // "Verfügbarkeitsprüfung". Einzel-Tracking: jede Überschneidung blockiert.
@@ -658,18 +529,18 @@ function checkAvailability(
   return used + candidate.quantity > capacity ? t("lending.loans.error.conflict") : null;
 }
 
-// Gemeinsamer Anlage-Pfad für /:id/loans (Item im Pfad) und /loans (Item aus
-// dem Formular, fromList). Unterschied nur: Fehlerseite und Redirect-Ziel.
-async function createLoan(c: Context<{ Variables: Variables }>, itemId: string, fromList: boolean) {
+async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) {
   const item = itemId ? await fetchLendingItem(itemId) : undefined;
-  if (!item && !fromList) return c.notFound();
   if (item?.inventoryItem.retiredAt) return c.notFound();
 
   const body = await c.req.parseBody();
-  const borrowerType = trimmed(body, "borrowerType") || "member";
-  const borrowerMemberId = borrowerType === "member" ? trimmed(body, "borrowerMemberId") : "";
-  const borrowerName = borrowerType === "external" ? trimmed(body, "borrowerName") : "";
-  const borrowerContact = borrowerType === "external" ? trimmed(body, "borrowerContact") : "";
+  const borrowerPersonId = trimmed(body, "borrowerPersonId");
+  const person = {
+    firstName: trimmed(body, "firstName"),
+    lastName: trimmed(body, "lastName"),
+    email: trimmed(body, "email"),
+    phone: trimmed(body, "phone"),
+  };
   const plannedFrom = trimmed(body, "plannedFrom") || null;
   const plannedTo = trimmed(body, "plannedTo") || null;
   const pickedUpAt = trimmed(body, "pickedUpAt") || null;
@@ -679,10 +550,17 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string, 
 
   const errors: Record<string, string> = {};
   if (!item) errors.item = t("lending.loans.error.itemRequired");
-  if (!borrowerMemberId && !borrowerName) errors.borrower = t("lending.loans.error.borrowerRequired");
+  const hasPerson = Boolean(borrowerPersonId || person.lastName || person.firstName);
+  if (!hasPerson) errors.borrower = t("lending.loans.error.borrowerRequired");
+  else if (!person.lastName) errors.lastName = t("common.required");
+  // Neue Person: ohne Kontakt ist der Ausleiher nicht erreichbar. Bestehende (z.B. Mitglieder) bleiben ausgenommen.
+  if (hasPerson && !borrowerPersonId && !person.email && !person.phone) errors.contact = t("lending.loans.error.contactRequired");
   if (item && !item.individualTracking && (!Number.isInteger(quantity) || quantity < 1)) errors.quantity = t("lending.loans.error.invalidQuantity");
-  const dateError = validateLoanDates({ pickedUpAt, returnedAt });
-  if (dateError) errors.dates = t(`lending.loans.error.${dateError}`);
+  if (!plannedFrom) errors.plannedFrom = t("common.required");
+  if (!plannedTo) errors.plannedTo = t("common.required");
+  const dateError = validateLoanDates({ plannedFrom, plannedTo, pickedUpAt, returnedAt });
+  // "noDates" ist durch die Pflicht für plannedFrom/plannedTo bereits abgedeckt.
+  if (dateError && dateError !== "noDates") errors.dates = t(`lending.loans.error.${dateError}`);
 
   if (item) {
     const existingLoans = await fetchLoans(item.id);
@@ -692,49 +570,90 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string, 
 
   if (Object.keys(errors).length > 0) {
     const user = c.get("user")!;
-    let memberName: string | undefined;
-    if (borrowerMemberId) {
-      const m = await db.query.members.findFirst({ where: eq(members.id, borrowerMemberId), with: { person: true } });
-      memberName = m ? `${(m as any).person.firstName} ${(m as any).person.lastName}` : undefined;
-    }
-    const values = { quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerMemberId, borrowerName, borrowerContact };
-    if (fromList) {
-      return c.html(
-        <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
-          <NewLoanHeader />
-          <LoanForm action="/inventory/lending/loans" item={item} items={await fetchLendableItems()} values={values} errors={errors} memberName={memberName} />
-        </Layout>,
-        422
-      );
-    }
-    const maxQuantity = Math.max(1, item!.inventoryItem.quantity - item!.inventoryItem.retiredQuantity);
+    const values = { quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerPersonId, ...person };
     return c.html(
-      <Layout title={item!.inventoryItem.name} user={user} activeNav="inventory">
-        <div class="mb-4">
-          <a href="/inventory/lending" class="link link-hover text-sm opacity-70">{t("lending.loans.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{item!.inventoryItem.name}</h1>
-        </div>
-        <LoanForm action={`/inventory/lending/${item!.id}/loans`} item={item} maxQuantity={maxQuantity} values={values} errors={errors} memberName={memberName} />
+      <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
+        <NewLoanHeader />
+        <LoanForm action="/inventory/lending/loans" item={item} items={await fetchLendableItems()} values={values} errors={errors} />
       </Layout>,
       422
     );
   }
 
-  await db.insert(lendingLoans).values({
-    lendingItemId: item!.id,
-    quantity,
-    borrowerMemberId: borrowerMemberId || null,
-    borrowerName: borrowerName || null,
-    borrowerContact: borrowerContact || null,
-    plannedFrom,
-    plannedTo,
-    pickedUpAt,
-    returnedAt,
+  await db.transaction(async (tx) => {
+    // Gewählte Person: Kontakt/Name wie im Spender-Formular direkt an der Person korrigieren.
+    let personId = borrowerPersonId;
+    const columns = { firstName: person.firstName, lastName: person.lastName, email: person.email || null, phone: person.phone || null };
+    if (personId) await tx.update(persons).set(columns).where(eq(persons.id, personId));
+    else [{ id: personId }] = await tx.insert(persons).values(columns).returning({ id: persons.id });
+    await tx.insert(lendingLoans).values({
+      lendingItemId: item!.id,
+      quantity,
+      borrowerPersonId: personId,
+      plannedFrom,
+      plannedTo,
+      pickedUpAt,
+      returnedAt,
+    });
   });
 
   setFlash(c, t("lending.loans.flash.created"), "success");
-  return c.redirect(fromList ? "/inventory/lending" : `/inventory/lending/${item!.id}/loans`);
+  return c.redirect(`/inventory/lending?item=${item!.id}&start=&end=`);
 }
+
+// GET /inventory/lending/search-persons — Mitglieder und frühere Ausleiher (keine reinen
+// Spender/Antragsteller). Treffer tragen die vier bearbeitbaren Felder.
+lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+
+  const needle = `%${q}%`;
+  const results = await db
+    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, phone: persons.phone })
+    .from(persons)
+    .where(and(
+      or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)),
+      or(
+        exists(db.select({ x: members.id }).from(members).where(eq(members.personId, persons.id))),
+        exists(db.select({ x: lendingLoans.id }).from(lendingLoans).where(eq(lendingLoans.borrowerPersonId, persons.id))),
+      ),
+    ))
+    .orderBy(asc(persons.lastName))
+    .limit(10);
+
+  const createNew = (
+    <div class="p-2">
+      <button type="button" class="btn btn-ghost btn-sm borrower-create-new">{t("lending.loans.form.borrowerExternalNew")}</button>
+    </div>
+  );
+  if (results.length === 0) {
+    return c.html(
+      <>
+        <p class="p-2 text-sm opacity-60">{t("lending.loans.form.borrowerNoResults", { query: q })}</p>
+        {createNew}
+      </>
+    );
+  }
+  return c.html(
+    <>
+      {results.map((p) => (
+        <div
+          key={p.id}
+          class="borrower-result p-2 hover:bg-base-200 cursor-pointer text-sm"
+          data-id={p.id}
+          data-first-name={p.firstName}
+          data-last-name={p.lastName}
+          data-email={p.email ?? ""}
+          data-phone={p.phone ?? ""}
+        >
+          <span class="font-medium">{personName(p)}</span>
+          {(p.email || p.phone) && <span class="opacity-60">{" — "}{[p.email, p.phone].filter(Boolean).join(" · ")}</span>}
+        </div>
+      ))}
+      {createNew}
+    </>
+  );
+});
 
 function NewLoanHeader() {
   return (
@@ -761,21 +680,8 @@ lendingRoutes.get("/loans/new", requireAuth("lending:manage"), async (c) => {
 
 lendingRoutes.post("/loans", requireAuth("lending:manage"), async (c) => {
   const body = await c.req.parseBody();
-  return createLoan(c, trimmed(body, "lendingItemId"), true);
+  return createLoan(c, trimmed(body, "lendingItemId"));
 });
-
-lendingRoutes.post("/:id/loans", requireAuth("lending:manage"), (c) => createLoan(c, c.req.param("id"), false));
-
-const isHtmx = (c: Context) => c.req.header("HX-Request") === "true";
-
-// Erfolg: HTMX-Formulare im Popup folgen keinem 302 sinnvoll, daher HX-Redirect.
-function finish(c: Context, returnTo: string) {
-  if (isHtmx(c)) {
-    c.header("HX-Redirect", returnTo);
-    return c.body(null, 200);
-  }
-  return c.redirect(returnTo);
-}
 
 async function loadLoanWithItem(loanId: string) {
   const loan = await fetchLoan(loanId);
@@ -783,39 +689,34 @@ async function loadLoanWithItem(loanId: string) {
   return loan && item ? { loan, item } : undefined;
 }
 
-// GET /inventory/lending/loans/:loanId/:view — Popup-Fragment (HTMX).
-lendingRoutes.get("/loans/:loanId/:view", requireAuth("lending:manage"), async (c) => {
-  const view = c.req.param("view") as LoanDialogView;
-  if (!LOAN_DIALOG_VIEWS.includes(view)) return c.notFound();
+lendingRoutes.get("/loans/:loanId", requireAuth("lending:manage"), async (c) => {
   const found = await loadLoanWithItem(c.req.param("loanId"));
   if (!found) return c.notFound();
-  const returnTo = safeReturnTo(c.req.query("returnTo"), `/inventory/lending/${found.item.id}/loans`);
-  return c.html(<LoanDialogContent {...found} returnTo={returnTo} view={view} />);
+  return c.html(
+    <Layout title={found.item.inventoryItem.name} user={c.get("user")!} activeNav="inventory">
+      <LoanPage {...found} />
+    </Layout>
+  );
 });
 
-// Gemeinsamer Schreibpfad für Abholen, Zurückgeben und Bearbeiten. Datumsregeln
-// gelten immer; die Verfügbarkeit nur, wenn sich Plan oder Menge ändern
-// (Abholung/Rückgabe sind Tatsachen und werden nie blockiert).
-async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string, view: "pickup" | "return" | "edit") {
+// Datumsregeln gelten immer; die Verfügbarkeit nur, wenn sich Plan oder Menge
+// ändern (Abholung/Rückgabe sind Tatsachen und werden nie blockiert).
+async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string) {
   const found = await loadLoanWithItem(loanId);
   if (!found) return c.notFound();
   const { loan, item } = found;
 
   const body = await c.req.parseBody();
-  const returnTo = safeReturnTo(trimmed(body, "returnTo"), `/inventory/lending/${item.id}/loans`);
   const pick = (key: "plannedFrom" | "plannedTo" | "pickedUpAt" | "returnedAt") =>
     key in body ? trimmed(body, key) || null : loan[key];
 
-  const patch =
-    view === "pickup" ? { pickedUpAt: trimmed(body, "pickedUpAt") || null }
-    : view === "return" ? { returnedAt: trimmed(body, "returnedAt") || null }
-    : {
-        plannedFrom: pick("plannedFrom"),
-        plannedTo: pick("plannedTo"),
-        pickedUpAt: pick("pickedUpAt"),
-        returnedAt: pick("returnedAt"),
-        quantity: item.individualTracking ? 1 : "quantity" in body ? Math.max(1, Math.round(Number(trimmed(body, "quantity"))) || 1) : loan.quantity,
-      };
+  const patch = {
+    plannedFrom: pick("plannedFrom"),
+    plannedTo: pick("plannedTo"),
+    pickedUpAt: pick("pickedUpAt"),
+    returnedAt: pick("returnedAt"),
+    quantity: item.individualTracking ? 1 : "quantity" in body ? Math.max(1, Math.round(Number(trimmed(body, "quantity"))) || 1) : loan.quantity,
+  };
   const next = { ...loan, ...patch };
 
   let error: string | null = null;
@@ -826,29 +727,21 @@ async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string, vi
   }
 
   if (error) {
-    if (!isHtmx(c)) {
-      setFlash(c, error, "error");
-      return c.redirect(returnTo);
-    }
-    // Status 200: HTMX tauscht 4xx-Antworten nicht ein, der Dialog soll offen bleiben.
-    const values = { date: String(view === "pickup" ? next.pickedUpAt ?? "" : next.returnedAt ?? ""), quantity: String(next.quantity), plannedFrom: next.plannedFrom ?? "", plannedTo: next.plannedTo ?? "", pickedUpAt: next.pickedUpAt ?? "", returnedAt: next.returnedAt ?? "" };
-    return c.html(<LoanDialogContent loan={loan} item={item} returnTo={returnTo} view={view} values={values} error={error} />);
+    setFlash(c, error, "error");
+    return c.redirect(`/inventory/lending/loans/${loan.id}`);
   }
 
   await db.update(lendingLoans).set(patch).where(eq(lendingLoans.id, loan.id));
   setFlash(c, t("lending.loans.flash.updated"), "success");
-  return finish(c, returnTo);
+  return c.redirect(`/inventory/lending?item=${item.id}&start=&end=`);
 }
 
-lendingRoutes.post("/loans/:loanId", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId"), "edit"));
-lendingRoutes.post("/loans/:loanId/pickup", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId"), "pickup"));
-lendingRoutes.post("/loans/:loanId/return", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId"), "return"));
+lendingRoutes.post("/loans/:loanId", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId")));
 
 lendingRoutes.post("/loans/:loanId/delete", requireAuth("lending:manage"), async (c) => {
   const found = await loadLoanWithItem(c.req.param("loanId"));
   if (!found) return c.notFound();
-  const body = await c.req.parseBody();
   await db.delete(lendingLoans).where(eq(lendingLoans.id, found.loan.id));
   setFlash(c, t("lending.loans.flash.deleted"), "success");
-  return finish(c, safeReturnTo(trimmed(body, "returnTo"), `/inventory/lending/${found.item.id}/loans`));
+  return c.redirect(`/inventory/lending?item=${found.item.id}&start=&end=`);
 });

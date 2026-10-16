@@ -4,7 +4,7 @@ import { getCookie } from "hono/cookie";
 import { eq, and, asc } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
@@ -74,7 +74,7 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
 // Deleting a member also erases its person record (see backlog 19_Mitglieder-loeschen.md),
 // but that record may still be needed elsewhere — donations carry retention duties of
 // their own, and applications are a separate workflow. Block rather than cascade.
-export type PersonBlockingLink = "donor" | "application" | null;
+export type PersonBlockingLink = "donor" | "application" | "loan" | null;
 
 async function findPersonBlockingLink(personId: string): Promise<PersonBlockingLink> {
   const [donorRow] = await db.select({ id: donors.id }).from(donors).where(eq(donors.personId, personId));
@@ -83,6 +83,8 @@ async function findPersonBlockingLink(personId: string): Promise<PersonBlockingL
   if (applicationRow) return "application";
   const [guardianRow] = await db.select({ id: applicationGuardians.id }).from(applicationGuardians).where(eq(applicationGuardians.personId, personId));
   if (guardianRow) return "application";
+  const [loanRow] = await db.select({ id: lendingLoans.id }).from(lendingLoans).where(eq(lendingLoans.borrowerPersonId, personId));
+  if (loanRow) return "loan";
   return null;
 }
 
@@ -725,7 +727,7 @@ function DeleteMemberButton({
       <button
         class="btn btn-ghost text-base-content/30 ml-auto"
         disabled
-        title={t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication")}
+        title={t(`members.delete.blocked${blockedBy === "donor" ? "Donor" : blockedBy === "loan" ? "Loan" : "Application"}`)}
       >
         {t("common.delete")}
       </button>
@@ -1707,7 +1709,7 @@ memberRoutes.post("/:id/delete", requireAuth("members:delete"), async (c) => {
 
   const blockedBy = await findPersonBlockingLink(existing.personId);
   if (blockedBy) {
-    setFlash(c, t(blockedBy === "donor" ? "members.delete.blockedDonor" : "members.delete.blockedApplication"), "error");
+    setFlash(c, t(`members.delete.blocked${blockedBy === "donor" ? "Donor" : blockedBy === "loan" ? "Loan" : "Application"}`), "error");
     return c.redirect(`/members/${id}`);
   }
 
