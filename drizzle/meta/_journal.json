@@ -155,6 +155,13 @@
       "when": 1790878011676,
       "tag": "0021_fair_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792156225541,
+      "tag": "0022_org_permissions",
+      "breakpoints": true
     }
   ]
 }

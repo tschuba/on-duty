@@ -35,6 +35,9 @@ export const de = {
   "common.nav.admin": "Admin",
   "common.nav.applications": "Anträge",
   "common.nav.inventory": "Inventar",
+  "common.nav.organisation": "Organisation",
+  "organisation.tabs.master": "Stammdaten",
+  "organisation.tabs.tax": "Steuerdaten",
   "common.remove": "Entfernen",
 
   // ── Status ───────────────────────────────────────────────────────────────────
@@ -189,7 +192,6 @@ export const de = {
   "admin.tabs.roles": "Funktionen",
   "admin.tabs.anniversaries": "Jubiläen",
   "admin.tabs.config": "Konfiguration",
-  "admin.tabs.orgConfig": "Organisation",
   "admin.tabs.backup": "Backup",
   "admin.backup.warnNotConfigured": "Kein Backup konfiguriert. Lege ein Backup-Ziel fest (Env-Vars BACKUP_LOCAL_PATH oder S3_*).",
   "admin.backup.warnLastFailed": "Letztes Backup fehlgeschlagen.",
@@ -271,6 +273,11 @@ export const de = {
   "admin.permissions.resource.applications": "Anträge",
   "admin.permissions.resource.inventory": "Inventar",
   "admin.permissions.resource.lending": "Verleih",
+  "admin.permissions.resource.org": "Organisation",
+  "admin.permissions.key.orgRead": "Organisation ansehen",
+  "admin.permissions.key.orgWrite": "Organisation bearbeiten",
+  "admin.permissions.key.orgTaxDataRead": "Steuerdaten ansehen",
+  "admin.permissions.key.orgTaxDataWrite": "Steuerdaten bearbeiten",
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",
@@ -340,7 +347,6 @@ export const de = {
   "admin.orgConfig.title": "Organisation",
   "admin.orgConfig.section.address": "Adresse",
   "admin.orgConfig.section.tax": "Steuerdaten",
-  "admin.orgConfig.section.bank": "Bankverbindung",
   "admin.orgConfig.field.orgName": "Rechtsname",
   "admin.orgConfig.field.orgName.desc": "Rechtsname des Vereins für Dokumente (z. B. mit „e.V.“ Suffix).",
   "admin.orgConfig.field.orgStreet": "Straße",
@@ -353,8 +359,6 @@ export const de = {
   "admin.orgConfig.field.taxAssessmentPeriodFrom": "Veranlagungszeitraum von",
   "admin.orgConfig.field.taxAssessmentPeriodTo": "Veranlagungszeitraum bis",
   "admin.orgConfig.field.charitablePurpose": "Begünstigter Zweck (Satzungszweck)",
-  "admin.orgConfig.field.iban": "IBAN",
-  "admin.orgConfig.field.bic": "BIC",
   "admin.orgConfig.section.applications": "Digitale Anträge",
   "admin.orgConfig.field.applicationNotifyEmail": "Benachrichtigungs-E-Mail für neue Anträge",
   "admin.orgConfig.flash.saved": "Organisationsdaten gespeichert.",

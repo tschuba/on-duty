@@ -11,6 +11,7 @@ import { applyRoutes } from "./routes/apply.js";
 import { memberRoutes } from "./routes/members.js";
 import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
+import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
@@ -74,6 +75,7 @@ app.route("/inventory", inventoryRoutes);
 
 // Admin routes
 app.route("/admin", adminRoutes);
+app.route("/organisation", organisationRoutes);
 
 // 404
 app.notFound((c) => {

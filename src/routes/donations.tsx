@@ -226,7 +226,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
           <div>
             <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
             <p>{t("donations.receipt.blockedBody")}</p>
-            <a href="/admin/org-config" class="link">{t("donations.receipt.blockedLink")}</a>
+            <a href="/organisation/steuerdaten" class="link">{t("donations.receipt.blockedLink")}</a>
           </div>
         </div>
       )}
@@ -459,7 +459,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
           <div>
             <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
             <p>{t("donations.receipt.blockedBody")}</p>
-            <a href="/admin/org-config" class="link">{t("donations.receipt.blockedLink")}</a>
+            <a href="/organisation/steuerdaten" class="link">{t("donations.receipt.blockedLink")}</a>
           </div>
         </div>
       </Layout>

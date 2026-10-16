@@ -922,48 +922,6 @@ describe("GET /config", () => {
   });
 });
 
-describe("GET /org-config", () => {
-  it("renders known fields with their current values and blanks for missing ones", async () => {
-    orgConfigFixture = [{ key: "orgName", value: "Feuerwehr Musterstadt e.V." }];
-    const html = await (await adminRoutes.request("/org-config")).text();
-    expect(html).toContain(t("admin.orgConfig.field.orgName"));
-    expect(html).toContain("Feuerwehr Musterstadt e.V.");
-    expect(html).toMatch(/name="orgStreet"[^>]*value=""/);
-    expect(html).toMatch(/name="orgHouseNumber"[^>]*value=""/);
-  });
-});
-
-describe("POST /org-config", () => {
-  it("upserts a submitted value", async () => {
-    const res = await adminRoutes.request("/org-config", {
-      method: "POST",
-      body: formBody({ orgName: "Feuerwehr Musterstadt e.V." }),
-    });
-    expect(res.status).toBe(302);
-    expect(
-      insertCalls.some((c) => c.table === orgConfig && c.values.key === "orgName" && c.values.value === "Feuerwehr Musterstadt e.V.")
-    ).toBe(true);
-  });
-
-  it("deletes the row when a field is submitted empty", async () => {
-    const res = await adminRoutes.request("/org-config", { method: "POST", body: formBody({ orgName: "" }) });
-    expect(res.status).toBe(302);
-    expect(deleteCalls.some((c) => c.table === orgConfig)).toBe(true);
-  });
-
-  it("normalizes iban/bic by stripping spaces and uppercasing", async () => {
-    await adminRoutes.request("/org-config", { method: "POST", body: formBody({ iban: "de12 3456 7890 1234 5678 90" }) });
-    expect(
-      insertCalls.some((c) => c.table === orgConfig && c.values.key === "iban" && c.values.value === "DE12345678901234567890")
-    ).toBe(true);
-  });
-
-  it("ignores unknown keys in the body", async () => {
-    await adminRoutes.request("/org-config", { method: "POST", body: formBody({ notAKnownKey: "x" }) });
-    expect(insert).not.toHaveBeenCalled();
-  });
-});
-
 describe("GET /backup", () => {
   it("shows the empty-history message when not configured and no runs", async () => {
     backupHistoryFixture = [];

@@ -17,6 +17,10 @@ export const permissionEnum = pgEnum("permission", [
   "inventory:manage",
   "lending:read",
   "lending:manage",
+  "org:read",
+  "org:write",
+  "org:tax-data:read",
+  "org:tax-data:write",
 ]);
 
 export const appRoles = pgTable("app_roles", {

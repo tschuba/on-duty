@@ -8,7 +8,7 @@ import { Icon } from "./icon.js";
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications" | "inventory";
+  activeNav?: "members" | "anniversaries" | "donations" | "donors" | "admin" | "applications" | "inventory" | "organisation";
 }>;
 
 export function ClickToEditHint() {
@@ -34,6 +34,7 @@ function OverdueInspectionsBadge({ count }: { count: number }) {
 export const Layout = async ({ title, children, user, activeNav }: Props) => {
   const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
   const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
+  const canSeeOrganisation = ["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"].some((p) => user?.permissions.has(p as never));
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
   const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
 
@@ -103,6 +104,14 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   <OverdueInspectionsBadge count={overdueInspectionsCount} />
                 </a>
               )}
+              {canSeeOrganisation && (
+                <a
+                  href="/organisation"
+                  class={navLink(activeNav === "organisation")}
+                >
+                  {t("common.nav.organisation")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -127,6 +136,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}</a></li>}
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donors" class={activeNav === "donors" ? "active" : ""}>{t("common.nav.donors")}</a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<OverdueInspectionsBadge count={overdueInspectionsCount} /></a></li>}
+                {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
               </ul>
             </div>
