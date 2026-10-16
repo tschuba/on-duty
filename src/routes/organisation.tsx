@@ -96,7 +96,7 @@ for (const tab of ["master", "tax"] as const) {
             <div class="alert alert-warning mb-4">
               <div>
                 <h3 class="font-bold">{t("organisation.receiptIncomplete.title")}</h3>
-                <p>{t("organisation.receiptIncomplete.body", { fields: missing.map((k) => t(FIELD_LABEL_KEYS[k])).join(", ") })}</p>
+                <p>{t("organisation.receiptIncomplete.body")}</p>
               </div>
             </div>
           )}

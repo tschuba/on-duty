@@ -46,7 +46,6 @@ describe("organisation", () => {
     config = { orgName: "FF" };
     const html = await (await organisationRoutes.request("/stammdaten")).text();
     expect(html).toContain("alert-warning");
-    expect(html).toContain("Straße");
     expect(html).toContain("text-error");
     expect(html).not.toContain(" required");
   });
