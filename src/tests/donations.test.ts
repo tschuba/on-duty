@@ -259,9 +259,11 @@ describe("GET /:id/receipt", () => {
   it("blocks with a link to org-config when org data is incomplete", async () => {
     orgConfigFixture = [];
     donationsFindFirstResult = makeDonation();
+    currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts", "org:tax-data:read"]) };
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
     expect(html).toContain("/organisation/steuerdaten");
+    expect(html).not.toContain("/organisation/stammdaten");
     expect(html).not.toContain(t("donations.receipt.explanation"));
   });
 

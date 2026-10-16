@@ -7,7 +7,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { loadOrgConfig, isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
+import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, canReadOrgTab, ORG_TABS, type OrgTab } from "../lib/org-config.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl } from "../lib/list-query.js";
@@ -15,6 +15,25 @@ import { countOpenReceipts } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
+
+// Names the missing fields and links only to org tabs the viewer may read.
+function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>; perms: Set<string> }) {
+  const missing = missingReceiptFields(config);
+  const tabs = (["master", "tax"] as OrgTab[]).filter((tab) => missing[tab].length > 0);
+  const linkable = tabs.filter((tab) => canReadOrgTab(perms, tab));
+  return (
+    <div class="alert alert-warning mb-4">
+      <div>
+        <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
+        <p>{t("donations.receipt.blockedBody")}</p>
+        <p>{t("donations.receipt.blockedMissing")} {tabs.flatMap((tab) => missing[tab]).map((k) => t(`admin.orgConfig.field.${k}` as never)).join(", ")}</p>
+        {linkable.length === 0
+          ? <p>{t("donations.receipt.blockedContactAdmin")}</p>
+          : linkable.map((tab) => <a href={`/organisation/${ORG_TABS[tab].path}`} class="link mr-4">{t(`organisation.tabs.${tab}` as never)} →</a>)}
+      </div>
+    </div>
+  );
+}
 
 export const donationRoutes = new Hono<{ Variables: Variables }>();
 
@@ -223,15 +242,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
 
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
-      {orgConfigIncomplete && (
-        <div class="alert alert-warning mb-4">
-          <div>
-            <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
-            <p>{t("donations.receipt.blockedBody")}</p>
-            <a href="/organisation/steuerdaten" class="link">{t("donations.receipt.blockedLink")}</a>
-          </div>
-        </div>
-      )}
+      {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>
         <a href="/donations/new" class="btn btn-primary">{t("donations.newDonation")}</a>
@@ -458,13 +469,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
   if (!isOrgConfigCompleteForReceipts(config)) {
     return c.html(
       <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
-        <div class="alert alert-warning">
-          <div>
-            <h3 class="font-bold">{t("donations.receipt.blockedTitle")}</h3>
-            <p>{t("donations.receipt.blockedBody")}</p>
-            <a href="/organisation/steuerdaten" class="link">{t("donations.receipt.blockedLink")}</a>
-          </div>
-        </div>
+        <OrgIncompleteAlert config={config} perms={user.permissions} />
       </Layout>
     );
   }

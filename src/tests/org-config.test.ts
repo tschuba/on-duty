@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isOrgConfigCompleteForReceipts } from "../lib/org-config.js";
+import { isOrgConfigCompleteForReceipts, missingReceiptFields } from "../lib/org-config.js";
 
 const COMPLETE = {
   orgName: "FF Altenhammer", orgStreet: "Hauptstr.", orgHouseNumber: "1", orgZip: "12345", orgCity: "Altenhammer",
@@ -14,5 +14,15 @@ describe("isOrgConfigCompleteForReceipts", () => {
 
   it("is false when a required field is missing", () => {
     expect(isOrgConfigCompleteForReceipts({ ...COMPLETE, taxOffice: "" })).toBe(false);
+  });
+});
+
+describe("missingReceiptFields", () => {
+  it("groups missing keys by tab", () => {
+    expect(missingReceiptFields({ ...COMPLETE, orgCity: "", taxOffice: "" })).toEqual({ master: ["orgCity"], tax: ["taxOffice"] });
+  });
+
+  it("is empty when complete", () => {
+    expect(missingReceiptFields(COMPLETE)).toEqual({ master: [], tax: [] });
   });
 });
