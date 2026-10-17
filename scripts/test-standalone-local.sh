@@ -42,25 +42,20 @@ esac
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Erzeuge $ENV_FILE (Fake-Domains + zufällige Secrets)..."
   cat > "$ENV_FILE" <<EOF
-APP_DOMAIN=app.localhost
-ZITADEL_DOMAIN=auth.localhost
+SERVICE_FQDN_APP=app.localhost
+SERVICE_FQDN_ZITADEL=auth.localhost
+# lokal teilt sich das Login-UI die Domain mit Zitadel (Pfad-Routing in Caddyfile.standalone.local)
+SERVICE_FQDN_ZITADELLOGIN=auth.localhost
 
-POSTGRES_USER=onduty
-POSTGRES_DB=onduty
+# In Coolify generiert (Magic Vars) — lokal selbst erzeugt
 SERVICE_PASSWORD_POSTGRES=$(openssl rand -hex 32)
-
-ZITADEL_DB_USER=zitadel
-ZITADEL_DB_NAME=zitadel
-SERVICE_PASSWORD_ZITADEL_DB=$(openssl rand -hex 32)
-
+SERVICE_PASSWORD_ZITADELDB=$(openssl rand -hex 32)
 SERVICE_PASSWORD_BETTERAUTH=$(openssl rand -hex 32)
 SERVICE_PASSWORD_ADMIN=$(openssl rand -hex 16)
+SERVICE_PASSWORD_ZITADELMASTER=$(openssl rand -hex 16)
+SERVICE_PASSWORD_ZITADELCOOKIE=$(openssl rand -hex 32)
+SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN=Aa1@$(openssl rand -hex 20)
 ORG_NAME=on-duty Standalone Local Test
-
-ZITADEL_MASTERKEY=$(openssl rand -hex 16)
-ZITADEL_SESSION_COOKIE_SECRET=$(openssl rand -base64 32)
-ZITADEL_ADMIN_USERNAME=zitadel-admin
-SERVICE_PASSWORD_ZITADEL_ADMIN=Aa1@$(openssl rand -hex 20)
 EOF
 fi
 
@@ -70,9 +65,9 @@ fi
 # instance instead of guessing it from ORG_NAME.
 zitadel_login_name() {
   local user db_user db_name name
-  user=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
-  db_user=$(grep '^ZITADEL_DB_USER=' "$ENV_FILE" | cut -d= -f2)
-  db_name=$(grep '^ZITADEL_DB_NAME=' "$ENV_FILE" | cut -d= -f2)
+  user=zitadel-admin
+  db_user=zitadel
+  db_name=zitadel
   name=$("${COMPOSE[@]}" exec -T db psql -U "$db_user" -d "$db_name" -tAc \
     "select login_name from projections.login_names3 where login_name_lower like '${user}@%' order by login_name limit 1;" \
     2>/dev/null | tr -d '[:space:]')
@@ -94,10 +89,10 @@ done
 # app only reads NODE_EXTRA_CA_CERTS at start — restart it once the CA certificate exists.
 "${COMPOSE[@]}" restart app >/dev/null
 
-APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
+APP_DOMAIN=$(grep '^SERVICE_FQDN_APP=' "$ENV_FILE" | cut -d= -f2)
 ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ADMIN=' "$ENV_FILE" | cut -d= -f2)
-ZITADEL_DOMAIN=$(grep '^ZITADEL_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
-ZITADEL_PASS=$(grep '^SERVICE_PASSWORD_ZITADEL_ADMIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_DOMAIN=$(grep '^SERVICE_FQDN_ZITADEL=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_PASS=$(grep '^SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN=' "$ENV_FILE" | cut -d= -f2)
 ZITADEL_LOGIN_NAME=$(zitadel_login_name)
 cat <<EOF
 
