@@ -27,7 +27,15 @@ services:
       # Explizite Werte in .env.standalone haben Vorrang (z. B. bestehende Installationen).
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      # Signing-Secret des Zitadel-Webhooks; zitadel-init-hooks legt es erst NACH dem app-Start an,
+      # daher liest on-duty die Datei zur Laufzeit (leer/fehlt = Webhook inaktiv).
+      ZITADEL_WEBHOOK_SECRET_FILE: /zitadel/bootstrap/webhook.secret
       OIDC_APP_URL: https://${APP_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       # Eingebauter Backup-Mechanismus ist im Standalone-Stack deaktiviert — der
       # dedizierte `backup`-Service unten sichert stattdessen beide Datenbanken.
       # Siehe 17_Backup-Status-Flag (unabhängiger Task): fest verdrahtet, kein
@@ -93,6 +101,11 @@ services:
       # gemeinsame zitadel-bootstrap-Volume mit zitadel-login teilt.
       # Einmaliger Admin-Machine-User (IAM_OWNER) nur für zitadel-init: legt Projekt + OIDC-App
       # an und löscht sich danach selbst. Entsteht nur beim allerersten Setup der Instanz.
+      # Zitadel sperrt ausgehende Aufrufe (Actions/Webhooks) standardmäßig an alle privaten Netze. Für den
+      # on-duty-Webhook (http://app:3000, Docker-Netz 172.16.0.0/12) wird genau dieser Bereich freigegeben;
+      # Loopback, Cloud-Metadaten (169.254/16) und die übrigen privaten Netze bleiben gesperrt. Die Liste
+      # ersetzt den Zitadel-Default vollständig (siehe cmd/defaults.yaml, HTTPClient.DenyList).
+      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,192.168.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
       ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/admin.pat
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: onduty-init
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (temporary)
@@ -138,15 +151,36 @@ services:
   zitadel-init:
     image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
     restart: "no"
-    command: ["node", "scripts/zitadel-init.mjs"]
+    command: ["node", "scripts/zitadel-init.mjs", "oidc"]
     environment:
       ZITADEL_DOMAIN: ${ZITADEL_DOMAIN}
       APP_DOMAIN: ${APP_DOMAIN}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      # Dieselben SMTP-Werte wie für on-duty — werden bei der Ersteinrichtung auch in Zitadel eingetragen.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
     depends_on:
       zitadel:
+        condition: service_healthy
+
+  # Phase 2 der Einrichtung: Webhook-Target anlegen, sobald app läuft (Zitadel löst den Host beim Anlegen auf),
+  # danach Bootstrap-Machine-User entfernen. Optional — scheitert das, läuft on-duty trotzdem.
+  zitadel-init-hooks:
+    image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
+    restart: "no"
+    command: ["node", "scripts/zitadel-init.mjs", "hooks"]
+    environment:
+      ZITADEL_DOMAIN: ${ZITADEL_DOMAIN}
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:rw
+    depends_on:
+      app:
         condition: service_healthy
 
   caddy:

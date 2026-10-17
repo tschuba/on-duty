@@ -65,6 +65,7 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM,
+  ZITADEL_WEBHOOK_SECRET_FILE: process.env.ZITADEL_WEBHOOK_SECRET_FILE,
 };
 
 export const ENV_META: { key: keyof typeof env; value: string | number | undefined }[] = [

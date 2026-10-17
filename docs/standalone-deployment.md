@@ -58,6 +58,15 @@ Passwort: `SERVICE_PASSWORD_ZITADEL_ADMIN`; der erste Login erzwingt eine Passwo
 - Bei späteren Starts tut `zitadel-init` nichts (`oidc.env` existiert bzw. `OIDC_CLIENT_ID` ist gesetzt).
 - Das Bootstrap-Volume enthält `oidc.env` mit dem Client-Secret (`0600`) — wie `.env.standalone` als Geheimnis behandeln.
 
+### Webhook und SMTP (optional)
+
+Zusätzlich richtet die Ersteinrichtung zwei Komfortfunktionen ein. Scheitert eine davon, läuft der Stack trotzdem — die Benutzer entstehen dann wie bei jedem anderen Provider beim ersten Login.
+
+- **Webhook:** `zitadel-init-hooks` legt (sobald `app` läuft) ein Zitadel-Target auf `http://app:3000/hooks/zitadel` an, mit Executions für `user.human.added` und `user.human.email.verified`. on-duty prüft die Signatur (`ZITADEL-Signature`, HMAC-SHA256 mit dem Signing-Key, den Zitadel beim Anlegen liefert; Schlüssel liegt als `webhook.secret` im Bootstrap-Volume) und legt bei `registrationEnabled` den Benutzer **bei der Registrierung** an (`emailVerified=false`, Zitadel-Benutzer-ID als `account`-Bindung). Nach der E-Mail-Bestätigung in Zitadel setzt das zweite Event `emailVerified=true`. Ein Benutzer ist **aktiv**, wenn die E-Mail bestätigt ist und er mindestens eine Rolle hat. Bis dahin sieht er `/pending`, der Admin ein Badge in der Navigation. Ohne Webhook entsteht der Benutzer erst beim ersten Login — die Regel bleibt gleich.
+- **SMTP:** Sind `SMTP_*` in `.env.standalone` gesetzt, trägt `zitadel-init` dieselben Werte als Zitadel-SMTP-Provider ein (Bestätigungsmails); on-duty nutzt sie für die Admin-Benachrichtigung. Beides ist unabhängig voneinander nutzbar: Zitadel versendet die Mail an den Benutzer, on-duty die Mail an die Admins.
+- Zitadel sperrt ausgehende Aufrufe an private Netze (`HTTPClient.DenyList`). Der Stack gibt `172.16.0.0/12` (Docker-Netz) frei (`ZITADEL_HTTPCLIENT_DENYLIST` in `docker-compose.standalone.yml`); Loopback, Cloud-Metadaten und übrige private Netze bleiben gesperrt.
+- `user.human.added` feuert auch für Benutzer, die ein Zitadel-Admin anlegt. Sie werden bei `registrationEnabled` wie Registrierungen behandelt.
+
 ### Manueller Fallback (bestehende Installationen)
 
 Der Machine-User entsteht nur beim allerersten Setup einer Zitadel-Instanz. Bei einer bestehenden Installation (oder falls `zitadel-init` fehlschlägt: `docker compose logs zitadel-init`) die Application von Hand anlegen und die Werte in `.env.standalone` eintragen — explizit gesetzte Werte haben Vorrang, `zitadel-init` beendet sich dann sofort:

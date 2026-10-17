@@ -7,6 +7,7 @@ import { auth } from "./auth.js";
 import { env } from "./env.js";
 import { startBackupScheduler } from "./lib/backup.js";
 import { accountRoutes, pendingRoutes } from "./routes/account.js";
+import { hookRoutes } from "./routes/hooks.js";
 import { loginRoutes } from "./routes/login.js";
 import { applyRoutes } from "./routes/apply.js";
 import { memberRoutes } from "./routes/members.js";
@@ -37,6 +38,9 @@ app.route("/", loginRoutes);
 
 // Public application forms — no auth guard, see backlog "Digitale Anträge"
 app.route("/apply", applyRoutes);
+
+// Optional provider webhooks (signature-verified, inactive unless configured)
+app.route("/hooks", hookRoutes);
 
 // Better Auth handler
 app.on(["POST", "GET"], "/auth/*", async (c) => {

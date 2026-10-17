@@ -85,7 +85,7 @@ echo "Baue App-Image aus lokalem Dockerfile..."
 echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
 # zitadel-init legt beim allerersten Zitadel-Setup Projekt + OIDC-App an und schreibt
 # Client-ID/Secret ins Bootstrap-Volume; app liest sie von dort.
-"${COMPOSE[@]}" up -d db zitadel zitadel-login zitadel-init caddy app
+"${COMPOSE[@]}" up -d db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks
 
 echo "Warte auf Caddys lokales CA-Zertifikat..."
 until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/root.crt 2>/dev/null; do
