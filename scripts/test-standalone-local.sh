@@ -61,83 +61,62 @@ ZITADEL_MASTERKEY=$(openssl rand -hex 16)
 ZITADEL_SESSION_COOKIE_SECRET=$(openssl rand -base64 32)
 ZITADEL_ADMIN_USERNAME=zitadel-admin
 SERVICE_PASSWORD_ZITADEL_ADMIN=Aa1@$(openssl rand -hex 20)
-
-OIDC_CLIENT_ID=REPLACE_ME
-OIDC_CLIENT_SECRET=REPLACE_ME
 EOF
 fi
+
+# Zitadel appends the org domain to the bootstrap username automatically
+# (default, see cmd/setup/steps.yaml) unless the username is an email address —
+# so the real login name is NOT the username alone. Read it from the running
+# instance instead of guessing it from ORG_NAME.
+zitadel_login_name() {
+  local user db_user db_name name
+  user=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
+  db_user=$(grep '^ZITADEL_DB_USER=' "$ENV_FILE" | cut -d= -f2)
+  db_name=$(grep '^ZITADEL_DB_NAME=' "$ENV_FILE" | cut -d= -f2)
+  name=$("${COMPOSE[@]}" exec -T db psql -U "$db_user" -d "$db_name" -tAc \
+    "select login_name from projections.login_names3 where login_name_lower like '${user}@%' order by login_name limit 1;" \
+    2>/dev/null | tr -d '[:space:]')
+  echo "${name:-$user}"
+}
 
 echo "Baue App-Image aus lokalem Dockerfile..."
 "${COMPOSE[@]}" build app
 
-echo "Starte Infrastruktur (db, zitadel, zitadel-login, caddy)..."
-"${COMPOSE[@]}" up -d db zitadel zitadel-login caddy
-# caddy hängt (wie in Prod) per depends_on auch an app — Compose startet ihn
-# also automatisch mit. Vor dem manuellen Zitadel-Setup wieder anhalten, er
-# hat an dieser Stelle ohnehin nur Platzhalter-OIDC-Credentials.
-"${COMPOSE[@]}" stop app >/dev/null 2>&1 || true
-
-echo "Warte auf Zitadel..."
-until [[ "$(docker inspect -f '{{.State.Health.Status}}' "$("${COMPOSE[@]}" ps -q zitadel)" 2>/dev/null)" == "healthy" ]]; do
-  sleep 2
-done
-
-if grep -q '^OIDC_CLIENT_ID=REPLACE_ME' "$ENV_FILE"; then
-  APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
-  ZITADEL_DOMAIN=$(grep '^ZITADEL_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
-  ADMIN_USER=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
-  ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ZITADEL_ADMIN=' "$ENV_FILE" | cut -d= -f2)
-  ZITADEL_DB_USER=$(grep '^ZITADEL_DB_USER=' "$ENV_FILE" | cut -d= -f2)
-  ZITADEL_DB_NAME=$(grep '^ZITADEL_DB_NAME=' "$ENV_FILE" | cut -d= -f2)
-  # Zitadel hängt an den Bootstrap-Username automatisch die Org-Domain an
-  # (Default, siehe cmd/setup/steps.yaml), sofern der Username keine
-  # E-Mail-Adresse ist — der echte Login-Name ist also NICHT $ADMIN_USER
-  # allein. Aus der laufenden Instanz auslesen statt aus ORG_NAME zu raten.
-  ADMIN_LOGIN_NAME=$("${COMPOSE[@]}" exec -T db psql -U "$ZITADEL_DB_USER" -d "$ZITADEL_DB_NAME" -tAc \
-    "select login_name from projections.login_names3 where login_name_lower like '${ADMIN_USER}@%' order by login_name limit 1;" \
-    2>/dev/null | tr -d '[:space:]')
-  ADMIN_LOGIN_NAME=${ADMIN_LOGIN_NAME:-$ADMIN_USER}
-  cat <<EOF
-
-Zitadel läuft: https://$ZITADEL_DOMAIN (Zertifikatswarnung akzeptieren, ist
-das selbstsignierte lokale CA von Caddy).
-
-Einmaliger manueller Schritt (Zitadel erlaubt keine vorab gesetzte
-Client-ID/Secret, siehe docs/standalone-deployment.md):
-  1. Login mit Benutzername "$ADMIN_LOGIN_NAME", Passwort "$ADMIN_PASS"
-     (Passwortänderung wird beim ersten Login erzwungen)
-  2. Projects → New Project (z. B. "on-duty")
-  3. Im Projekt: New Application
-       Type: Web, Authentication Method: Code
-       Redirect URI:             https://$APP_DOMAIN/auth/callback/oidc
-       Post Logout Redirect URI: https://$APP_DOMAIN
-  4. Client-ID/Secret in $ENV_FILE eintragen:
-       OIDC_CLIENT_ID=...
-       OIDC_CLIENT_SECRET=...
-  5. Dieses Skript erneut ausführen: $0
-
-EOF
-  exit 0
-fi
+echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
+# On the very first Zitadel setup, zitadel-init creates project + OIDC app and writes
+# client id/secret to the bootstrap volume; app reads them from there.
+"${COMPOSE[@]}" up -d db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks
 
 echo "Warte auf Caddys lokales CA-Zertifikat..."
 until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/root.crt 2>/dev/null; do
   sleep 1
 done
-
-echo "Baue und starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
-"${COMPOSE[@]}" build app
-"${COMPOSE[@]}" up -d db zitadel zitadel-login caddy app
+# app only reads NODE_EXTRA_CA_CERTS at start — restart it once the CA certificate exists.
+"${COMPOSE[@]}" restart app >/dev/null
 
 APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
 ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ADMIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_DOMAIN=$(grep '^ZITADEL_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_PASS=$(grep '^SERVICE_PASSWORD_ZITADEL_ADMIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_LOGIN_NAME=$(zitadel_login_name)
 cat <<EOF
 
 Fertig. https://$APP_DOMAIN ist erreichbar (Zertifikatswarnung akzeptieren).
 
 Admin-Login: /admin/login, Passwort: $ADMIN_PASS
-Für den OIDC-Login-Test vorher passenden Benutzer unter Admin → Benutzer
-anlegen (kein JIT, siehe docs/oidc.md).
+
+Zitadel-Console: https://$ZITADEL_DOMAIN
+  Login-Name: $ZITADEL_LOGIN_NAME
+  Passwort:   $ZITADEL_PASS (nach der erzwungenen Änderung beim ersten Login
+              gilt dein neues Passwort)
+
+OIDC-Login-Test: passenden Benutzer unter Admin → Benutzer anlegen, oder
+Selbstregistrierung testen:
+  1. Zitadel: Settings → Login Behavior and Security → "Register allowed"
+     (Bestätigungsmails brauchen SMTP — Zitadel: Notification settings)
+  2. on-duty: https://$APP_DOMAIN/admin/config → registrationEnabled
+     (und ggf. registrationAutoApprove + registrationDefaultRoleId)
+  Siehe docs/oidc.md, Abschnitt "Selbstregistrierung".
 
 Neustart nach Codeänderungen: einfach erneut ausführen (baut App neu, Volumes
 bleiben erhalten). Fresh-Install-Test: $0 --clean

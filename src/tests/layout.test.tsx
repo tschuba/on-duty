@@ -107,3 +107,13 @@ describe("Layout — Hauptmenü-Badge im aktiven Bereich", () => {
     expect(await render("donations", "applications:review")).toContain('badge-primary ml-1">1<');
   });
 });
+
+describe("user menu", () => {
+  it("links to /account", async () => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout user={userWith("members:read")}>x</Layout>));
+    const html = await (await app.request("/")).text();
+    expect(html).toContain('href="/account"');
+  });
+});
+

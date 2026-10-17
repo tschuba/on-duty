@@ -11,7 +11,8 @@ export type { Permission };
 export type AuthedUser = AppUser & { permissions: Set<Permission> };
 export type Variables = { user: AuthedUser };
 
-export function requireAuth(required?: Permission | Permission[]) {
+// allowPending: let users without any app role through (used by /pending and /account); all others are sent to /pending.
+export function requireAuth(required?: Permission | Permission[], opts: { allowPending?: boolean } = {}) {
   return createMiddleware<{ Variables: Variables }>(async (c, next) => {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
@@ -27,12 +28,17 @@ export function requireAuth(required?: Permission | Permission[]) {
       return c.redirect("/login?error=disabled");
     }
 
+    // leftJoin: a role without permissions still yields a row (permission null) → counts as "has a role".
     const rows = await db
-      .select({ permission: appRolePermissions.permission })
+      .select({ roleId: userAppRoles.roleId, permission: appRolePermissions.permission })
       .from(userAppRoles)
-      .innerJoin(appRolePermissions, eq(appRolePermissions.roleId, userAppRoles.roleId))
+      .leftJoin(appRolePermissions, eq(appRolePermissions.roleId, userAppRoles.roleId))
       .where(eq(userAppRoles.userId, user.id));
-    const permissions = new Set(rows.map((r) => r.permission));
+    const permissions = new Set(rows.flatMap((r) => (r.permission ? [r.permission] : [])));
+
+    // Zero roles = self-registered and not yet approved. A role without the needed permission still gets the 403 below.
+    // Active = verified email AND at least one role. Unverified accounts only exist via the Zitadel webhook.
+    if (!opts.allowPending && (rows.length === 0 || !user.emailVerified)) return c.redirect("/pending");
 
     const requiredList = required ? ([] as Permission[]).concat(required) : [];
     if (requiredList.length > 0 && !requiredList.some((p) => permissions.has(p))) {

@@ -1,10 +1,12 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { genericOAuth } from "better-auth/plugins";
+import { APIError } from "better-auth/api";
 import { eq } from "drizzle-orm";
 import { db } from "./db/index.js";
 import * as schema from "./db/schema/index.js";
 import { env } from "./env.js";
+import { checkRegistration, onUserRegistered } from "./lib/registration.js";
 import { parseSessionLifetime } from "./lib/session-lifetime.js";
 
 // Marks the owning user as having completed at least one successful login.
@@ -33,11 +35,10 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false,
   },
+  // No trustedProviders: linking an OIDC login to an existing user requires email_verified=true from the
+  // provider, otherwise an unverified address at a self-registration provider could take over an account.
   account: {
     skipStateCookieCheck: true,
-    accountLinking: {
-      trustedProviders: ["oidc"],
-    },
   },
   user: {
     additionalFields: {
@@ -46,6 +47,18 @@ export const auth = betterAuth({
     },
   },
   databaseHooks: {
+    // Only better-auth-created users reach these hooks (OIDC sign-up); admin-created users are inserted directly.
+    user: {
+      create: {
+        before: async (user) => {
+          const rejection = await checkRegistration(Boolean(user.emailVerified));
+          if (rejection) throw new APIError("FORBIDDEN", { code: rejection, message: rejection });
+        },
+        after: async (user) => {
+          await onUserRegistered(user);
+        },
+      },
+    },
     session: {
       create: {
         after: async (session) => {
@@ -64,7 +77,7 @@ export const auth = betterAuth({
           discoveryUrl: `${env.OIDC_PROVIDER}/.well-known/openid-configuration`,
           scopes: ["openid", "email", "profile"],
           pkce: true,
-          disableSignUp: true, // no JIT — admin must pre-create users
+          // sign-up is gated at runtime by the user.create.before hook (registrationEnabled)
         },
       ],
     }),

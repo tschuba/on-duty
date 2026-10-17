@@ -6,7 +6,8 @@ on-duty nutzt OpenID Connect (OIDC) für die Anmeldung regulärer Benutzer. Der 
 
 - Ein laufender OIDC-Provider (z. B. Authentik, Keycloak, Zitadel)
 - Eine öffentlich erreichbare App-URL mit HTTPS (`OIDC_APP_URL`)
-- Benutzer müssen **vorab in on-duty angelegt werden** — es gibt keine automatische Kontoerstellung beim ersten Login (kein JIT). Die E-Mail-Adresse im on-duty-Benutzerkonto muss exakt mit der E-Mail aus dem OIDC-Token übereinstimmen.
+- Benutzer werden entweder **vorab in on-duty angelegt** oder registrieren sich selbst (siehe [Selbstregistrierung](#selbstregistrierung)). Die E-Mail-Adresse im on-duty-Benutzerkonto muss mit der E-Mail aus dem OIDC-Token übereinstimmen.
+- Der Provider muss `email_verified=true` im Token liefern. Ohne bestätigte E-Mail verknüpft on-duty ein OIDC-Konto **nicht** mit einem bestehenden Benutzer und legt keinen neuen an.
 
 ---
 
@@ -91,3 +92,38 @@ OIDC-Benutzer müssen vor dem ersten Login in on-duty existieren. Die Verwaltung
 | „Ihr Konto ist nicht für die Anmeldung freigeschaltet" | E-Mail aus dem OIDC-Token stimmt mit keinem on-duty-Konto überein | Benutzer in on-duty anlegen; E-Mail-Adresse prüfen |
 | `invalid_redirect_uri` (Authentik-Fehlerseite) | Registrierte Redirect-URI stimmt nicht mit `${OIDC_APP_URL}/auth/callback/oidc` überein | URI im Authentik-Provider korrigieren oder `OIDC_APP_URL` anpassen |
 | 404 / leere Antwort beim Login | Discovery-Endpoint nicht erreichbar | `OIDC_PROVIDER` prüfen: korrekter Slug, kein abschließender `/`, HTTPS |
+
+---
+
+## Selbstregistrierung
+
+Standardmäßig ist die Selbstregistrierung **aus**. Der Admin schaltet sie unter **Admin → Konfiguration** ein (`registrationEnabled`).
+
+| Einstellung | Wirkung |
+|---|---|
+| `registrationEnabled` | Beim ersten OIDC-Login mit bestätigter E-Mail wird automatisch ein on-duty-Benutzer angelegt. |
+| `registrationAutoApprove` | Neue Benutzer erhalten sofort die Standardrolle. Ohne diese Option sehen sie die Seite „Freischaltung ausstehend“, bis ein Admin ihnen unter **Admin → Benutzer** eine Rolle zuweist („Ablehnen“ löscht den Benutzer). |
+| `registrationDefaultRoleId` | Rolle für automatisch freigegebene Benutzer; muss mindestens ein Recht haben. **Achtung:** Jeder, der sich beim Provider registrieren kann, bekommt diese Rechte. |
+
+Bei neuen Registrierungen ohne Auto-Freigabe erhalten Admins eine E-Mail, sofern SMTP konfiguriert ist.
+
+**Zwei Schalter:** Die Registrierung beim Provider (Zitadel: *Register allowed*, Authentik: Enrollment Flow) bleibt dauerhaft aktiv; im Alltag steuert der Admin nur `registrationEnabled` in on-duty. Bei einem dedizierten Provider ist der on-duty-Schalter optional, bei einem **geteilten** Provider nötig, sonst würde jeder dort Registrierte einen on-duty-Benutzer erhalten. Provider-Konten ohne on-duty-Benutzer können entstehen, wenn die Registrierung in on-duty aus ist.
+
+**Konto löschen:** Benutzer können ihr Konto unter `/account` (bzw. auf der Wartebildschirm-Seite) selbst löschen. Das lokale Admin-Konto und das letzte Konto mit Benutzerverwaltungs-Recht sind ausgenommen. Das Konto beim Provider bleibt bestehen und muss dort separat gelöscht werden.
+
+### Zitadel
+
+*Settings → Login Behavior and Security → Register allowed* aktivieren. Für Bestätigungsmails ist ein SMTP-Server nötig (*Notification settings → SMTP*); der Standalone-Stack bringt keinen mit.
+
+### Authentik
+
+Authentik liefert `email_verified` seit Release **2025.10** standardmäßig als `false` (davor immer `true`). **Vor dem Update bzw. vor dem Einschalten dieser Version von on-duty** ein eigenes Scope-Mapping anlegen (*Customization → Property Mappings → Scope Mapping*, Scope `email`) und im OAuth2-Provider statt des Standard-Mappings auswählen:
+
+```python
+return {
+    "email": request.user.email,
+    "email_verified": request.user.attributes.get("email_verified", False),
+}
+```
+
+Für die Selbstregistrierung einen Enrollment Flow bauen (Stages: Prompt → User Write → Email → User Login) und in der Login-Stage verlinken. Das Setzen des Attributs `email_verified` nach der Email-Stage (z. B. per Expression Policy) muss in der eigenen Instanz getestet werden. Sind alle Benutzer vertrauenswürdig, kann das Mapping stattdessen fest `True` liefern.

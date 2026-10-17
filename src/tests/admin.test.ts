@@ -131,6 +131,9 @@ let lastBackupResult: any = null;
 let scheduleResult: { prev: Date | null; next: Date | null } = { prev: null, next: null };
 const runBackupMock = vi.fn(() => Promise.resolve());
 
+// Layout badge count is a separate DB query; keep it out of the per-route select-call assertions.
+vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
+
 vi.mock("../lib/backup.js", () => ({
   isBackupConfigured: () => backupConfigured,
   getLastBackup: () => Promise.resolve(lastBackupResult),
@@ -171,6 +174,7 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     name: "Ben Bauer",
     email: "ben@example.com",
     disabled: false,
+    emailVerified: true,
     lastLoginAt: new Date("2024-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -302,6 +306,19 @@ describe("GET /users", () => {
     userAppRolesFixture = [];
     const html = await (await adminRoutes.request("/users")).text();
     expect(html).toContain("—");
+  });
+
+  it("shows 'pending' for a logged-in user without any role", async () => {
+    usersFixture = [makeUser({ lastLoginAt: new Date() })];
+    userAppRolesFixture = [];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusPending"));
+  });
+
+  it("shows 'email unverified' for a user created before verification", async () => {
+    usersFixture = [makeUser({ emailVerified: false, lastLoginAt: null })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusEmailUnverified"));
   });
 
   it("shows 'unconfirmed' for a user who has never logged in", async () => {
@@ -572,6 +589,12 @@ describe("POST /permissions", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("rejects a role without any permission", async () => {
+    const res = await adminRoutes.request("/permissions", { method: "POST", body: formBody({ name: "Leer" }) });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === appRoles)).toBe(false);
+  });
+
   it("creates the role with its permissions", async () => {
     const res = await adminRoutes.request("/permissions", {
       method: "POST",
@@ -601,6 +624,14 @@ describe("POST /permissions/:id", () => {
     appRolesFixture = [makeAppRole()];
     userAppRolesFixture = [{ cnt: 0 }];
     const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "" }) });
+    expect(res.status).toBe(302);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects removing all permissions from a role", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "Neu" }) });
     expect(res.status).toBe(302);
     expect(update).not.toHaveBeenCalled();
   });
@@ -897,6 +928,16 @@ describe("GET /config", () => {
     expect(html).toContain("ORG_NAME");
     expect(html).toContain("Test Feuerwehr");
     expect(html).toContain("—");
+  });
+
+  it("puts the save button in the title row, bound to the form", async () => {
+    const html = await (await adminRoutes.request("/config")).text();
+    const h1 = html.indexOf("<h1");
+    const btn = html.indexOf('id="config-save"');
+    const form = html.indexOf('id="config-form"');
+    expect(h1).toBeLessThan(btn);
+    expect(btn).toBeLessThan(form);
+    expect(html).toContain('form="config-form"');
   });
 
   it("shows the not-configured backup warning", async () => {

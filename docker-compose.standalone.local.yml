@@ -12,6 +12,21 @@ services:
     volumes:
       - caddy_data:/caddy-ca:ro
 
+  zitadel-init:
+    image: on-duty-standalone-local:latest
+
+  zitadel-init-hooks:
+    image: on-duty-standalone-local:latest
+    environment:
+      # *.localhost resolves to loopback, so the public URL is unreachable here -> go straight to the app network.
+      WEBHOOK_URL: http://app:3000/hooks/zitadel
+
+  # Fixed subnet + deny list without 172.16.0.0/12 so Zitadel allows the webhook to app:3000.
+  # Local test only (Zitadel's default blocks all private networks).
+  zitadel:
+    environment:
+      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,192.168.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
+
   caddy:
     volumes:
       - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro
@@ -25,3 +40,9 @@ services:
         aliases:
           - ${APP_DOMAIN}
           - ${ZITADEL_DOMAIN}
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.77.0/24
