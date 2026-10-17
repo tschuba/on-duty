@@ -1597,10 +1597,10 @@ adminRoutes.get("/config", guard, async (c) => {
       <form method="post" action="/admin/config" id="config-form">
         <div class="flex flex-wrap items-center gap-2 mb-4">
           <input type="search" id="config-search" class="input input-bordered input-sm" placeholder={t("admin.config.search")} />
-          <select id="config-filter" class="select select-bordered select-sm">
-            <option value="all">{t("admin.config.filter.all")}</option>
-            <option value="writable">{t("admin.config.filter.writable")}</option>
-          </select>
+          <label class="label cursor-pointer gap-2">
+            <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
+            <span class="label-text">{t("admin.config.filter.writable")}</span>
+          </label>
         </div>
         <div class="overflow-x-auto">
           <table class="table table-zebra w-full">
@@ -1654,7 +1654,7 @@ adminRoutes.get("/config", guard, async (c) => {
   const apply = () => {
     const q = search.value.trim().toLowerCase();
     document.querySelectorAll('[data-config-row]').forEach((tr) => {
-      const hideW = filter.value === 'writable' && tr.dataset.writable !== '1';
+      const hideW = filter.checked && tr.dataset.writable !== '1';
       tr.hidden = hideW || (q && !tr.textContent.toLowerCase().includes(q));
     });
   };

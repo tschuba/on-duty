@@ -746,7 +746,6 @@ export const de = {
   "admin.permissions.flash.requiredPermission": "Eine Rolle braucht mindestens ein Recht.",
   "admin.permissions.noPermissionsWarning": "Keine Rechte – Rolle hat keine Wirkung",
   "admin.config.settings.heading": "Einstellungen",
-  "admin.config.filter.all": "Alle",
   "admin.config.filter.writable": "Nur schreibbare",
   "admin.config.search": "Suchen …",
   "admin.config.save": "Speichern",
