@@ -132,7 +132,31 @@ Das Skript:
 
 `https://app.localhost` ist danach erreichbar; Login zunächst über
 `/admin/login`, für den OIDC-Test vorher passenden Benutzer unter **Admin →
-Benutzer** anlegen (oder per Selbstregistrierung, siehe [docs/oidc.md](oidc.md)).
+Benutzer** anlegen (oder per Selbstregistrierung, siehe unten).
+
+### Zitadel-Console lokal
+
+`https://auth.localhost` (Zertifikatswarnung akzeptieren). Das Skript druckt
+Login-Name und Passwort am Ende jedes Laufs. Der Login-Name ist nicht der reine
+`ZITADEL_ADMIN_USERNAME`, sondern enthält die Org-Domain, z. B.
+`zitadel-admin@on-duty-standalone-local-test.auth.localhost`. Das Passwort ist
+`SERVICE_PASSWORD_ZITADEL_ADMIN` aus `.env.standalone.local`; der erste Login
+erzwingt eine Änderung, danach gilt das neue Passwort.
+
+### Selbstregistrierung lokal testen
+
+1. Zitadel-Console: **Settings → Login Behavior and Security → Register allowed**
+   aktivieren. Bestätigungsmails brauchen einen SMTP-Server (**Notification
+   settings → SMTP**); der lokale Stack bringt keinen mit.
+2. on-duty als lokaler Admin (`/admin/login`) → **Admin → Konfiguration**:
+   `registrationEnabled` einschalten, optional `registrationAutoApprove` mit
+   `registrationDefaultRoleId`.
+3. In einem privaten Fenster `https://app.localhost` öffnen und über Zitadel
+   registrieren. Ohne Auto-Freigabe landet der neue Benutzer auf der Seite
+   „Freischaltung ausstehend“ und erscheint unter **Admin → Benutzer** als
+   „wartet auf Freigabe“.
+
+Details und Provider-Besonderheiten: [docs/oidc.md](oidc.md#selbstregistrierung).
 
 Volumes bleiben zwischen Läufen erhalten (schnelle Iteration, der manuelle
 Zitadel-Schritt bleibt einmalig). Für einen echten Fresh-Install-Test:

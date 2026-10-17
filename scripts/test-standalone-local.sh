@@ -67,6 +67,21 @@ OIDC_CLIENT_SECRET=REPLACE_ME
 EOF
 fi
 
+# Zitadel hängt an den Bootstrap-Username automatisch die Org-Domain an
+# (Default, siehe cmd/setup/steps.yaml), sofern der Username keine
+# E-Mail-Adresse ist — der echte Login-Name ist also NICHT der Username allein.
+# Aus der laufenden Instanz auslesen statt aus ORG_NAME zu raten.
+zitadel_login_name() {
+  local user db_user db_name name
+  user=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
+  db_user=$(grep '^ZITADEL_DB_USER=' "$ENV_FILE" | cut -d= -f2)
+  db_name=$(grep '^ZITADEL_DB_NAME=' "$ENV_FILE" | cut -d= -f2)
+  name=$("${COMPOSE[@]}" exec -T db psql -U "$db_user" -d "$db_name" -tAc \
+    "select login_name from projections.login_names3 where login_name_lower like '${user}@%' order by login_name limit 1;" \
+    2>/dev/null | tr -d '[:space:]')
+  echo "${name:-$user}"
+}
+
 echo "Baue App-Image aus lokalem Dockerfile..."
 "${COMPOSE[@]}" build app
 
@@ -87,16 +102,7 @@ if grep -q '^OIDC_CLIENT_ID=REPLACE_ME' "$ENV_FILE"; then
   ZITADEL_DOMAIN=$(grep '^ZITADEL_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
   ADMIN_USER=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
   ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ZITADEL_ADMIN=' "$ENV_FILE" | cut -d= -f2)
-  ZITADEL_DB_USER=$(grep '^ZITADEL_DB_USER=' "$ENV_FILE" | cut -d= -f2)
-  ZITADEL_DB_NAME=$(grep '^ZITADEL_DB_NAME=' "$ENV_FILE" | cut -d= -f2)
-  # Zitadel hängt an den Bootstrap-Username automatisch die Org-Domain an
-  # (Default, siehe cmd/setup/steps.yaml), sofern der Username keine
-  # E-Mail-Adresse ist — der echte Login-Name ist also NICHT $ADMIN_USER
-  # allein. Aus der laufenden Instanz auslesen statt aus ORG_NAME zu raten.
-  ADMIN_LOGIN_NAME=$("${COMPOSE[@]}" exec -T db psql -U "$ZITADEL_DB_USER" -d "$ZITADEL_DB_NAME" -tAc \
-    "select login_name from projections.login_names3 where login_name_lower like '${ADMIN_USER}@%' order by login_name limit 1;" \
-    2>/dev/null | tr -d '[:space:]')
-  ADMIN_LOGIN_NAME=${ADMIN_LOGIN_NAME:-$ADMIN_USER}
+  ADMIN_LOGIN_NAME=$(zitadel_login_name)
   cat <<EOF
 
 Zitadel läuft: https://$ZITADEL_DOMAIN (Zertifikatswarnung akzeptieren, ist
@@ -131,13 +137,27 @@ echo "Baue und starte kompletten Stack (ohne backup — für den lokalen Test ir
 
 APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
 ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ADMIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_DOMAIN=$(grep '^ZITADEL_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_PASS=$(grep '^SERVICE_PASSWORD_ZITADEL_ADMIN=' "$ENV_FILE" | cut -d= -f2)
+ZITADEL_LOGIN_NAME=$(zitadel_login_name)
 cat <<EOF
 
 Fertig. https://$APP_DOMAIN ist erreichbar (Zertifikatswarnung akzeptieren).
 
 Admin-Login: /admin/login, Passwort: $ADMIN_PASS
-Für den OIDC-Login-Test vorher passenden Benutzer unter Admin → Benutzer
-anlegen (kein JIT, siehe docs/oidc.md).
+
+Zitadel-Console: https://$ZITADEL_DOMAIN
+  Login-Name: $ZITADEL_LOGIN_NAME
+  Passwort:   $ZITADEL_PASS (nach der erzwungenen Änderung beim ersten Login
+              gilt dein neues Passwort)
+
+OIDC-Login-Test: passenden Benutzer unter Admin → Benutzer anlegen, oder
+Selbstregistrierung testen:
+  1. Zitadel: Settings → Login Behavior and Security → "Register allowed"
+     (Bestätigungsmails brauchen SMTP — Zitadel: Notification settings)
+  2. on-duty: https://$APP_DOMAIN/admin/config → registrationEnabled
+     (und ggf. registrationAutoApprove + registrationDefaultRoleId)
+  Siehe docs/oidc.md, Abschnitt "Selbstregistrierung".
 
 Neustart nach Codeänderungen: einfach erneut ausführen (baut App neu, Volumes
 bleiben erhalten). Fresh-Install-Test: $0 --clean
