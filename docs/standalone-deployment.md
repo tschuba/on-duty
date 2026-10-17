@@ -75,7 +75,7 @@ OIDC_CLIENT_SECRET=<Client-Secret aus Schritt 4>
 docker compose --file docker-compose.standalone.yml --env-file .env.standalone up -d
 ```
 
-`https://<APP_DOMAIN>` ist danach erreichbar. Login zunächst über `/admin/login` (lokaler Admin, `SERVICE_PASSWORD_ADMIN`) — OIDC-Benutzer müssen wie immer vorab unter **Admin → Benutzer** angelegt werden (kein JIT, siehe [docs/oidc.md](oidc.md)).
+`https://<APP_DOMAIN>` ist danach erreichbar. Login zunächst über `/admin/login` (lokaler Admin, `SERVICE_PASSWORD_ADMIN`) — OIDC-Benutzer müssen wie immer vorab unter **Admin → Benutzer** angelegt werden (oder per Selbstregistrierung, siehe [docs/oidc.md](oidc.md)).
 
 ## Upgrade
 
@@ -132,7 +132,7 @@ Das Skript:
 
 `https://app.localhost` ist danach erreichbar; Login zunächst über
 `/admin/login`, für den OIDC-Test vorher passenden Benutzer unter **Admin →
-Benutzer** anlegen (kein JIT, siehe [docs/oidc.md](oidc.md)).
+Benutzer** anlegen (oder per Selbstregistrierung, siehe [docs/oidc.md](oidc.md)).
 
 Volumes bleiben zwischen Läufen erhalten (schnelle Iteration, der manuelle
 Zitadel-Schritt bleibt einmalig). Für einen echten Fresh-Install-Test:

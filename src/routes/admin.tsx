@@ -21,6 +21,7 @@ import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
 import { setFlash } from "../lib/flash.js";
 import { LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
+import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
@@ -196,6 +197,12 @@ adminRoutes.get("/users", guard, async (c) => {
   for (const r of roleAssignments) {
     rolesByUser.set(r.userId, [...(rolesByUser.get(r.userId) ?? []), r.roleName]);
   }
+  // Logged in at least once but no app role = waiting for approval. Never-logged-in users stay "unconfirmed".
+  const isPending = (u: { id: string; email: string; disabled: boolean; lastLoginAt: Date | null }) =>
+    !u.disabled && u.email !== LOCAL_ADMIN_EMAIL && u.lastLoginAt !== null && !rolesByUser.has(u.id);
+  const onlyPending = c.req.query("filter") === "pending";
+  const pendingCount = allUsers.filter(isPending).length;
+  const shownUsers = onlyPending ? allUsers.filter(isPending) : allUsers;
 
   return c.html(
     <Layout title={t("admin.users.title")} user={user} activeNav="admin">
@@ -215,6 +222,13 @@ adminRoutes.get("/users", guard, async (c) => {
         </button>
       </div>
 
+      <div class="tabs tabs-boxed mb-2 w-fit">
+        <a href="/admin/users" class={`tab${onlyPending ? "" : " tab-active"}`}>{t("admin.users.filter.all")}</a>
+        <a href="/admin/users?filter=pending" class={`tab${onlyPending ? " tab-active" : ""}`}>
+          {t("admin.users.filter.pending")}
+          {pendingCount > 0 && <span class="badge badge-warning badge-sm ml-1">{pendingCount}</span>}
+        </a>
+      </div>
       <ClickToEditHint />
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
@@ -228,7 +242,7 @@ adminRoutes.get("/users", guard, async (c) => {
             </tr>
           </thead>
           <tbody>
-            {allUsers.map((u) => {
+            {shownUsers.map((u) => {
               const isLocal = u.email === LOCAL_ADMIN_EMAIL;
               return (
                 <tr
@@ -251,6 +265,8 @@ adminRoutes.get("/users", guard, async (c) => {
                   <td>
                     {u.disabled ? (
                       <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
+                    ) : isPending(u) ? (
+                      <span class="badge badge-warning badge-sm">{t("admin.users.statusPending")}</span>
                     ) : !isLocal && u.lastLoginAt === null ? (
                       <span class="badge badge-warning badge-sm">{t("admin.users.statusUnconfirmed")}</span>
                     ) : (
@@ -303,6 +319,35 @@ adminRoutes.get("/users", guard, async (c) => {
                           </>
                         ) : (
                           <>
+                            {isPending(u) && u.id !== user.id && (
+                              <>
+                                <button
+                                  class="btn btn-outline btn-error btn-xs"
+                                  onclick={`event.stopPropagation(); document.getElementById('reject-${u.id}').showModal()`}
+                                >
+                                  {t("admin.users.reject")}
+                                </button>
+                                <dialog id={`reject-${u.id}`} class="modal" onclick="event.stopPropagation()">
+                                  <div class="modal-box">
+                                    <h3 class="font-bold text-lg">{t("admin.users.confirmReject.title")}</h3>
+                                    <p class="py-2 opacity-70">
+                                      {t("admin.users.confirmReject.body", { name: u.name, email: u.email })}
+                                    </p>
+                                    <div class="modal-action">
+                                      <form method="dialog">
+                                        <button class="btn">{t("common.cancel")}</button>
+                                      </form>
+                                      <form method="post" action={`/admin/users/${u.id}/reject`}>
+                                        <button type="submit" class="btn btn-error">{t("admin.users.reject")}</button>
+                                      </form>
+                                    </div>
+                                  </div>
+                                  <form method="dialog" class="modal-backdrop">
+                                    <button>{t("common.close")}</button>
+                                  </form>
+                                </dialog>
+                              </>
+                            )}
                             <button
                               class={`btn btn-ghost btn-xs ${u.id === user.id ? "text-base-content/30" : "text-error"}`}
                               onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
@@ -584,6 +629,21 @@ adminRoutes.post("/users/:id/activate", guard, async (c) => {
   return c.redirect("/admin/users");
 });
 
+// POST /admin/users/:id/reject — delete a user still waiting for approval (no app role)
+adminRoutes.post("/users/:id/reject", guard, async (c) => {
+  const id = c.req.param("id");
+  if (c.get("user").id === id) return c.html("", HTTP_STATUS.FORBIDDEN);
+
+  const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, id));
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
+  const roles = await db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id));
+  if (roles.length > 0) return c.html("", HTTP_STATUS.BAD_REQUEST);
+
+  await db.delete(users).where(eq(users.id, id));
+  setFlash(c, t("admin.users.flash.rejected"), "success");
+  return c.redirect("/admin/users");
+});
+
 // POST /admin/users/:id/delete
 adminRoutes.post("/users/:id/delete", guard, async (c) => {
   const id = c.req.param("id");
@@ -668,6 +728,9 @@ adminRoutes.get("/permissions", guard, async (c) => {
                     {r.name}
                   </td>
                   <td>
+                    {(permsByRole.get(r.id) ?? []).length === 0 && (
+                      <span class="badge badge-warning badge-sm">{t("admin.permissions.noPermissionsWarning")}</span>
+                    )}
                     <PermissionBadges permissions={permsByRole.get(r.id) ?? []} />
                   </td>
                   <td>
@@ -869,6 +932,10 @@ adminRoutes.post("/permissions", guard, async (c) => {
     setFlash(c, t("admin.permissions.flash.requiredName"), "error");
     return c.redirect("/admin/permissions");
   }
+  if (permissions.length === 0) {
+    setFlash(c, t("admin.permissions.flash.requiredPermission"), "error");
+    return c.redirect("/admin/permissions");
+  }
 
   const id = crypto.randomUUID();
   await db.insert(appRoles).values({ id, name, description, isProtected: false });
@@ -889,6 +956,10 @@ adminRoutes.post("/permissions/:id", guard, async (c) => {
   const body = await c.req.parseBody({ all: true });
   const permissions = parsePermissions(body);
   const description = String(body.description ?? "").trim() || null;
+  if (permissions.length === 0) {
+    setFlash(c, t("admin.permissions.flash.requiredPermission"), "error");
+    return c.redirect("/admin/permissions");
+  }
 
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
 
@@ -929,6 +1000,7 @@ adminRoutes.post("/permissions/:id/delete", guard, async (c) => {
     return c.redirect("/admin/permissions");
   }
 
+  await clearDefaultRoleIfDeleted(id);
   await db.delete(appRoles).where(eq(appRoles.id, id));
   setFlash(c, t("admin.permissions.flash.deleted", { name: role.name }), "success");
   return c.redirect("/admin/permissions");
@@ -1498,7 +1570,15 @@ const CONFIG_DESCRIPTIONS: Record<string, string> = {
 
 adminRoutes.get("/config", guard, async (c) => {
   const user = c.get("user");
-  const warn = await backupWarnProps();
+  const [warn, settings, roles] = await Promise.all([
+    backupWarnProps(),
+    getSettings(),
+    db.select({ id: appRoles.id, name: appRoles.name }).from(appRoles).orderBy(asc(appRoles.name)),
+  ]);
+  const rows = [
+    ...ENV_META.map(({ key, value }) => ({ key, writable: false as const, value: value ?? null })),
+    ...SETTINGS.map((s) => ({ key: s.key, writable: true as const, type: s.type, value: settings[s.key] })),
+  ];
   return c.html(
     <Layout title={t("admin.config.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
@@ -1507,30 +1587,95 @@ adminRoutes.get("/config", guard, async (c) => {
       <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
         {t("admin.config.title")}
       </h1>
-      <div class="overflow-x-auto">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th>{t("admin.config.table.variable")}</th>
-              <th>{t("admin.config.table.value")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ENV_META.map(({ key, value }) => (
+      <form method="post" action="/admin/config" id="config-form">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <input type="search" id="config-search" class="input input-bordered input-sm" placeholder={t("admin.config.search")} />
+          <select id="config-filter" class="select select-bordered select-sm">
+            <option value="all">{t("admin.config.filter.all")}</option>
+            <option value="writable">{t("admin.config.filter.writable")}</option>
+          </select>
+          <button type="submit" id="config-save" class="btn btn-primary btn-sm ml-auto" disabled>
+            {t("admin.config.save")}
+          </button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra w-full">
+            <thead>
               <tr>
-                <td>
-                  <span class="font-mono text-sm">{key}</span>
-                  <p class="text-sm text-base-content/50 mt-0.5">{CONFIG_DESCRIPTIONS[key]}</p>
-                </td>
-                <td class="font-mono text-sm">{value ?? <span class="opacity-40">—</span>}</td>
+                <th>{t("admin.config.table.variable")}</th>
+                <th>{t("admin.config.table.value")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr data-config-row data-writable={r.writable ? "1" : "0"}>
+                  <td>
+                    <span class="font-mono text-sm">{r.key}</span>
+                    <p class="text-sm text-base-content/50 mt-0.5">
+                      {CONFIG_DESCRIPTIONS[r.key] ?? t(`admin.config.desc.${r.key}` as never)}
+                    </p>
+                  </td>
+                  <td class="font-mono text-sm">
+                    {!r.writable ? (
+                      r.value ?? <span class="opacity-40">—</span>
+                    ) : r.type === "boolean" ? (
+                      <input type="checkbox" class="toggle" name={r.key} value="1" checked={r.value === "true"} />
+                    ) : (
+                      <select name={r.key} class="select select-bordered select-sm">
+                        <option value="">{t("admin.config.noRole")}</option>
+                        {roles.map((role) => (
+                          <option value={role.id} selected={role.id === r.value}>{role.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </form>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(() => {
+  const form = document.getElementById('config-form');
+  const save = document.getElementById('config-save');
+  const search = document.getElementById('config-search');
+  const filter = document.getElementById('config-filter');
+  const snap = () => new URLSearchParams(new FormData(form)).toString();
+  const initial = snap();
+  const refreshSave = () => { save.disabled = snap() === initial; };
+  form.addEventListener('input', refreshSave);
+  form.addEventListener('change', refreshSave);
+  const apply = () => {
+    const q = search.value.trim().toLowerCase();
+    document.querySelectorAll('[data-config-row]').forEach((tr) => {
+      const hideW = filter.value === 'writable' && tr.dataset.writable !== '1';
+      tr.hidden = hideW || (q && !tr.textContent.toLowerCase().includes(q));
+    });
+  };
+  search.addEventListener('input', apply);
+  filter.addEventListener('change', apply);
+  search.addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+})();`,
+        }}
+      />
       </div>
     </Layout>
   );
+});
+
+// POST /admin/config — save writable settings (env rows are read-only)
+adminRoutes.post("/config", guard, async (c) => {
+  const body = await c.req.parseBody();
+  const result = await parseSettingsForm(body, checkRole);
+  if ("error" in result) {
+    setFlash(c, t(`admin.config.flash.${result.error}` as never), "error");
+    return c.redirect("/admin/config");
+  }
+  for (const s of SETTINGS) await setSetting(s.key, result.values[s.key]);
+  setFlash(c, t("admin.config.flash.saved"), "success");
+  return c.redirect("/admin/config");
 });
 
 // ── /admin/backup ──────────────────────────────────────────────────────────────

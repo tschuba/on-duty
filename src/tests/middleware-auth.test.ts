@@ -5,10 +5,10 @@ const getSession = vi.fn();
 const dbDeleteWhere = vi.fn().mockResolvedValue(undefined);
 const dbDelete = vi.fn(() => ({ where: dbDeleteWhere }));
 
-let permissionRows: { permission: string }[] = [];
+let permissionRows: { roleId: string; permission: string | null }[] = [];
 const selectWhere = vi.fn(() => Promise.resolve(permissionRows));
-const selectInnerJoin = vi.fn(() => ({ where: selectWhere }));
-const selectFrom = vi.fn(() => ({ innerJoin: selectInnerJoin }));
+const selectLeftJoin = vi.fn(() => ({ where: selectWhere }));
+const selectFrom = vi.fn(() => ({ leftJoin: selectLeftJoin }));
 const dbSelect = vi.fn(() => ({ from: selectFrom }));
 
 vi.mock("../auth.js", () => ({
@@ -59,7 +59,7 @@ describe("requireAuth", () => {
 
   it("returns 403 when the user lacks the required permission", async () => {
     getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
-    permissionRows = [{ permission: "members:read" }];
+    permissionRows = [{ roleId: "r1", permission: "members:read" }];
     const res = await appWith("system:admin").request("/protected");
 
     expect(res.status).toBe(403);
@@ -68,7 +68,7 @@ describe("requireAuth", () => {
 
   it("sets the user's permission set and calls next when access is granted", async () => {
     getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
-    permissionRows = [{ permission: "system:admin" }, { permission: "members:read" }];
+    permissionRows = [{ roleId: "r1", permission: "system:admin" }, { roleId: "r1", permission: "members:read" }];
     const res = await appWith("system:admin").request("/protected");
 
     expect(res.status).toBe(200);
@@ -77,10 +77,34 @@ describe("requireAuth", () => {
 
   it("bare requireAuth() only requires authentication, no specific permission", async () => {
     getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
-    permissionRows = [];
+    permissionRows = [{ roleId: "r1", permission: null }];
     const res = await appWith().request("/protected");
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: "u1", permissions: [] });
+  });
+
+  it("redirects users with zero roles to /pending", async () => {
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
+    permissionRows = [];
+    const res = await appWith().request("/protected");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/pending");
+  });
+
+  it("lets zero-role users through when allowPending is set", async () => {
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
+    permissionRows = [];
+    const app = new Hono();
+    app.get("/p", requireAuth(undefined, { allowPending: true }), (c) => c.text("ok"));
+    expect((await app.request("/p")).status).toBe(200);
+  });
+
+  it("keeps 403 (not /pending) for a user with a role lacking the permission", async () => {
+    getSession.mockResolvedValue({ user: { id: "u1", disabled: false } });
+    permissionRows = [{ roleId: "r1", permission: "members:read" }];
+    const res = await appWith("system:admin").request("/protected");
+    expect(res.status).toBe(403);
   });
 });

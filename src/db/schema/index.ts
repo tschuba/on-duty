@@ -10,3 +10,4 @@ export * from "./donations";
 export * from "./applications";
 export * from "./inventory";
 export * from "./lending";
+export * from "./app-settings";

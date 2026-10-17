@@ -23,7 +23,11 @@ loginRoutes.get("/login", (c) => {
       ? t("login.error.unknownUser")
       : error === "disabled"
         ? t("login.error.disabled")
-        : null;
+        : error === "registration_disabled"
+          ? t("login.error.registrationDisabled")
+          : error === "email_unverified"
+            ? t("login.error.emailUnverified")
+            : null;
 
   return c.html(
     <Layout title={t("login.title")}>

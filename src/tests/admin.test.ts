@@ -304,6 +304,13 @@ describe("GET /users", () => {
     expect(html).toContain("—");
   });
 
+  it("shows 'pending' for a logged-in user without any role", async () => {
+    usersFixture = [makeUser({ lastLoginAt: new Date() })];
+    userAppRolesFixture = [];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusPending"));
+  });
+
   it("shows 'unconfirmed' for a user who has never logged in", async () => {
     usersFixture = [makeUser({ lastLoginAt: null })];
     const html = await (await adminRoutes.request("/users")).text();
@@ -572,6 +579,12 @@ describe("POST /permissions", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("rejects a role without any permission", async () => {
+    const res = await adminRoutes.request("/permissions", { method: "POST", body: formBody({ name: "Leer" }) });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === appRoles)).toBe(false);
+  });
+
   it("creates the role with its permissions", async () => {
     const res = await adminRoutes.request("/permissions", {
       method: "POST",
@@ -601,6 +614,14 @@ describe("POST /permissions/:id", () => {
     appRolesFixture = [makeAppRole()];
     userAppRolesFixture = [{ cnt: 0 }];
     const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "" }) });
+    expect(res.status).toBe(302);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("rejects removing all permissions from a role", async () => {
+    appRolesFixture = [makeAppRole()];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "Neu" }) });
     expect(res.status).toBe(302);
     expect(update).not.toHaveBeenCalled();
   });
