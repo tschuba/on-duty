@@ -27,9 +27,20 @@ services:
     environment:
       ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,192.168.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
 
+  # Lokal ersetzt Caddy das Coolify-Traefik (Basis-Compose enthält keinen Proxy).
   caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${SERVICE_FQDN_APP}
+      ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
     volumes:
       - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       default:
         # *.localhost lösen bei App_DOMAIN/ZITADEL_DOMAIN lokal auf Loopback
@@ -38,8 +49,12 @@ services:
         # auf Caddy). Der Alias macht die Domains innerhalb des
         # Compose-Netzwerks stattdessen auf Caddy auflösbar.
         aliases:
-          - ${APP_DOMAIN}
-          - ${ZITADEL_DOMAIN}
+          - ${SERVICE_FQDN_APP}
+          - ${SERVICE_FQDN_ZITADEL}
+
+volumes:
+  caddy_data:
+  caddy_config:
 
 networks:
   default:
