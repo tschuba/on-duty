@@ -23,12 +23,12 @@ services:
       ADMIN_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
       ORG_NAME: ${ORG_NAME}
       OIDC_PROVIDER: https://${ZITADEL_DOMAIN}
-      # Leer = automatisch angelegt von zitadel-init (oidc.env im Bootstrap-Volume).
-      # Explizite Werte in .env.standalone haben Vorrang (z. B. bestehende Installationen).
+      # Empty = created automatically by zitadel-init (oidc.env in the bootstrap volume).
+      # Explicit values in .env.standalone take precedence (e.g. existing installations).
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
-      # Signing-Secret des Zitadel-Webhooks; zitadel-init-hooks legt es erst NACH dem app-Start an,
-      # daher liest on-duty die Datei zur Laufzeit (leer/fehlt = Webhook inaktiv).
+      # Signing secret of the Zitadel webhook; zitadel-init-hooks only creates it AFTER app has started,
+      # so on-duty reads the file at runtime (empty/missing = webhook inactive).
       ZITADEL_WEBHOOK_SECRET_FILE: /zitadel/bootstrap/webhook.secret
       OIDC_APP_URL: https://${APP_DOMAIN}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -99,8 +99,8 @@ services:
       # Login V2 (eigener zitadel-login-Container) braucht einen Machine-User
       # mit PAT, den Zitadel beim Bootstrap selbst anlegt und über das
       # gemeinsame zitadel-bootstrap-Volume mit zitadel-login teilt.
-      # Einmaliger Admin-Machine-User (IAM_OWNER) nur für zitadel-init: legt Projekt + OIDC-App
-      # an und löscht sich danach selbst. Entsteht nur beim allerersten Setup der Instanz.
+      # One-time admin machine user (IAM_OWNER) for zitadel-init only: creates project + OIDC app
+      # and deletes itself afterwards. Only created during the very first setup of the instance.
       ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/admin.pat
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: onduty-init
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (temporary)
@@ -141,8 +141,8 @@ services:
       zitadel:
         condition: service_healthy
 
-  # Einmaliger Init: legt nach dem Zitadel-Erstsetup Projekt + OIDC-App an (Client-ID/Secret ->
-  # Bootstrap-Volume, vom app-Service gelesen). Nutzt das on-duty-Image (Node), kein Extra-Image.
+  # One-shot init: after the first Zitadel setup, creates project + OIDC app (client id/secret ->
+  # bootstrap volume, read by the app service). Uses the on-duty image (Node), no extra image.
   zitadel-init:
     image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
     restart: "no"
@@ -151,7 +151,7 @@ services:
       ZITADEL_DOMAIN: ${ZITADEL_DOMAIN}
       APP_DOMAIN: ${APP_DOMAIN}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
-      # Dieselben SMTP-Werte wie für on-duty — werden bei der Ersteinrichtung auch in Zitadel eingetragen.
+      # Same SMTP values as for on-duty — also registered in Zitadel during the first setup.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USER: ${SMTP_USER:-}
@@ -163,8 +163,8 @@ services:
       zitadel:
         condition: service_healthy
 
-  # Phase 2 der Einrichtung: Webhook-Target anlegen, sobald app läuft (Zitadel löst den Host beim Anlegen auf),
-  # danach Bootstrap-Machine-User entfernen. Optional — scheitert das, läuft on-duty trotzdem.
+  # Setup phase 2: create the webhook target once app is running (Zitadel resolves the host on creation),
+  # then remove the bootstrap machine user. Optional — if this fails, on-duty still works.
   zitadel-init-hooks:
     image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
     restart: "no"
@@ -172,8 +172,8 @@ services:
     environment:
       ZITADEL_DOMAIN: ${ZITADEL_DOMAIN}
       APP_DOMAIN: ${APP_DOMAIN}
-      # Zitadel sperrt Webhook-Ziele in privaten Netzen (HTTPClient.DenyList, Default bleibt aktiv) — daher die
-      # öffentliche URL über Caddy, nicht http://app:3000. Das Docker-Subnetz ist nicht vorhersagbar.
+      # Zitadel blocks webhook targets in private networks (HTTPClient.DenyList, default stays active) — hence the
+      # public URL via Caddy, not http://app:3000. The Docker subnet is not predictable.
       WEBHOOK_URL: ${WEBHOOK_URL:-https://${APP_DOMAIN}/hooks/zitadel}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw

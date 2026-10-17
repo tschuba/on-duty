@@ -64,10 +64,10 @@ SERVICE_PASSWORD_ZITADEL_ADMIN=Aa1@$(openssl rand -hex 20)
 EOF
 fi
 
-# Zitadel hängt an den Bootstrap-Username automatisch die Org-Domain an
-# (Default, siehe cmd/setup/steps.yaml), sofern der Username keine
-# E-Mail-Adresse ist — der echte Login-Name ist also NICHT der Username allein.
-# Aus der laufenden Instanz auslesen statt aus ORG_NAME zu raten.
+# Zitadel appends the org domain to the bootstrap username automatically
+# (default, see cmd/setup/steps.yaml) unless the username is an email address —
+# so the real login name is NOT the username alone. Read it from the running
+# instance instead of guessing it from ORG_NAME.
 zitadel_login_name() {
   local user db_user db_name name
   user=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
@@ -83,15 +83,15 @@ echo "Baue App-Image aus lokalem Dockerfile..."
 "${COMPOSE[@]}" build app
 
 echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
-# zitadel-init legt beim allerersten Zitadel-Setup Projekt + OIDC-App an und schreibt
-# Client-ID/Secret ins Bootstrap-Volume; app liest sie von dort.
+# On the very first Zitadel setup, zitadel-init creates project + OIDC app and writes
+# client id/secret to the bootstrap volume; app reads them from there.
 "${COMPOSE[@]}" up -d db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks
 
 echo "Warte auf Caddys lokales CA-Zertifikat..."
 until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/root.crt 2>/dev/null; do
   sleep 1
 done
-# app liest NODE_EXTRA_CA_CERTS nur beim Start — nach dem CA-Zertifikat neu starten.
+# app only reads NODE_EXTRA_CA_CERTS at start — restart it once the CA certificate exists.
 "${COMPOSE[@]}" restart app >/dev/null
 
 APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)

@@ -1,11 +1,11 @@
-// Legt nach dem allerersten Zitadel-Setup Projekt + OIDC-Application für on-duty an und schreibt
-// Client-ID/Secret nach /zitadel/bootstrap/oidc.env (vom app-Service beim Start eingelesen).
-// Läuft als einmaliger Init-Container mit dem on-duty-Image (Node, kein zusätzliches Image nötig).
-// Zitadel erlaubt keine vorab gesetzte Client-ID/Secret (zitadel/zitadel#4349), daher per API.
+// After the very first Zitadel setup, creates the project + OIDC application for on-duty and writes
+// client id/secret to /zitadel/bootstrap/oidc.env (read by the app service on start).
+// Runs as a one-shot init container using the on-duty image (Node, no extra image needed).
+// Zitadel does not allow a preset client id/secret (zitadel/zitadel#4349), hence the API.
 //
-// Zwei Phasen (Argument): "oidc" läuft VOR dem app-Service (Projekt, Application, SMTP); "hooks" läuft NACH dem
-// Start von app (Zitadel löst den Webhook-Host beim Anlegen des Targets auf — app muss dann schon existieren) und
-// räumt am Ende den Bootstrap-Machine-User (IAM_OWNER) samt PAT weg, damit kein mächtiges Token im Volume bleibt.
+// Two phases (argument): "oidc" runs BEFORE the app service (project, application, SMTP); "hooks" runs AFTER app has
+// started (Zitadel resolves the webhook host when creating the target, so app must already exist) and finally removes
+// the bootstrap machine user (IAM_OWNER) and its PAT so no powerful token stays in the volume.
 import http from "node:http";
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 
@@ -40,7 +40,7 @@ if (!existsSync(PAT_FILE)) {
 
 const pat = readFileSync(PAT_FILE, "utf8").trim();
 
-// Direkt gegen den Container (kein TLS/Caddy); Host-Header wählt die Zitadel-Instanz.
+// Talks to the container directly (no TLS/Caddy); the Host header selects the Zitadel instance.
 function api(method, path, body) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : undefined;
@@ -73,7 +73,7 @@ function api(method, path, body) {
   });
 }
 
-// Zitadel ist laut Healthcheck bereit, die Projections für den Machine-User können aber kurz nachlaufen.
+// Zitadel reports healthy, but the projections for the machine user may lag behind briefly.
 async function retry(fn, tries = 30) {
   for (let i = 1; ; i++) {
     try {
@@ -104,7 +104,7 @@ if (PHASE === "oidc") {
   });
   if (!app.clientId || !app.clientSecret) throw new Error("Zitadel lieferte keine Client-ID/Secret");
 
-  // Optionaler Komfort: dieselben SMTP_*-Werte wie für on-duty auch in Zitadel (Bestätigungsmails).
+  // Optional convenience: register the same SMTP_* values in Zitadel (confirmation mails).
   if (SMTP_HOST && SMTP_FROM) {
     try {
       const host = `${SMTP_HOST}:${SMTP_PORT || "587"}`;
@@ -127,9 +127,9 @@ if (PHASE === "oidc") {
   console.log(`[zitadel-init] Application angelegt (Client-ID ${app.clientId}).`);
 
 } else {
-  // Optionaler Komfort: Webhook für Registrierung/E-Mail-Bestätigung (on-duty: POST /hooks/zitadel). Scheitert das,
-  // läuft on-duty trotzdem — der Benutzer entsteht dann beim ersten Login. Das Signing-Secret liest on-duty zur
-  // Laufzeit aus dem Volume (app war beim Anlegen schon gestartet, kennt es aber noch nicht).
+  // Optional convenience: webhook for registration/email verification (on-duty: POST /hooks/zitadel). If this fails,
+  // on-duty still works — the user is then created at first login. on-duty reads the signing secret from the volume
+  // at runtime (app was already running when the target was created and does not know it yet).
   try {
     const target = await api("POST", "/v2/actions/targets", {
       name: "on-duty",
@@ -138,8 +138,8 @@ if (PHASE === "oidc") {
       timeout: "10s",
     });
     if (target.signingKey) writeFileSync(WEBHOOK_SECRET_FILE, target.signingKey, { mode: 0o644 });
-    // Login UI v2 erzeugt auch bei Selbstregistrierung "user.human.added" (nur die alte UI "selfregistered").
-    // "added" feuert auch bei Admin-angelegten Benutzern — on-duty filtert über registrationEnabled.
+    // Login UI v2 emits "user.human.added" for self-registration too (only the legacy UI emits "selfregistered").
+    // "added" also fires for admin-created users — on-duty gates on registrationEnabled.
     await api("PUT", "/v2/actions/executions", {
       condition: { event: { event: "user.human.added" } },
       targets: [target.id],
@@ -160,7 +160,7 @@ if (PHASE === "oidc") {
     }
   }
 
-  // Aufräumen (nur nach der letzten Phase): Bootstrap-User samt PAT entfernen.
+  // Cleanup (only after the last phase): remove the bootstrap user and its PAT.
   try {
     await api("DELETE", `/management/v1/users/${me.user.id}`);
     unlinkSync(PAT_FILE);
