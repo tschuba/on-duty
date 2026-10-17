@@ -33,7 +33,9 @@ const PROVIDER_ID = "oidc";
 // The Zitadel user id is the OIDC `sub`, which better-auth stores as account.accountId. Binding it here means the first
 // login finds this user by identity instead of by email — an unverified address can't be used to take the account over.
 export async function handleZitadelEvent(ev: ZitadelEvent): Promise<"created" | "verified" | "ignored"> {
-  const zitadelId = ev.userID ?? ev.aggregateID;
+  // aggregateID is the affected user. `userID` is the actor who triggered the event (e.g. the login client or an
+  // org admin) — using it would bind every registered user to the same identity.
+  const zitadelId = ev.aggregateType === "user" ? ev.aggregateID : undefined;
   if (!zitadelId) return "ignored";
 
   // Login UI v2 emits "added" for self-registration; the legacy UI emits "selfregistered". "added" also fires for

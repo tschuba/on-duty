@@ -17,6 +17,15 @@ services:
 
   zitadel-init-hooks:
     image: on-duty-standalone-local:latest
+    environment:
+      # *.localhost zeigt auf Loopback, die öffentliche URL ist hier nicht erreichbar -> direkt ans app-Netz.
+      WEBHOOK_URL: http://app:3000/hooks/zitadel
+
+  # Festes Subnetz + Deny-Liste ohne 172.16.0.0/12, damit Zitadel den Webhook an app:3000 zulässt.
+  # Nur für den lokalen Test (Zitadels Default sperrt alle privaten Netze).
+  zitadel:
+    environment:
+      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,192.168.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
 
   caddy:
     volumes:
@@ -31,3 +40,9 @@ services:
         aliases:
           - ${APP_DOMAIN}
           - ${ZITADEL_DOMAIN}
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.77.0/24

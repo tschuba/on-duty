@@ -14,7 +14,7 @@ const OUT = `${DIR}/oidc.env`;
 const WEBHOOK_SECRET_FILE = `${DIR}/webhook.secret`;
 const PHASE = process.argv[2] ?? "oidc";
 const PAT_FILE = `${DIR}/admin.pat`;
-const { ZITADEL_DOMAIN, APP_DOMAIN, OIDC_CLIENT_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
+const { ZITADEL_DOMAIN, APP_DOMAIN, WEBHOOK_URL, OIDC_CLIENT_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
 
 if (PHASE === "oidc") {
   if (OIDC_CLIENT_ID) {
@@ -134,7 +134,7 @@ if (PHASE === "oidc") {
     const target = await api("POST", "/v2/actions/targets", {
       name: "on-duty",
       restAsync: {},
-      endpoint: "http://app:3000/hooks/zitadel",
+      endpoint: WEBHOOK_URL || `https://${APP_DOMAIN}/hooks/zitadel`,
       timeout: "10s",
     });
     if (target.signingKey) writeFileSync(WEBHOOK_SECRET_FILE, target.signingKey, { mode: 0o644 });
@@ -151,6 +151,13 @@ if (PHASE === "oidc") {
     console.log("[zitadel-init] Webhook-Target + Executions angelegt.");
   } catch (e) {
     console.warn("[zitadel-init] Webhook konnte nicht eingerichtet werden (optional):", e.message);
+    if (e.message.includes("DeniedURL")) {
+      console.warn(
+        "  Zitadel sperrt dieses Ziel (HTTPClient.DenyList: private Netze/Loopback). WEBHOOK_URL muss auf eine öffentlich\n" +
+          "  auflösbare Adresse zeigen (Default: https://<APP_DOMAIN>/hooks/zitadel). Ohne Webhook entsteht der Benutzer\n" +
+          "  beim ersten Login — siehe docs/standalone-deployment.md.",
+      );
+    }
   }
 
   // Aufräumen (nur nach der letzten Phase): Bootstrap-User samt PAT entfernen.
