@@ -12,6 +12,9 @@ services:
     volumes:
       - caddy_data:/caddy-ca:ro
 
+  zitadel-init:
+    image: on-duty-standalone-local:latest
+
   caddy:
     volumes:
       - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro

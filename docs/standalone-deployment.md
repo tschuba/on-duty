@@ -23,7 +23,7 @@ scripts/postgres-init-standalone.sh
 
 ## Ersteinrichtung
 
-Das Deployment ist **zweistufig**, weil Zitadel Client-ID/Client-Secret einer OIDC-Application nicht vorgeben lässt ([Zitadel Discussion #4349](https://github.com/zitadel/zitadel/discussions/4349)) — die App-Registrierung muss einmalig manuell in der Zitadel-Console erfolgen, bevor on-duty selbst gestartet werden kann.
+Zitadel lässt Client-ID/Client-Secret einer OIDC-Application nicht vorgeben ([Zitadel Discussion #4349](https://github.com/zitadel/zitadel/discussions/4349)). Der Stack legt die Application deshalb beim allerersten Start selbst per API an: Der Einmal-Service `zitadel-init` erstellt Projekt + Application, schreibt Client-ID/Secret in das Bootstrap-Volume (`oidc.env`), und der `app`-Service liest sie beim Start ein.
 
 ### 1. `.env.standalone` anlegen
 
@@ -31,51 +31,51 @@ Das Deployment ist **zweistufig**, weil Zitadel Client-ID/Client-Secret einer OI
 cp .env.standalone.example .env.standalone
 ```
 
-Alle Felder außer `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` befüllen (Platzhalter mit `openssl rand -hex 32` bzw. `openssl rand -hex 16` für `ZITADEL_MASTERKEY`, siehe Kommentare in der Datei).
+Alle Felder befüllen (Platzhalter mit `openssl rand -hex 32` bzw. `openssl rand -hex 16` für `ZITADEL_MASTERKEY`, siehe Kommentare in der Datei). `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` **leer lassen**.
 
-### 2. Infrastruktur-Services starten
-
-```bash
-docker compose --file docker-compose.standalone.yml --env-file .env.standalone up -d db zitadel zitadel-login caddy
-```
-
-Logs abwarten, bis Zitadel bereit ist:
-
-```bash
-docker compose --file docker-compose.standalone.yml logs -f zitadel
-```
-
-### 3. Projekt + OIDC-Application in Zitadel anlegen (manuell, einmalig)
-
-1. Login-Namen ermitteln: Zitadel hängt an `ZITADEL_ADMIN_USERNAME` automatisch die Org-Domain an, sofern der Username keine E-Mail-Adresse ist (Zitadel-Default, siehe `cmd/setup/steps.yaml`) — der tatsächliche Login-Name ist also **nicht** `ZITADEL_ADMIN_USERNAME` allein:
-
-   ```bash
-   source .env.standalone && docker compose --file docker-compose.standalone.yml --env-file .env.standalone \
-     exec -T db psql -U "$ZITADEL_DB_USER" -d "$ZITADEL_DB_NAME" -tAc \
-     "select login_name from projections.login_names3 where login_name_lower like '${ZITADEL_ADMIN_USERNAME}@%' limit 1;"
-   ```
-2. `https://<ZITADEL_DOMAIN>` aufrufen, mit dem Login-Namen aus Schritt 1 einloggen (Passwort `SERVICE_PASSWORD_ZITADEL_ADMIN`). Erster Login erzwingt eine Passwortänderung.
-3. **Projects → New Project** — Name z. B. `on-duty`.
-4. Im Projekt: **New Application**
-   - Type: **Web**
-   - Authentication Method: **Code** (Authorization Code + PKCE — passend zu on-dutys Auth-Flow)
-   - Redirect URI: `https://<APP_DOMAIN>/auth/callback/oidc`
-   - Post Logout Redirect URI: `https://<APP_DOMAIN>` (on-duty nutzt kein RP-Initiated Logout, Feld aber von Zitadel benötigt)
-5. Nach dem Speichern zeigt Zitadel **Client-ID** und **Client-Secret** — beide notieren.
-6. In `.env.standalone` eintragen:
-
-```env
-OIDC_CLIENT_ID=<Client-ID aus Schritt 4>
-OIDC_CLIENT_SECRET=<Client-Secret aus Schritt 4>
-```
-
-### 4. Komplett-Stack starten
+### 2. Stack starten
 
 ```bash
 docker compose --file docker-compose.standalone.yml --env-file .env.standalone up -d
 ```
 
 `https://<APP_DOMAIN>` ist danach erreichbar. Login zunächst über `/admin/login` (lokaler Admin, `SERVICE_PASSWORD_ADMIN`) — OIDC-Benutzer müssen wie immer vorab unter **Admin → Benutzer** angelegt werden (oder per Selbstregistrierung, siehe [docs/oidc.md](oidc.md)).
+
+Zitadel-Console: `https://<ZITADEL_DOMAIN>`. Login-Name ermitteln — Zitadel hängt an `ZITADEL_ADMIN_USERNAME` automatisch die Org-Domain an, sofern der Username keine E-Mail-Adresse ist (siehe `cmd/setup/steps.yaml`):
+
+```bash
+source .env.standalone && docker compose --file docker-compose.standalone.yml --env-file .env.standalone \
+  exec -T db psql -U "$ZITADEL_DB_USER" -d "$ZITADEL_DB_NAME" -tAc \
+  "select login_name from projections.login_names3 where login_name_lower like '${ZITADEL_ADMIN_USERNAME}@%' limit 1;"
+```
+
+Passwort: `SERVICE_PASSWORD_ZITADEL_ADMIN`; der erste Login erzwingt eine Passwortänderung.
+
+### Wie die Automatisierung funktioniert
+
+- Zitadel legt beim allerersten Setup einen Machine-User `onduty-init` (Rolle `IAM_OWNER`) samt PAT im Bootstrap-Volume an.
+- `zitadel-init` nutzt diesen PAT, erzeugt Projekt `on-duty` und eine Web-Application (Authorization Code + PKCE, Redirect-URI `https://<APP_DOMAIN>/auth/callback/oidc`), schreibt `oidc.env` und **löscht den Machine-User samt PAT wieder**.
+- Bei späteren Starts tut `zitadel-init` nichts (`oidc.env` existiert bzw. `OIDC_CLIENT_ID` ist gesetzt).
+- Das Bootstrap-Volume enthält `oidc.env` mit dem Client-Secret (`0600`) — wie `.env.standalone` als Geheimnis behandeln.
+
+### Manueller Fallback (bestehende Installationen)
+
+Der Machine-User entsteht nur beim allerersten Setup einer Zitadel-Instanz. Bei einer bestehenden Installation (oder falls `zitadel-init` fehlschlägt: `docker compose logs zitadel-init`) die Application von Hand anlegen und die Werte in `.env.standalone` eintragen — explizit gesetzte Werte haben Vorrang, `zitadel-init` beendet sich dann sofort:
+
+1. In der Console (Login-Name wie oben): **Projects → New Project** — Name z. B. `on-duty`.
+2. Im Projekt: **New Application**
+   - Type: **Web**
+   - Authentication Method: **Code** (Authorization Code + PKCE — passend zu on-dutys Auth-Flow)
+   - Redirect URI: `https://<APP_DOMAIN>/auth/callback/oidc`
+   - Post Logout Redirect URI: `https://<APP_DOMAIN>` (on-duty nutzt kein RP-Initiated Logout, Feld aber von Zitadel benötigt)
+3. **Client-ID** und **Client-Secret** notieren und eintragen:
+
+```env
+OIDC_CLIENT_ID=<Client-ID>
+OIDC_CLIENT_SECRET=<Client-Secret>
+```
+
+4. `docker compose --file docker-compose.standalone.yml --env-file .env.standalone up -d`
 
 ## Upgrade
 
@@ -123,12 +123,11 @@ Das Skript:
 - startet `db`, `zitadel`, `zitadel-login`, `caddy`. Caddy nutzt lokal `tls
   internal` (Caddyfile.standalone.local) statt echtem Let's Encrypt —
   Zertifikatswarnungen im Browser sind normal und können akzeptiert werden
-- stoppt beim ersten Lauf vor dem App-Start und druckt Zugangsdaten +
-  Anleitung für den einmaligen manuellen Zitadel-Projekt/App-Schritt
-  (Client-ID/Secret lassen sich wie in Prod nicht vorab setzen)
-- bei erneutem Lauf (Client-ID/Secret bereits eingetragen): baut die App neu
-  und startet den kompletten Stack — ohne den `backup`-Service, der für den
-  lokalen Test keine Rolle spielt
+- startet den kompletten Stack — ohne den `backup`-Service, der für den
+  lokalen Test keine Rolle spielt. `zitadel-init` legt beim ersten Lauf
+  Projekt + OIDC-Application automatisch an (siehe oben), es ist kein
+  manueller Zitadel-Schritt nötig
+- druckt am Ende Zugangsdaten (App-Admin, Zitadel-Console)
 
 `https://app.localhost` ist danach erreichbar; Login zunächst über
 `/admin/login`, für den OIDC-Test vorher passenden Benutzer unter **Admin →
@@ -158,8 +157,8 @@ erzwingt eine Änderung, danach gilt das neue Passwort.
 
 Details und Provider-Besonderheiten: [docs/oidc.md](oidc.md#selbstregistrierung).
 
-Volumes bleiben zwischen Läufen erhalten (schnelle Iteration, der manuelle
-Zitadel-Schritt bleibt einmalig). Für einen echten Fresh-Install-Test:
+Volumes bleiben zwischen Läufen erhalten (schnelle Iteration, die Zitadel-
+Application wird nur einmal angelegt). Für einen echten Fresh-Install-Test:
 
 ```bash
 ./scripts/test-standalone-local.sh --clean
@@ -170,6 +169,8 @@ Zitadel-Schritt bleibt einmalig). Für einen echten Fresh-Install-Test:
 | Symptom | Ursache | Lösung |
 |---|---|---|
 | Zitadel-Login-Seite lädt nicht (`/ui/v2/login` 502) | `zitadel-login`-Container noch nicht bereit oder Bootstrap-PAT noch nicht geschrieben | `docker compose logs zitadel-login` prüfen; `zitadel` muss zuerst healthy sein (schreibt die PAT-Datei ins gemeinsame Volume) |
-| Login mit `ZITADEL_ADMIN_USERNAME` schlägt fehl: „Benutzer im System nicht gefunden" | Login-Name ist nicht `ZITADEL_ADMIN_USERNAME` allein, sondern mit Org-Domain als Suffix (siehe Schritt 1 oben) | Echten Login-Namen per DB-Query ermitteln (siehe Schritt 1 oben) und damit einloggen |
+| Login mit `ZITADEL_ADMIN_USERNAME` schlägt fehl: „Benutzer im System nicht gefunden" | Login-Name ist nicht `ZITADEL_ADMIN_USERNAME` allein, sondern mit Org-Domain als Suffix | Echten Login-Namen per DB-Query ermitteln (siehe Schritt 2 oben) und damit einloggen |
+| `zitadel-init` bricht ab: „Weder OIDC_CLIENT_ID noch ein Bootstrap-Token vorhanden“ | Zitadel wurde nicht frisch aufgesetzt (bestehende DB), daher gibt es keinen Machine-User | Application manuell anlegen (Abschnitt „Manueller Fallback“) |
+| on-duty-Login: `Errors.App.NotFound` | Die Client-ID existiert in Zitadel nicht (Instanz zurückgesetzt, `oidc.env`/`.env.standalone` veraltet) | Bei frischer Instanz Bootstrap-Volume + DB gemeinsam zurücksetzen (`down -v`); sonst Application neu anlegen und `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` setzen |
 | on-duty-Login schlägt fehl, obwohl OIDC-Vars gesetzt sind | Redirect-URI in der Zitadel-Application stimmt nicht exakt mit `https://<APP_DOMAIN>/auth/callback/oidc` überein | URI in der Zitadel-Console korrigieren |
 | Caddy bekommt kein Let's-Encrypt-Zertifikat | DNS zeigt noch nicht auf den Server, oder Port 80/443 ist blockiert | DNS-Propagation abwarten, Firewall prüfen (`docker compose logs caddy`) |

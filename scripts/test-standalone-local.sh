@@ -61,9 +61,6 @@ ZITADEL_MASTERKEY=$(openssl rand -hex 16)
 ZITADEL_SESSION_COOKIE_SECRET=$(openssl rand -base64 32)
 ZITADEL_ADMIN_USERNAME=zitadel-admin
 SERVICE_PASSWORD_ZITADEL_ADMIN=Aa1@$(openssl rand -hex 20)
-
-OIDC_CLIENT_ID=REPLACE_ME
-OIDC_CLIENT_SECRET=REPLACE_ME
 EOF
 fi
 
@@ -85,55 +82,17 @@ zitadel_login_name() {
 echo "Baue App-Image aus lokalem Dockerfile..."
 "${COMPOSE[@]}" build app
 
-echo "Starte Infrastruktur (db, zitadel, zitadel-login, caddy)..."
-"${COMPOSE[@]}" up -d db zitadel zitadel-login caddy
-# caddy hängt (wie in Prod) per depends_on auch an app — Compose startet ihn
-# also automatisch mit. Vor dem manuellen Zitadel-Setup wieder anhalten, er
-# hat an dieser Stelle ohnehin nur Platzhalter-OIDC-Credentials.
-"${COMPOSE[@]}" stop app >/dev/null 2>&1 || true
-
-echo "Warte auf Zitadel..."
-until [[ "$(docker inspect -f '{{.State.Health.Status}}' "$("${COMPOSE[@]}" ps -q zitadel)" 2>/dev/null)" == "healthy" ]]; do
-  sleep 2
-done
-
-if grep -q '^OIDC_CLIENT_ID=REPLACE_ME' "$ENV_FILE"; then
-  APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
-  ZITADEL_DOMAIN=$(grep '^ZITADEL_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
-  ADMIN_USER=$(grep '^ZITADEL_ADMIN_USERNAME=' "$ENV_FILE" | cut -d= -f2)
-  ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ZITADEL_ADMIN=' "$ENV_FILE" | cut -d= -f2)
-  ADMIN_LOGIN_NAME=$(zitadel_login_name)
-  cat <<EOF
-
-Zitadel läuft: https://$ZITADEL_DOMAIN (Zertifikatswarnung akzeptieren, ist
-das selbstsignierte lokale CA von Caddy).
-
-Einmaliger manueller Schritt (Zitadel erlaubt keine vorab gesetzte
-Client-ID/Secret, siehe docs/standalone-deployment.md):
-  1. Login mit Benutzername "$ADMIN_LOGIN_NAME", Passwort "$ADMIN_PASS"
-     (Passwortänderung wird beim ersten Login erzwungen)
-  2. Projects → New Project (z. B. "on-duty")
-  3. Im Projekt: New Application
-       Type: Web, Authentication Method: Code
-       Redirect URI:             https://$APP_DOMAIN/auth/callback/oidc
-       Post Logout Redirect URI: https://$APP_DOMAIN
-  4. Client-ID/Secret in $ENV_FILE eintragen:
-       OIDC_CLIENT_ID=...
-       OIDC_CLIENT_SECRET=...
-  5. Dieses Skript erneut ausführen: $0
-
-EOF
-  exit 0
-fi
+echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
+# zitadel-init legt beim allerersten Zitadel-Setup Projekt + OIDC-App an und schreibt
+# Client-ID/Secret ins Bootstrap-Volume; app liest sie von dort.
+"${COMPOSE[@]}" up -d db zitadel zitadel-login zitadel-init caddy app
 
 echo "Warte auf Caddys lokales CA-Zertifikat..."
 until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/root.crt 2>/dev/null; do
   sleep 1
 done
-
-echo "Baue und starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
-"${COMPOSE[@]}" build app
-"${COMPOSE[@]}" up -d db zitadel zitadel-login caddy app
+# app liest NODE_EXTRA_CA_CERTS nur beim Start — nach dem CA-Zertifikat neu starten.
+"${COMPOSE[@]}" restart app >/dev/null
 
 APP_DOMAIN=$(grep '^APP_DOMAIN=' "$ENV_FILE" | cut -d= -f2)
 ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ADMIN=' "$ENV_FILE" | cut -d= -f2)

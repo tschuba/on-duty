@@ -23,17 +23,27 @@ services:
       ADMIN_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
       ORG_NAME: ${ORG_NAME}
       OIDC_PROVIDER: https://${ZITADEL_DOMAIN}
-      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}
-      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET}
+      # Leer = automatisch angelegt von zitadel-init (oidc.env im Bootstrap-Volume).
+      # Explizite Werte in .env.standalone haben Vorrang (z. B. bestehende Installationen).
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
       OIDC_APP_URL: https://${APP_DOMAIN}
       # Eingebauter Backup-Mechanismus ist im Standalone-Stack deaktiviert — der
       # dedizierte `backup`-Service unten sichert stattdessen beide Datenbanken.
       # Siehe 17_Backup-Status-Flag (unabhängiger Task): fest verdrahtet, kein
       # Platzhalter in .env.standalone, da es hier nie sinnvoll umzuschalten wäre.
       BACKUP_DISABLED: "true"
+    command:
+      - sh
+      - -c
+      - '[ -n "$$OIDC_CLIENT_ID" ] || . /zitadel/bootstrap/oidc.env; export OIDC_CLIENT_ID OIDC_CLIENT_SECRET; exec node dist/entrypoint.js'
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:ro
     depends_on:
       db:
         condition: service_healthy
+      zitadel-init:
+        condition: service_completed_successfully
 
   db:
     image: postgres:17.11-alpine
@@ -81,6 +91,12 @@ services:
       # Login V2 (eigener zitadel-login-Container) braucht einen Machine-User
       # mit PAT, den Zitadel beim Bootstrap selbst anlegt und über das
       # gemeinsame zitadel-bootstrap-Volume mit zitadel-login teilt.
+      # Einmaliger Admin-Machine-User (IAM_OWNER) nur für zitadel-init: legt Projekt + OIDC-App
+      # an und löscht sich danach selbst. Entsteht nur beim allerersten Setup der Instanz.
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/admin.pat
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: onduty-init
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (temporary)
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2099-01-01T00:00:00Z"
       ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
       ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
       ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: Automatically Initialized IAM_LOGIN_CLIENT
@@ -113,6 +129,22 @@ services:
       CUSTOM_REQUEST_HEADERS: Host:${ZITADEL_DOMAIN},X-Forwarded-Proto:https
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
+    depends_on:
+      zitadel:
+        condition: service_healthy
+
+  # Einmaliger Init: legt nach dem Zitadel-Erstsetup Projekt + OIDC-App an (Client-ID/Secret ->
+  # Bootstrap-Volume, vom app-Service gelesen). Nutzt das on-duty-Image (Node), kein Extra-Image.
+  zitadel-init:
+    image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
+    restart: "no"
+    command: ["node", "scripts/zitadel-init.mjs"]
+    environment:
+      ZITADEL_DOMAIN: ${ZITADEL_DOMAIN}
+      APP_DOMAIN: ${APP_DOMAIN}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+    volumes:
+      - zitadel-bootstrap:/zitadel/bootstrap:rw
     depends_on:
       zitadel:
         condition: service_healthy
