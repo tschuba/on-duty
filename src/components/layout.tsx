@@ -163,6 +163,9 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   ))}
                 </li>
                 <li class="mt-2 border-t border-base-content/20 pt-2">
+                  <a href="/account" class="flex w-full items-center gap-2 px-3 py-2"><Icon name="users" class="h-5 w-5" />{t("common.nav.account")}</a>
+                </li>
+                <li>
                   <form action="/logout" method="post" class="p-0">
                     <button type="submit" class="flex w-full items-center gap-2 px-3 py-2"><Icon name="arrow-right-start-on-rectangle" class="h-5 w-5" />{t("common.logout")}</button>
                   </form>

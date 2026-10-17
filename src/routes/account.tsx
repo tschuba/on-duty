@@ -5,6 +5,9 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { deleteOwnAccount } from "../lib/account.js";
 import { auth } from "../auth.js";
+import { db } from "../db/index.js";
+import { appRoles, userAppRoles } from "../db/schema/index.js";
+import { eq } from "drizzle-orm";
 
 export const accountRoutes = new Hono<{ Variables: Variables }>();
 
@@ -60,12 +63,28 @@ pendingRoutes.get("/", guard, (c) => {
   );
 });
 
-accountRoutes.get("/", guard, (c) => {
+accountRoutes.get("/", guard, async (c) => {
   const user = c.get("user");
+  const roles = await db
+    .select({ name: appRoles.name })
+    .from(userAppRoles)
+    .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId))
+    .where(eq(userAppRoles.userId, user.id));
   return c.html(
     <Layout title={t("account.title")} user={user}>
       <div class="max-w-xl mx-auto">
         <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{t("account.title")}</h1>
+        {/* Name and email come from the OIDC provider and are not editable here. */}
+        <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 mb-6">
+          <dt class="opacity-60">{t("account.profile.name")}</dt>
+          <dd>{user.name}</dd>
+          <dt class="opacity-60">{t("account.profile.email")}</dt>
+          <dd>{user.email}</dd>
+          <dt class="opacity-60">{t("account.profile.roles")}</dt>
+          <dd class="flex flex-wrap gap-1">
+            {roles.length === 0 ? <span class="opacity-40">—</span> : roles.map((r) => <span class="badge badge-outline badge-sm">{r.name}</span>)}
+          </dd>
+        </dl>
         <p class="opacity-70 mb-4">{t("account.delete.body")}</p>
         <DeleteAccount />
       </div>

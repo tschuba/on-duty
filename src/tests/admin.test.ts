@@ -930,6 +930,16 @@ describe("GET /config", () => {
     expect(html).toContain("—");
   });
 
+  it("puts the save button in the title row, bound to the form", async () => {
+    const html = await (await adminRoutes.request("/config")).text();
+    const h1 = html.indexOf("<h1");
+    const btn = html.indexOf('id="config-save"');
+    const form = html.indexOf('id="config-form"');
+    expect(h1).toBeLessThan(btn);
+    expect(btn).toBeLessThan(form);
+    expect(html).toContain('form="config-form"');
+  });
+
   it("shows the not-configured backup warning", async () => {
     backupConfigured = false;
     const html = await (await adminRoutes.request("/config")).text();

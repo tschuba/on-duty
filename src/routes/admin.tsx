@@ -1585,9 +1585,15 @@ adminRoutes.get("/config", guard, async (c) => {
       <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
       <div class="max-w-4xl mx-auto">
-      <h1 class="text-2xl font-bold mb-6" style="font-family: var(--font-heading)">
-        {t("admin.config.title")}
-      </h1>
+      <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
+          {t("admin.config.title")}
+        </h1>
+        {/* Outside the form element, tied to it via the form attribute. */}
+        <button type="submit" form="config-form" id="config-save" class="btn btn-primary" disabled>
+          {t("admin.config.save")}
+        </button>
+      </div>
       <form method="post" action="/admin/config" id="config-form">
         <div class="flex flex-wrap items-center gap-2 mb-4">
           <input type="search" id="config-search" class="input input-bordered input-sm" placeholder={t("admin.config.search")} />
@@ -1595,9 +1601,6 @@ adminRoutes.get("/config", guard, async (c) => {
             <option value="all">{t("admin.config.filter.all")}</option>
             <option value="writable">{t("admin.config.filter.writable")}</option>
           </select>
-          <button type="submit" id="config-save" class="btn btn-primary btn-sm ml-auto" disabled>
-            {t("admin.config.save")}
-          </button>
         </div>
         <div class="overflow-x-auto">
           <table class="table table-zebra w-full">
