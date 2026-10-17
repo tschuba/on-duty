@@ -5,6 +5,7 @@ import { countOpenApplications } from "../lib/applications.js";
 import { countOpenReceipts } from "../lib/donations.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
+import { countPendingUsers } from "../lib/registration.js";
 import { Icon } from "./icon.js";
 
 type Props = PropsWithChildren<{
@@ -45,6 +46,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
     const missing = missingReceiptFields(await loadOrgConfig());
     orgMissingCount = (["master", "tax"] as OrgTab[]).filter((tab) => canReadOrgTab(user.permissions, tab)).reduce((n, tab) => n + missing[tab].length, 0);
   }
+  const pendingUsersCount = user?.permissions.has("system:admin") ? await countPendingUsers() : 0;
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
   const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
 
@@ -109,6 +111,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   class={navLink(activeNav === "admin")}
                 >
                   {t("common.nav.admin")}
+                  <CountBadge count={activeNav === "admin" ? 0 : pendingUsersCount} />
                 </a>
               )}
             </div>
@@ -125,7 +128,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} /></a></li>}
-                {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}</a></li>}
+                {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}<CountBadge count={activeNav === "admin" ? 0 : pendingUsersCount} /></a></li>}
               </ul>
             </div>
           </div>

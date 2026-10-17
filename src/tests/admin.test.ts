@@ -131,6 +131,9 @@ let lastBackupResult: any = null;
 let scheduleResult: { prev: Date | null; next: Date | null } = { prev: null, next: null };
 const runBackupMock = vi.fn(() => Promise.resolve());
 
+// Layout badge count is a separate DB query; keep it out of the per-route select-call assertions.
+vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
+
 vi.mock("../lib/backup.js", () => ({
   isBackupConfigured: () => backupConfigured,
   getLastBackup: () => Promise.resolve(lastBackupResult),
@@ -171,6 +174,7 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     name: "Ben Bauer",
     email: "ben@example.com",
     disabled: false,
+    emailVerified: true,
     lastLoginAt: new Date("2024-01-01T00:00:00Z"),
     ...overrides,
   };
@@ -309,6 +313,12 @@ describe("GET /users", () => {
     userAppRolesFixture = [];
     const html = await (await adminRoutes.request("/users")).text();
     expect(html).toContain(t("admin.users.statusPending"));
+  });
+
+  it("shows 'email unverified' for a user created before verification", async () => {
+    usersFixture = [makeUser({ emailVerified: false, lastLoginAt: null })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain(t("admin.users.statusEmailUnverified"));
   });
 
   it("shows 'unconfirmed' for a user who has never logged in", async () => {

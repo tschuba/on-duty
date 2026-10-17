@@ -37,7 +37,8 @@ export function requireAuth(required?: Permission | Permission[], opts: { allowP
     const permissions = new Set(rows.flatMap((r) => (r.permission ? [r.permission] : [])));
 
     // Zero roles = self-registered and not yet approved. A role without the needed permission still gets the 403 below.
-    if (!opts.allowPending && rows.length === 0) return c.redirect("/pending");
+    // Active = verified email AND at least one role. Unverified accounts only exist via the Zitadel webhook.
+    if (!opts.allowPending && (rows.length === 0 || !user.emailVerified)) return c.redirect("/pending");
 
     const requiredList = required ? ([] as Permission[]).concat(required) : [];
     if (requiredList.length > 0 && !requiredList.some((p) => permissions.has(p))) {

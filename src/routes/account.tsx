@@ -38,13 +38,16 @@ function DeleteAccount() {
 export const pendingRoutes = new Hono<{ Variables: Variables }>();
 pendingRoutes.get("/", guard, (c) => {
   const user = c.get("user");
-  // Already approved → nothing to wait for.
-  if (user.permissions.size > 0) return c.redirect("/");
+  // Active (verified email + a role) → nothing to wait for.
+  if (user.permissions.size > 0 && user.emailVerified) return c.redirect("/");
+  const unverified = !user.emailVerified;
   return c.html(
     <Layout title={t("pending.title")}>
       <div class="max-w-md mx-auto text-center mt-16">
-        <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{t("pending.title")}</h1>
-        <p class="opacity-70 mb-6">{t("pending.body")}</p>
+        <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">
+          {t(unverified ? "pending.unverified.title" : "pending.title")}
+        </h1>
+        <p class="opacity-70 mb-6">{t(unverified ? "pending.unverified.body" : "pending.body")}</p>
         <div class="flex gap-2 justify-center">
           <form method="post" action="/logout">
             <button type="submit" class="btn">{t("pending.logout")}</button>

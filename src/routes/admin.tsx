@@ -21,6 +21,7 @@ import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
 import { setFlash } from "../lib/flash.js";
 import { LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
+import { isPendingUser } from "../lib/registration.js";
 import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
@@ -197,9 +198,7 @@ adminRoutes.get("/users", guard, async (c) => {
   for (const r of roleAssignments) {
     rolesByUser.set(r.userId, [...(rolesByUser.get(r.userId) ?? []), r.roleName]);
   }
-  // Logged in at least once but no app role = waiting for approval. Never-logged-in users stay "unconfirmed".
-  const isPending = (u: { id: string; email: string; disabled: boolean; lastLoginAt: Date | null }) =>
-    !u.disabled && u.email !== LOCAL_ADMIN_EMAIL && u.lastLoginAt !== null && !rolesByUser.has(u.id);
+  const isPending = (u: typeof allUsers[number]) => isPendingUser(u, rolesByUser.has(u.id));
   const onlyPending = c.req.query("filter") === "pending";
   const pendingCount = allUsers.filter(isPending).length;
   const shownUsers = onlyPending ? allUsers.filter(isPending) : allUsers;
@@ -265,6 +264,8 @@ adminRoutes.get("/users", guard, async (c) => {
                   <td>
                     {u.disabled ? (
                       <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
+                    ) : !isLocal && !u.emailVerified ? (
+                      <span class="badge badge-warning badge-sm">{t("admin.users.statusEmailUnverified")}</span>
                     ) : isPending(u) ? (
                       <span class="badge badge-warning badge-sm">{t("admin.users.statusPending")}</span>
                     ) : !isLocal && u.lastLoginAt === null ? (
