@@ -279,12 +279,12 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             <th>{t("donations.table.type")}</th>
             <th>{t("donations.table.purpose")}</th>
             <th>{t("donations.table.receipt")}</th>
-            <th>{t("donations.table.actions")}</th>
+            {canIssueReceipts && <th>{t("donations.table.actions")}</th>}
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <tr><td colspan={7} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
+            <tr><td colspan={canIssueReceipts ? 7 : 6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donations/${d.id}/edit'` : undefined}>
               <td>{formatDate(d.date)}</td>
@@ -297,13 +297,13 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
                   ? <span class="badge badge-success badge-sm">{t("donations.table.receiptIssued")}</span>
                   : <span class="badge badge-ghost badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
-              <td class="whitespace-nowrap">
-                {!canIssueReceipts
-                  ? null
-                  : orgConfigIncomplete
-                  ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
-                  : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
-              </td>
+              {canIssueReceipts && (
+                <td class="whitespace-nowrap">
+                  {orgConfigIncomplete
+                    ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
+                    : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

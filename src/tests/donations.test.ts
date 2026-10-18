@@ -158,6 +158,7 @@ describe("GET /", () => {
     currentUser = { ...currentUser, permissions: new Set(["donations:record"]) };
     const html = await (await donationRoutes.request("/")).text();
     expect(html).not.toContain("/receipt");
+    expect(html).not.toContain("Aktionen");
   });
 
   it("filters by donor-name search", async () => {
