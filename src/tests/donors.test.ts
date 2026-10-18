@@ -294,3 +294,13 @@ describe("POST /new", () => {
   });
 });
 
+
+describe("parseDonorPersonFields with company", () => {
+  const addr = { street: "A", houseNumber: "1", zip: "1", city: "X" };
+  it("makes first/last name optional when a company name is given", () => {
+    expect(parseDonorPersonFields({ companyName: "Müller GmbH", ...addr }).errors).toEqual({});
+  });
+  it("still requires the address", () => {
+    expect(Object.keys(parseDonorPersonFields({ companyName: "Müller GmbH" }).errors).sort()).toEqual(["city", "houseNumber", "street", "zip"]);
+  });
+});

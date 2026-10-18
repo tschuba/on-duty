@@ -360,6 +360,14 @@ describe("POST /:id/delete", () => {
   });
 });
 
+describe("mark-issued from not_required", () => {
+  it("issues the receipt", async () => {
+    donationsFindFirstResult = makeDonation({ receiptStatus: "not_required" });
+    await donationRoutes.request("/don1/mark-issued", { method: "POST" });
+    expect(updateCalls[0].set.receiptStatus).toBe("issued");
+  });
+});
+
 describe("mark-issued from issued / receipt-status", () => {
   it("does not re-stamp an already issued receipt", async () => {
     donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date("2026-03-05") });

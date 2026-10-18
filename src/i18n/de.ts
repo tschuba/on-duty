@@ -219,6 +219,7 @@ export const de = {
   "donors.table.firstName": "Vorname",
   "donors.table.address": "Adresse",
   "donors.table.companyName": "Firma",
+  "donors.form.nameHint": "Vor- und Nachname sind Pflicht, außer eine Firma ist angegeben (dann Ansprechpartner, optional).",
   "donors.form.companyName": "Firma (optional)",
   "donors.table.empty": "Keine Spender gefunden.",
   "donors.table.count": "{count} Spender",

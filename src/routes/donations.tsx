@@ -325,7 +325,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
               </td>
               {canIssueReceipts && (
                 <td class="whitespace-nowrap">
-                  {orgConfigIncomplete
+                  {d.receiptStatus === "not_required"
+                    ? null
+                    : orgConfigIncomplete
                     ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
                     : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
                 </td>
