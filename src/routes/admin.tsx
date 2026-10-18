@@ -133,7 +133,7 @@ export async function backupWarnProps() {
 function ModalScaffold() {
   return (
     <dialog id="admin-modal" class="modal">
-      <div class="modal-box max-w-lg" id="modal-content" />
+      <div class="modal-box max-w-2xl" id="modal-content" />
       <form method="dialog" class="modal-backdrop">
         <button>{t("common.close")}</button>
       </form>
