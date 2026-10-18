@@ -4,6 +4,7 @@ import { users } from "./auth";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const donationTypeEnum = pgEnum("donation_type", ["cash", "transfer"]);
+export const receiptStatusEnum = pgEnum("receipt_status", ["open", "issued", "not_required"]);
 
 // One donor per person: personId is UNIQUE so donor selection can be get-or-create,
 // keeping every donation for a person under a single donors row.
@@ -24,6 +25,7 @@ export const donations = pgTable("donations", {
   date: date("date").notNull(),
   type: donationTypeEnum("type").notNull(),
   purpose: text("purpose"),
+  receiptStatus: receiptStatusEnum("receipt_status").notNull().default("open"),
   receiptIssuedAt: timestamp("receipt_issued_at"),
   issuedBy: text("issued_by").references(() => users.id, { onDelete: "set null" }),
 });

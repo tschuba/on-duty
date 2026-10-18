@@ -3,7 +3,7 @@ import { eq, or, ilike, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, donors } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { countOpenReceipts } from "../lib/donations.js";
+import { countOpenReceipts, recipientName } from "../lib/donations.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
 import { Icon } from "../components/icon.js";
@@ -33,6 +33,7 @@ type PersonFieldValues = {
   houseNumber: string;
   zip: string;
   city: string;
+  companyName: string | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ export function parseDonorPersonFields(body: Record<string, any>): { values: Per
     houseNumber: trimmed(body, "houseNumber"),
     zip: trimmed(body, "zip"),
     city: trimmed(body, "city"),
+    companyName: trimmed(body, "companyName") || null,
   };
   const errors: Record<string, string> = {};
   for (const key of ["firstName", "lastName", "street", "houseNumber", "zip", "city"] as const) {
@@ -74,12 +76,12 @@ export async function getOrCreateDonor(tx: typeof db, personId: string): Promise
 // straight through as prefill values without a manual conversion step.
 type PersonFieldInput = Partial<Record<keyof PersonFieldValues, string | null>>;
 
-function personField(name: keyof PersonFieldValues, label: string, values: PersonFieldInput | undefined, errors: Record<string, string> | undefined) {
+function personField(name: keyof PersonFieldValues, label: string, values: PersonFieldInput | undefined, errors: Record<string, string> | undefined, optional = false) {
   const err = errors?.[name];
   return (
     <div class="form-control">
       <label class="label">
-        <span class="label-text">{label}<span class="text-error ml-1">*</span></span>
+        <span class="label-text">{label}{!optional && <span class="text-error ml-1">*</span>}</span>
       </label>
       <input
         type="text"
@@ -98,6 +100,7 @@ function personField(name: keyof PersonFieldValues, label: string, values: Perso
 export function DonorPersonFields({ values, errors }: { values?: PersonFieldInput; errors?: Record<string, string> }) {
   return (
     <>
+      {personField("companyName", t("donors.form.companyName"), values, errors, true)}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {personField("lastName", t("donors.form.lastName"), values, errors)}
         {personField("firstName", t("donors.form.firstName"), values, errors)}
@@ -122,7 +125,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
     <div class="space-y-3">
       <div id="donor-picker-search" class={showFields ? "hidden" : ""}>
         <label class="label">
-          <span class="label-text">{t("donations.form.donor")}<span class="text-error ml-1">*</span></span>
+          <span class="label-text">{t("donations.form.donor")}</span>
         </label>
         <label class="input input-bordered flex items-center gap-2 w-full">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
@@ -138,6 +141,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
           />
         </label>
         <div id="donor-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+        <button type="button" class="link link-primary text-sm mt-2 donor-create-new">{t("donations.form.donorCreateNew")}</button>
       </div>
       <input type="hidden" id="donor-personId" name="personId" value={personId ?? ""} />
       <div id="donor-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
@@ -153,7 +157,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
             var resEl = e.target.closest('.donor-result');
             if (resEl) {
               document.getElementById('donor-personId').value = resEl.dataset.id;
-              ['firstName','lastName','street','houseNumber','zip','city'].forEach(function(f) {
+              ['firstName','lastName','street','houseNumber','zip','city','companyName'].forEach(function(f) {
                 document.getElementById('donor-' + f).value = resEl.dataset[f] || '';
               });
               document.getElementById('donor-fields').classList.remove('hidden');
@@ -162,7 +166,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
             }
             if (e.target.closest('.donor-create-new')) {
               document.getElementById('donor-personId').value = '';
-              ['firstName','lastName','street','houseNumber','zip','city'].forEach(function(f) {
+              ['firstName','lastName','street','houseNumber','zip','city','companyName'].forEach(function(f) {
                 document.getElementById('donor-' + f).value = '';
               });
               document.getElementById('donor-fields').classList.remove('hidden');
@@ -203,9 +207,10 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
       houseNumber: persons.houseNumber,
       zip: persons.zip,
       city: persons.city,
+      companyName: persons.companyName,
     })
     .from(persons)
-    .where(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)))
+    .where(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(persons.companyName, needle)))
     .orderBy(asc(persons.lastName))
     .limit(10);
 
@@ -231,8 +236,9 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
           data-house-number={p.houseNumber ?? ""}
           data-zip={p.zip ?? ""}
           data-city={p.city ?? ""}
+          data-company-name={p.companyName ?? ""}
         >
-          <span class="font-medium">{p.firstName} {p.lastName}</span>
+          <span class="font-medium">{recipientName(p)}</span>
           {" — "}{formatAddress(p)}
         </div>
       ))}
@@ -272,7 +278,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
   const all = (await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as DonorWithPerson[];
   const needle = search.toLowerCase();
   const filtered = all
-    .filter((d) => !search || `${d.person.firstName} ${d.person.lastName}`.toLowerCase().includes(needle))
+    .filter((d) => !search || `${d.person.companyName ?? ""} ${d.person.firstName} ${d.person.lastName}`.toLowerCase().includes(needle))
     .filter((d) => !member || Boolean(d.person.member) === (member === "yes"));
   const sorted = [...filtered].sort((a, b) => {
     const cmp = a.person[sort].localeCompare(b.person[sort], "de");
@@ -320,16 +326,18 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
           <tr>
             <th><a href={donorListUrl({ search, sort: "lastName", sort_dir: sort === "lastName" && dir === "asc" ? "desc" : "asc", pageSize, member })} class="link link-hover">{t("donors.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
             <th><a href={donorListUrl({ search, sort: "firstName", sort_dir: sort === "firstName" && dir === "asc" ? "desc" : "asc", pageSize, member })} class="link link-hover">{t("donors.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
+            <th>{t("donors.table.companyName")}</th>
             <th>{t("donors.table.address")}</th>
           </tr>
         </thead>
         <tbody>
           {pageItems.length === 0 ? (
-            <tr><td colspan={3} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
+            <tr><td colspan={4} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageItems.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donors/${d.id}/edit'` : undefined}>
               <td class="font-medium"><MemberLink memberId={d.person.member?.id} canLink={canLink}>{d.person.lastName}</MemberLink><MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
               <td>{d.person.firstName}</td>
+              <td>{d.person.companyName ?? "—"}</td>
               <td>{formatAddress(d.person)}</td>
             </tr>
           ))}

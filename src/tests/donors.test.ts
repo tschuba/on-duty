@@ -161,7 +161,7 @@ describe("GET /search-persons", () => {
     personsFixture = [makePerson()];
     await donorRoutes.request("/search-persons?q=an");
     const cols = selectCalls[selectCalls.length - 1];
-    expect(Object.keys(cols).sort()).toEqual(["city", "firstName", "houseNumber", "id", "lastName", "street", "zip"]);
+    expect(Object.keys(cols).sort()).toEqual(["city", "companyName", "firstName", "houseNumber", "id", "lastName", "street", "zip"]);
   });
 
   it("shows a create-new prompt when nothing matches", async () => {

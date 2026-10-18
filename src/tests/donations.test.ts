@@ -131,7 +131,7 @@ function completeOrgConfig(overrides: Record<string, string> = {}) {
 
 function makeDonation(overrides: Record<string, unknown> = {}) {
   return {
-    id: "don1", donorId: "d1", amount: "100.00", date: "2026-03-01", type: "cash", purpose: null, receiptIssuedAt: null,
+    id: "don1", donorId: "d1", amount: "100.00", date: "2026-03-01", type: "cash", purpose: null, receiptStatus: "open", receiptIssuedAt: null,
     donor: {
       id: "d1", personId: "p1",
       person: { id: "p1", firstName: "Anna", lastName: "Bauer", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt" },
@@ -257,7 +257,7 @@ describe("GET /:id/receipt", () => {
     const html = await res.text();
     expect(html).toContain("/organisation/tax-data");
     expect(html).not.toContain("/organisation/master-data");
-    expect(html).not.toContain(t("donations.receipt.explanation"));
+    expect(html).toContain("disabled");
   });
 
   it("renders the receipt summary and download link when org data is complete", async () => {
@@ -271,7 +271,7 @@ describe("GET /:id/receipt", () => {
 
   it("shows who issued the receipt and when, once issued", async () => {
     completeOrgConfig();
-    donationsFindFirstResult = makeDonation({ receiptIssuedAt: new Date("2026-03-05"), issuer: { id: "u1", name: "Erika Musterfrau" } });
+    donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date("2026-03-05"), issuer: { id: "u1", name: "Erika Musterfrau" } });
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
     expect(html).toContain("Erika Musterfrau");
@@ -280,7 +280,7 @@ describe("GET /:id/receipt", () => {
 
   it("falls back to 'unbekannt' when the issuing user is gone", async () => {
     completeOrgConfig();
-    donationsFindFirstResult = makeDonation({ receiptIssuedAt: new Date("2026-03-05"), issuer: null });
+    donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date("2026-03-05"), issuer: null });
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
     expect(html).toContain(t("donations.receipt.issuedByUnknown"));
@@ -336,6 +336,7 @@ describe("GET /:id/receipt.xml", () => {
 
 describe("POST /:id/mark-issued", () => {
   it("stamps receiptIssuedAt and issuedBy, and redirects to the xml download", async () => {
+    donationsFindFirstResult = makeDonation();
     const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/donations/don1/receipt.xml");
@@ -352,9 +353,44 @@ describe("POST /:id/delete", () => {
   });
 
   it("refuses once a receipt was issued", async () => {
-    donationsFindFirstResult = makeDonation({ id: "don1", receiptIssuedAt: new Date() });
+    donationsFindFirstResult = makeDonation({ id: "don1", receiptStatus: "issued", receiptIssuedAt: new Date() });
     const res = await donationRoutes.request("/don1/delete", { method: "POST" });
     expect(res.headers.get("location")).toBe("/donations/don1/edit");
     expect(deleteCalls.some((c) => c.table === donations)).toBe(false);
+  });
+});
+
+describe("mark-issued from issued / receipt-status", () => {
+  it("does not re-stamp an already issued receipt", async () => {
+    donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date("2026-03-05") });
+    await donationRoutes.request("/don1/mark-issued", { method: "POST" });
+    expect(updateCalls.length).toBe(0);
+  });
+
+  it("revoke clears issue data and sets open", async () => {
+    donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date() });
+    const res = await donationRoutes.request("/don1/receipt-status", { method: "POST", body: formBody({ action: "revoke" }) });
+    expect(res.status).toBe(302);
+    expect(updateCalls[0].set).toEqual({ receiptStatus: "open", receiptIssuedAt: null, issuedBy: null });
+  });
+
+  it("rejects an invalid transition", async () => {
+    donationsFindFirstResult = makeDonation();
+    await donationRoutes.request("/don1/receipt-status", { method: "POST", body: formBody({ action: "revoke" }) });
+    expect(updateCalls.length).toBe(0);
+  });
+
+  it("open -> not_required keeps issue data untouched", async () => {
+    donationsFindFirstResult = makeDonation();
+    await donationRoutes.request("/don1/receipt-status", { method: "POST", body: formBody({ action: "markNotRequired" }) });
+    expect(updateCalls[0].set).toEqual({ receiptStatus: "not_required" });
+  });
+
+  it("uses the company name in the receipt filename and XML", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation({ donor: { person: { firstName: "Anna", lastName: "Bauer", companyName: "Müller GmbH", street: "A", houseNumber: "1", zip: "1", city: "X", member: null } } });
+    const res = await donationRoutes.request("/don1/receipt.xml");
+    expect(res.headers.get("content-disposition")).toContain("Mueller_GmbH");
+    expect(await res.text()).toContain("Müller GmbH");
   });
 });
