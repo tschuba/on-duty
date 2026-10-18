@@ -687,7 +687,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             const lending = lendingByItem.get(item.id);
             const status = itemStatus(item, !!lending);
             return (
-              <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
+              <tr key={item.id} {...(user.permissions.has("inventory:manage") ? { class: "cursor-pointer hover", onclick: `window.location='/inventory/${item.id}/edit'` } : {})}>
                 <td>{item.name}</td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
                 <td>{due ? formatDate(due) : "—"}</td>
@@ -1128,7 +1128,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
             {due.map((d) => {
               const overdue = d.dueDate < today;
               return (
-                <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${d.id}/edit'`}>
+                <tr key={d.id} {...(user.permissions.has("inventory:manage") ? { class: "cursor-pointer hover", onclick: `window.location='/inventory/${d.id}/edit'` } : {})}>
                   <td class={overdue ? "text-error font-semibold" : ""}>{d.name}</td>
                   <td><CategoryBadge category={d.category} /></td>
                   <td class={overdue ? "text-error font-semibold" : ""}>{formatDate(d.dueDate)} {overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
