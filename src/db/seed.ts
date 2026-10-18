@@ -2,6 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and } from "drizzle-orm";
+import { appSettings } from "./schema/index.js";
 import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL } from "../lib/constants.js";
 import {
   users,
@@ -92,6 +93,16 @@ export async function runSeed() {
     await db.insert(appRolePermissions).values(
       APP_ROLES.flatMap((r) => r.permissions.map((permission) => ({ roleId: r.id, permission }))),
     ).onConflictDoNothing();
+
+    // One-time presets from env: only inserted while the key is absent, so later changes in /admin/config stick.
+    const presets = {
+      registrationEnabled: process.env.REGISTRATION_ENABLED,
+      registrationAutoApprove: process.env.REGISTRATION_AUTO_APPROVE,
+      registrationDefaultRoleId: process.env.REGISTRATION_DEFAULT_ROLE_ID,
+    };
+    for (const [key, value] of Object.entries(presets)) {
+      if (value) await db.insert(appSettings).values({ key, value }).onConflictDoNothing();
+    }
 
     const now = new Date();
     const hash = await hashPassword(process.env.ADMIN_PASSWORD);
