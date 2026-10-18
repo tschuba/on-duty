@@ -1,5 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { isOrgConfigCompleteForReceipts, missingReceiptFields } from "../lib/org-config.js";
+import { describe, it, expect, vi } from "vitest";
+
+process.env.ORG_NAME = "Test Feuerwehr";
+process.env.ADMIN_PASSWORD = "test-password-123";
+process.env.BETTER_AUTH_SECRET = "test-secret";
+process.env.DATABASE_URL = "postgres://test";
+
+let rows: { key: string; value: string }[] = [];
+vi.mock("../db/index.js", () => ({ db: { select: vi.fn(() => ({ from: vi.fn(async () => rows) })) } }));
+
+const { isOrgConfigCompleteForReceipts, missingReceiptFields, loadOrgConfig } = await import("../lib/org-config.js");
 
 const COMPLETE = {
   orgName: "FF Altenhammer", orgStreet: "Hauptstr.", orgHouseNumber: "1", orgZip: "12345", orgCity: "Altenhammer",
@@ -24,5 +33,19 @@ describe("missingReceiptFields", () => {
 
   it("is empty when complete", () => {
     expect(missingReceiptFields(COMPLETE)).toEqual({ master: [], tax: [] });
+  });
+});
+
+describe("loadOrgConfig", () => {
+  it("defaults orgName to ORG_NAME when none or only blank is stored", async () => {
+    rows = [];
+    expect((await loadOrgConfig()).orgName).toBe("Test Feuerwehr");
+    rows = [{ key: "orgName", value: " " }];
+    expect((await loadOrgConfig()).orgName).toBe("Test Feuerwehr");
+  });
+
+  it("keeps a stored orgName", async () => {
+    rows = [{ key: "orgName", value: "FF e.V." }];
+    expect((await loadOrgConfig()).orgName).toBe("FF e.V.");
   });
 });

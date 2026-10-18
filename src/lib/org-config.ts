@@ -1,4 +1,5 @@
 import { db } from "../db/index.js";
+import { env } from "../env.js";
 import { orgConfig } from "../db/schema/index.js";
 
 // Fields the amtliche Muster requires on every Zuwendungsbestätigung. org_config
@@ -12,7 +13,10 @@ export const REQUIRED_RECEIPT_FIELDS = [
 
 export async function loadOrgConfig(): Promise<Record<string, string>> {
   const rows = await db.select().from(orgConfig);
-  return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const config = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  // ORG_NAME is the default until an admin stores a Rechtsname.
+  if (!config.orgName?.trim()) config.orgName = env.ORG_NAME;
+  return config;
 }
 
 export function isOrgConfigCompleteForReceipts(config: Record<string, string>): boolean {

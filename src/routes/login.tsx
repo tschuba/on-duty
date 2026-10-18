@@ -6,7 +6,6 @@ import { auth } from "../auth.js";
 import { db } from "../db/index.js";
 import { accounts } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
-import { loadOrgConfig } from "../lib/org-config.js";
 import { Layout } from "../components/layout.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { env } from "../env.js";
@@ -31,8 +30,7 @@ loginRoutes.get("/login", async (c) => {
             ? t("login.error.emailUnverified")
             : null;
 
-  const orgName = ((await loadOrgConfig()).orgName ?? "").trim();
-  const heading = orgName || "on-duty";
+  const heading = env.ORG_NAME;
 
   return c.html(
     <Layout title={t("login.title")}>
