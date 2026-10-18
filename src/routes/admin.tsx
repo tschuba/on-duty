@@ -426,10 +426,16 @@ function RoleCheckboxes({
             <div class="flex flex-col min-w-0">
               <span class="font-medium text-sm">{r.name}</span>
               {r.description && <span class="text-xs opacity-60 truncate">{r.description}</span>}
-              <details class="text-xs">
-                <summary class="cursor-pointer opacity-60" onclick="event.preventDefault();this.parentElement.toggleAttribute('open')">{t("admin.users.modal.roleDetails")}</summary>
-                <div class="mt-1"><PermissionBadges permissions={permsByRole.get(r.id) ?? []} /></div>
-              </details>
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs gap-1 self-start -ml-2"
+                aria-expanded="false"
+                onclick="event.preventDefault();const p=this.nextElementSibling;p.hidden=!p.hidden;this.setAttribute('aria-expanded',String(!p.hidden));this.querySelector('svg').classList.toggle('rotate-180')"
+              >
+                {t("admin.users.modal.roleDetails")}
+                <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
+              </button>
+              <div hidden class="mt-1"><PermissionBadges permissions={permsByRole.get(r.id) ?? []} /></div>
             </div>
           </label>
         ))}

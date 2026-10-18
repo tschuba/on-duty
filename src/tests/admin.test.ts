@@ -363,8 +363,8 @@ describe("role picker", () => {
     const html = await (await adminRoutes.request("/users/new")).text();
     expect(html).toContain(t("admin.users.modal.roleSearchPlaceholder"));
     expect(html).toContain('data-role-item="editor darf daten ändern"');
-    expect(html).toContain("<details");
-    expect(html).not.toMatch(/<details[^>]*open/);
+    expect(html).toContain(t("admin.users.modal.roleDetails"));
+    expect(html).toMatch(/aria-expanded="false"/);
     expect(html).toContain("overflow-y-auto");
   });
 });
