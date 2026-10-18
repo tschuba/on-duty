@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, or, ilike, asc, and, exists } from "drizzle-orm";
+import { eq, or, ilike, asc, and, exists, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -59,6 +59,22 @@ export function parseDonorPersonFields(body: Record<string, any>): { values: Per
     if (!values[key]) errors[key] = t("common.required");
   }
   return { values, errors };
+}
+
+// For "create new person": a member/donor with the same name probably means the user skipped the search.
+// Returns an error for DonorPickerFields unless the user ticked "create anyway".
+export async function duplicatePersonError(body: Record<string, any>, values: PersonFieldValues): Promise<string | undefined> {
+  if (trimmed(body, "personId") || trimmed(body, "confirmDuplicate") || !values.firstName || !values.lastName) return undefined;
+  const [hit] = await db
+    .select({ id: persons.id })
+    .from(persons)
+    .where(and(
+      sql`lower(${persons.firstName}) = ${values.firstName.toLowerCase()}`,
+      sql`lower(${persons.lastName}) = ${values.lastName.toLowerCase()}`,
+      or(exists(db.select({ x: members.id }).from(members).where(eq(members.personId, persons.id))), exists(db.select({ x: donors.id }).from(donors).where(eq(donors.personId, persons.id)))),
+    ))
+    .limit(1);
+  return hit ? t("donations.form.duplicateWarning") : undefined;
 }
 
 // Get-or-create by personId — keeps every donation for a person under one
@@ -145,6 +161,17 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
       </div>
       <input type="hidden" id="donor-personId" name="personId" value={personId ?? ""} />
       <div id="donor-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
+        {errors?.duplicate && (
+          <div class="alert alert-warning">
+            <div>
+              <p>{errors.duplicate}</p>
+              <label class="label cursor-pointer justify-start gap-2">
+                <input type="checkbox" name="confirmDuplicate" value="1" class="checkbox checkbox-sm" />
+                <span class="label-text">{t("donations.form.duplicateConfirm")}</span>
+              </label>
+            </div>
+          </div>
+        )}
         <DonorPersonFields values={values} errors={errors} />
         <button type="button" class="btn btn-ghost donor-change-selection">
           {t("donations.form.donorChangeSelection")}
@@ -389,6 +416,8 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   const body = await c.req.parseBody();
   const personId = trimmed(body, "personId") || undefined;
   const { values, errors } = parseDonorPersonFields(body);
+  const dup = await duplicatePersonError(body, values);
+  if (dup) errors.duplicate = dup;
 
   if (Object.keys(errors).length > 0) {
     return c.html(

@@ -16,7 +16,7 @@ import { buildListUrl } from "../lib/list-query.js";
 import { countOpenReceipts, nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
+import { DonorPickerFields, duplicatePersonError, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
 // Names the missing fields and links only to org tabs the viewer may read.
 function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>; perms: Set<string> }) {
@@ -368,7 +368,8 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   const personId = trimmed(body, "personId") || undefined;
   const donorFields = parseDonorPersonFields(body);
   const donationFields = parseDonationFields(body);
-  const errors = { ...donorFields.errors, ...donationFields.errors };
+  const dup = await duplicatePersonError(body, donorFields.values);
+  const errors: Record<string, string> = { ...donorFields.errors, ...donationFields.errors, ...(dup ? { duplicate: dup } : {}) };
 
   if (Object.keys(errors).length > 0) {
     return c.html(

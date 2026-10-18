@@ -183,6 +183,8 @@ export const de = {
   "donations.form.typeTransfer": "Überweisung",
   "donations.form.purpose": "Verwendungszweck / Notiz",
   "donations.form.donor": "Spender suchen",
+  "donations.form.duplicateWarning": "Ein Mitglied oder Spender mit diesem Namen existiert bereits. Bitte oben über die Suche auswählen.",
+  "donations.form.duplicateConfirm": "Trotzdem als neue Person anlegen",
   "donations.form.donorCreateNew": "Neuen Spender anlegen",
   "donations.form.donorSearchPlaceholder": "Name eingeben, um bestehende Person zu suchen …",
   "donations.form.donorNoMatch": "Keine Übereinstimmung? Neue Person anlegen",

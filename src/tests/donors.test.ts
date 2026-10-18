@@ -252,6 +252,24 @@ describe("POST /new", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("warns instead of creating when a member/donor with the same name exists", async () => {
+    personsFixture = [{ id: "p9" }];
+    const fields = { firstName: "Anna", lastName: "Bauer", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt" };
+    const res = await donorRoutes.request("/new", { method: "POST", body: formBody(fields) });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("donations.form.duplicateWarning"));
+    expect(insertCalls.some((c) => c.table === persons)).toBe(false);
+  });
+
+  it("creates anyway once the duplicate is confirmed", async () => {
+    personsFixture = [{ id: "p9" }];
+    donorLookupResult = [];
+    const fields = { firstName: "Anna", lastName: "Bauer", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt", confirmDuplicate: "1" };
+    const res = await donorRoutes.request("/new", { method: "POST", body: formBody(fields) });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === persons)).toBe(true);
+  });
+
   it("creates a new person and donor when no personId is given", async () => {
     donorLookupResult = [];
     const res = await donorRoutes.request("/new", {
