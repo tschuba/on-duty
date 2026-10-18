@@ -5,6 +5,8 @@ export const PERMISSIONS = [
   "members:read",
   "members:write",
   "members:delete",
+  "members:bank-data:read",
+  "members:bank-data:write",
   "system:admin",
   "donations:read",
   "donations:record",

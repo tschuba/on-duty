@@ -35,6 +35,8 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "members:read": t("admin.permissions.key.membersRead"),
   "members:write": t("admin.permissions.key.membersWrite"),
   "members:delete": t("admin.permissions.key.membersDelete"),
+  "members:bank-data:read": t("admin.permissions.key.membersBankDataRead"),
+  "members:bank-data:write": t("admin.permissions.key.membersBankDataWrite"),
   "system:admin": t("admin.permissions.key.systemAdmin"),
   "donations:read": t("admin.permissions.key.donationsRead"),
   "donations:record": t("admin.permissions.key.donationsRecord"),

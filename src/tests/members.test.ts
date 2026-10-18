@@ -724,6 +724,54 @@ describe("GET /:id", () => {
   });
 });
 
+describe("bank data gating", () => {
+  const perms = (...p: string[]) => { currentUser = { id: "u1", permissions: new Set(p), disabled: false }; };
+  const VALID = "DE89 3704 0044 0532 0130 00";
+
+  it("hides the section without bank-data:read", async () => {
+    perms("members:write");
+    findFirstResult = memberWithAssignments({ iban: "DE89370400440532013000" });
+    const html = await (await memberRoutes.request("/m1")).text();
+    expect(html).not.toContain("Bankverbindung");
+    expect(html).not.toContain("DE89");
+  });
+
+  it("shows read-only grouped IBAN with read, editable input with write", async () => {
+    findFirstResult = memberWithAssignments({ iban: "DE89370400440532013000" });
+    perms("members:read", "members:bank-data:read");
+    let html = await (await memberRoutes.request("/m1")).text();
+    expect(html).toContain("DE89 3704 0044 0532 0130 00");
+    expect(html).not.toContain('name="iban"');
+    perms("members:read", "members:bank-data:write");
+    html = await (await memberRoutes.request("/m1")).text();
+    expect(html).toContain('name="iban"');
+  });
+
+  it("bank-only writer saves bank data and ignores master data", async () => {
+    perms("members:bank-data:write");
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1", { method: "POST", body: formBody({ lastName: "Hacked", iban: VALID, bic: "cobadeff" }) });
+    expect(res.status).toBe(302);
+    expect(updateCalls.some((c) => c.table === persons)).toBe(false);
+    expect(updateCalls.find((c) => c.table === members)?.set).toMatchObject({ iban: "DE89370400440532013000", bic: "COBADEFF", accountHolder: null });
+  });
+
+  it("master-data writer without bank permission cannot change bank data", async () => {
+    perms("members:write");
+    findFirstResult = memberWithAssignments();
+    await memberRoutes.request("/m1", { method: "POST", body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01", iban: VALID }) });
+    expect(updateCalls.find((c) => c.table === members)?.set).not.toHaveProperty("iban");
+  });
+
+  it("rejects an invalid IBAN", async () => {
+    perms("members:bank-data:write");
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1", { method: "POST", body: formBody({ iban: "DE00 1234" }) });
+    expect(res.status).toBe(422);
+    expect(updateCalls.some((c) => c.table === members)).toBe(false);
+  });
+});
+
 describe("POST /:id/delete", () => {
   it("returns 404 for an unknown member", async () => {
     findFirstResult = undefined;

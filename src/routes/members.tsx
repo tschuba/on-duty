@@ -17,6 +17,7 @@ import { trimmed } from "../lib/forms.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
+import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
@@ -416,7 +417,7 @@ function RoleRow({
                   data-title={r.title}
                   aria-selected={r.id === assignment?.memberRoleId ? "true" : "false"}
                 >
-                  <a class="min-h-11 flex items-center">{r.title}</a>
+                  <a class="min-h-11 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
                 </li>
               ))}
               <li class="role-combobox-no-match hidden"><a class="disabled pointer-events-none opacity-50 min-h-11 flex items-center">{t("members.form.roleNoMatch")}</a></li>
@@ -597,6 +598,58 @@ function RoleRow({
         }
       ` }} />
     </tr>
+  );
+}
+
+// Bank data is plaintext, protected by permission only (backlog 34). Without read
+// permission the section is not rendered at all — not even a hint that data exists.
+function parseBankData(body: Record<string, any>, errors: Record<string, string>) {
+  const rawIban = trimmed(body, "iban");
+  const iban = rawIban ? normalizeIban(rawIban) : null;
+  if (iban && !isValidIban(iban)) errors.iban = t("members.error.ibanInvalid");
+  return { iban, bic: trimmed(body, "bic").toUpperCase() || null, accountHolder: trimmed(body, "accountHolder") || null };
+}
+
+function BankDataSection({
+  m,
+  editable,
+  errors,
+}: {
+  m: Partial<Member>;
+  editable: boolean;
+  errors?: Record<string, string>;
+}) {
+  const iban = m.iban ? formatIban(m.iban) : "";
+  if (!editable) {
+    return (
+      <div class="mt-6 max-w-2xl">
+        <h2 class="font-semibold mb-2">{t("members.bank.title")}</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <ViewField label={t("members.bank.iban")} value={iban} />
+          <ViewField label={t("members.bank.bic")} value={m.bic} />
+          <ViewField label={t("members.bank.accountHolder")} value={m.accountHolder || `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim()} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div class="divider">{t("members.bank.title")}</div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
+        <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
+        {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
+        <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
+        <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input-bordered w-full" />
+        <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
+      </div>
+    </>
   );
 }
 
@@ -1057,6 +1110,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           </label>
         )}
         <div class="divider">{t("members.form.assignments")}</div>
+        <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
@@ -1177,6 +1231,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </label>
           )}
           <div class="divider">{t("members.form.assignments")}</div>
+          <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1393,6 +1448,8 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   if (!m) return c.notFound();
 
   const isEditor = user.permissions.has("members:write");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
+  const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");
   const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
 
   const canDelete = user.permissions.has("members:delete");
@@ -1437,6 +1494,12 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             </div>
           </div>
         )}
+        {canWriteBank ? (
+          <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
+            <BankDataSection m={m} editable />
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+          </form>
+        ) : canReadBank && <BankDataSection m={m} editable={false} />}
       </Layout>
     );
   }
@@ -1456,7 +1519,9 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       </div>
       <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
         <MemberFormFields m={m} />
+        {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
+        <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1478,16 +1543,38 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 });
 
 // POST /members/:id — update member
-memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
+memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write"]), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const reactivateParam = c.req.query("reactivate");
+  const canWriteMaster = user.permissions.has("members:write");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
 
   const existing = await fetchMember(id);
   if (!existing) return c.notFound();
 
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
+
+  // Fields without permission are ignored, not rejected: bank-only users never touch master data.
+  if (!canWriteMaster) {
+    const bank = parseBankData(body, errors);
+    if (errors.iban) {
+      return c.html(
+        <Layout title={`${existing.firstName} ${existing.lastName}`} user={user} activeNav="members">
+          <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+            <BankDataSection m={{ ...existing, ...bank, iban: trimmed(body, "iban") }} editable errors={errors} />
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+          </form>
+        </Layout>,
+        422
+      );
+    }
+    await db.update(members).set(bank).where(eq(members.id, id));
+    setFlash(c, t("members.flash.saved"), "success");
+    return c.redirect(`/members/${id}`);
+  }
+  const bank = canWriteBank ? parseBankData(body, errors) : null;
 
   const lastName = trimmed(body, "lastName");
   const firstName = trimmed(body, "firstName");
@@ -1525,7 +1612,8 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
       street: body.street as string, houseNumber: body.houseNumber as string,
       zip: body.zip as string, city: body.city as string,
       gender: (body.gender as any) || null,
-      phone: body.phone as string, email: body.email as string };
+      phone: body.phone as string, email: body.email as string,
+      ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
@@ -1536,7 +1624,9 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
           <MemberFormFields m={m} errors={errors} />
+          {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
+          <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1584,6 +1674,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
       birthDate, entryDate,
       exitDate: exitDate ?? "",
       deathDate: deathDate ?? "",
+      ...(canWriteBank && { iban: trimmed(body, "iban"), bic: trimmed(body, "bic"), accountHolder: trimmed(body, "accountHolder") }),
       phone: (body.phone as string) ?? "",
       email: (body.email as string) ?? "",
       "assignment_id[]": assignmentIds,
@@ -1605,6 +1696,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
+          <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1652,6 +1744,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
       entryDate,
       exitDate: exitDate || null,
       deathDate: deathDate || null,
+      ...bank,
     }).where(eq(members.id, id));
 
     // Archive: close open assignments when exitDate or deathDate set
