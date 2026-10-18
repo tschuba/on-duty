@@ -15,6 +15,8 @@ export const persons = pgTable("persons", {
   // Nullable: a donor-only person has no reason to supply one. Members still
   // require it, enforced app-side in members.tsx (not here).
   birthDate: date("birth_date"),
+  // Only set/edited via the donor form; donation context only (see donors.tsx).
+  companyName: text("company_name"),
   phone: text("phone"),
   email: text("email"),
 });

@@ -13,10 +13,10 @@ import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl } from "../lib/list-query.js";
-import { countOpenReceipts } from "../lib/donations.js";
+import { countOpenReceipts, nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { DonorPickerFields, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
+import { DonorPickerFields, duplicatePersonError, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
 // Names the missing fields and links only to org tabs the viewer may read.
 function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>; perms: Set<string> }) {
@@ -33,6 +33,28 @@ function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>;
           ? <p>{t("donations.receipt.blockedContactAdmin")}</p>
           : linkable.map((tab) => <a href={`/organisation/${ORG_TABS[tab].path}`} class="link mr-4">{t(`organisation.tabs.${tab}` as never)} →</a>)}
       </div>
+    </div>
+  );
+}
+
+// Status changes only here (detail area); offers only transitions valid from the current status.
+function ReceiptStatusActions({ d, canIssue }: { d: DonationRow; canIssue: boolean }) {
+  const actions: { action: ReceiptAction; label: string; confirm?: string }[] = [
+    { action: "markNotRequired", label: t("donations.receiptStatus.markNotRequired") },
+    { action: "reopen", label: t("donations.receiptStatus.reopen") },
+    { action: "revoke", label: t("donations.receiptStatus.revoke"), confirm: t("donations.receiptStatus.revokeConfirm") },
+  ];
+  const offered = actions.filter((a) => nextReceiptStatus(d.receiptStatus, a.action));
+  if (!canIssue || offered.length === 0) return null;
+  return (
+    <div class="flex flex-wrap items-center gap-2 max-w-xl mb-4">
+      <span class="font-semibold">{t("donations.receiptStatus.heading")}:</span>
+      {offered.map((a) => (
+        <form method="post" action={`/donations/${d.id}/receipt-status`} onsubmit={a.confirm ? `return confirm(${JSON.stringify(a.confirm)})` : undefined}>
+          <input type="hidden" name="action" value={a.action} />
+          <button type="submit" class="btn btn-outline btn-sm">{a.label}</button>
+        </form>
+      ))}
     </div>
   );
 }
@@ -79,7 +101,8 @@ function receiptFilename(d: DonationWithDonor): string {
       .replace(/\s+/g, "_")
       .replace(/[^a-zA-Z0-9_-]/g, "");
   const p = d.donor.person;
-  return `Zuwendungsbestaetigung_${slug(p.lastName)}_${slug(p.firstName)}_${d.date}_${d.id.slice(0, 8)}.xml`;
+  const who = p.companyName ? slug(p.companyName) : `${slug(p.lastName)}_${slug(p.firstName)}`;
+  return `Zuwendungsbestaetigung_${who}_${d.date}_${d.id.slice(0, 8)}.xml`;
 }
 
 // Builds the FFW xml-data import file for the official Muster 034122 form
@@ -91,7 +114,7 @@ function receiptFilename(d: DonationWithDonor): string {
 function buildReceiptXml(d: DonationWithDonor, config: Record<string, string>): string {
   const aussteller = [config.orgName, `${config.orgStreet} ${config.orgHouseNumber}`, `${config.orgZip} ${config.orgCity}`].join("\n");
   const p = d.donor.person;
-  const name = [`${p.firstName} ${p.lastName}`, `${p.street} ${p.houseNumber}`, `${p.zip} ${p.city}`].join("\n");
+  const name = [recipientName(p), `${p.street} ${p.houseNumber}`, `${p.zip} ${p.city}`].join("\n");
   const wert = Number(d.amount).toFixed(2).replace(".", ",");
   const amountWords = toCurrency(Number(d.amount));
   const wert2 = amountWords.charAt(0).toUpperCase() + amountWords.slice(1);
@@ -230,7 +253,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const all = await fetchDonations();
   const needle = search.toLowerCase();
   const filtered = all.filter((d) => {
-    if (search && !`${d.donor.person.firstName} ${d.donor.person.lastName}`.toLowerCase().includes(needle)) return false;
+    if (search && !`${d.donor.person.companyName ?? ""} ${d.donor.person.firstName} ${d.donor.person.lastName}`.toLowerCase().includes(needle)) return false;
     if (from && d.date < from) return false;
     if (to && d.date > to) return false;
     return true;
@@ -289,18 +312,22 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           ) : sorted.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donations/${d.id}/edit'` : undefined}>
               <td>{formatDate(d.date)}</td>
-              <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
+              <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
               <td>{TYPE_LABELS[d.type]}</td>
               <td>{d.purpose ?? "—"}</td>
               <td>
-                {d.receiptIssuedAt
+                {d.receiptStatus === "issued"
                   ? <span class="badge badge-success badge-sm">{t("donations.table.receiptIssued")}</span>
-                  : <span class="badge badge-ghost badge-sm">{t("donations.table.receiptOpen")}</span>}
+                  : d.receiptStatus === "not_required"
+                    ? <span class="badge badge-ghost badge-sm">{t("donations.table.receiptNotRequired")}</span>
+                    : <span class="badge badge-warning badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
               {canIssueReceipts && (
                 <td class="whitespace-nowrap">
-                  {orgConfigIncomplete
+                  {d.receiptStatus === "not_required"
+                    ? null
+                    : orgConfigIncomplete
                     ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
                     : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
                 </td>
@@ -343,7 +370,8 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   const personId = trimmed(body, "personId") || undefined;
   const donorFields = parseDonorPersonFields(body);
   const donationFields = parseDonationFields(body);
-  const errors = { ...donorFields.errors, ...donationFields.errors };
+  const dup = await duplicatePersonError(body, donorFields.values);
+  const errors: Record<string, string> = { ...donorFields.errors, ...donationFields.errors, ...(dup ? { duplicate: dup } : {}) };
 
   if (Object.keys(errors).length > 0) {
     return c.html(
@@ -389,8 +417,8 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   return c.redirect("/donations");
 });
 
-const canDelete = (user: { permissions: Set<string> }, d: { receiptIssuedAt: Date | null }) =>
-  user.permissions.has("donations:delete") && !d.receiptIssuedAt;
+const canDelete = (user: { permissions: Set<string> }, d: { receiptStatus: string }) =>
+  user.permissions.has("donations:delete") && d.receiptStatus !== "issued";
 
 // GET/POST /donations/:id/edit — donation fields only, donor is fixed once recorded
 donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
@@ -403,10 +431,11 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
     <Layout title={t("donations.title")} user={user} activeNav="donations">
       <div class="mb-4">
         <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
+        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
-      {d.receiptIssuedAt && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
+      {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
+      <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
       </form>
@@ -435,7 +464,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
       <Layout title={t("donations.title")} user={user} activeNav="donations">
         <div class="mb-4">
           <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
+          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
@@ -469,7 +498,7 @@ donationRoutes.post("/:id/delete", requireAuth("donations:delete"), async (c) =>
   const d = await fetchDonation(id);
   if (!d) return c.notFound();
   // Issued receipts are tax documents: the donation must stay.
-  if (d.receiptIssuedAt) {
+  if (d.receiptStatus === "issued") {
     setFlash(c, t("donations.flash.deleteBlocked"), "error");
     return c.redirect(`/donations/${id}/edit`);
   }
@@ -485,13 +514,17 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
   if (!d) return c.notFound();
 
   const config = await loadOrgConfig();
-  if (!isOrgConfigCompleteForReceipts(config)) {
-    return c.html(
-      <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
-        <OrgIncompleteAlert config={config} perms={user.permissions} />
-      </Layout>
-    );
-  }
+  const orgComplete = isOrgConfigCompleteForReceipts(config);
+  const missingOrg = new Set(Object.values(missingReceiptFields(config)).flat());
+  const p = d.donor.person;
+  const addressMissing = !p.street || !p.houseNumber || !p.zip || !p.city;
+
+  const row = (label: string, value: string | null | undefined, missing = false) => (
+    <tr>
+      <th class="font-semibold w-48">{label}</th>
+      <td class={missing || !value ? "text-error" : ""}>{value || t("donations.receipt.missing")}</td>
+    </tr>
+  );
 
   return c.html(
     <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
@@ -500,7 +533,9 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.receipt.title")}</h1>
       </div>
 
-      {d.receiptIssuedAt && (
+      {!orgComplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
+
+      {d.receiptStatus === "issued" && d.receiptIssuedAt && (
         <div class="alert alert-info max-w-2xl mb-4">
           <span>
             {t("donations.warn.receiptIssued")}{" "}
@@ -509,17 +544,33 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
         </div>
       )}
 
-      <div class="max-w-xl border border-base-300 rounded-box p-6">
-        <p class="mb-1"><span class="font-semibold">{t("donations.receipt.summaryDonor")}:</span> {d.donor.person.firstName} {d.donor.person.lastName}</p>
-        <p class="mb-1"><span class="font-semibold">{t("donations.receipt.summaryAmount")}:</span> {formatAmount(d.amount)}</p>
-        <p class="mb-4"><span class="font-semibold">{t("donations.receipt.summaryDate")}:</span> {formatDate(d.date)}</p>
+      {addressMissing && (
+        <div class="alert alert-error max-w-2xl mb-4">
+          <span>{t("donations.receipt.addressMissing")} <a href={`/donors/${d.donorId}/edit`} class="link">{t("donations.receipt.addressMissingLink")}</a></span>
+        </div>
+      )}
 
-        <p class="text-sm opacity-80 mb-4">{t("donations.receipt.explanation")}</p>
-        <a href="https://www.formulare-bfinv.de/ffw/action/invoke.do?id=034122" target="_blank" rel="noopener" class="link text-sm">{t("donations.receipt.officialFormLink")}</a>
-      </div>
+      <h2 class="font-semibold mb-2">{t("donations.receipt.previewTitle")}</h2>
+      <table class="table max-w-2xl mb-4">
+        <tbody>
+          {row(t("donations.receipt.previewRecipient"), recipientName(p))}
+          {row(t("donations.receipt.previewAddress"), addressMissing ? null : `${p.street} ${p.houseNumber}, ${p.zip} ${p.city}`)}
+          {row(t("donations.receipt.summaryAmount"), formatAmount(d.amount))}
+          {row(t("donations.receipt.summaryDate"), formatDate(d.date))}
+          {row(t("donations.receipt.previewType"), TYPE_LABELS[d.type])}
+          {row(t("donations.receipt.previewPurpose"), d.purpose ?? "—")}
+          {row(t("donations.receipt.previewTaxOffice"), config.taxOffice, missingOrg.has("taxOffice"))}
+          {row(t("donations.receipt.previewTaxNumber"), config.taxExemptionNumber, missingOrg.has("taxExemptionNumber"))}
+          {row(t("donations.receipt.previewTaxDate"), config.taxExemptionDate ? formatDate(config.taxExemptionDate) : "", missingOrg.has("taxExemptionDate"))}
+        </tbody>
+      </table>
 
+      <p class="text-sm opacity-80 mb-2 max-w-2xl">{t("donations.receipt.explanation")}</p>
+      <a href="https://www.formulare-bfinv.de/ffw/action/invoke.do?id=034122" target="_blank" rel="noopener" class="link text-sm">{t("donations.receipt.officialFormLink")}</a>
+
+      {/* The button is the confirmation; only missing org data blocks it. */}
       <form method="post" action={`/donations/${d.id}/mark-issued`} class="mt-4">
-        <button type="submit" class="btn btn-primary">{t("donations.receipt.download")}</button>
+        <button type="submit" class="btn btn-primary" disabled={!orgComplete}>{t("donations.receipt.generate")}</button>
       </form>
     </Layout>
   );
@@ -540,11 +591,35 @@ donationRoutes.get("/:id/receipt.xml", requireAuth("donations:issue-receipts"), 
   return c.body(xml);
 });
 
-// POST /donations/:id/mark-issued — set on every download click (re-issuing stays allowed,
-// overwriting both the timestamp and the issuer)
+// POST /donations/:id/mark-issued — allowed from open and not_required; a second issue
+// of an already issued receipt is rejected (receiptIssuedAt/issuedBy stay untouched).
+// The XML stays downloadable via /receipt.xml.
 donationRoutes.post("/:id/mark-issued", requireAuth("donations:issue-receipts"), async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
-  await db.update(donations).set({ receiptIssuedAt: new Date(), issuedBy: user.id }).where(eq(donations.id, id));
+  const d = await fetchDonation(id);
+  if (!d) return c.notFound();
+  // Same guard as receipt.xml: without complete org data no file can be produced, so don't mark as issued.
+  if (!isOrgConfigCompleteForReceipts(await loadOrgConfig())) return c.redirect(`/donations/${id}/receipt`);
+  if (nextReceiptStatus(d.receiptStatus, "issue")) {
+    await db.update(donations).set({ receiptStatus: "issued", receiptIssuedAt: new Date(), issuedBy: user.id }).where(eq(donations.id, id));
+  }
   return c.redirect(`/donations/${id}/receipt.xml`);
+});
+
+// POST /donations/:id/receipt-status — markNotRequired / reopen / revoke (invalid transitions rejected)
+donationRoutes.post("/:id/receipt-status", requireAuth("donations:issue-receipts"), async (c) => {
+  const id = c.req.param("id");
+  const d = await fetchDonation(id);
+  if (!d) return c.notFound();
+  const body = await c.req.parseBody();
+  const action = trimmed(body, "action") as ReceiptAction;
+  const next = nextReceiptStatus(d.receiptStatus, action);
+  if (!next) {
+    setFlash(c, t("donations.flash.statusInvalid"), "error");
+    return c.redirect(`/donations/${id}/edit`);
+  }
+  await db.update(donations).set(next === "open" ? { receiptStatus: next, receiptIssuedAt: null, issuedBy: null } : { receiptStatus: next }).where(eq(donations.id, id));
+  setFlash(c, t("donations.flash.statusChanged"), "success");
+  return c.redirect(`/donations/${id}/edit`);
 });

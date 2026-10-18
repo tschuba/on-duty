@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { t } from "../i18n/index.js";
 import { persons, donors } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 import { makePerson } from "./fixtures.js";
@@ -160,8 +161,9 @@ describe("GET /search-persons", () => {
   it("projects only the narrow field set — never gender/birthDate/phone/email", async () => {
     personsFixture = [makePerson()];
     await donorRoutes.request("/search-persons?q=an");
-    const cols = selectCalls[selectCalls.length - 1];
-    expect(Object.keys(cols).sort()).toEqual(["city", "firstName", "houseNumber", "id", "lastName", "street", "zip"]);
+    // first select = outer query; the exists() subqueries come after
+    const cols = selectCalls.find((c) => "firstName" in c)!;
+    expect(Object.keys(cols).sort()).toEqual(["city", "companyName", "firstName", "houseNumber", "id", "lastName", "street", "zip"]);
   });
 
   it("shows a create-new prompt when nothing matches", async () => {
@@ -251,6 +253,24 @@ describe("POST /new", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("warns instead of creating when a member/donor with the same name exists", async () => {
+    personsFixture = [{ id: "p9" }];
+    const fields = { firstName: "Anna", lastName: "Bauer", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt" };
+    const res = await donorRoutes.request("/new", { method: "POST", body: formBody(fields) });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("donations.form.duplicateWarning"));
+    expect(insertCalls.some((c) => c.table === persons)).toBe(false);
+  });
+
+  it("creates anyway once the duplicate is confirmed", async () => {
+    personsFixture = [{ id: "p9" }];
+    donorLookupResult = [];
+    const fields = { firstName: "Anna", lastName: "Bauer", street: "Musterweg", houseNumber: "5", zip: "12345", city: "Musterstadt", confirmDuplicate: "1" };
+    const res = await donorRoutes.request("/new", { method: "POST", body: formBody(fields) });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === persons)).toBe(true);
+  });
+
   it("creates a new person and donor when no personId is given", async () => {
     donorLookupResult = [];
     const res = await donorRoutes.request("/new", {
@@ -274,3 +294,13 @@ describe("POST /new", () => {
   });
 });
 
+
+describe("parseDonorPersonFields with company", () => {
+  const addr = { street: "A", houseNumber: "1", zip: "1", city: "X" };
+  it("makes first/last name optional when a company name is given", () => {
+    expect(parseDonorPersonFields({ companyName: "Müller GmbH", ...addr }).errors).toEqual({});
+  });
+  it("still requires the address", () => {
+    expect(Object.keys(parseDonorPersonFields({ companyName: "Müller GmbH" }).errors).sort()).toEqual(["city", "houseNumber", "street", "zip"]);
+  });
+});
