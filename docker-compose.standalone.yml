@@ -101,7 +101,9 @@ services:
       # entstehen NICHT automatisch — siehe docs/standalone-deployment.md.
       ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ORG_NAME:?ORG_NAME must be set - Zitadel fixes the name on first start}
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
-      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN}
+      # Fixed suffix guarantees upper/lower case, digit and symbol: the random Coolify value alone sometimes
+      # misses one class and the first setup then fails in a retry loop (PasswordComplexityPolicy).
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN}Aa1!
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "true"
       # Login V2 (separate zitadel-login container) needs a machine user
       # with a PAT, which Zitadel creates itself during bootstrap and shares
