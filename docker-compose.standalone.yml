@@ -104,6 +104,7 @@ services:
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
       # Fixed suffix guarantees upper/lower case, digit and symbol: the random Coolify value alone sometimes
       # misses one class and the first setup then fails in a retry loop (PasswordComplexityPolicy).
+      # So the initial password is NOT the Coolify value alone: it is the value shown in Coolify + "Aa1!".
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN}Aa1!
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "true"
       # Login V2 (separate zitadel-login container) needs a machine user
