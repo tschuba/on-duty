@@ -16,6 +16,28 @@ const PHASE = process.argv[2] ?? "oidc";
 const PAT_FILE = `${DIR}/admin.pat`;
 const { ZITADEL_DOMAIN, APP_DOMAIN, WEBHOOK_URL, OIDC_CLIENT_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
 
+if (!ZITADEL_DOMAIN || !APP_DOMAIN) {
+  console.error("[zitadel-init] ZITADEL_DOMAIN/APP_DOMAIN missing — set the domains of the zitadel and app services in Coolify.");
+  process.exit(1);
+}
+
+// Domains are baked into Zitadel (issuer, redirect URI, webhook) on first setup and the bootstrap PAT is deleted
+// afterwards, so a later domain change cannot be synced automatically. Detect it and say what to do (warn only: the
+// local admin login must keep working).
+const DOMAINS_FILE = `${DIR}/domains`;
+const domains = `ZITADEL_DOMAIN=${ZITADEL_DOMAIN}\nAPP_DOMAIN=${APP_DOMAIN}\n`;
+if (PHASE === "oidc") {
+  if (!existsSync(DOMAINS_FILE)) {
+    writeFileSync(DOMAINS_FILE, domains);
+  } else if (readFileSync(DOMAINS_FILE, "utf8") !== domains) {
+    console.warn(
+      `[zitadel-init] WARNING: domain changed (stored: ${readFileSync(DOMAINS_FILE, "utf8").trim().replace(/\n/g, ", ")}).\n` +
+        "  Zitadel issuer, OIDC app redirect URI and webhook target still point to the old domain —\n" +
+        "  OIDC login fails until they are updated. See docs/standalone-deployment.md.",
+    );
+  }
+}
+
 if (PHASE === "oidc") {
   if (OIDC_CLIENT_ID) {
     console.log("[zitadel-init] OIDC_CLIENT_ID ist explizit gesetzt — nichts zu tun.");

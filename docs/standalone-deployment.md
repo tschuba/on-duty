@@ -78,6 +78,12 @@ OIDC_CLIENT_SECRET=<Client-Secret>
 
 4. `docker compose --file docker-compose.standalone.yml --env-file .env.standalone up -d`
 
+## Nach dem Erststart fixiert
+
+- `ORG_NAME` ist Pflicht; fehlt der Wert, bricht der Deploy ab, bevor Zitadel initialisiert wird. Nach dem Erststart ändert sich der Org-Name nur noch in der Zitadel-Console (die Variable wirkt dann nur noch in der App).
+- **Domains** (`app`, `zitadel`, `zitadel-login`) stecken in Zitadel (Issuer, Redirect-URI, Webhook-Target). `zitadel-init` merkt sich diese im Bootstrap-Volume (`domains`) und warnt im Log, wenn sie sich später ändern. Eine automatische Korrektur gibt es nicht (Bootstrap-PAT wird nach dem Setup gelöscht). Der lokale Admin-Login (`/admin/login`) funktioniert weiterhin.
+- Masterkey und DB-Passwörter (`SERVICE_PASSWORD_*`) nie neu generieren und ins Backup aufnehmen.
+
 ## Upgrade
 
 ```bash
