@@ -71,13 +71,15 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           </a>
           {user && (
             <div class="hidden md:flex gap-4 items-baseline">
-              <a
-                href="/members"
-                class={navLink(activeNav === "members")}
-              >
-                {t("common.nav.members")}
-                <CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} />
-              </a>
+              {user.permissions.has("members:read") && (
+                <a
+                  href="/members"
+                  class={navLink(activeNav === "members")}
+                >
+                  {t("common.nav.members")}
+                  <CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} />
+                </a>
+              )}
               {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
@@ -124,7 +126,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
-                <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>
+                {user.permissions.has("members:read") && <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} /></a></li>}

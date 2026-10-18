@@ -61,7 +61,17 @@ app.get("/", requireAuth(), (c) => {
     deleteCookie(c, "returnTo", { path: "/" });
     return c.redirect(returnTo);
   }
-  return c.redirect("/members");
+  // First section the user may open, in nav order; /account is open to every active user.
+  const perms = c.get("user").permissions;
+  const landing: [string[], string][] = [
+    [["members:read"], "/members"],
+    [["donations:read", "donations:record", "donations:issue-receipts"], "/donations"],
+    [["inventory:read"], "/inventory"],
+    [["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"], "/organisation"],
+    [["applications:read"], "/applications"],
+    [["system:admin"], "/admin"],
+  ];
+  return c.redirect(landing.find(([ps]) => ps.some((p) => perms.has(p as never)))?.[1] ?? "/account");
 });
 
 // Self-registration: waiting screen + account deletion
