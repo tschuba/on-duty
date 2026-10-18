@@ -426,8 +426,8 @@ function RoleCheckboxes({
             <div class="flex flex-col min-w-0">
               <span class="font-medium text-sm">{r.name}</span>
               {r.description && <span class="text-xs opacity-60 truncate">{r.description}</span>}
-              <details class="text-xs" onclick="event.stopPropagation()">
-                <summary class="cursor-pointer opacity-60">{t("admin.users.modal.roleDetails")}</summary>
+              <details class="text-xs">
+                <summary class="cursor-pointer opacity-60" onclick="event.preventDefault();this.parentElement.toggleAttribute('open')">{t("admin.users.modal.roleDetails")}</summary>
                 <div class="mt-1"><PermissionBadges permissions={permsByRole.get(r.id) ?? []} /></div>
               </details>
             </div>

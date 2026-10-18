@@ -27,7 +27,25 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
+let orgConfigFixture: Record<string, string> = {};
+vi.mock("../lib/org-config.js", () => ({ loadOrgConfig: vi.fn(async () => orgConfigFixture) }));
+
 const { loginRoutes } = await import("../routes/login.js");
+
+describe("GET /login", () => {
+  it("shows the org name with on-duty in the heading", async () => {
+    orgConfigFixture = { orgName: "FF Altenhammer" };
+    const html = await (await loginRoutes.request("/login")).text();
+    expect(html).toContain("FF Altenhammer on-duty");
+    expect(html).not.toContain("OIDC");
+  });
+
+  it("falls back to plain on-duty when the org name is empty", async () => {
+    orgConfigFixture = { orgName: " " };
+    const html = await (await loginRoutes.request("/login")).text();
+    expect(html).toMatch(/<h1[^>]*>on-duty<\/h1>/);
+  });
+});
 
 describe("GET /admin/login", () => {
   it("autofocuses the username field", async () => {
