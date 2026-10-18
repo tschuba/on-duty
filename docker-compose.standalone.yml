@@ -22,7 +22,8 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-onduty}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-onduty}
       BETTER_AUTH_SECRET: ${SERVICE_PASSWORD_BETTERAUTH}
       ADMIN_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
-      ORG_NAME: ${ORG_NAME:?ORG_NAME must be set - Zitadel fixes the name on first start}
+      # Required (`:?` without text: Coolify would take the text as the default value). Zitadel fixes the org name on first start.
+      ORG_NAME: ${ORG_NAME:?}
       OIDC_PROVIDER: https://${SERVICE_FQDN_ZITADEL}
       # Empty = created automatically by zitadel-init (oidc.env in the bootstrap volume).
       # Explicit values in .env.standalone take precedence (e.g. existing installations).
@@ -99,9 +100,11 @@ services:
       ZITADEL_DATABASE_POSTGRES_DSN: postgresql://${ZITADEL_DB_USER:-zitadel}:${SERVICE_PASSWORD_ZITADELDB}@db:5432/${ZITADEL_DB_NAME:-zitadel}?sslmode=disable
       # Erstinstanz-Bootstrap: nur Org + Admin-User. Projekt/OIDC-Application
       # entstehen NICHT automatisch — siehe docs/standalone-deployment.md.
-      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ORG_NAME:?ORG_NAME must be set - Zitadel fixes the name on first start}
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ORG_NAME:?}
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
-      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN}
+      # Fixed suffix guarantees upper/lower case, digit and symbol: the random Coolify value alone sometimes
+      # misses one class and the first setup then fails in a retry loop (PasswordComplexityPolicy).
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN}Aa1!
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "true"
       # Login V2 (separate zitadel-login container) needs a machine user
       # with a PAT, which Zitadel creates itself during bootstrap and shares
