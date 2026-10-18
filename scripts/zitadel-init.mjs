@@ -185,6 +185,7 @@ if (PHASE === "oidc") {
     const name = r.result?.[0]?.preferredLoginName;
     if (!name) throw new Error("user zitadel-admin not found");
     console.log(`[zitadel-init] Console login: https://${ZITADEL_DOMAIN} — login name: ${name}`);
+    console.log("[zitadel-init] Initial password: value of SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN in Coolify + \"Aa1!\" (changed on first login).");
   } catch (e) {
     console.warn("[zitadel-init] Could not determine the admin login name:", e.message);
   }
