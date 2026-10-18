@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -285,16 +286,19 @@ function MemberPickerFields({ memberId, memberName }: { memberId?: string; membe
     <div class="form-control" data-show-cats="ppe" data-show-batch="false">
       <label class="label"><span class="label-text">{t("inventory.form.assignedMember")}</span></label>
       <div id="member-picker-search" class={showSelected ? "hidden" : ""}>
-        <input
-          type="text"
-          name="q"
-          autocomplete="off"
-          placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
-          class="input input-bordered w-full"
-          hx-get="/inventory/search-members"
-          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-          hx-target="#member-picker-results"
-        />
+        <label class="input input-bordered flex items-center gap-2 w-full">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="text"
+            name="q"
+            autocomplete="off"
+            placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
+            class="grow min-w-0"
+            hx-get="/inventory/search-members"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#member-picker-results"
+          />
+        </label>
         <div id="member-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
       </div>
       <input type="hidden" id="assignedMemberId" name="assignedMemberId" value={memberId ?? ""} />
@@ -344,16 +348,19 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
         ))}
       </div>
       <div id="batch-assign-search">
-        <input
-          type="text"
-          name="q"
-          autocomplete="off"
-          placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
-          class="input input-bordered w-full"
-          hx-get="/inventory/search-members"
-          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-          hx-target="#batch-assign-results"
-        />
+        <label class="input input-bordered flex items-center gap-2 w-full">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="text"
+            name="q"
+            autocomplete="off"
+            placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
+            class="grow min-w-0"
+            hx-get="/inventory/search-members"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#batch-assign-results"
+          />
+        </label>
         <div id="batch-assign-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
       </div>
       <input type="hidden" id="inventory-assignments" name="assignments" value={serialized} />
