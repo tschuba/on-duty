@@ -40,7 +40,7 @@ Nur `ORG_NAME` (Pflicht), optional `SMTP_*` und `APP_VERSION`; `OIDC_CLIENT_ID`/
 
 Deploy in Coolify starten. `https://<on-duty-domain>` ist danach erreichbar. Login zunächst über `/admin/login` (lokaler Admin, `SERVICE_PASSWORD_ADMIN`) — OIDC-Benutzer müssen vorab unter **Admin → Benutzer** angelegt werden (oder per Selbstregistrierung, siehe [docs/oidc.md](oidc.md)).
 
-Zitadel-Console: `https://<zitadel-domain>`, Benutzername `zitadel-admin` (Zitadel hängt automatisch die Org-Domain an; Login-Name per `psql` im `db`-Container aus `projections.login_names3` ermitteln). Passwort: Wert von `SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN` aus den Coolify-Variablen **plus `Aa1!`**; der erste Login erzwingt eine Passwortänderung.
+Zitadel-Console: `https://<zitadel-domain>`, Benutzername `zitadel-admin` (Zitadel hängt automatisch die Org-Domain an; den vollständigen Login-Namen gibt `zitadel-init` im Log aus: Zeile `Console login: … login name: …`). Passwort: Wert von `SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN` aus den Coolify-Variablen **plus `Aa1!`**; der erste Login erzwingt eine Passwortänderung.
 
 ### Wie die Automatisierung funktioniert
 

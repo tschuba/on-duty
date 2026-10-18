@@ -176,6 +176,18 @@ if (PHASE === "oidc") {
   await api("PUT", "/v2/features/instance", {
     loginV2: { required: true, baseUri: `https://${LOGIN_DOMAIN || ZITADEL_DOMAIN}/ui/v2/login/` },
   });
+
+  // Zitadel appends the org domain to the username, so the console login name is not obvious. Print it (comfort only).
+  try {
+    const r = await api("POST", "/v2/users", {
+      queries: [{ userNameQuery: { userName: "zitadel-admin@", method: "TEXT_QUERY_METHOD_STARTS_WITH" } }],
+    });
+    const name = r.result?.[0]?.preferredLoginName;
+    if (!name) throw new Error("user zitadel-admin not found");
+    console.log(`[zitadel-init] Console login: https://${ZITADEL_DOMAIN} — login name: ${name}`);
+  } catch (e) {
+    console.warn("[zitadel-init] Could not determine the admin login name:", e.message);
+  }
 } else {
   // Optional convenience: webhook for registration/email verification (on-duty: POST /hooks/zitadel). If this fails,
   // on-duty still works — the user is then created at first login. on-duty reads the signing secret from the volume
