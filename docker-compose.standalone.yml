@@ -106,11 +106,13 @@ services:
       # Login V2 (separate zitadel-login container) needs a machine user
       # with a PAT, which Zitadel creates itself during bootstrap and shares
       # with zitadel-login via the common zitadel-bootstrap volume.
-      # One-time admin machine user (IAM_OWNER) for zitadel-init only: creates project + OIDC app
-      # and deletes itself afterwards. Only created during the very first setup of the instance.
-      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/admin.pat
+      # Admin machine user (IAM_OWNER) for zitadel-init only: creates project + OIDC app on first start and keeps
+      # redirect URIs, login URL and webhook in sync with the domains on every deploy. Its PAT lives in the separate
+      # zitadel-admin volume, mounted only by zitadel and the init containers. Only created during the very first
+      # setup of the instance.
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/admin/admin.pat
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: onduty-init
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (temporary)
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (domain sync)
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2099-01-01T00:00:00Z"
       ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
       ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
@@ -128,6 +130,7 @@ services:
       start_period: 20s
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:rw
     depends_on:
       db:
         condition: service_healthy
@@ -160,6 +163,7 @@ services:
     environment:
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       APP_DOMAIN: ${SERVICE_FQDN_APP}
+      LOGIN_DOMAIN: ${SERVICE_FQDN_ZITADELLOGIN}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       # Same SMTP values as for on-duty — also registered in Zitadel during the first setup.
       SMTP_HOST: ${SMTP_HOST:-}
@@ -169,6 +173,7 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:ro
     depends_on:
       zitadel:
         condition: service_healthy
@@ -182,11 +187,13 @@ services:
     environment:
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       APP_DOMAIN: ${SERVICE_FQDN_APP}
+      LOGIN_DOMAIN: ${SERVICE_FQDN_ZITADELLOGIN}
       # Zitadel blocks webhook targets in private networks (HTTPClient.DenyList, default stays active) — hence the
       # public URL via Caddy, not http://app:3000. The Docker subnet is not predictable.
       WEBHOOK_URL: ${WEBHOOK_URL:-https://${SERVICE_FQDN_APP}/hooks/zitadel}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:ro
     depends_on:
       app:
         condition: service_healthy
@@ -216,6 +223,7 @@ services:
 volumes:
   pgdata:
   zitadel-bootstrap:
+  zitadel-admin:
 
 configs:
   init-zitadel-db:

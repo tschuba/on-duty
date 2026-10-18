@@ -44,8 +44,8 @@ Zitadel-Console: `https://<zitadel-domain>`, Benutzername `zitadel-admin` (Zitad
 
 ### Wie die Automatisierung funktioniert
 
-- Zitadel legt beim allerersten Setup einen Machine-User `onduty-init` (Rolle `IAM_OWNER`) samt PAT im Bootstrap-Volume an.
-- `zitadel-init` nutzt diesen PAT, erzeugt Projekt `on-duty` und eine Web-Application (Authorization Code + PKCE, Redirect-URI `https://<on-duty-domain>/auth/callback/oidc`), schreibt `oidc.env` und **löscht den Machine-User samt PAT wieder**.
+- Zitadel legt beim allerersten Setup einen Machine-User `onduty-init` (Rolle `IAM_OWNER`) samt PAT im separaten Volume `zitadel-admin` an (nur `zitadel`, `zitadel-init` und `zitadel-init-hooks` mounten es, `app` und `zitadel-login` nicht).
+- `zitadel-init` nutzt diesen PAT, erzeugt Projekt `on-duty` und eine Web-Application (Authorization Code + PKCE, Redirect-URI `https://<on-duty-domain>/auth/callback/oidc`), schreibt `oidc.env`. Der Machine-User bleibt bestehen: `zitadel-init` und `zitadel-init-hooks` laufen bei jedem Deploy und gleichen Redirect-URIs, Login-UI-URL und Webhook-Endpoint mit den aktuellen Domains ab. Das Volume `zitadel-admin` enthält einen `IAM_OWNER`-Token und gehört nicht in Backups oder Snapshots, die Dritte lesen können.
 - Bei späteren Starts tut `zitadel-init` nichts (`oidc.env` existiert bzw. `OIDC_CLIENT_ID` ist gesetzt).
 - Das Bootstrap-Volume enthält `oidc.env` mit dem Client-Secret (`0600`) — wie `.env.standalone` als Geheimnis behandeln.
 
@@ -81,19 +81,18 @@ OIDC_CLIENT_SECRET=<Client-Secret>
 ## Nach dem Erststart fixiert
 
 - `ORG_NAME` ist Pflicht; fehlt der Wert, bricht der Deploy ab, bevor Zitadel initialisiert wird. Nach dem Erststart ändert sich der Org-Name nur noch in der Zitadel-Console (die Variable wirkt dann nur noch in der App).
-- **Domains** (`app`, `zitadel`, `zitadel-login`) stecken teilweise in Zitadel. `zitadel-init` merkt sich diese im Bootstrap-Volume (`domains`) und warnt im Log, wenn sie sich später ändern. Eine automatische Korrektur gibt es nicht (der Bootstrap-PAT wird nach dem Setup gelöscht). Der lokale Admin-Login (`/admin/login`) funktioniert weiterhin. Anleitung: [Domain nachträglich ändern](#domain-nachträglich-ändern).
+- **Domains** (`app`, `zitadel`, `zitadel-login`) werden bei jedem Deploy automatisch nach Zitadel synchronisiert, siehe [Domain nachträglich ändern](#domain-nachträglich-ändern).
 - Masterkey und DB-Passwörter (`SERVICE_PASSWORD_*`) nie neu generieren und ins Backup aufnehmen.
 
 ## Domain nachträglich ändern
 
-Domain in Coolify ändern und redeployen. Zitadel akzeptiert eine neue `zitadel`-Domain beim Start von selbst (Issuer und Discovery folgen `ZITADEL_EXTERNALDOMAIN`). Diese Werte bleiben aber auf der alten Domain und müssen von Hand angepasst werden (Zitadel-Console, als `zitadel-admin` angemeldet):
+Domain in Coolify ändern und redeployen, mehr nicht. `zitadel-init` und `zitadel-init-hooks` gleichen bei jedem Deploy ab:
 
-| Geänderte Domain | Was anpassen |
-|---|---|
-| `app` | Projekt `on-duty` → Anwendung `on-duty` → Redirect Settings: Redirect-URI `https://<app-domain>/auth/callback/oidc` und Post-Logout-URI ergänzen (Symptom sonst: `invalid_request … redirect_uri is missing`). Webhook-Target (Actions → Targets, bzw. `/v2/actions/targets`): Endpoint auf `https://<app-domain>/hooks/zitadel` setzen, sonst werden Selbstregistrierungen nicht synchronisiert. |
-| `zitadel` oder `zitadel-login` | Login-V2-Basis-URL der Instanz auf `https://<login-domain>/ui/v2/login/` setzen (`PUT /v2/features/instance` mit `{"loginV2":{"required":true,"baseUri":"…"}}`; Symptom sonst: Weiterleitung beim Login zur alten Domain). Die Redirect-URI der App bleibt gleich. |
+- Redirect-URI und Post-Logout-URI der OIDC-Application (`app`-Domain),
+- Login-V2-Basis-URL der Instanz (`zitadel-login`-Domain),
+- Endpoint des Webhook-Targets (`app`-Domain; Signing-Key und `webhook.secret` bleiben gleich).
 
-`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` bleiben unverändert, `oidc.env` muss nicht neu erzeugt werden.
+Zitadels Issuer folgt `ZITADEL_EXTERNALDOMAIN` beim Start von selbst. `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` bleiben unverändert. Voraussetzung ist das Volume `zitadel-admin`. Installationen aus der Zeit davor (PAT wurde gelöscht) haben es nicht: `zitadel-init` warnt dort nur bei Domain-Änderungen, und die drei Werte müssen in der Zitadel-Console von Hand angepasst werden (Redirect-URI: Projekt `on-duty` → Application; Webhook: Actions → Targets; Login-URL: `PUT /v2/features/instance` mit `{"loginV2":{"required":true,"baseUri":"https://<login-domain>/ui/v2/login/"}}`).
 
 ## Upgrade
 
