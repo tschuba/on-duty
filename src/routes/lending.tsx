@@ -370,16 +370,19 @@ function BorrowerPickerFields({ personId, values, errors }: {
         <label class="label">
           <span class="label-text">{t("lending.loans.form.borrowerType")}<span class="text-error ml-1">*</span></span>
         </label>
-        <input
-          type="text"
-          name="q"
-          autocomplete="off"
-          placeholder={t("lending.loans.form.borrowerSearchPlaceholder")}
-          class={`input input-bordered w-full${errors?.borrower ? " input-error" : ""}`}
-          hx-get="/inventory/lending/search-persons"
-          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-          hx-target="#borrower-picker-results"
-        />
+        <label class={`input input-bordered flex items-center gap-2 w-full${errors?.borrower ? " input-error" : ""}`}>
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="text"
+            name="q"
+            autocomplete="off"
+            placeholder={t("lending.loans.form.borrowerSearchPlaceholder")}
+            class="grow min-w-0"
+            hx-get="/inventory/lending/search-persons"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#borrower-picker-results"
+          />
+        </label>
         <div id="borrower-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
         {errors?.borrower && <p class="text-error text-sm mt-1">{errors.borrower}</p>}
       </div>

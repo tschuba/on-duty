@@ -9,6 +9,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const out = join(root, "src", "components", "icons.generated.ts");
 
 const ICONS = {
+  fire: "24/outline/fire.svg",
   link: "24/outline/link.svg",
   "magnifying-glass": "24/outline/magnifying-glass.svg",
   "clipboard-document": "24/outline/clipboard-document.svg",

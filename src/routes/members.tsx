@@ -8,6 +8,7 @@ import { members, persons, memberRoles, memberRoleAssignments, applications, app
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
+import { RolePopover } from "../components/role-popover.js";
 import { deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -272,14 +273,7 @@ export function MembersTable({
                         {roles.length === 1
                           ? <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>
                           : roles.length > 1 && (
-                            <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
-                              <div tabindex={0} role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">{t("members.table.roleCount", { count: roles.length })}</div>
-                              <div tabindex={0} class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
-                                <div class="flex flex-wrap gap-1 max-w-48">
-                                  {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
-                                </div>
-                              </div>
-                            </div>
+                            <RolePopover roles={roles} label={t("members.table.roleCount", { count: roles.length })} />
                           )}
                       </div>
                     );

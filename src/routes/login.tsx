@@ -5,6 +5,8 @@ import { getCookie, deleteCookie } from "hono/cookie";
 import { auth } from "../auth.js";
 import { db } from "../db/index.js";
 import { accounts } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
+import { loadOrgConfig } from "../lib/org-config.js";
 import { Layout } from "../components/layout.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { env } from "../env.js";
@@ -16,7 +18,7 @@ export const loginRoutes = new Hono<{ Variables: Variables }>();
 
 // ── /login — OIDC entry point ─────────────────────────────────────────────────
 
-loginRoutes.get("/login", (c) => {
+loginRoutes.get("/login", async (c) => {
   const error = c.req.query("error");
   const errorMsg =
     error === "unknown_user"
@@ -29,13 +31,17 @@ loginRoutes.get("/login", (c) => {
             ? t("login.error.emailUnverified")
             : null;
 
+  const orgName = ((await loadOrgConfig()).orgName ?? "").trim();
+  const heading = orgName ? t("login.heading", { org: orgName }) : "on-duty";
+
   return c.html(
     <Layout title={t("login.title")}>
-      <div class="flex min-h-[60vh] items-center justify-center">
-        <div class="card bg-base-200 w-full max-w-sm shadow">
-          <div class="card-body gap-4">
+      <div class="flex min-h-[70vh] items-center justify-center rounded-box bg-base-200 p-4">
+        <div class="card bg-base-100 border border-base-300 w-full max-w-sm shadow">
+          <div class="card-body gap-4 items-center text-center">
+            <Icon name="fire" class="w-12 h-12 text-primary" />
             <h1 class="card-title text-2xl" style="font-family: var(--font-heading)">
-              {t("login.title")}
+              {heading}
             </h1>
             {errorMsg && (
               <div class="alert alert-error text-sm">

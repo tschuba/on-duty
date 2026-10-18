@@ -54,7 +54,7 @@ describe("Anträge tab (MemberTabs)", () => {
     const app = new Hono();
     app.get("/", (c) => c.html(<Layout user={userWith("members:read", "applications:read")}>x</Layout>));
     const html = await (await app.request("/")).text();
-    expect(html).toContain('badge-primary ml-1">3<');
+    expect(html).toContain('badge-warning ml-1">3<');
   });
 
   it("never queries the DB for a user without the permission", async () => {
@@ -75,7 +75,7 @@ describe("Layout — Spenden badge", () => {
 
   it("shows open receipts count with donations:issue-receipts", async () => {
     openDonationsFixture = [{ id: "d1" }, { id: "d2" }];
-    expect(await render("donations:issue-receipts")).toContain('badge-primary ml-1">2<');
+    expect(await render("donations:issue-receipts")).toContain('badge-warning ml-1">2<');
   });
 
   it("hides the badge without the permission", async () => {
@@ -98,13 +98,13 @@ describe("Layout — Hauptmenü-Badge im aktiven Bereich", () => {
   it("hides the Spenden badge when donations is active, shows it otherwise", async () => {
     openDonationsFixture = [{ id: "d1" }];
     expect(await render("donations", "donations:issue-receipts")).not.toContain("badge-primary");
-    expect(await render("members", "donations:issue-receipts")).toContain('badge-primary ml-1">1<');
+    expect(await render("members", "donations:issue-receipts")).toContain('badge-warning ml-1">1<');
   });
 
   it("hides the Mitglieder badge when members is active, shows it otherwise", async () => {
     openApplicationsFixture = [{ id: "a1" }];
     expect(await render("members", "members:read", "applications:read")).not.toContain("badge-primary");
-    expect(await render("donations", "members:read", "applications:read")).toContain('badge-primary ml-1">1<');
+    expect(await render("donations", "members:read", "applications:read")).toContain('badge-warning ml-1">1<');
   });
 });
 

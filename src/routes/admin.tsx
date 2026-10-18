@@ -14,6 +14,7 @@ import {
   userAppRoles,
 } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
@@ -146,16 +147,7 @@ function UserRoleBadges({ roles }: { roles: string[] }) {
     return <span class="badge badge-outline badge-sm whitespace-nowrap">{roles[0]}</span>;
   }
   return (
-    <div class="dropdown dropdown-end dropdown-hover" onclick="event.stopPropagation()">
-      <div tabindex={0} role="button" class="badge badge-neutral badge-sm cursor-pointer whitespace-nowrap">
-        {t("admin.users.roleCount", { count: roles.length })}
-      </div>
-      <div tabindex={0} class="dropdown-content z-10 card card-compact bg-base-100 shadow border border-base-300 p-2 mt-1">
-        <div class="flex flex-wrap gap-1 max-w-48">
-          {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
-        </div>
-      </div>
-    </div>
+    <RolePopover roles={roles} label={t("admin.users.roleCount", { count: roles.length })} />
   );
 }
 
@@ -412,17 +404,36 @@ function RoleCheckboxes({
   checkedIds: Set<string>;
 }) {
   return (
-    <div class="flex flex-col gap-2">
-      {allRoles.map((r) => (
-        <label key={r.id} class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-2 cursor-pointer has-[:checked]:border-primary">
-          <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm mt-1" checked={checkedIds.has(r.id)} />
-          <div class="flex flex-col gap-1">
-            <span class="font-medium text-sm">{r.name}</span>
-            {r.description && <span class="text-xs opacity-60">{r.description}</span>}
-            <PermissionBadges permissions={permsByRole.get(r.id) ?? []} />
-          </div>
-        </label>
-      ))}
+    <div class="role-picker flex flex-col gap-2">
+      <label class="input input-bordered input-sm flex items-center gap-2 w-full">
+        <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+        <input
+          type="text"
+          autocomplete="off"
+          class="grow min-w-0"
+          placeholder={t("admin.users.modal.roleSearchPlaceholder")}
+          oninput="const q=this.value.toLowerCase();this.closest('.role-picker').querySelectorAll('[data-role-item]').forEach(function(el){el.hidden=!el.dataset.roleItem.includes(q)})"
+        />
+      </label>
+      <div class="flex flex-col gap-1 max-h-72 overflow-y-auto">
+        {allRoles.map((r) => (
+          <label
+            key={r.id}
+            data-role-item={`${r.name} ${r.description ?? ""}`.toLowerCase()}
+            class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-1.5 cursor-pointer has-[:checked]:border-primary"
+          >
+            <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm mt-1" checked={checkedIds.has(r.id)} />
+            <div class="flex flex-col min-w-0">
+              <span class="font-medium text-sm">{r.name}</span>
+              {r.description && <span class="text-xs opacity-60 truncate">{r.description}</span>}
+              <details class="text-xs" onclick="event.stopPropagation()">
+                <summary class="cursor-pointer opacity-60">{t("admin.users.modal.roleDetails")}</summary>
+                <div class="mt-1"><PermissionBadges permissions={permsByRole.get(r.id) ?? []} /></div>
+              </details>
+            </div>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
