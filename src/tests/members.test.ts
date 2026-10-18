@@ -773,6 +773,17 @@ describe("bank data gating", () => {
     expect(updateCalls.find((c) => c.table === members)?.set).not.toHaveProperty("iban");
   });
 
+  it("stores bank data on create only with bank-data:write", async () => {
+    const form = { lastName: "Neu", firstName: "Nina", birthDate: "1990-01-01", entryDate: "2024-01-01", iban: VALID };
+    perms("members:write", "members:bank-data:write");
+    await memberRoutes.request("/new", { method: "POST", body: formBody(form) });
+    expect(insertCalls.find((c) => c.table === members)?.values).toMatchObject({ iban: "DE89370400440532013000" });
+    insertCalls.length = 0;
+    perms("members:write");
+    await memberRoutes.request("/new", { method: "POST", body: formBody(form) });
+    expect(insertCalls.find((c) => c.table === members)?.values).not.toHaveProperty("iban");
+  });
+
   it("rejects an invalid IBAN", async () => {
     perms("members:bank-data:write");
     findFirstResult = memberWithAssignments();

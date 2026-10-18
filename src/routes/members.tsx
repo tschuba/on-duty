@@ -1104,6 +1104,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 // contact data.
 memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   const personId = c.req.query("personId");
   const linkMemberId = c.req.query("linkMemberId");
@@ -1152,6 +1153,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
         {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
         <MemberFormFields m={prefill} />
+        {canWriteBank && !linkMemberId && <BankDataSection m={prefill ?? {}} editable />}
         {applicationId && (
           <label class="label cursor-pointer justify-start gap-3">
             <input type="checkbox" name="notifyApplicant" class="checkbox" />
@@ -1195,11 +1197,14 @@ memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
 // POST /members/new — create member (or link an existing person, see GET /new)
 memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
   const personId = trimmed(body, "personId") || undefined;
   const linkMemberId = trimmed(body, "linkMemberId") || undefined;
+  // Re-linking reuses an existing member row, so bank data is only taken for brand-new members.
+  const bank = canWriteBank && !linkMemberId ? parseBankData(body, errors) : null;
   const applicationId = trimmed(body, "applicationId") || undefined;
   const notifyApplicant = body.notifyApplicant === "on";
 
@@ -1255,6 +1260,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       deathDate: (body.deathDate as string) || null,
       phone: body.phone as string,
       email: body.email as string,
+      ...(bank && { ...bank, iban: trimmed(body, "iban") }),
     };
     return c.html(
       <Layout title={t("members.newMember")} user={user} activeNav="members">
@@ -1273,6 +1279,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
           {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
           <MemberFormFields m={m} errors={errors} />
+          {canWriteBank && !linkMemberId && <BankDataSection m={m} editable errors={errors} />}
           {applicationId && (
             <label class="label cursor-pointer justify-start gap-3">
               <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
@@ -1349,6 +1356,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         entryDate,
         exitDate: (body.exitDate as string) || null,
         deathDate: (body.deathDate as string) || null,
+        ...bank,
       }).returning();
       memberId = m.id;
     }
