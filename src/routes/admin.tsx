@@ -13,6 +13,7 @@ import {
   appRolePermissions,
   userAppRoles,
 } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
@@ -1602,7 +1603,7 @@ adminRoutes.get("/config", guard, async (c) => {
       </div>
       <form method="post" action="/admin/config" id="config-form">
         <div class="flex flex-wrap items-center gap-2 mb-4">
-          <input type="search" id="config-search" class="input input-bordered input-sm" placeholder={t("admin.config.search")} />
+          <label class="input input-bordered input-sm flex items-center gap-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
           <label class="label cursor-pointer gap-2">
             <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
             <span class="label-text">{t("admin.config.filter.writable")}</span>
