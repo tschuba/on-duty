@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
@@ -7,6 +8,9 @@ import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
 import { Icon } from "./icon.js";
+
+// package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
+const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).version;
 
 type Props = PropsWithChildren<{
   title?: string;
@@ -177,7 +181,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           </div>
         )}
       </nav>
-      <main class="container mx-auto px-4 py-6">{children}</main>
+      <main class="container mx-auto px-4 py-6 pb-10">{children}</main>
+      <footer class="fixed bottom-0 inset-x-0 px-4 py-1 text-xs text-base-content/40 text-right bg-base-100/80 pointer-events-none"><a href={`https://github.com/tschuba/on-duty/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
 
       {/* Toast handler + flash cookie reader */}
       <script dangerouslySetInnerHTML={{ __html: `
