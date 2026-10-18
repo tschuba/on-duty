@@ -257,6 +257,13 @@ describe("parseListQuery", () => {
 });
 
 describe("buildExportSheets", () => {
+  it("never leaks bank data, even with every option enabled", () => {
+    const m = makeMember({ iban: "DE89370400440532013000", bic: "COBADEFF", accountHolder: "Geheim Konto" });
+    const sheets = buildExportSheets([m], [], { addr: true, contact: true, dates: true, gender: true, assignments: true });
+    const cells = JSON.stringify(sheets);
+    for (const secret of ["DE89", "COBADEFF", "Geheim Konto"]) expect(cells).not.toContain(secret);
+  });
+
   const m1 = makeMember({ id: "m1", lastName: "Bauer", firstName: "Anna", gender: "female", street: "Hauptstr.", houseNumber: "1", zip: "12345", city: "Altenhammer", phone: "123", email: "a@b.de" });
   const m2 = makeMember({ id: "m2", lastName: "Adler", firstName: "Ben", gender: "male" });
 
