@@ -80,7 +80,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:delete", "donations:issue-receipts"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -109,7 +109,7 @@ beforeEach(() => {
   donorLookupResult = [];
   orgConfigFixture = [];
   openReceiptsFixture = [];
-  currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:issue-receipts"]), disabled: false };
+  currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:delete", "donations:issue-receipts"]), disabled: false };
 });
 
 function completeOrgConfig(overrides: Record<string, string> = {}) {
@@ -335,8 +335,16 @@ describe("POST /:id/mark-issued", () => {
 
 describe("POST /:id/delete", () => {
   it("deletes the donation and redirects to the list", async () => {
+    donationsFindFirstResult = makeDonation({ id: "don1" });
     const res = await donationRoutes.request("/don1/delete", { method: "POST" });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === donations)).toBe(true);
+  });
+
+  it("refuses once a receipt was issued", async () => {
+    donationsFindFirstResult = makeDonation({ id: "don1", receiptIssuedAt: new Date() });
+    const res = await donationRoutes.request("/don1/delete", { method: "POST" });
+    expect(res.headers.get("location")).toBe("/donations/don1/edit");
+    expect(deleteCalls.some((c) => c.table === donations)).toBe(false);
   });
 });

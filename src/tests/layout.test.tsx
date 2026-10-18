@@ -33,7 +33,7 @@ function userWith(...permissions: string[]) {
 }
 
 describe("Anträge tab (MemberTabs)", () => {
-  it("hides the nav entry for a user without applications:review", async () => {
+  it("hides the nav entry for a user without applications:read", async () => {
     const app = new Hono();
     app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith("members:write")} />));
     const html = await (await app.request("/")).text();
@@ -43,7 +43,7 @@ describe("Anträge tab (MemberTabs)", () => {
   it("shows the nav entry with no badge when there are no open applications", async () => {
     openApplicationsFixture = [];
     const app = new Hono();
-    app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith("applications:review")} />));
+    app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith("applications:read")} />));
     const html = await (await app.request("/")).text();
     expect(html).toContain("Anträge");
     expect(html).not.toContain("badge-primary");
@@ -52,7 +52,7 @@ describe("Anträge tab (MemberTabs)", () => {
   it("shows the open-applications count as a badge", async () => {
     openApplicationsFixture = [{ id: "a1" }, { id: "a2" }, { id: "a3" }];
     const app = new Hono();
-    app.get("/", (c) => c.html(<Layout user={userWith("applications:review")}>x</Layout>));
+    app.get("/", (c) => c.html(<Layout user={userWith("members:read", "applications:read")}>x</Layout>));
     const html = await (await app.request("/")).text();
     expect(html).toContain('badge-primary ml-1">3<');
   });
@@ -103,8 +103,8 @@ describe("Layout — Hauptmenü-Badge im aktiven Bereich", () => {
 
   it("hides the Mitglieder badge when members is active, shows it otherwise", async () => {
     openApplicationsFixture = [{ id: "a1" }];
-    expect(await render("members", "applications:review")).not.toContain("badge-primary");
-    expect(await render("donations", "applications:review")).toContain('badge-primary ml-1">1<');
+    expect(await render("members", "members:read", "applications:read")).not.toContain("badge-primary");
+    expect(await render("donations", "members:read", "applications:read")).toContain('badge-primary ml-1">1<');
   });
 });
 

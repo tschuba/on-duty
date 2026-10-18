@@ -734,6 +734,15 @@ function assignmentDisplayList(item: ItemWithRelations): AssignmentInput[] {
 
 type LendableField = { checked: boolean; editable: boolean; locked: boolean; error?: string };
 
+function ViewField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <div class="text-sm opacity-60">{label}</div>
+      <div class="font-medium">{value || "—"}</div>
+    </div>
+  );
+}
+
 function lendableField(user: { permissions: Set<string> }, checked: boolean, opts: { editable?: boolean; locked?: boolean; error?: string } = {}): LendableField | undefined {
   if (!user.permissions.has("lending:read")) return undefined;
   return { checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: opts.locked ?? false, error: opts.error };
@@ -851,10 +860,62 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
 
 // GET /inventory/:id/edit — also where a completed inspection is recorded (no
 // inline quick-action, see backlog doc: every date is free-form anyway).
-inventoryRoutes.get("/:id/edit", requireAuth("inventory:manage"), async (c) => {
+inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
   const item = await fetchItem(c.req.param("id"));
   if (!item) return c.notFound();
+
+  if (!user.permissions.has("inventory:manage")) {
+    const lending = user.permissions.has("lending:read")
+      ? await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, item.id) })
+      : undefined;
+    const status = itemStatus(item, !!lending);
+    const assigned = assignmentDisplayList(item);
+    const cat = item.category as InventoryCategory;
+    const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
+    return c.html(
+      <Layout title={item.name} user={user} activeNav="inventory">
+        <div class="mb-4">
+          <a href="/inventory" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
+          <div class="flex items-center gap-3 mt-1">
+            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{item.name}</h1>
+            <CategoryBadge category={cat} />
+            <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span>
+          </div>
+        </div>
+        {item.retiredAt && (
+          <div class="alert alert-warning max-w-2xl mb-4">
+            {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
+          </div>
+        )}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+          <ViewField label={t("inventory.form.purchaseDate")} value={item.purchaseDate ? formatDate(item.purchaseDate) : null} />
+          <ViewField label={t("inventory.form.purchasePrice")} value={price} />
+          {cat === "vehicle" && <>
+            <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
+            <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
+            <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />
+          </>}
+          {(cat === "scba" || cat === "equipment" || cat === "ppe") && <>
+            {item.quantity <= 1 && <ViewField label={t("inventory.form.serialNumber")} value={item.serialNumber} />}
+            {cat === "scba" && <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />}
+            <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
+          </>}
+          {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
+          <ViewField
+            label={t("inventory.form.assignedMember")}
+            value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
+          />
+        </div>
+        {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
+        {item.tags.length > 0 && (
+          <div class="mt-6 flex flex-wrap gap-1">
+            {item.tags.map((tg) => <span class="badge badge-ghost badge-sm">{tg.tag}</span>)}
+          </div>
+        )}
+      </Layout>
+    );
+  }
 
   const assignmentList = assignmentDisplayList(item);
   const isBatch = item.quantity > 1;

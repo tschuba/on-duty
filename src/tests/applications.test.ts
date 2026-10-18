@@ -56,7 +56,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", permissions: new Set(["applications:review"]), disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["applications:read", "applications:record", "applications:review"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -89,7 +89,7 @@ beforeEach(() => {
   findFirstResult = undefined;
   memberDuplicatesFixture = [];
   applicationDuplicatesFixture = [];
-  currentUser = { id: "u1", permissions: new Set(["applications:review"]), disabled: false };
+  currentUser = { id: "u1", permissions: new Set(["applications:read", "applications:record", "applications:review"]), disabled: false };
   applicationFormsFixture = {
     membership: { type: "membership", isActive: true, startDate: null, endDate: null },
     youth: { type: "youth", isActive: true, startDate: null, endDate: null },
@@ -133,7 +133,7 @@ describe("GET /", () => {
   });
 
   it("shows the settings gear and modal for a user with applications:manage-forms", async () => {
-    currentUser.permissions = new Set(["applications:review", "applications:manage-forms"]);
+    currentUser.permissions = new Set(["applications:read", "applications:record", "applications:review", "applications:manage-forms"]);
     const res = await applicationRoutes.request("/");
     const html = await res.text();
     expect(html).toContain('id="form-settings-membership"');
