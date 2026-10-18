@@ -43,6 +43,11 @@ services:
       # See 17_Backup-Status-Flag (separate task): hard-wired, no placeholder
       # in .env.standalone since toggling it never makes sense here.
       BACKUP_DISABLED: "true"
+      # One-time start values for the registration settings (only applied while unset in the DB).
+      # Role ID = built-in role "Leser" (src/db/seed.ts).
+      REGISTRATION_ENABLED: "true"
+      REGISTRATION_AUTO_APPROVE: "false"
+      REGISTRATION_DEFAULT_ROLE_ID: 7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f
     command:
       - sh
       - -c

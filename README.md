@@ -100,6 +100,9 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `OIDC_APP_URL` | ✓ | — | Eigene App-URL für Redirect-URI (HTTPS) |
 | `SESSION_LIFETIME` | — | `7d` | Session-Dauer (z. B. `7d`, `8h`, `30m`) |
 | `CHILDREN_AGE_LIMIT` | — | `12` | Altersgrenze Kinderfeuerwehr (Jahre, muss < `YOUTH_AGE_LIMIT`) |
+| `REGISTRATION_ENABLED` | — | `false` | Startwert: Selbstregistrierung aktiv (`true`/`false`); wird nur einmalig übernommen, solange die Einstellung noch nie gespeichert wurde |
+| `REGISTRATION_AUTO_APPROVE` | — | `false` | Startwert (einmalig): Registrierungen automatisch freigeben (braucht `REGISTRATION_DEFAULT_ROLE_ID`) |
+| `REGISTRATION_DEFAULT_ROLE_ID` | — | — | Startwert (einmalig): Rollen-ID für automatisch freigegebene Nutzer |
 | `YOUTH_AGE_LIMIT` | — | `18` | Altersgrenze Jugendfeuerwehr (Jahre) |
 | `ANNIVERSARY_CUTOFF` | — | `01-06` | Jubiläumsstichtag (MM-DD) |
 | `BACKUP_SCHEDULE` | — | `0 2 * * 0` | Backup-Intervall (Cron-Ausdruck) |
