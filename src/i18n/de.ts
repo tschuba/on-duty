@@ -486,7 +486,6 @@ export const de = {
 
   // ── Login ─────────────────────────────────────────────────────────────────────
   "login.title": "Anmelden",
-  "login.heading": "{org} on-duty",
   "login.oidcButton": "Anmelden",
   "login.error.unknownUser": "Ihr Konto ist nicht für die Anmeldung freigeschaltet. Bitte wenden Sie sich an einen Administrator.",
   "login.error.disabled": "Ihr Konto wurde deaktiviert.",

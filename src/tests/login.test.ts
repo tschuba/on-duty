@@ -33,10 +33,10 @@ vi.mock("../lib/org-config.js", () => ({ loadOrgConfig: vi.fn(async () => orgCon
 const { loginRoutes } = await import("../routes/login.js");
 
 describe("GET /login", () => {
-  it("shows the org name with on-duty in the heading", async () => {
+  it("shows the org name in the heading", async () => {
     orgConfigFixture = { orgName: "FF Altenhammer" };
     const html = await (await loginRoutes.request("/login")).text();
-    expect(html).toContain("FF Altenhammer on-duty");
+    expect(html).toMatch(/<h1[^>]*>FF Altenhammer<\/h1>/);
     expect(html).not.toContain("OIDC");
   });
 

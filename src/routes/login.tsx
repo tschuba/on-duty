@@ -32,7 +32,7 @@ loginRoutes.get("/login", async (c) => {
             : null;
 
   const orgName = ((await loadOrgConfig()).orgName ?? "").trim();
-  const heading = orgName ? t("login.heading", { org: orgName }) : "on-duty";
+  const heading = orgName || "on-duty";
 
   return c.html(
     <Layout title={t("login.title")}>
