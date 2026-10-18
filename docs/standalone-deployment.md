@@ -34,13 +34,13 @@ Neue Ressource → Docker Compose → Repo, Compose-Datei `docker-compose.standa
 
 Nur `ORG_NAME` (Pflicht), optional `SMTP_*` und `APP_VERSION`; `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` **leer lassen** (siehe `.env.standalone.example`). Passwörter und Secrets (`SERVICE_PASSWORD_*`) erzeugt Coolify selbst und darf nach dem ersten Deploy nicht mehr neu generiert werden (Masterkey, DB-Passwörter).
 
-`SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN` ist ein Zufallswert; erfüllt er ausnahmsweise Zitadels Passwort-Policy nicht (Groß-/Kleinbuchstabe, Ziffer, Symbol), schlägt die Ersteinrichtung fehl → Wert in Coolify neu generieren und redeployen.
+`SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN` ist ein Zufallswert, der Zitadels Passwort-Policy (Groß-/Kleinbuchstabe, Ziffer, Symbol) nicht immer erfüllt. Der Stack hängt deshalb `Aa1!` an: das Initialpasswort ist der Coolify-Wert **plus `Aa1!`**.
 
 ### 4. Deployen und anmelden
 
 Deploy in Coolify starten. `https://<on-duty-domain>` ist danach erreichbar. Login zunächst über `/admin/login` (lokaler Admin, `SERVICE_PASSWORD_ADMIN`) — OIDC-Benutzer müssen vorab unter **Admin → Benutzer** angelegt werden (oder per Selbstregistrierung, siehe [docs/oidc.md](oidc.md)).
 
-Zitadel-Console: `https://<zitadel-domain>`, Benutzername `zitadel-admin` (Zitadel hängt automatisch die Org-Domain an; Login-Name per `psql` im `db`-Container aus `projections.login_names3` ermitteln). Passwort: Wert von `SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN` aus den Coolify-Variablen; der erste Login erzwingt eine Passwortänderung.
+Zitadel-Console: `https://<zitadel-domain>`, Benutzername `zitadel-admin` (Zitadel hängt automatisch die Org-Domain an; Login-Name per `psql` im `db`-Container aus `projections.login_names3` ermitteln). Passwort: Wert von `SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN` aus den Coolify-Variablen **plus `Aa1!`**; der erste Login erzwingt eine Passwortänderung.
 
 ### Wie die Automatisierung funktioniert
 
