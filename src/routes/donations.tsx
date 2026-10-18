@@ -241,6 +241,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
+  const canIssueReceipts = user.permissions.has("donations:issue-receipts");
   const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   return c.html(
@@ -297,7 +298,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
                   : <span class="badge badge-ghost badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
               <td class="whitespace-nowrap">
-                {orgConfigIncomplete
+                {!canIssueReceipts
+                  ? null
+                  : orgConfigIncomplete
                   ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
                   : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
               </td>

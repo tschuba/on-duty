@@ -151,6 +151,15 @@ describe("GET /", () => {
     expect(html).toContain("100,00");
   });
 
+  it("shows the receipt link only with donations:issue-receipts", async () => {
+    completeOrgConfig();
+    donationsFindManyResult = [makeDonation()];
+    expect(await (await donationRoutes.request("/")).text()).toContain("/donations/don1/receipt");
+    currentUser = { ...currentUser, permissions: new Set(["donations:record"]) };
+    const html = await (await donationRoutes.request("/")).text();
+    expect(html).not.toContain("/receipt");
+  });
+
   it("filters by donor-name search", async () => {
     donationsFindManyResult = [
       makeDonation({ id: "don1" }),
