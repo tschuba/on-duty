@@ -357,6 +357,18 @@ describe("GET /users/new", () => {
   });
 });
 
+describe("role picker", () => {
+  it("renders search field, per-role filter text and collapsed details", async () => {
+    appRolesFixture = [makeAppRole({ id: "ar1", name: "Editor", description: "Darf Daten ändern" })];
+    const html = await (await adminRoutes.request("/users/new")).text();
+    expect(html).toContain(t("admin.users.modal.roleSearchPlaceholder"));
+    expect(html).toContain('data-role-item="editor darf daten ändern"');
+    expect(html).toContain(t("admin.users.modal.roleDetails"));
+    expect(html).toMatch(/aria-expanded="false"/);
+    expect(html).toContain("overflow-y-auto");
+  });
+});
+
 describe("GET /users/:id/edit", () => {
   it("404s for an unknown user", async () => {
     usersFixture = [];

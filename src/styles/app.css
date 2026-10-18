@@ -109,6 +109,15 @@
   margin-top: 0.25rem;
 }
 
+/* Hover-Popover "N Rollen" (components/role-popover.tsx): Top Layer, am Badge verankert. */
+.role-popover[popover] {
+  position: fixed;
+  position-area: block-end span-inline-start;
+  position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+  width: max-content;
+  margin-top: 0.25rem;
+}
+
 .role-combobox-list {
   max-height: 16rem;
   overflow-y: auto;

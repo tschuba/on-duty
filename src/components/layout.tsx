@@ -26,7 +26,7 @@ const navLink = (active: boolean) =>
 export const DONORS_TAB_COUNT = 0;
 
 export function CountBadge({ count }: { count: number }) {
-  return count > 0 ? <span class="badge badge-sm badge-primary ml-1">{count}</span> : null;
+  return count > 0 ? <span class="badge badge-sm badge-warning ml-1">{count}</span> : null;
 }
 
 // Async component — hono/jsx resolves Promise children/return values during render,

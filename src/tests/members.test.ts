@@ -355,7 +355,7 @@ describe("MembersTable", () => {
     const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
     const html = await res.text();
     expect(html).toContain(roleAktiv.title);
-    expect(html).not.toContain("dropdown-content");
+    expect(html).not.toContain("role-popover");
   });
 
   it("renders a count dropdown for more than one open role", async () => {
@@ -365,7 +365,7 @@ describe("MembersTable", () => {
     ]);
     const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
     const html = await res.text();
-    expect(html).toContain("dropdown-content");
+    expect(html).toContain("role-popover");
     expect(html).toContain(roleAktiv.title);
     expect(html).toContain(roleVorstand.title);
   });
