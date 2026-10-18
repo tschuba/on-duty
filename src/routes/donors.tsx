@@ -6,6 +6,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { countOpenReceipts } from "../lib/donations.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
+import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -123,16 +124,19 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
         <label class="label">
           <span class="label-text">{t("donations.form.donor")}<span class="text-error ml-1">*</span></span>
         </label>
-        <input
-          type="text"
-          name="q"
-          autocomplete="off"
-          placeholder={t("donations.form.donorSearchPlaceholder")}
-          class="input input-bordered w-full"
-          hx-get="/donors/search-persons"
-          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-          hx-target="#donor-picker-results"
-        />
+        <label class="input input-bordered flex items-center gap-2 w-full">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="text"
+            name="q"
+            autocomplete="off"
+            placeholder={t("donations.form.donorSearchPlaceholder")}
+            class="grow min-w-0"
+            hx-get="/donors/search-persons"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#donor-picker-results"
+          />
+        </label>
         <div id="donor-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
       </div>
       <input type="hidden" id="donor-personId" name="personId" value={personId ?? ""} />
@@ -287,13 +291,16 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
 
       <div class="flex flex-wrap gap-3 mb-4 items-center">
         <form method="get" class="flex gap-2">
-          <input
-            type="search"
-            name="search"
-            placeholder={t("common.searchPlaceholder")}
-            value={search}
-            class="input input-bordered w-64"
-          />
+          <label class="input input-bordered flex items-center gap-2 w-64">
+            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <input
+              type="search"
+              name="search"
+              placeholder={t("common.searchPlaceholder")}
+              value={search}
+              class="grow min-w-0"
+            />
+          </label>
           <input type="hidden" name="sort" value={sort} />
           <input type="hidden" name="sort_dir" value={dir} />
           <input type="hidden" name="pageSize" value={pageSize} />

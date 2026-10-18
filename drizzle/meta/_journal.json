@@ -232,6 +232,20 @@
       "when": 1792400000008,
       "tag": "0032_administrator_permissions",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792400000009,
+      "tag": "0033_member_bank_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792400000010,
+      "tag": "0034_finance_role",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,7 @@ import { trimmed } from "../lib/forms.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
+import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
@@ -397,15 +398,18 @@ function RoleRow({
             class="role-combobox-popover dropdown-content bg-base-100 rounded-box shadow p-2"
             style={`position-anchor:--role-combobox-anchor-${index}`}
           >
-            <input
-              type="text"
-              autocomplete="off"
-              role="searchbox"
-              aria-autocomplete="list"
-              aria-controls={`role-combobox-list-${index}`}
-              class="role-combobox-search input input-bordered input-sm w-full mb-1"
-              placeholder={t("common.searchPlaceholder")}
-            />
+            <label class="input input-bordered input-sm flex items-center gap-2 w-full mb-1">
+              <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+              <input
+                type="text"
+                autocomplete="off"
+                role="searchbox"
+                aria-autocomplete="list"
+                aria-controls={`role-combobox-list-${index}`}
+                class="role-combobox-search grow min-w-0"
+                placeholder={t("common.searchPlaceholder")}
+              />
+            </label>
             <ul id={`role-combobox-list-${index}`} role="listbox" class="role-combobox-list menu p-0">
               {roles.map((r) => (
                 <li
@@ -416,7 +420,7 @@ function RoleRow({
                   data-title={r.title}
                   aria-selected={r.id === assignment?.memberRoleId ? "true" : "false"}
                 >
-                  <a class="min-h-11 flex items-center">{r.title}</a>
+                  <a class="min-h-11 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
                 </li>
               ))}
               <li class="role-combobox-no-match hidden"><a class="disabled pointer-events-none opacity-50 min-h-11 flex items-center">{t("members.form.roleNoMatch")}</a></li>
@@ -597,6 +601,107 @@ function RoleRow({
         }
       ` }} />
     </tr>
+  );
+}
+
+// Bank data is plaintext, protected by permission only (backlog 34). Without read
+// permission the section is not rendered at all — not even a hint that data exists.
+function parseBankData(body: Record<string, any>, errors: Record<string, string>) {
+  const rawIban = trimmed(body, "iban");
+  const iban = rawIban ? normalizeIban(rawIban) : null;
+  if (iban && !isValidIban(iban)) errors.iban = t("members.error.ibanInvalid");
+  return { iban, bic: trimmed(body, "bic").toUpperCase() || null, accountHolder: trimmed(body, "accountHolder") || null };
+}
+
+function BankDataSection({
+  m,
+  editable,
+  errors,
+}: {
+  m: Partial<Member>;
+  editable: boolean;
+  errors?: Record<string, string>;
+}) {
+  const iban = m.iban ? formatIban(m.iban) : "";
+  if (!editable) {
+    return (
+      <div class="mt-6 max-w-2xl">
+        <h2 class="font-semibold mb-2">{t("members.bank.title")}</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <ViewField label={t("members.bank.iban")} value={iban} />
+          <ViewField label={t("members.bank.bic")} value={m.bic} />
+          <ViewField label={t("members.bank.accountHolder")} value={m.accountHolder || `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim()} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div class="divider">{t("members.bank.title")}</div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
+        <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
+        {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
+        <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
+        <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input-bordered w-full" />
+        <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
+      </div>
+    </>
+  );
+}
+
+// Live preview of the derived status; mirrors deriveMemberStatus (src/lib/status.ts) client-side.
+function StatusPreview({ roles }: { roles: Role[] }) {
+  const cfg = {
+    active: roles.filter((r) => r.grantsActiveStatus).map((r) => r.id),
+    children: env.CHILDREN_AGE_LIMIT,
+    youth: env.YOUTH_AGE_LIMIT,
+    labels: STATUS_LABELS,
+  };
+  return (
+    <p class="text-sm opacity-60" id="status-preview" data-cfg={JSON.stringify(cfg)}>
+      {t("members.form.activeHint")} {t("members.form.statusPreview")} <strong class="status-preview-value"></strong>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function () {
+          var box = document.getElementById('status-preview');
+          var cfg = JSON.parse(box.dataset.cfg);
+          var form = box.closest('form');
+          function val(n) { var el = form.querySelector('[name="' + n + '"]'); return el ? el.value : ''; }
+          function update() {
+            var status = 'passiv';
+            if (val('deathDate')) status = 'verstorben';
+            else if (val('exitDate')) status = 'ausgetreten';
+            else {
+              var roles = form.querySelectorAll('[name="assignment_role[]"]');
+              var tos = form.querySelectorAll('[name="assignment_to[]"]');
+              var hasActive = Array.prototype.some.call(roles, function (r, i) {
+                return r.value && !tos[i].value && cfg.active.indexOf(r.value) !== -1;
+              });
+              if (hasActive) {
+                var b = new Date(val('birthDate')), now = new Date();
+                var age = now.getFullYear() - b.getFullYear();
+                if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+                status = isNaN(age) ? 'aktiv' : age < cfg.children ? 'kinder' : age < cfg.youth ? 'jugend' : 'aktiv';
+              }
+            }
+            var out = box.querySelector('.status-preview-value');
+            // write only on change: this node sits inside the observed form, an unconditional write would retrigger the observer forever
+            if (out.textContent !== cfg.labels[status]) out.textContent = cfg.labels[status];
+          }
+          form.addEventListener('input', update);
+          form.addEventListener('change', update);
+          // role combobox sets a hidden input programmatically, which fires no event
+          new MutationObserver(update).observe(form, { subtree: true, attributes: true, childList: true, attributeFilter: ['value', 'aria-selected'] });
+          update();
+        })();
+      ` }} />
+    </p>
   );
 }
 
@@ -947,18 +1052,21 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
       {/* Toolbar */}
       <div class="flex flex-wrap gap-3 mb-4 items-center">
-        <input
-          type="search"
-          name="search"
-          placeholder={t("common.searchPlaceholder")}
-          value={search}
-          class="input input-bordered w-64"
-          hx-get="/members"
-          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-          hx-target="#members-results"
-          hx-include="[name='search']"
-          hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
-        />
+        <label class="input input-bordered flex items-center gap-2 w-64">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="search"
+            name="search"
+            placeholder={t("common.searchPlaceholder")}
+            value={search}
+            class="grow min-w-0"
+            hx-get="/members"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#members-results"
+            hx-include="[name='search']"
+            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
+          />
+        </label>
         <div class="join">
           {(["aktiv", "passiv", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
             <a
@@ -1002,6 +1110,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 // contact data.
 memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
   const personId = c.req.query("personId");
   const linkMemberId = c.req.query("linkMemberId");
@@ -1050,6 +1159,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
         {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
         <MemberFormFields m={prefill} />
+        {canWriteBank && !linkMemberId && <BankDataSection m={prefill ?? {}} editable />}
         {applicationId && (
           <label class="label cursor-pointer justify-start gap-3">
             <input type="checkbox" name="notifyApplicant" class="checkbox" />
@@ -1057,6 +1167,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           </label>
         )}
         <div class="divider">{t("members.form.assignments")}</div>
+        <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
@@ -1092,11 +1203,14 @@ memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
 // POST /members/new — create member (or link an existing person, see GET /new)
 memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
 
   const personId = trimmed(body, "personId") || undefined;
   const linkMemberId = trimmed(body, "linkMemberId") || undefined;
+  // Re-linking reuses an existing member row, so bank data is only taken for brand-new members.
+  const bank = canWriteBank && !linkMemberId ? parseBankData(body, errors) : null;
   const applicationId = trimmed(body, "applicationId") || undefined;
   const notifyApplicant = body.notifyApplicant === "on";
 
@@ -1152,6 +1266,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       deathDate: (body.deathDate as string) || null,
       phone: body.phone as string,
       email: body.email as string,
+      ...(bank && { ...bank, iban: trimmed(body, "iban") }),
     };
     return c.html(
       <Layout title={t("members.newMember")} user={user} activeNav="members">
@@ -1170,6 +1285,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
           {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
           <MemberFormFields m={m} errors={errors} />
+          {canWriteBank && !linkMemberId && <BankDataSection m={m} editable errors={errors} />}
           {applicationId && (
             <label class="label cursor-pointer justify-start gap-3">
               <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
@@ -1177,6 +1293,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </label>
           )}
           <div class="divider">{t("members.form.assignments")}</div>
+          <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1245,6 +1362,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         entryDate,
         exitDate: (body.exitDate as string) || null,
         deathDate: (body.deathDate as string) || null,
+        ...bank,
       }).returning();
       memberId = m.id;
     }
@@ -1393,6 +1511,8 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   if (!m) return c.notFound();
 
   const isEditor = user.permissions.has("members:write");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
+  const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");
   const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
 
   const canDelete = user.permissions.has("members:delete");
@@ -1437,6 +1557,12 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             </div>
           </div>
         )}
+        {canWriteBank ? (
+          <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
+            <BankDataSection m={m} editable />
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+          </form>
+        ) : canReadBank && <BankDataSection m={m} editable={false} />}
       </Layout>
     );
   }
@@ -1456,7 +1582,9 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       </div>
       <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
         <MemberFormFields m={m} />
+        {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
+        <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1478,16 +1606,38 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 });
 
 // POST /members/:id — update member
-memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
+memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write"]), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const reactivateParam = c.req.query("reactivate");
+  const canWriteMaster = user.permissions.has("members:write");
+  const canWriteBank = user.permissions.has("members:bank-data:write");
 
   const existing = await fetchMember(id);
   if (!existing) return c.notFound();
 
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
+
+  // Fields without permission are ignored, not rejected: bank-only users never touch master data.
+  if (!canWriteMaster) {
+    const bank = parseBankData(body, errors);
+    if (errors.iban) {
+      return c.html(
+        <Layout title={`${existing.firstName} ${existing.lastName}`} user={user} activeNav="members">
+          <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+            <BankDataSection m={{ ...existing, ...bank, iban: trimmed(body, "iban") }} editable errors={errors} />
+            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+          </form>
+        </Layout>,
+        422
+      );
+    }
+    await db.update(members).set(bank).where(eq(members.id, id));
+    setFlash(c, t("members.flash.saved"), "success");
+    return c.redirect(`/members/${id}`);
+  }
+  const bank = canWriteBank ? parseBankData(body, errors) : null;
 
   const lastName = trimmed(body, "lastName");
   const firstName = trimmed(body, "firstName");
@@ -1525,7 +1675,8 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
       street: body.street as string, houseNumber: body.houseNumber as string,
       zip: body.zip as string, city: body.city as string,
       gender: (body.gender as any) || null,
-      phone: body.phone as string, email: body.email as string };
+      phone: body.phone as string, email: body.email as string,
+      ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
@@ -1536,7 +1687,9 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
           <MemberFormFields m={m} errors={errors} />
+          {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
+          <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1584,6 +1737,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
       birthDate, entryDate,
       exitDate: exitDate ?? "",
       deathDate: deathDate ?? "",
+      ...(canWriteBank && { iban: trimmed(body, "iban"), bic: trimmed(body, "bic"), accountHolder: trimmed(body, "accountHolder") }),
       phone: (body.phone as string) ?? "",
       email: (body.email as string) ?? "",
       "assignment_id[]": assignmentIds,
@@ -1605,6 +1759,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
+          <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1652,6 +1807,7 @@ memberRoutes.post("/:id", requireAuth("members:write"), async (c) => {
       entryDate,
       exitDate: exitDate || null,
       deathDate: deathDate || null,
+      ...bank,
     }).where(eq(members.id, id));
 
     // Archive: close open assignments when exitDate or deathDate set

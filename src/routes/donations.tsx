@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -241,6 +242,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
+  const canIssueReceipts = user.permissions.has("donations:issue-receipts");
   const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   return c.html(
@@ -254,7 +256,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
 
       <form method="get" class="flex flex-wrap gap-3 mb-4 items-end">
         <div class="form-control">
-          <input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="input input-bordered w-64" />
+          <label class="input input-bordered flex items-center gap-2 w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
         <QuickRangeFilter presets={presets} start={from} end={to} href={(p) => buildListUrl("/donations", { search }, { from: p.start, to: p.end })} />
         <div class="form-control">
@@ -278,12 +280,12 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             <th>{t("donations.table.type")}</th>
             <th>{t("donations.table.purpose")}</th>
             <th>{t("donations.table.receipt")}</th>
-            <th>{t("donations.table.actions")}</th>
+            {canIssueReceipts && <th>{t("donations.table.actions")}</th>}
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <tr><td colspan={7} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
+            <tr><td colspan={canIssueReceipts ? 7 : 6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donations/${d.id}/edit'` : undefined}>
               <td>{formatDate(d.date)}</td>
@@ -296,11 +298,13 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
                   ? <span class="badge badge-success badge-sm">{t("donations.table.receiptIssued")}</span>
                   : <span class="badge badge-ghost badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
-              <td class="whitespace-nowrap">
-                {orgConfigIncomplete
-                  ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
-                  : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
-              </td>
+              {canIssueReceipts && (
+                <td class="whitespace-nowrap">
+                  {orgConfigIncomplete
+                    ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
+                    : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

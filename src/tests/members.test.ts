@@ -166,6 +166,9 @@ function makeMember(overrides: Record<string, unknown> = {}) {
     entryDate: "2010-01-01",
     exitDate: null,
     deathDate: null,
+    iban: null,
+    bic: null,
+    accountHolder: null,
     phone: null,
     email: null,
     ...overrides,
@@ -257,6 +260,13 @@ describe("parseListQuery", () => {
 });
 
 describe("buildExportSheets", () => {
+  it("never leaks bank data, even with every option enabled", () => {
+    const m = makeMember({ iban: "DE89370400440532013000", bic: "COBADEFF", accountHolder: "Geheim Konto" });
+    const sheets = buildExportSheets([m], [], { addr: true, contact: true, dates: true, gender: true, assignments: true });
+    const cells = JSON.stringify(sheets);
+    for (const secret of ["DE89", "COBADEFF", "Geheim Konto"]) expect(cells).not.toContain(secret);
+  });
+
   const m1 = makeMember({ id: "m1", lastName: "Bauer", firstName: "Anna", gender: "female", street: "Hauptstr.", houseNumber: "1", zip: "12345", city: "Altenhammer", phone: "123", email: "a@b.de" });
   const m2 = makeMember({ id: "m2", lastName: "Adler", firstName: "Ben", gender: "male" });
 
@@ -721,6 +731,65 @@ describe("GET /:id", () => {
     const html = await res.text();
     expect(html).not.toContain("delete-member-modal");
     expect(html).toContain(t("members.delete.blockedDonor"));
+  });
+});
+
+describe("bank data gating", () => {
+  const perms = (...p: string[]) => { currentUser = { id: "u1", permissions: new Set(p), disabled: false }; };
+  const VALID = "DE89 3704 0044 0532 0130 00";
+
+  it("hides the section without bank-data:read", async () => {
+    perms("members:write");
+    findFirstResult = memberWithAssignments({ iban: "DE89370400440532013000" });
+    const html = await (await memberRoutes.request("/m1")).text();
+    expect(html).not.toContain("Bankverbindung");
+    expect(html).not.toContain("DE89");
+  });
+
+  it("shows read-only grouped IBAN with read, editable input with write", async () => {
+    findFirstResult = memberWithAssignments({ iban: "DE89370400440532013000" });
+    perms("members:read", "members:bank-data:read");
+    let html = await (await memberRoutes.request("/m1")).text();
+    expect(html).toContain("DE89 3704 0044 0532 0130 00");
+    expect(html).not.toContain('name="iban"');
+    perms("members:read", "members:bank-data:write");
+    html = await (await memberRoutes.request("/m1")).text();
+    expect(html).toContain('name="iban"');
+  });
+
+  it("bank-only writer saves bank data and ignores master data", async () => {
+    perms("members:bank-data:write");
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1", { method: "POST", body: formBody({ lastName: "Hacked", iban: VALID, bic: "cobadeff" }) });
+    expect(res.status).toBe(302);
+    expect(updateCalls.some((c) => c.table === persons)).toBe(false);
+    expect(updateCalls.find((c) => c.table === members)?.set).toMatchObject({ iban: "DE89370400440532013000", bic: "COBADEFF", accountHolder: null });
+  });
+
+  it("master-data writer without bank permission cannot change bank data", async () => {
+    perms("members:write");
+    findFirstResult = memberWithAssignments();
+    await memberRoutes.request("/m1", { method: "POST", body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01", iban: VALID }) });
+    expect(updateCalls.find((c) => c.table === members)?.set).not.toHaveProperty("iban");
+  });
+
+  it("stores bank data on create only with bank-data:write", async () => {
+    const form = { lastName: "Neu", firstName: "Nina", birthDate: "1990-01-01", entryDate: "2024-01-01", iban: VALID };
+    perms("members:write", "members:bank-data:write");
+    await memberRoutes.request("/new", { method: "POST", body: formBody(form) });
+    expect(insertCalls.find((c) => c.table === members)?.values).toMatchObject({ iban: "DE89370400440532013000" });
+    insertCalls.length = 0;
+    perms("members:write");
+    await memberRoutes.request("/new", { method: "POST", body: formBody(form) });
+    expect(insertCalls.find((c) => c.table === members)?.values).not.toHaveProperty("iban");
+  });
+
+  it("rejects an invalid IBAN", async () => {
+    perms("members:bank-data:write");
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1", { method: "POST", body: formBody({ iban: "DE00 1234" }) });
+    expect(res.status).toBe(422);
+    expect(updateCalls.some((c) => c.table === members)).toBe(false);
   });
 });
 

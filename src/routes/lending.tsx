@@ -2,6 +2,7 @@ import { Hono, type Context } from "hono";
 import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
@@ -195,7 +196,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
       </div>
 
       <form method="get" action="/inventory/lending" class="flex gap-2 items-center flex-wrap mb-4">
-        <input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="input input-bordered w-56" />
+        <label class="input input-bordered flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
         <MultiSelectFilter
           param="status"
           options={(Object.keys(LOAN_STATUS_LABEL) as LoanStatus[]).map((s) => ({ value: s, label: LOAN_STATUS_LABEL[s] }))}

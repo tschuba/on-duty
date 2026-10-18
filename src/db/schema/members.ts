@@ -1,4 +1,4 @@
-import { pgTable, date, uuid } from "drizzle-orm/pg-core";
+import { pgTable, date, text, uuid } from "drizzle-orm/pg-core";
 import { persons } from "./persons";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
@@ -11,5 +11,8 @@ export const members = pgTable("members", {
   entryDate: date("entry_date").notNull(),
   exitDate: date("exit_date"),
   deathDate: date("death_date"),
+  iban: text("iban"),
+  bic: text("bic"),
+  accountHolder: text("account_holder"),
 });
 /* v8 ignore stop */

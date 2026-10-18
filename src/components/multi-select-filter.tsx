@@ -1,3 +1,4 @@
+import { Icon } from "./icon.js";
 export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string };
 
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
@@ -28,7 +29,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
       <button type="button" class="btn btn-ghost m-0" popovertarget={id}>{label} ▾</button>
       <div id={id} popover="auto" class="msf-panel bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 m-0">
         {searchable && (
-          <input type="text" placeholder={searchPlaceholder} class="input input-bordered w-full mb-2" data-msf-search />
+          <label class="input input-bordered flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
         )}
         <ul class="space-y-0.5 max-h-64 overflow-y-auto">
           {options.length === 0 && emptyLabel && <li class="text-sm opacity-50 px-2 py-1">{emptyLabel}</li>}
