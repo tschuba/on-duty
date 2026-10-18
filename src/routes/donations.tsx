@@ -39,13 +39,13 @@ function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>;
 
 // Status changes only here (detail area); offers only transitions valid from the current status.
 function ReceiptStatusActions({ d, canIssue }: { d: DonationRow; canIssue: boolean }) {
-  const actions: { action: ReceiptAction; label: string; confirm?: string; needsIssue?: boolean }[] = [
+  const actions: { action: ReceiptAction; label: string; confirm?: string }[] = [
     { action: "markNotRequired", label: t("donations.receiptStatus.markNotRequired") },
     { action: "reopen", label: t("donations.receiptStatus.reopen") },
-    { action: "revoke", label: t("donations.receiptStatus.revoke"), confirm: t("donations.receiptStatus.revokeConfirm"), needsIssue: true },
+    { action: "revoke", label: t("donations.receiptStatus.revoke"), confirm: t("donations.receiptStatus.revokeConfirm") },
   ];
-  const offered = actions.filter((a) => nextReceiptStatus(d.receiptStatus, a.action) && (canIssue || !a.needsIssue));
-  if (offered.length === 0) return null;
+  const offered = actions.filter((a) => nextReceiptStatus(d.receiptStatus, a.action));
+  if (!canIssue || offered.length === 0) return null;
   return (
     <div class="flex flex-wrap items-center gap-2 max-w-xl mb-4">
       <span class="font-semibold">{t("donations.receiptStatus.heading")}:</span>
@@ -608,16 +608,14 @@ donationRoutes.post("/:id/mark-issued", requireAuth("donations:issue-receipts"),
 });
 
 // POST /donations/:id/receipt-status — markNotRequired / reopen / revoke (invalid transitions rejected)
-donationRoutes.post("/:id/receipt-status", requireAuth(["donations:record", "donations:issue-receipts"]), async (c) => {
+donationRoutes.post("/:id/receipt-status", requireAuth("donations:issue-receipts"), async (c) => {
   const id = c.req.param("id");
-  const user = c.get("user");
   const d = await fetchDonation(id);
   if (!d) return c.notFound();
   const body = await c.req.parseBody();
   const action = trimmed(body, "action") as ReceiptAction;
   const next = nextReceiptStatus(d.receiptStatus, action);
-  // Revoking an issued receipt needs the issue permission.
-  if (!next || (action === "revoke" && !user.permissions.has("donations:issue-receipts"))) {
+  if (!next) {
     setFlash(c, t("donations.flash.statusInvalid"), "error");
     return c.redirect(`/donations/${id}/edit`);
   }
