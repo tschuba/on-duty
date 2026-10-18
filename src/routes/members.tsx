@@ -687,7 +687,9 @@ function StatusPreview({ roles }: { roles: Role[] }) {
                 status = isNaN(age) ? 'aktiv' : age < cfg.children ? 'kinder' : age < cfg.youth ? 'jugend' : 'aktiv';
               }
             }
-            box.querySelector('.status-preview-value').textContent = cfg.labels[status];
+            var out = box.querySelector('.status-preview-value');
+            // write only on change: this node sits inside the observed form, an unconditional write would retrigger the observer forever
+            if (out.textContent !== cfg.labels[status]) out.textContent = cfg.labels[status];
           }
           form.addEventListener('input', update);
           form.addEventListener('change', update);
