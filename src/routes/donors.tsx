@@ -258,10 +258,11 @@ function donorListUrl(base: Record<string, string | number>) {
 
 // GET /donors — sortable/paginated/searchable list, name + address only (see
 // Berechtigungsgrenze in the backlog note — no member-only data here).
-donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"]), async (c) => {
+donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
   const { search, sort, dir, page, pageSize, member } = parseListQuery(c.req.query());
   const canLink = Boolean(user.permissions.has("members:read"));
+  const canRecord = user.permissions.has("donations:record");
   const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   const all = (await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as DonorWithPerson[];
@@ -281,7 +282,7 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
       <DonationTabs active="donors" openReceiptsCount={openReceipts} />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donors.title")}</h1>
-        <a href="/donors/new" class="btn btn-primary">{t("donors.addDonor")}</a>
+        {canRecord && <a href="/donors/new" class="btn btn-primary">{t("donors.addDonor")}</a>}
       </div>
 
       <div class="flex flex-wrap gap-3 mb-4 items-center">
@@ -319,7 +320,7 @@ donorRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"
           {pageItems.length === 0 ? (
             <tr><td colspan={3} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageItems.map((d) => (
-            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donors/${d.id}/edit'`}>
+            <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donors/${d.id}/edit'` : undefined}>
               <td class="font-medium"><MemberLink memberId={d.person.member?.id} canLink={canLink}>{d.person.lastName}</MemberLink><MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
               <td>{d.person.firstName}</td>
               <td>{formatAddress(d.person)}</td>
@@ -411,6 +412,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const donor = await db.query.donors.findFirst({ where: eq(donors.id, c.req.param("id")), with: { person: { with: { member: true } } } }) as DonorWithPerson | undefined;
   if (!donor) return c.notFound();
   const canLink = Boolean(user.permissions.has("members:read"));
+  const canRecord = user.permissions.has("donations:record");
 
   return c.html(
     <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
@@ -436,6 +438,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: { with: { member: true } } } }) as DonorWithPerson | undefined;
   if (!donor) return c.notFound();
   const canLink = Boolean(user.permissions.has("members:read"));
+  const canRecord = user.permissions.has("donations:record");
 
   const body = await c.req.parseBody();
   const { values, errors } = parseDonorPersonFields(body);

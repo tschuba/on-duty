@@ -1,0 +1,2 @@
+ALTER TYPE "public"."permission" ADD VALUE IF NOT EXISTS 'applications:read' BEFORE 'applications:review';--> statement-breakpoint
+ALTER TYPE "public"."permission" ADD VALUE IF NOT EXISTS 'applications:record' BEFORE 'applications:review';

@@ -34,7 +34,7 @@ export function CountBadge({ count }: { count: number }) {
 // the permission) instead of threading a count prop through every route that renders
 // the nav.
 export const Layout = async ({ title, children, user, activeNav }: Props) => {
-  const canReviewApplications = Boolean(user?.permissions.has("applications:review"));
+  const canReviewApplications = Boolean(user?.permissions.has("applications:read"));
   const openApplicationsCount = canReviewApplications ? await countOpenApplications() : 0;
   const canIssueReceipts = Boolean(user?.permissions.has("donations:issue-receipts"));
   const openReceiptsCount = canIssueReceipts ? await countOpenReceipts() : 0;
@@ -78,7 +78,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {t("common.nav.members")}
                 <CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} />
               </a>
-              {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
+              {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && (
                 <a
                   href="/donations"
                   class={navLink(activeNav === "donations")}
@@ -125,7 +125,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
                 <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>
-                {(user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
+                {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} /></a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}<CountBadge count={activeNav === "admin" ? 0 : pendingUsersCount} /></a></li>}
@@ -225,7 +225,7 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
 
 // Async like Layout: the Applications tab (permission + open count) is resolved here.
 export async function MemberTabs({ active, user }: { active: "members" | "anniversaries" | "applications"; user: AuthedUser }) {
-  const canReviewApplications = user.permissions.has("applications:review");
+  const canReviewApplications = user.permissions.has("applications:read");
   const tabs = [
     { key: "members", href: "/members", count: 0 },
     { key: "anniversaries", href: "/anniversaries", count: 0 },

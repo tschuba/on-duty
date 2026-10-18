@@ -22,7 +22,9 @@ import {
 } from "../lib/application-forms.js";
 
 export const applicationRoutes = new Hono<{ Variables: Variables }>();
-const guard = requireAuth("applications:review");
+const guard = requireAuth("applications:read");
+const recordGuard = requireAuth("applications:record");
+const reviewGuard = requireAuth("applications:review");
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -382,6 +384,8 @@ applicationRoutes.get("/", guard, async (c) => {
 // GET /applications/:id — detail, duplicate check, edit form
 applicationRoutes.get("/:id", guard, async (c) => {
   const user = c.get("user");
+  const canEdit = user.permissions.has("applications:record");
+  const canReview = user.permissions.has("applications:review");
   const app = await fetchApplication(c.req.param("id"));
   if (!app) return c.notFound();
 
@@ -423,6 +427,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
 
       <div class="max-w-2xl border border-base-300 rounded-box p-6 mb-6">
         <form id="application-edit-form" method="post" action={`/applications/${app.id}`} class="space-y-4">
+          <fieldset disabled={!canEdit} class="space-y-4 border-0 p-0 m-0 min-w-0">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="form-control">
               <label class="label"><span class="label-text">{t("apply.form.lastName")}</span></label>
@@ -469,6 +474,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
             <label class="label"><span class="label-text">{t("applications.detail.message")}</span></label>
             <textarea name="message" class="textarea textarea-bordered w-full" rows={3}>{app.message ?? ""}</textarea>
           </div>
+          </fieldset>
         </form>
         {app.guardians.length > 0 && (
           <div class="mt-4">
@@ -488,18 +494,18 @@ applicationRoutes.get("/:id", guard, async (c) => {
         )}
       </div>
 
-      {app.status === "open" && (
+      {app.status === "open" && (canEdit || canReview) && (
         <div class="max-w-2xl space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <button type="submit" form="application-edit-form" class="btn btn-primary btn-outline">{t("applications.actions.save")}</button>
-              {memberMatch ? (
+              {canEdit && <button type="submit" form="application-edit-form" class="btn btn-primary btn-outline">{t("applications.actions.save")}</button>}
+              {canReview && (memberMatch ? (
                 <button type="button" id="create-member-btn" class="btn btn-primary" onclick="document.getElementById('approve-modal').showModal()">{t("applications.actions.approve")}</button>
               ) : (
                 <button type="submit" form="application-approve-form" id="create-member-btn" class="btn btn-primary">{t("applications.actions.approve")}</button>
-              )}
+              ))}
             </div>
-            <button type="button" class="btn btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()">{t("applications.actions.reject")}</button>
+            {canReview && <button type="button" class="btn btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()">{t("applications.actions.reject")}</button>}
           </div>
 
           <form id="application-approve-form" method="post" action={`/applications/${app.id}/approve`}>
@@ -571,7 +577,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
 });
 
 // POST /applications/:id — edit fields (typo corrections etc.)
-applicationRoutes.post("/:id", guard, async (c) => {
+applicationRoutes.post("/:id", recordGuard, async (c) => {
   const id = c.req.param("id");
   const app = await fetchApplication(id);
   if (!app) return c.notFound();
@@ -600,7 +606,7 @@ applicationRoutes.post("/:id", guard, async (c) => {
 // found by findDuplicates, then hands off to the prefilled /members/new form. The
 // application's status only flips to "approved" once that form is actually saved
 // (see members.tsx).
-applicationRoutes.post("/:id/approve", guard, async (c) => {
+applicationRoutes.post("/:id/approve", reviewGuard, async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const app = await fetchApplication(id);
@@ -633,7 +639,7 @@ applicationRoutes.post("/:id/approve", guard, async (c) => {
 });
 
 // POST /applications/:id/reject
-applicationRoutes.post("/:id/reject", guard, async (c) => {
+applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
   const app = await fetchApplication(id);

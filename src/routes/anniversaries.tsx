@@ -182,7 +182,7 @@ function AnniversariesExportModal() {
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
-anniversaryRoutes.get("/", requireAuth(), async (c) => {
+anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user")!;
   const today = todayStr();
 
@@ -316,7 +316,7 @@ anniversaryRoutes.get("/", requireAuth(), async (c) => {
 });
 
 // GET /anniversaries/export — xlsx download
-anniversaryRoutes.get("/export", requireAuth(), async (c) => {
+anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const q = c.req.query();
   const today = todayStr();
   const start = q.start || today;

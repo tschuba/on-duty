@@ -219,7 +219,7 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
 // GET /donations — list with donor-name search and date range (filtered in JS,
 // same reasoning as members.tsx: the full set is small and already needs to be
 // loaded for the filter to run over joined donor/person fields).
-donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receipts"]), async (c) => {
+donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
   const q = c.req.query();
   const search = q.search ?? "";
@@ -240,6 +240,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
   const config = await loadOrgConfig();
   const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
   const canLink = user.permissions.has("members:read");
+  const canRecord = user.permissions.has("donations:record");
   const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   return c.html(
@@ -247,7 +248,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
       <DonationTabs active="donations" openReceiptsCount={openReceipts} />
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>
-        <a href="/donations/new" class="btn btn-primary">{t("donations.newDonation")}</a>
+        {canRecord && <a href="/donations/new" class="btn btn-primary">{t("donations.newDonation")}</a>}
       </div>
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
@@ -284,7 +285,7 @@ donationRoutes.get("/", requireAuth(["donations:record", "donations:issue-receip
           {sorted.length === 0 ? (
             <tr><td colspan={7} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
-            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}/edit'`}>
+            <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donations/${d.id}/edit'` : undefined}>
               <td>{formatDate(d.date)}</td>
               <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{d.donor.person.firstName} {d.donor.person.lastName}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
@@ -384,6 +385,9 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   return c.redirect("/donations");
 });
 
+const canDelete = (user: { permissions: Set<string> }, d: { receiptIssuedAt: Date | null }) =>
+  user.permissions.has("donations:delete") && !d.receiptIssuedAt;
+
 // GET/POST /donations/:id/edit — donation fields only, donor is fixed once recorded
 donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
@@ -402,10 +406,10 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
       </form>
-      <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}></form>
+      {canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}></form>}
       <div class="flex gap-2 pt-4 max-w-xl">
         <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
-        <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>
+        {canDelete(user, d) && <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>}
         <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
       </div>
     </Layout>
@@ -433,10 +437,10 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
           <DonationFormFields values={values} errors={errors} />
         </form>
-        <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm('${d.receiptIssuedAt ? t("donations.confirmDeleteIssued") : t("donations.confirmDelete")}')`}></form>
+        {canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}></form>}
         <div class="flex gap-2 pt-4 max-w-xl">
           <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
-          <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>
+          {canDelete(user, d) && <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>}
           <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
         </div>
       </Layout>,
@@ -456,8 +460,15 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
 });
 
 // POST /donations/:id/delete
-donationRoutes.post("/:id/delete", requireAuth("donations:record"), async (c) => {
+donationRoutes.post("/:id/delete", requireAuth("donations:delete"), async (c) => {
   const id = c.req.param("id");
+  const d = await fetchDonation(id);
+  if (!d) return c.notFound();
+  // Issued receipts are tax documents: the donation must stay.
+  if (d.receiptIssuedAt) {
+    setFlash(c, t("donations.flash.deleteBlocked"), "error");
+    return c.redirect(`/donations/${id}/edit`);
+  }
   await db.delete(donations).where(eq(donations.id, id));
   setFlash(c, t("donations.flash.deleted"), "success");
   return c.redirect("/donations");

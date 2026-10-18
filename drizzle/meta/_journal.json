@@ -176,6 +176,62 @@
       "when": 1792400000000,
       "tag": "0024_damp_grey_gargoyle",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792400000001,
+      "tag": "0025_donations_delete_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792400000002,
+      "tag": "0026_role_permissions_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792400000003,
+      "tag": "0027_donations_read_permission",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792400000004,
+      "tag": "0028_donations_read_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792400000005,
+      "tag": "0029_applications_read_record_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792400000006,
+      "tag": "0030_applications_permissions_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792400000007,
+      "tag": "0031_bearbeiter_permissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792400000008,
+      "tag": "0032_administrator_permissions",
+      "breakpoints": true
     }
   ]
 }
