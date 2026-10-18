@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { t } from "../i18n/index.js";
 import { persons, donors } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 import { makePerson } from "./fixtures.js";
