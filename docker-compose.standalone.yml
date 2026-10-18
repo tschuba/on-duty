@@ -1,9 +1,9 @@
 services:
   app:
     image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
-    # node läuft hier als PID 1 ohne eigenen SIGTERM-Handler — ohne init
-    # ignoriert PID 1 das Signal (Linux-Sonderfall), `stop`/`down` müsste den
-    # vollen Grace-Timeout abwarten und dann SIGKILL schicken (Exit 137).
+    # node runs as PID 1 here without its own SIGTERM handler — without init
+    # PID 1 ignores the signal (Linux special case), so `stop`/`down` would wait
+    # for the full grace timeout and then send SIGKILL (exit 137).
     init: true
     restart: on-failure
     deploy:
@@ -22,7 +22,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-onduty}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-onduty}
       BETTER_AUTH_SECRET: ${SERVICE_PASSWORD_BETTERAUTH}
       ADMIN_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
-      ORG_NAME: ${ORG_NAME}
+      ORG_NAME: ${ORG_NAME:?ORG_NAME must be set - Zitadel fixes the name on first start}
       OIDC_PROVIDER: https://${SERVICE_FQDN_ZITADEL}
       # Empty = created automatically by zitadel-init (oidc.env in the bootstrap volume).
       # Explicit values in .env.standalone take precedence (e.g. existing installations).
@@ -37,10 +37,10 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      # Eingebauter Backup-Mechanismus ist im Standalone-Stack deaktiviert — der
-      # dedizierte `backup`-Service unten sichert stattdessen beide Datenbanken.
-      # Siehe 17_Backup-Status-Flag (unabhängiger Task): fest verdrahtet, kein
-      # Platzhalter in .env.standalone, da es hier nie sinnvoll umzuschalten wäre.
+      # The built-in backup mechanism is disabled in the standalone stack — the
+      # dedicated `backup` service below backs up both databases instead.
+      # See 17_Backup-Status-Flag (separate task): hard-wired, no placeholder
+      # in .env.standalone since toggling it never makes sense here.
       BACKUP_DISABLED: "true"
     command:
       - sh
@@ -66,8 +66,8 @@ services:
       ZITADEL_DB_PASSWORD: ${SERVICE_PASSWORD_ZITADELDB}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # Init-Skript per Docker-`configs` (inline) statt Bind-Mount: Coolify legt relative
-      # Bind-Mounts als leeres Verzeichnis an ("Is a directory").
+      # Init script via Docker `configs` (inline) instead of a bind mount: Coolify creates relative
+      # bind mounts as an empty directory ("Is a directory").
     configs:
       - source: init-zitadel-db
         target: /docker-entrypoint-initdb.d/init-zitadel-db.sh
@@ -90,27 +90,29 @@ services:
       ZITADEL_EXTERNALDOMAIN: ${SERVICE_FQDN_ZITADEL}
       ZITADEL_EXTERNALPORT: 443
       ZITADEL_EXTERNALSECURE: "true"
-      # Der Reverse Proxy (Coolify/Traefik bzw. lokal Caddy) terminiert TLS und
-      # spricht Zitadel intern per h2c (Klartext-HTTP/2) an.
+      # The reverse proxy (Coolify/Traefik, locally Caddy) terminates TLS and
+      # talks to Zitadel internally via h2c (cleartext HTTP/2).
       ZITADEL_TLS_ENABLED: "false"
-      # Eigener, nicht-privilegierter DB-User (siehe configs: init-zitadel-db unten)
-      # statt des onduty-Superusers — bei gesetztem DSN legt Zitadel keinen
-      # eigenen User an, sondern nutzt exakt den hier angegebenen.
+      # Dedicated, unprivileged DB user (see configs: init-zitadel-db below)
+      # instead of the onduty superuser — with a DSN set, Zitadel does not create
+      # its own user but uses exactly the one given here.
       ZITADEL_DATABASE_POSTGRES_DSN: postgresql://${ZITADEL_DB_USER:-zitadel}:${SERVICE_PASSWORD_ZITADELDB}@db:5432/${ZITADEL_DB_NAME:-zitadel}?sslmode=disable
       # Erstinstanz-Bootstrap: nur Org + Admin-User. Projekt/OIDC-Application
       # entstehen NICHT automatisch — siehe docs/standalone-deployment.md.
-      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ORG_NAME}
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: ${ORG_NAME:?ORG_NAME must be set - Zitadel fixes the name on first start}
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: zitadel-admin
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN}
       ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "true"
-      # Login V2 (eigener zitadel-login-Container) braucht einen Machine-User
-      # mit PAT, den Zitadel beim Bootstrap selbst anlegt und über das
-      # gemeinsame zitadel-bootstrap-Volume mit zitadel-login teilt.
-      # One-time admin machine user (IAM_OWNER) for zitadel-init only: creates project + OIDC app
-      # and deletes itself afterwards. Only created during the very first setup of the instance.
-      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/bootstrap/admin.pat
+      # Login V2 (separate zitadel-login container) needs a machine user
+      # with a PAT, which Zitadel creates itself during bootstrap and shares
+      # with zitadel-login via the common zitadel-bootstrap volume.
+      # Admin machine user (IAM_OWNER) for zitadel-init only: creates project + OIDC app on first start and keeps
+      # redirect URIs, login URL and webhook in sync with the domains on every deploy. Its PAT lives in the separate
+      # zitadel-admin volume, mounted only by zitadel and the init containers. Only created during the very first
+      # setup of the instance.
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel/admin/admin.pat
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: onduty-init
-      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (temporary)
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: on-duty init (domain sync)
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: "2099-01-01T00:00:00Z"
       ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel/bootstrap/login-client.pat
       ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
@@ -128,6 +130,7 @@ services:
       start_period: 20s
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:rw
     depends_on:
       db:
         condition: service_healthy
@@ -137,8 +140,8 @@ services:
     restart: unless-stopped
     user: "0"
     environment:
-      # Eigene Domain OHNE Pfad: Coolify strippt sonst den Pfad-Präfix (Traefik stripprefix),
-      # das Login-UI braucht ihn aber (NEXT_PUBLIC_BASE_PATH).
+      # Own domain WITHOUT a path: otherwise Coolify strips the path prefix (Traefik stripprefix),
+      # but the login UI needs it (NEXT_PUBLIC_BASE_PATH).
       SERVICE_FQDN_ZITADELLOGIN_3000:
       ZITADEL_API_URL: http://zitadel:8080
       NEXT_PUBLIC_BASE_PATH: /ui/v2/login
@@ -160,6 +163,7 @@ services:
     environment:
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       APP_DOMAIN: ${SERVICE_FQDN_APP}
+      LOGIN_DOMAIN: ${SERVICE_FQDN_ZITADELLOGIN}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       # Same SMTP values as for on-duty — also registered in Zitadel during the first setup.
       SMTP_HOST: ${SMTP_HOST:-}
@@ -169,6 +173,7 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:ro
     depends_on:
       zitadel:
         condition: service_healthy
@@ -182,11 +187,13 @@ services:
     environment:
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       APP_DOMAIN: ${SERVICE_FQDN_APP}
+      LOGIN_DOMAIN: ${SERVICE_FQDN_ZITADELLOGIN}
       # Zitadel blocks webhook targets in private networks (HTTPClient.DenyList, default stays active) — hence the
       # public URL via Caddy, not http://app:3000. The Docker subnet is not predictable.
       WEBHOOK_URL: ${WEBHOOK_URL:-https://${SERVICE_FQDN_APP}/hooks/zitadel}
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:rw
+      - zitadel-admin:/zitadel/admin:ro
     depends_on:
       app:
         condition: service_healthy
@@ -196,10 +203,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_HOST: db
-      # onduty ist der Postgres-Superuser (Bootstrap-User des offiziellen
-      # Images) und hat damit Lesezugriff auf beide Datenbanken — der
-      # Backup-Container braucht eine einzelne Rolle mit Zugriff auf alle
-      # in POSTGRES_DB gelisteten DBs, nicht den eingeschränkten Zitadel-User.
+      # onduty is the Postgres superuser (bootstrap user of the official
+      # image) and thus can read both databases — the backup container needs
+      # a single role with access to all DBs listed in POSTGRES_DB, not the
+      # restricted Zitadel user.
       POSTGRES_USER: ${POSTGRES_USER:-onduty}
       POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
       POSTGRES_DB: ${POSTGRES_DB:-onduty},${ZITADEL_DB_NAME:-zitadel}
@@ -216,13 +223,14 @@ services:
 volumes:
   pgdata:
   zitadel-bootstrap:
+  zitadel-admin:
 
 configs:
   init-zitadel-db:
     content: |
       #!/bin/sh
-      # Läuft einmalig beim ersten Start (leeres Datenverzeichnis): zweite DB + eigener,
-      # nicht-privilegierter User für Zitadel.
+      # Runs once on first start (empty data directory): second DB + dedicated,
+      # unprivileged user for Zitadel.
       set -e
       psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" <<-EOSQL
           CREATE USER "$$ZITADEL_DB_USER" WITH PASSWORD '$$ZITADEL_DB_PASSWORD';
