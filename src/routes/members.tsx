@@ -398,15 +398,18 @@ function RoleRow({
             class="role-combobox-popover dropdown-content bg-base-100 rounded-box shadow p-2"
             style={`position-anchor:--role-combobox-anchor-${index}`}
           >
-            <input
-              type="text"
-              autocomplete="off"
-              role="searchbox"
-              aria-autocomplete="list"
-              aria-controls={`role-combobox-list-${index}`}
-              class="role-combobox-search input input-bordered input-sm w-full mb-1"
-              placeholder={t("common.searchPlaceholder")}
-            />
+            <label class="input input-bordered input-sm flex items-center gap-2 w-full mb-1">
+              <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+              <input
+                type="text"
+                autocomplete="off"
+                role="searchbox"
+                aria-autocomplete="list"
+                aria-controls={`role-combobox-list-${index}`}
+                class="role-combobox-search grow min-w-0"
+                placeholder={t("common.searchPlaceholder")}
+              />
+            </label>
             <ul id={`role-combobox-list-${index}`} role="listbox" class="role-combobox-list menu p-0">
               {roles.map((r) => (
                 <li
@@ -1049,18 +1052,21 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
       {/* Toolbar */}
       <div class="flex flex-wrap gap-3 mb-4 items-center">
-        <input
-          type="search"
-          name="search"
-          placeholder={t("common.searchPlaceholder")}
-          value={search}
-          class="input input-bordered w-64"
-          hx-get="/members"
-          hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-          hx-target="#members-results"
-          hx-include="[name='search']"
-          hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
-        />
+        <label class="input input-bordered flex items-center gap-2 w-64">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="search"
+            name="search"
+            placeholder={t("common.searchPlaceholder")}
+            value={search}
+            class="grow min-w-0"
+            hx-get="/members"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#members-results"
+            hx-include="[name='search']"
+            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
+          />
+        </label>
         <div class="join">
           {(["aktiv", "passiv", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
             <a

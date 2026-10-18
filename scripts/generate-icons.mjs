@@ -10,6 +10,7 @@ const out = join(root, "src", "components", "icons.generated.ts");
 
 const ICONS = {
   link: "24/outline/link.svg",
+  "magnifying-glass": "24/outline/magnifying-glass.svg",
   "clipboard-document": "24/outline/clipboard-document.svg",
   "cog-6-tooth": "24/outline/cog-6-tooth.svg",
   users: "24/outline/users.svg",

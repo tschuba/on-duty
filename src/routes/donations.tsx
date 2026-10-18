@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -255,7 +256,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
 
       <form method="get" class="flex flex-wrap gap-3 mb-4 items-end">
         <div class="form-control">
-          <input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="input input-bordered w-64" />
+          <label class="input input-bordered flex items-center gap-2 w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
         <QuickRangeFilter presets={presets} start={from} end={to} href={(p) => buildListUrl("/donations", { search }, { from: p.start, to: p.end })} />
         <div class="form-control">
