@@ -128,6 +128,7 @@ export const de = {
   "members.bank.accountHolder": "Kontoinhaber",
   "members.bank.accountHolderHint": "Leer = Name des Mitglieds.",
   "members.form.roleActive": "aktiv",
+  "members.form.statusPreview": "Status nach dem Speichern:",
   "members.form.activeHint": "Aktiv ist, wer eine aktive Funktion hat.",
   "admin.permissions.key.membersBankDataRead": "Bankdaten ansehen",
   "admin.permissions.key.membersBankDataWrite": "Bankdaten bearbeiten",

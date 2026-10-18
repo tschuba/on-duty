@@ -653,6 +653,53 @@ function BankDataSection({
   );
 }
 
+// Live preview of the derived status; mirrors deriveMemberStatus (src/lib/status.ts) client-side.
+function StatusPreview({ roles }: { roles: Role[] }) {
+  const cfg = {
+    active: roles.filter((r) => r.grantsActiveStatus).map((r) => r.id),
+    children: env.CHILDREN_AGE_LIMIT,
+    youth: env.YOUTH_AGE_LIMIT,
+    labels: STATUS_LABELS,
+  };
+  return (
+    <p class="text-sm opacity-60" id="status-preview" data-cfg={JSON.stringify(cfg)}>
+      {t("members.form.activeHint")} {t("members.form.statusPreview")} <strong class="status-preview-value"></strong>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function () {
+          var box = document.getElementById('status-preview');
+          var cfg = JSON.parse(box.dataset.cfg);
+          var form = box.closest('form');
+          function val(n) { var el = form.querySelector('[name="' + n + '"]'); return el ? el.value : ''; }
+          function update() {
+            var status = 'passiv';
+            if (val('deathDate')) status = 'verstorben';
+            else if (val('exitDate')) status = 'ausgetreten';
+            else {
+              var roles = form.querySelectorAll('[name="assignment_role[]"]');
+              var tos = form.querySelectorAll('[name="assignment_to[]"]');
+              var hasActive = Array.prototype.some.call(roles, function (r, i) {
+                return r.value && !tos[i].value && cfg.active.indexOf(r.value) !== -1;
+              });
+              if (hasActive) {
+                var b = new Date(val('birthDate')), now = new Date();
+                var age = now.getFullYear() - b.getFullYear();
+                if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+                status = isNaN(age) ? 'aktiv' : age < cfg.children ? 'kinder' : age < cfg.youth ? 'jugend' : 'aktiv';
+              }
+            }
+            box.querySelector('.status-preview-value').textContent = cfg.labels[status];
+          }
+          form.addEventListener('input', update);
+          form.addEventListener('change', update);
+          // role combobox sets a hidden input programmatically, which fires no event
+          new MutationObserver(update).observe(form, { subtree: true, attributes: true, childList: true, attributeFilter: ['value', 'aria-selected'] });
+          update();
+        })();
+      ` }} />
+    </p>
+  );
+}
+
 function MemberFormFields({
   m,
   errors,
@@ -1110,7 +1157,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           </label>
         )}
         <div class="divider">{t("members.form.assignments")}</div>
-        <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
+        <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
@@ -1231,7 +1278,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </label>
           )}
           <div class="divider">{t("members.form.assignments")}</div>
-          <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
+          <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1521,7 +1568,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
-        <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
+        <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1626,7 +1673,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
-          <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
+          <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
@@ -1696,7 +1743,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
-          <p class="text-sm opacity-60">{t("members.form.activeHint")}</p>
+          <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
