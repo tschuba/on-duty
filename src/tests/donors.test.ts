@@ -160,7 +160,8 @@ describe("GET /search-persons", () => {
   it("projects only the narrow field set — never gender/birthDate/phone/email", async () => {
     personsFixture = [makePerson()];
     await donorRoutes.request("/search-persons?q=an");
-    const cols = selectCalls[selectCalls.length - 1];
+    // first select = outer query; the exists() subqueries come after
+    const cols = selectCalls.find((c) => "firstName" in c)!;
     expect(Object.keys(cols).sort()).toEqual(["city", "companyName", "firstName", "houseNumber", "id", "lastName", "street", "zip"]);
   });
 

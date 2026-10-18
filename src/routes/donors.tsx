@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { eq, or, ilike, asc } from "drizzle-orm";
+import { eq, or, ilike, asc, and, exists } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { persons, donors } from "../db/schema/index.js";
+import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { countOpenReceipts, recipientName } from "../lib/donations.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
@@ -210,7 +210,11 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
       companyName: persons.companyName,
     })
     .from(persons)
-    .where(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(persons.companyName, needle)))
+    .where(and(
+      or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(persons.companyName, needle)),
+      // Only members and existing donors: persons that exist solely for applications/guardians would show up as duplicates.
+      or(exists(db.select({ x: members.id }).from(members).where(eq(members.personId, persons.id))), exists(db.select({ x: donors.id }).from(donors).where(eq(donors.personId, persons.id)))),
+    ))
     .orderBy(asc(persons.lastName))
     .limit(10);
 
