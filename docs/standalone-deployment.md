@@ -81,8 +81,19 @@ OIDC_CLIENT_SECRET=<Client-Secret>
 ## Nach dem Erststart fixiert
 
 - `ORG_NAME` ist Pflicht; fehlt der Wert, bricht der Deploy ab, bevor Zitadel initialisiert wird. Nach dem Erststart ändert sich der Org-Name nur noch in der Zitadel-Console (die Variable wirkt dann nur noch in der App).
-- **Domains** (`app`, `zitadel`, `zitadel-login`) stecken in Zitadel (Issuer, Redirect-URI, Webhook-Target). `zitadel-init` merkt sich diese im Bootstrap-Volume (`domains`) und warnt im Log, wenn sie sich später ändern. Eine automatische Korrektur gibt es nicht (Bootstrap-PAT wird nach dem Setup gelöscht). Der lokale Admin-Login (`/admin/login`) funktioniert weiterhin.
+- **Domains** (`app`, `zitadel`, `zitadel-login`) stecken teilweise in Zitadel. `zitadel-init` merkt sich diese im Bootstrap-Volume (`domains`) und warnt im Log, wenn sie sich später ändern. Eine automatische Korrektur gibt es nicht (der Bootstrap-PAT wird nach dem Setup gelöscht). Der lokale Admin-Login (`/admin/login`) funktioniert weiterhin. Anleitung: [Domain nachträglich ändern](#domain-nachträglich-ändern).
 - Masterkey und DB-Passwörter (`SERVICE_PASSWORD_*`) nie neu generieren und ins Backup aufnehmen.
+
+## Domain nachträglich ändern
+
+Domain in Coolify ändern und redeployen. Zitadel akzeptiert eine neue `zitadel`-Domain beim Start von selbst (Issuer und Discovery folgen `ZITADEL_EXTERNALDOMAIN`). Diese Werte bleiben aber auf der alten Domain und müssen von Hand angepasst werden (Zitadel-Console, als `zitadel-admin` angemeldet):
+
+| Geänderte Domain | Was anpassen |
+|---|---|
+| `app` | Projekt `on-duty` → Anwendung `on-duty` → Redirect Settings: Redirect-URI `https://<app-domain>/auth/callback/oidc` und Post-Logout-URI ergänzen (Symptom sonst: `invalid_request … redirect_uri is missing`). Webhook-Target (Actions → Targets, bzw. `/v2/actions/targets`): Endpoint auf `https://<app-domain>/hooks/zitadel` setzen, sonst werden Selbstregistrierungen nicht synchronisiert. |
+| `zitadel` oder `zitadel-login` | Login-V2-Basis-URL der Instanz auf `https://<login-domain>/ui/v2/login/` setzen (`PUT /v2/features/instance` mit `{"loginV2":{"required":true,"baseUri":"…"}}`; Symptom sonst: Weiterleitung beim Login zur alten Domain). Die Redirect-URI der App bleibt gleich. |
+
+`OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` bleiben unverändert, `oidc.env` muss nicht neu erzeugt werden.
 
 ## Upgrade
 
