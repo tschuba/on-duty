@@ -599,6 +599,8 @@ donationRoutes.post("/:id/mark-issued", requireAuth("donations:issue-receipts"),
   const user = c.get("user");
   const d = await fetchDonation(id);
   if (!d) return c.notFound();
+  // Same guard as receipt.xml: without complete org data no file can be produced, so don't mark as issued.
+  if (!isOrgConfigCompleteForReceipts(await loadOrgConfig())) return c.redirect(`/donations/${id}/receipt`);
   if (nextReceiptStatus(d.receiptStatus, "issue")) {
     await db.update(donations).set({ receiptStatus: "issued", receiptIssuedAt: new Date(), issuedBy: user.id }).where(eq(donations.id, id));
   }

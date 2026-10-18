@@ -336,6 +336,7 @@ describe("GET /:id/receipt.xml", () => {
 
 describe("POST /:id/mark-issued", () => {
   it("stamps receiptIssuedAt and issuedBy, and redirects to the xml download", async () => {
+    completeOrgConfig();
     donationsFindFirstResult = makeDonation();
     const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(res.status).toBe(302);
@@ -360,8 +361,19 @@ describe("POST /:id/delete", () => {
   });
 });
 
+describe("mark-issued with incomplete org data", () => {
+  it("does not mark as issued", async () => {
+    orgConfigFixture = [];
+    donationsFindFirstResult = makeDonation();
+    const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
+    expect(res.headers.get("location")).toBe("/donations/don1/receipt");
+    expect(updateCalls.length).toBe(0);
+  });
+});
+
 describe("mark-issued from not_required", () => {
   it("issues the receipt", async () => {
+    completeOrgConfig();
     donationsFindFirstResult = makeDonation({ receiptStatus: "not_required" });
     await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(updateCalls[0].set.receiptStatus).toBe("issued");
