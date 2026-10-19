@@ -652,6 +652,7 @@ export const de = {
   "inventory.form.commissionedAt": "Indienststellung",
   "inventory.form.inventoryNumber": "Inventarnummer",
   "inventory.form.inventoryNumbers": "Inventarnummern",
+  "inventory.form.inventoryNumberPlaceholder": "Inventarnummer eingeben",
   "inventory.form.inventoryNumbersPlaceholder": "Nummer eingeben, Enter zum Hinzufügen",
   "inventory.form.numbersCounter": "{n} von {max}",
   "inventory.form.numbersTooMany": "Mehr Inventarnummern als Stückzahl (max. {max}).",

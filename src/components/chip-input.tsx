@@ -3,7 +3,7 @@ import { t } from "../i18n/index.js";
 // Generic chip input: every chip is its own <input type="hidden" name={name}>, so
 // values may contain commas. Script is bound once per page and works per instance
 // via [data-chip-input] (no fixed ids → several instances per page are fine).
-export function ChipInput({ name, label, placeholder, values, max, maxFrom, labelSingle, splitOnComma = false, caseSensitive = true, hint }: {
+export function ChipInput({ name, label, placeholder, values, max, maxFrom, labelSingle, placeholderSingle, splitOnComma = false, caseSensitive = true, hint }: {
   name: string;
   label: string;
   placeholder?: string;
@@ -13,6 +13,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
   maxFrom?: string;
   /** Label used while the maximum is 1; the counter is hidden then. */
   labelSingle?: string;
+  placeholderSingle?: string;
   splitOnComma?: boolean;
   caseSensitive?: boolean;
   /** Counter text template, "{n}" and "{max}" are replaced. */
@@ -21,7 +22,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
   const list = values ?? [];
   return (
     <div class="form-control" data-chip-input data-name={name} data-split={splitOnComma ? "1" : ""} data-case={caseSensitive ? "1" : ""}
-      data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-label={label} data-label-single={labelSingle ?? ""} data-remove-label={t("common.remove")}>
+      data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-label={label} data-label-single={labelSingle ?? ""} data-placeholder={placeholder ?? ""} data-placeholder-single={placeholderSingle ?? ""} data-remove-label={t("common.remove")}>
       <label class="label"><span class="label-text chip-label">{label}</span></label>
       <div class="chip-box input input-bordered w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
         {list.map((v) => (
@@ -51,6 +52,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
             input.disabled = count >= max;
             var c = root.querySelector('.chip-counter');
             root.querySelector('.chip-label').textContent = (max === 1 && root.dataset.labelSingle) || root.dataset.label;
+            input.placeholder = (max === 1 && root.dataset.placeholderSingle) || root.dataset.placeholder;
             c.textContent = (root.dataset.hint && max !== Infinity && max > 1) ? root.dataset.hint.replace('{n}', count).replace('{max}', max) : '';
           }
           function chipAdd(root, value) {
@@ -94,6 +96,9 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
             rm.closest('[data-chip]').remove();
             chipRefresh(root);
           });
+          document.body.addEventListener('submit', function(e) {
+            e.target.querySelectorAll('[data-chip-input] .chip-text').forEach(function(i){ if (i.value.trim()) chipCommit(i); });
+          }, true);
           document.body.addEventListener('input', function(e) {
             document.querySelectorAll('[data-chip-input][data-max-from]').forEach(chipRefresh);
           });

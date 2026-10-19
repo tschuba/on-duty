@@ -527,6 +527,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         label={t("inventory.form.inventoryNumbers")}
         labelSingle={t("inventory.form.inventoryNumber")}
         placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
+        placeholderSingle={t("inventory.form.inventoryNumberPlaceholder")}
         values={v.numbersList}
         maxFrom="#inventory-quantity"
         max={1}
