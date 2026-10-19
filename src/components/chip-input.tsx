@@ -24,7 +24,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
     <div class="form-control" data-chip-input data-name={name} data-split={splitOnComma ? "1" : ""} data-case={caseSensitive ? "1" : ""}
       data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-label={label} data-label-single={labelSingle ?? ""} data-placeholder={placeholder ?? ""} data-placeholder-single={placeholderSingle ?? ""} data-remove-label={t("common.remove")}>
       <label class="label"><span class="label-text chip-label">{label}</span></label>
-      <div class="chip-box input input-bordered w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
+      <div class="chip-box cursor-text input input-bordered w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
         {list.map((v) => (
           <span class="badge badge-outline gap-1 pr-1" data-chip={v}>
             {v}
@@ -49,7 +49,8 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
           function chipRefresh(root) {
             var count = root.querySelectorAll('[data-chip]').length, max = chipMax(root);
             var input = root.querySelector('.chip-text');
-            input.disabled = count >= max;
+            // readonly statt disabled: bleibt fokussierbar, nimmt aber nichts mehr an
+            input.readOnly = count >= max;
             var c = root.querySelector('.chip-counter');
             root.querySelector('.chip-label').textContent = (max === 1 && root.dataset.labelSingle) || root.dataset.label;
             input.placeholder = (max === 1 && root.dataset.placeholderSingle) || root.dataset.placeholder;
@@ -87,9 +88,12 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
             var input = e.target.closest && e.target.closest('[data-chip-input] .chip-text');
             if (!input) return;
             var root = input.closest('[data-chip-input]');
+            if (input.readOnly && e.key === 'Enter') { e.preventDefault(); return; }
             if (e.key === 'Enter' || (e.key === ',' && root.dataset.split)) { e.preventDefault(); chipCommit(input); }
           });
           document.body.addEventListener('click', function(e) {
+            var box = e.target.closest && e.target.closest('.chip-box');
+            if (box && !e.target.closest('.chip-remove')) box.querySelector('.chip-text').focus();
             var rm = e.target.closest('.chip-remove');
             if (!rm) return;
             var root = rm.closest('[data-chip-input]');
