@@ -21,7 +21,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Benutzerverwaltung, Systemkonfiguration und Antragsformulare",
     isProtected: true,
-    permissions: ["system:admin", "applications:manage-forms"],
+    permissions: ["system:admin", "applications:manage-forms", "import:run"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
