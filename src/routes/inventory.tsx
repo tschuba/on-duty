@@ -712,7 +712,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
                 <td>
                   {item.name}
-                  {item.quantity > 1 && !(canSeeLending && lending) && <span class="badge badge-outline badge-sm ml-2" title={t("inventory.table.batch")}>{item.quantity}×</span>}
+                  {item.quantity > 1 && !canSeeLending && <span class="badge badge-outline badge-sm ml-2" title={t("inventory.table.batch")}>{item.quantity}×</span>}
                 </td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
                 <td>{due ? formatDate(due) : "—"}</td>
@@ -727,7 +727,12 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                   {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
                 </td>
                 {canSeeLending && (
-                  <td>{lending ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-ghost"}`}>{item.quantity > 1 ? t("inventory.lending.availableOf", { count: lending.available, total: item.quantity }) : t("inventory.lending.available", { count: lending.available })}</span> : "—"}</td>
+                  <td>{(() => {
+                    // Nicht verleihbar: verfügbar = alles, was nicht ausgemustert ist; Einzelstücke zeigen nichts.
+                    const available = lending ? lending.available : item.quantity - item.retiredQuantity;
+                    if (!lending && item.quantity <= 1) return "—";
+                    return <span class={`badge badge-sm ${lending && available <= 0 ? "badge-warning" : "badge-ghost"}`}>{item.quantity > 1 ? t("inventory.lending.availableOf", { count: available, total: item.quantity }) : t("inventory.lending.available", { count: available })}</span>;
+                  })()}</td>
                 )}
                 {canLend && (
                   <td>
