@@ -19,6 +19,7 @@ import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
 import { inventoryRoutes } from "./routes/inventory.js";
 import { lendingRoutes } from "./routes/lending.js";
+import { importRoutes } from "./routes/import.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { Layout } from "./components/layout.js";
 
@@ -70,6 +71,7 @@ app.get("/", requireAuth(), (c) => {
     [["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"], "/organisation"],
     [["applications:read"], "/applications"],
     [["system:admin"], "/admin"],
+    [["import:run"], "/import"],
   ];
   return c.redirect(landing.find(([ps]) => ps.some((p) => perms.has(p as never)))?.[1] ?? "/account");
 });
@@ -98,6 +100,7 @@ app.route("/inventory", inventoryRoutes);
 // Admin routes
 app.route("/admin", adminRoutes);
 app.route("/organisation", organisationRoutes);
+app.route("/import", importRoutes);
 
 // 404
 app.notFound((c) => {

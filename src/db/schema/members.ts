@@ -9,6 +9,7 @@ export const members = pgTable("members", {
     .unique()
     .references(() => persons.id, { onDelete: "restrict" }),
   entryDate: date("entry_date").notNull(),
+  firstEntryDate: date("first_entry_date"),
   exitDate: date("exit_date"),
   deathDate: date("death_date"),
   iban: text("iban"),

@@ -260,6 +260,48 @@
       "when": 1792400000012,
       "tag": "0036_person_mobile",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792400000013,
+      "tag": "0037_first_entry_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792401000013,
+      "tag": "0038_assignment_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792402000013,
+      "tag": "0039_merge_board_command_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792407258963,
+      "tag": "0040_inventory_numbers_commissioned_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792412284559,
+      "tag": "0041_inventory_serials",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792419374078,
+      "tag": "0042_import_permission",
+      "breakpoints": true
     }
   ]
 }

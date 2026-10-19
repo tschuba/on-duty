@@ -47,7 +47,7 @@ describe("getCeremonyYear", () => {
 });
 
 describe("generateEvents scope filtering", () => {
-  const ay = [{ year: 25, title: null }];
+  const ay = [{ kind: "service" as const, year: 25, title: null }, { kind: "membership" as const, year: 25, title: null }];
 
   const mkMember = (status: "aktiv" | "jugend" | "kinder" | "passiv" | "ausgetreten" | "verstorben") => ({
     id: status,
@@ -65,10 +65,36 @@ describe("generateEvents scope filtering", () => {
     }
   });
 
-  it("passiv: birthday only, no anniversary", () => {
-    const evs = generateEvents([mkMember("passiv")], ay, CUTOFF, "2025-01-01", "2027-12-31");
-    expect(evs.every(e => e.kind === "birthday")).toBe(true);
-    expect(evs.some(e => e.kind === "anniversary")).toBe(false);
+  it("passiv/kinder/jugend: membership only", () => {
+    for (const st of ["passiv", "kinder", "jugend"] as const) {
+      const a = generateEvents([mkMember(st)], ay, CUTOFF, "2025-01-01", "2027-12-31").filter(e => e.kind === "anniversary");
+      expect(a.map(e => e.types)).toEqual([["membership"]]);
+    }
+  });
+
+  it("aktiv without firstEntryDate: one merged row", () => {
+    const a = generateEvents([mkMember("aktiv")], ay, CUTOFF, "2025-01-01", "2027-12-31").filter(e => e.kind === "anniversary");
+    expect(a).toHaveLength(1);
+    expect(a[0].types).toEqual(["service", "membership"]);
+  });
+
+  it("firstEntryDate shifts service, separate rows", () => {
+    const m = { ...mkMember("aktiv"), firstEntryDate: "1990-06-15" };
+    const a = generateEvents([m], ay, CUTOFF, "1990-01-01", "2027-12-31").filter(e => e.kind === "anniversary");
+    expect(a.map(e => [e.date, e.types])).toEqual([["2016-06-15", ["service"]], ["2026-06-15", ["membership"]]]);
+  });
+
+  it("cutoff applies per base date", () => {
+    const m = { ...mkMember("aktiv"), firstEntryDate: "1990-01-05" }; // on/before cutoff → no +1
+    const a = generateEvents([m], ay, CUTOFF, "2000-01-01", "2027-12-31").filter(e => e.types?.[0] === "service");
+    expect(a[0].date).toBe("2015-01-05");
+  });
+
+  it("same date but different years or titles", () => {
+    const ay2 = [{ kind: "service" as const, year: 25, title: "A" }, { kind: "membership" as const, year: 25, title: "B" }];
+    const a = generateEvents([mkMember("aktiv")], ay2, CUTOFF, "2025-01-01", "2027-12-31").filter(e => e.kind === "anniversary");
+    expect(a).toHaveLength(1);
+    expect(a[0].title).toBe("A / B");
   });
 
   it("aktiv: birthday + anniversary in range", () => {

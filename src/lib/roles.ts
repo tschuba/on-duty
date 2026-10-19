@@ -24,6 +24,7 @@ export const PERMISSIONS = [
   "org:write",
   "org:tax-data:read",
   "org:tax-data:write",
+  "import:run",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

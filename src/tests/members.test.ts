@@ -281,12 +281,17 @@ describe("buildExportSheets", () => {
   it("adds gender/dates/address/contact columns per toggle", () => {
     const sheets = buildExportSheets([m1], [], { addr: true, contact: true, dates: true, gender: true, assignments: false });
     const row = sheets[0].rows[0];
-    // lastName, firstName, gender, birth, entry, exit, death, street, houseNumber, zip, city, phone, mobile, email
-    expect(row).toHaveLength(14);
+    // lastName, firstName, gender, birth, entry, firstEntry, exit, death, street, houseNumber, zip, city, phone, mobile, email
+    expect(row).toHaveLength(15);
     expect(row[2]).toBe("Weiblich");
-    expect(row[7]).toBe("Hauptstr.");
-    expect(row[11]).toBe("123");
-    expect(row[12]).toBe("0170");
+    expect(row[8]).toBe("Hauptstr.");
+    expect(row[12]).toBe("123");
+    expect(row[13]).toBe("0170");
+  });
+
+  it("exports firstEntryDate in the dates block", () => {
+    const sheets = buildExportSheets([{ ...m1, firstEntryDate: "2001-02-03" }], [], { addr: false, contact: false, dates: true, gender: false, assignments: false });
+    expect(sheets[0].rows[0]).toContainEqual(new Date("2001-02-03T00:00:00"));
   });
 
   it("maps unset gender to 'ohne Angabe'", () => {
@@ -512,6 +517,36 @@ describe("GET /role-row", () => {
     expect(html).toContain(`data-id="${roleAktiv.id}"`);
     expect(html).toContain(`data-title="${roleAktiv.title}"`);
     expect(html).not.toContain("<select");
+  });
+});
+
+describe("firstEntryDate", () => {
+  const base = { lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01" };
+
+  it("rejects firstEntryDate after entryDate on create and edit", async () => {
+    const c = await memberRoutes.request("/new", { method: "POST", body: formBody({ ...base, firstEntryDate: "2011-01-01" }) });
+    expect(c.status).toBe(422);
+    expect(insert).not.toHaveBeenCalled();
+    findFirstResult = memberWithAssignments();
+    const e = await memberRoutes.request("/m1", { method: "POST", body: formBody({ ...base, firstEntryDate: "2011-01-01" }) });
+    expect(e.status).toBe(422);
+    expect(updateCalls.some((u) => u.table === members)).toBe(false);
+  });
+
+  it("accepts empty and earlier values, stores them", async () => {
+    await memberRoutes.request("/new", { method: "POST", body: formBody({ ...base, firstEntryDate: "2000-01-01" }) });
+    expect(insertCalls.find((x) => x.table === members)?.values).toMatchObject({ firstEntryDate: "2000-01-01" });
+    insertCalls.length = 0;
+    await memberRoutes.request("/new", { method: "POST", body: formBody(base) });
+    expect(insertCalls.find((x) => x.table === members)?.values).toMatchObject({ firstEntryDate: null });
+  });
+
+  it("shows it in the detail view only when set", async () => {
+    currentUser = { id: "u1", permissions: new Set(), disabled: false };
+    findFirstResult = memberWithAssignments({ firstEntryDate: "2000-01-01" });
+    expect(await (await memberRoutes.request("/m1")).text()).toContain("01.01.2000");
+    findFirstResult = memberWithAssignments({ firstEntryDate: null });
+    expect(await (await memberRoutes.request("/m1")).text()).not.toContain("Erstes Eintrittsdatum");
   });
 });
 
