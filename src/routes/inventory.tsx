@@ -485,7 +485,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       </div>
 
       <div data-show-cats="scba,equipment,ppe" class="space-y-4">
-        <div class="divider">{t("inventory.form.serialNumber")} / {t("inventory.form.nextInspectionDue")}</div>
+        <div class="divider">{t("inventory.form.sectionInspection")}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div class="form-control" data-show-cats="scba,equipment,ppe" data-show-batch="false">
             <label class="label"><span class="label-text">{t("inventory.form.serialNumber")}</span></label>
