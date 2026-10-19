@@ -28,7 +28,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
         {list.map((v) => (
           <span class="badge badge-outline gap-1 pr-1" data-chip={v}>
             {v}
-            <button type="button" class="chip-remove btn btn-ghost btn-circle min-h-0 h-4 w-4 p-0 ml-0.5 text-base leading-none opacity-60 hover:opacity-100" aria-label={t("common.remove")}>×</button>
+            <button type="button" class="chip-remove btn btn-circle min-h-0 h-4 w-4 p-0 ml-0.5 border-0 bg-base-300 text-xs leading-none hover:bg-error hover:text-error-content" aria-label={t("common.remove")}>×</button>
             <input type="hidden" name={name} value={v} />
           </span>
         ))}
@@ -68,7 +68,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
             chip.dataset.chip = value;
             chip.appendChild(document.createTextNode(value));
             var rm = document.createElement('button');
-            rm.type = 'button'; rm.className = 'chip-remove btn btn-ghost btn-circle min-h-0 h-4 w-4 p-0 ml-0.5 text-base leading-none opacity-60 hover:opacity-100'; rm.textContent = '×';
+            rm.type = 'button'; rm.className = 'chip-remove btn btn-circle min-h-0 h-4 w-4 p-0 ml-0.5 border-0 bg-base-300 text-xs leading-none hover:bg-error hover:text-error-content'; rm.textContent = '×';
             rm.setAttribute('aria-label', root.dataset.removeLabel);
             chip.appendChild(rm);
             var h = document.createElement('input');
