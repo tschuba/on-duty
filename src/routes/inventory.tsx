@@ -425,7 +425,11 @@ const CATEGORY_TOGGLE_SCRIPT = `
       el.classList.toggle('hidden', !(catOk && batchOk));
     });
     var qtyInput = document.getElementById('inventory-quantity');
-    if (qtyInput && !(isBatch && __inventoryBatchCats.indexOf(cat) >= 0)) qtyInput.value = '1';
+    if (qtyInput && !(isBatch && __inventoryBatchCats.indexOf(cat) >= 0) && qtyInput.value !== '1') {
+      qtyInput.value = '1';
+      // programmatic changes fire no event; ChipInput listens for it to refresh label/counter/limit
+      qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
   updateInventoryFormVisibility();
 `;
