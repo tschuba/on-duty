@@ -1,14 +1,15 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
-import { trimmed, parseTags } from "../lib/forms.js";
+import { ChipInput } from "../components/chip-input.js";
+import { trimmed, parseTags, parseList } from "../lib/forms.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, rangePresets } from "../lib/quick-range.js";
@@ -25,10 +26,12 @@ export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 
 type InventoryItemRow = typeof inventoryItems.$inferSelect;
 type Tag = typeof inventoryItemTags.$inferSelect;
+type ItemNumber = typeof inventoryItemNumbers.$inferSelect;
+type ItemSerial = typeof inventoryItemSerials.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
 type Person = { firstName: string; lastName: string };
 type AssignmentWithMember = typeof inventoryItemAssignments.$inferSelect & { member: MemberRow & { person: Person } };
-type ItemWithRelations = InventoryItemRow & { tags: Tag[]; assignments: AssignmentWithMember[] };
+type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[] };
 
 // Which categories may be entered as a batch ("30 Helme" instead of one item per
 // piece). A plain list, not scattered if/category checks, so a future category
@@ -100,14 +103,15 @@ type AssignmentInput = { memberId: string; name: string; quantity: number };
 export type InventoryFieldValues = {
   name: string;
   category: string;
-  purchaseDate: string;
+  commissionedAt: string;
+  numbersList?: string[];
   purchasePrice: string;
   notes: string;
   tagsList?: string[];
   licensePlate: string;
   yearOfManufacture: string;
   vehicleInspectionDue: string;
-  serialNumber: string;
+  serialsList?: string[];
   nextInspectionDue: string;
   lastInspectionDate: string;
   quantity: string;
@@ -122,13 +126,12 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
   const values: InventoryFieldValues = {
     name: trimmed(body, "name"),
     category: trimmed(body, "category"),
-    purchaseDate: trimmed(body, "purchaseDate"),
+    commissionedAt: trimmed(body, "commissionedAt"),
     purchasePrice: trimmed(body, "purchasePrice"),
     notes: trimmed(body, "notes"),
     licensePlate: trimmed(body, "licensePlate"),
     yearOfManufacture: trimmed(body, "yearOfManufacture"),
     vehicleInspectionDue: trimmed(body, "vehicleInspectionDue"),
-    serialNumber: trimmed(body, "serialNumber"),
     nextInspectionDue: trimmed(body, "nextInspectionDue"),
     lastInspectionDate: trimmed(body, "lastInspectionDate"),
     quantity: trimmed(body, "quantity") || "1",
@@ -202,7 +205,7 @@ export function toInsertValues(values: InventoryFieldValues) {
   return {
     name: values.name,
     category,
-    purchaseDate: values.purchaseDate || null,
+    commissionedAt: values.commissionedAt || null,
     purchasePrice: values.purchasePrice ? values.purchasePrice.replace(",", ".") : null,
     notes: values.notes || null,
     quantity,
@@ -210,70 +213,113 @@ export function toInsertValues(values: InventoryFieldValues) {
     yearOfManufacture: category === "vehicle" && values.yearOfManufacture ? Number(values.yearOfManufacture) : null,
     vehicleInspectionDue: category === "vehicle" ? values.vehicleInspectionDue || null : null,
     // A batch's serial number doesn't identify one piece — dropped once quantity > 1.
-    serialNumber: (category === "scba" || category === "equipment" || category === "ppe") && !isBatch ? values.serialNumber || null : null,
     nextInspectionDue: category === "scba" || category === "equipment" || category === "ppe" ? values.nextInspectionDue || null : null,
     lastInspectionDate: category === "scba" ? values.lastInspectionDate || null : null,
   };
 }
 
-// ── Tag input (chip UI over a comma-joined hidden field) ────────────────────
+// ── Inventory numbers ────────────────────────────────────────────────────────
 
-export function TagInput({ tags }: { tags?: string[] }) {
-  const list = tags ?? [];
+const NUMBER_MAX_LENGTH = 100;
+
+const natural = (a: string, b: string) => a.localeCompare(b, "de", { numeric: true });
+
+export function sortedNumbers(item: { numbers?: { number: string }[] }): string[] {
+  return (item.numbers ?? []).map((n) => n.number).sort(natural);
+}
+
+export function sortedSerials(item: { serials?: { serial: string }[] }): string[] {
+  return (item.serials ?? []).map((n) => n.serial).sort(natural);
+}
+
+const SERIAL_CATEGORIES = new Set<string>(["scba", "equipment", "ppe"]);
+
+// Seriennummern: höchstens eine pro Stück, nicht global eindeutig. Andere Kategorien ignorieren sie.
+function validateSerials(serials: string[], quantity: number): string | undefined {
+  if (serials.length > quantity) return t("inventory.form.serialsTooMany", { max: quantity });
+  // eslint-disable-next-line no-control-regex
+  if (serials.some((n) => n.length > NUMBER_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(n))) return t("inventory.form.numberInvalid");
+  return undefined;
+}
+
+// Returns an error message or undefined. Numbers are globally unique and case-sensitive;
+// numbers of archived items stay taken. A race past this check hits the unique index.
+async function validateNumbers(numbers: string[], quantity: number, selfId?: string): Promise<string | undefined> {
+  if (numbers.length > quantity) return t("inventory.form.numbersTooMany", { max: quantity });
+  // eslint-disable-next-line no-control-regex
+  if (numbers.some((n) => n.length > NUMBER_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(n))) return t("inventory.form.numberInvalid");
+  if (numbers.length === 0) return undefined;
+  const rows = await db.query.inventoryItemNumbers.findMany({ where: inArray(inventoryItemNumbers.number, numbers), with: { item: true } });
+  const taken = rows.find((r: any) => r.inventoryItemId !== selfId);
+  if (!taken) return undefined;
+  const item = (taken as any).item;
+  return t("inventory.form.numberTaken", { number: taken.number, item: item.name, archived: item.retiredAt ? ` ${t("inventory.form.archivedSuffix")}` : "" });
+}
+
+// Postgres unique_violation (23505) — z. B. wenn zwischen Vorabprüfung und Insert jemand
+// dieselbe Inventarnummer vergibt. Drizzle kann den Fehler in `cause` verpacken.
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; cause?: { code?: string } };
+  return e?.code === "23505" || e?.cause?.code === "23505";
+}
+
+// Menge 1: einfaches Textfeld; ab Menge 2: ChipInput. Beide tragen denselben Feldnamen,
+// das jeweils verborgene Feld ist disabled (wird nicht gesendet) — Umschalten per Skript.
+function NumberListField({ name, label, labelSingle, placeholder, placeholderSingle, values, quantity, error }: {
+  name: string; label: string; labelSingle: string; placeholder: string; placeholderSingle: string;
+  values?: string[]; quantity: number; error?: string;
+}) {
+  const multi = quantity > 1;
+  const list = values ?? [];
   return (
-    <div class="form-control">
-      <label class="label"><span class="label-text">{t("inventory.form.tags")}</span></label>
-      <div id="tag-input" class="input input-bordered w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
-        {list.map((tag) => (
-          <span class="badge badge-outline gap-1" data-tag={tag}>
-            {tag}
-            <button type="button" class="tag-remove" aria-label={t("common.remove")}>×</button>
-          </span>
-        ))}
-        <input type="text" class="grow min-w-24 outline-none bg-transparent" placeholder={t("inventory.form.tagsPlaceholder")} />
+    <div data-numlist>
+      <div data-numlist-single class={multi ? "hidden" : ""}>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{labelSingle}</span></label>
+          <input type="text" name={name} value={list[0] ?? ""} placeholder={placeholderSingle} disabled={multi} maxlength={NUMBER_MAX_LENGTH}
+            class={`input input-bordered w-full${error ? " input-error" : ""}`} />
+        </div>
       </div>
-      <input type="hidden" id="tag-input-value" name="tags" value={list.join(",")} />
+      <div data-numlist-multi class={multi ? "" : "hidden"}>
+        <ChipInput name={name} label={label} placeholder={placeholder} values={multi ? list : []} maxFrom="#inventory-quantity" max={quantity}
+          hint={t("inventory.form.numbersCounter")} />
+      </div>
+      {error && <span class="text-error text-sm">{error}</span>}
       <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__tagInputBound) {
-          window.__tagInputBound = true;
-          function syncTagInput() {
-            var el = document.getElementById('tag-input');
-            if (!el) return;
-            var tags = Array.from(el.querySelectorAll('[data-tag]')).map(function(s){return s.dataset.tag});
-            document.getElementById('tag-input-value').value = tags.join(',');
+        if (!window.__numListBound) {
+          window.__numListBound = true;
+          function syncNumLists() {
+            var qf = document.getElementById('inventory-quantity');
+            var multi = (parseInt(qf && qf.value, 10) || 1) > 1;
+            document.querySelectorAll('[data-numlist]').forEach(function(root) {
+              var was = root.dataset.mode;
+              var mode = multi ? 'multi' : 'single';
+              if (was === mode) return;
+              root.dataset.mode = mode;
+              var single = root.querySelector('[data-numlist-single] input');
+              var chipRoot = root.querySelector('[data-chip-input]');
+              root.querySelector('[data-numlist-single]').classList.toggle('hidden', multi);
+              root.querySelector('[data-numlist-multi]').classList.toggle('hidden', !multi);
+              single.disabled = multi;
+              chipRoot.querySelectorAll('[data-chip] input[type=hidden]').forEach(function(h){ h.disabled = !multi; });
+              if (was && !multi && !single.value) { var first = chipRoot.querySelector('[data-chip]'); if (first) single.value = first.dataset.chip; }
+              if (was && multi && single.value.trim()) chipAdd(chipRoot, single.value);
+              chipRefresh(chipRoot);
+            });
           }
-          document.body.addEventListener('keydown', function(e) {
-            if (e.key !== 'Enter' && e.key !== ',') return;
-            var input = e.target.closest('#tag-input input[type=text]');
-            if (!input) return;
-            e.preventDefault();
-            var value = input.value.trim().replace(/,$/, '');
-            if (!value) return;
-            var el = document.getElementById('tag-input');
-            if (Array.from(el.querySelectorAll('[data-tag]')).some(function(s){return s.dataset.tag.toLowerCase() === value.toLowerCase()})) { input.value = ''; return; }
-            var chip = document.createElement('span');
-            chip.className = 'badge badge-outline gap-1';
-            chip.dataset.tag = value;
-            chip.textContent = value;
-            var remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'tag-remove';
-            remove.textContent = '×';
-            chip.appendChild(remove);
-            el.insertBefore(chip, input);
-            input.value = '';
-            syncTagInput();
-          });
-          document.body.addEventListener('click', function(e) {
-            if (e.target.closest('.tag-remove')) {
-              e.target.closest('[data-tag]').remove();
-              syncTagInput();
-            }
-          });
+          document.addEventListener('input', syncNumLists);
+          document.addEventListener('DOMContentLoaded', syncNumLists);
         }
+        if (typeof syncNumLists === 'function') syncNumLists();
       ` }} />
     </div>
   );
+}
+
+// ── Tag input (thin wrapper over the generic ChipInput) ─────────────────────
+
+export function TagInput({ tags }: { tags?: string[] }) {
+  return <ChipInput name="tags" label={t("inventory.form.tags")} placeholder={t("inventory.form.tagsPlaceholder")} values={tags} splitOnComma caseSensitive={false} />;
 }
 
 // ── Assigned-member picker(s) (search existing aktiv/jugend members, no create) ─
@@ -432,7 +478,11 @@ const CATEGORY_TOGGLE_SCRIPT = `
       el.classList.toggle('hidden', !(catOk && batchOk));
     });
     var qtyInput = document.getElementById('inventory-quantity');
-    if (qtyInput && !(isBatch && __inventoryBatchCats.indexOf(cat) >= 0)) qtyInput.value = '1';
+    if (qtyInput && !(isBatch && __inventoryBatchCats.indexOf(cat) >= 0) && qtyInput.value !== '1') {
+      qtyInput.value = '1';
+      // programmatic changes fire no event; ChipInput listens for it to refresh label/counter/limit
+      qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
   updateInventoryFormVisibility();
 `;
@@ -476,8 +526,8 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="form-control">
-          <label class="label"><span class="label-text">{t("inventory.form.purchaseDate")}</span></label>
-          <input type="date" name="purchaseDate" value={v.purchaseDate ?? ""} class="input input-bordered w-full" />
+          <label class="label"><span class="label-text">{t("inventory.form.commissionedAt")}</span></label>
+          <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input input-bordered w-full" />
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">{t("inventory.form.purchasePrice")}</span></label>
@@ -514,12 +564,8 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       </div>
 
       <div data-show-cats="scba,equipment,ppe" class="space-y-4">
-        <div class="divider">{t("inventory.form.serialNumber")} / {t("inventory.form.nextInspectionDue")}</div>
+        <div class="divider">{t("inventory.form.sectionInspection")}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="form-control" data-show-cats="scba,equipment,ppe" data-show-batch="false">
-            <label class="label"><span class="label-text">{t("inventory.form.serialNumber")}</span></label>
-            <input type="text" name="serialNumber" value={v.serialNumber ?? ""} class="input input-bordered w-full" />
-          </div>
           <div class="form-control" data-show-cats="scba">
             <label class="label"><span class="label-text">{t("inventory.form.lastInspectionDate")}</span></label>
             <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input input-bordered w-full" />
@@ -551,6 +597,30 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         </div>
       </div>
 
+      <NumberListField
+        name="numbers"
+        label={t("inventory.form.inventoryNumbers")}
+        labelSingle={t("inventory.form.inventoryNumber")}
+        placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
+        placeholderSingle={t("inventory.form.inventoryNumberPlaceholder")}
+        values={v.numbersList}
+        quantity={quantity}
+        error={errors?.numbers}
+      />
+
+      <div data-show-cats="scba,equipment,ppe">
+        <NumberListField
+          name="serials"
+          label={t("inventory.form.serialNumbers")}
+          labelSingle={t("inventory.form.serialNumber")}
+          placeholder={t("inventory.form.serialNumbersPlaceholder")}
+          placeholderSingle={t("inventory.form.serialNumberPlaceholder")}
+          values={v.serialsList}
+          quantity={quantity}
+          error={errors?.serials}
+        />
+      </div>
+
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
       <BatchAssignmentFields assignments={assignments ?? []} />
 
@@ -563,7 +633,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
 async function fetchItems(): Promise<ItemWithRelations[]> {
   return db.query.inventoryItems.findMany({
-    with: { tags: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, assignments: { with: { member: { with: { person: true } } } } },
     orderBy: (items, { asc }) => [asc(items.name)],
   }) as unknown as Promise<ItemWithRelations[]>;
 }
@@ -571,7 +641,7 @@ async function fetchItems(): Promise<ItemWithRelations[]> {
 async function fetchItem(id: string): Promise<ItemWithRelations | undefined> {
   return db.query.inventoryItems.findFirst({
     where: eq(inventoryItems.id, id),
-    with: { tags: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, assignments: { with: { member: { with: { person: true } } } } },
   }) as unknown as Promise<ItemWithRelations | undefined>;
 }
 
@@ -594,6 +664,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const q = c.req.query();
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const tagFilter = c.req.queries("tag") ?? [];
+  const search = (q.q ?? "").trim();
   const showArchived = q.archived === "1";
   const canSeeLending = user.permissions.has("lending:read");
   const canLend = user.permissions.has("lending:manage");
@@ -619,12 +690,17 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     if (categoryFilter.length > 0 && !categoryFilter.includes(item.category)) return false;
     if (tagFilter.length > 0 && !tagFilter.every((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
+    if (search) {
+      const needle = search.toLowerCase();
+      const hay = [item.name, ...item.serials.map((n) => n.serial), ...item.numbers.map((n) => n.number)];
+      if (!hay.some((h) => h.toLowerCase().includes(needle))) return false;
+    }
     return true;
   });
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
-  const columnCount = 5 + (canSeeLending ? 1 : 0) + (canLend ? 1 : 0);
+    buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
+  const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
     <Layout title={t("inventory.title")} user={user} activeNav="inventory">
@@ -640,6 +716,30 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
+        <form method="get" action="/inventory" class="contents">
+          <label class="input input-bordered flex items-center gap-2">
+            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <input
+              type="search"
+              name="q"
+              value={search}
+              autocomplete="off"
+              placeholder={t("inventory.search.placeholder")}
+              class="grow min-w-0"
+              hx-get="/inventory"
+              hx-include="closest form"
+              hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+              hx-target="#inventory-results"
+              hx-select="#inventory-results"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+            />
+          </label>
+          {categoryFilter.map((v) => <input type="hidden" name="category" value={v} />)}
+          {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
+          {showArchived && <input type="hidden" name="archived" value="1" />}
+          {lendableOnly && <input type="hidden" name="lendable" value="1" />}
+        </form>
         <MultiSelectFilter
           param="category"
           autoApply
@@ -674,6 +774,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         )}
       </div>
 
+      <div id="inventory-results">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -682,7 +783,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             <th>{t("inventory.table.dueDate")}</th>
             <th>{t("inventory.table.tags")}</th>
             <th>{t("inventory.table.status")}</th>
-            {canSeeLending && <th>{t("inventory.table.available")}</th>}
+            <th>{t("inventory.table.quantity")}</th>
             {canLend && <th></th>}
           </tr>
         </thead>
@@ -708,9 +809,11 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                   {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
                   {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
                 </td>
-                {canSeeLending && (
-                  <td>{lending ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-ghost"}`}>{t("inventory.lending.available", { count: lending.available })}</span> : "—"}</td>
-                )}
+                <td>
+                  {lending
+                    ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-outline"}`}>{t("inventory.lending.available", { count: lending.available })}</span>
+                    : item.quantity > 1 && <span class="badge badge-outline badge-sm">{item.quantity - item.retiredQuantity}</span>}
+                </td>
                 {canLend && (
                   <td>
                     {lending && !item.retiredAt && (
@@ -725,6 +828,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           })}
         </tbody>
       </table>
+      </div>
     </Layout>
   );
 });
@@ -818,13 +922,19 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
 // POST /inventory
 inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
   const tags = parseTags(body, "tags");
+  const numbers = parseList(body, "numbers");
+  const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity);
   if (assignmentError) errors.assignments = assignmentError;
+  const numbersError = await validateNumbers(numbers, insertValues.quantity);
+  if (numbersError) errors.numbers = numbersError;
+  const serialsError = validateSerials(serials, insertValues.quantity);
+  if (serialsError) errors.serials = serialsError;
   const wantsLendable = trimmed(body, "lendable") === "1";
 
   if (Object.keys(errors).length > 0) {
@@ -835,7 +945,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           title={t("inventory.newItem")}
           action="/inventory"
           formId="inventory-new-form"
-          values={{ ...values, tagsList: tags }}
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -846,10 +956,17 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     );
   }
 
+  try {
   await db.transaction(async (tx) => {
     const [item] = await tx.insert(inventoryItems).values(insertValues).returning();
     if (tags.length > 0) {
       await tx.insert(inventoryItemTags).values(tags.map((tag) => ({ inventoryItemId: item.id, tag })));
+    }
+    if (numbers.length > 0) {
+      await tx.insert(inventoryItemNumbers).values(numbers.map((number) => ({ inventoryItemId: item.id, number })));
+    }
+    if (serials.length > 0) {
+      await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: item.id, serial })));
     }
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
@@ -860,6 +977,19 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
       await tx.insert(inventoryItemAssignments).values(assignments.map((a) => ({ inventoryItemId: item.id, memberId: a.memberId, quantity: a.quantity })));
     }
   });
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    errors.numbers = t("inventory.form.numberRace");
+    const assignmentNames = await resolveAssignmentNames(assignments);
+    return c.html(
+      <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
+        <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable)} />
+      </Layout>,
+      422
+    );
+  }
 
   setFlash(c, t("inventory.flash.created"), "success");
   return c.redirect("/inventory");
@@ -896,15 +1026,26 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
           </div>
         )}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
-          <ViewField label={t("inventory.form.purchaseDate")} value={item.purchaseDate ? formatDate(item.purchaseDate) : null} />
+          <ViewField label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
           <ViewField label={t("inventory.form.purchasePrice")} value={price} />
+          {item.numbers.length > 0 && (
+            <div class="sm:col-span-2">
+              <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.inventoryNumbers" : "inventory.form.inventoryNumber")}</div>
+              <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+            </div>
+          )}
+          {SERIAL_CATEGORIES.has(cat) && item.serials.length > 0 && (
+            <div class="sm:col-span-2">
+              <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.serialNumbers" : "inventory.form.serialNumber")}</div>
+              <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+            </div>
+          )}
           {cat === "vehicle" && <>
             <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
             <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
             <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />
           </>}
           {(cat === "scba" || cat === "equipment" || cat === "ppe") && <>
-            {item.quantity <= 1 && <ViewField label={t("inventory.form.serialNumber")} value={item.serialNumber} />}
             {cat === "scba" && <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />}
             <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
           </>}
@@ -931,18 +1072,19 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
   const values: Partial<InventoryFieldValues> & { tagsList?: string[] } = {
     name: item.name,
     category: item.category,
-    purchaseDate: item.purchaseDate ?? "",
+    commissionedAt: item.commissionedAt ?? "",
     purchasePrice: item.purchasePrice ?? "",
     notes: item.notes ?? "",
     licensePlate: item.licensePlate ?? "",
     yearOfManufacture: item.yearOfManufacture ? String(item.yearOfManufacture) : "",
     vehicleInspectionDue: item.vehicleInspectionDue ?? "",
-    serialNumber: item.serialNumber ?? "",
+    serialsList: sortedSerials(item),
     nextInspectionDue: item.nextInspectionDue ?? "",
     lastInspectionDate: item.lastInspectionDate ?? "",
     quantity: String(item.quantity),
     assignedMemberId: !isBatch ? (assignmentList[0]?.memberId ?? "") : "",
     tagsList: item.tags.map((tg) => tg.tag),
+    numbersList: sortedNumbers(item),
   };
 
   const assignedTotal = assignmentList.reduce((sum, a) => sum + a.quantity, 0);
@@ -1017,13 +1159,19 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   const existing = await fetchItem(id);
   if (!existing) return c.notFound();
 
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
   const tags = parseTags(body, "tags");
+  const numbers = parseList(body, "numbers");
+  const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity, existing.retiredQuantity);
   if (assignmentError) errors.assignments = assignmentError;
+  const numbersError = await validateNumbers(numbers, insertValues.quantity, id);
+  if (numbersError) errors.numbers = numbersError;
+  const serialsError = validateSerials(serials, insertValues.quantity);
+  if (serialsError) errors.serials = serialsError;
 
   // Verleih-Flag: nur mit lending:manage, serverseitig geprüft (UI-Disabled ist nur Komfort).
   const wantsLendable = trimmed(body, "lendable") === "1";
@@ -1051,7 +1199,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           title={existing.name}
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
-          values={{ ...values, tagsList: tags }}
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1062,11 +1210,20 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     );
   }
 
+  try {
   await db.transaction(async (tx) => {
     await tx.update(inventoryItems).set(insertValues).where(eq(inventoryItems.id, id));
     await tx.delete(inventoryItemTags).where(eq(inventoryItemTags.inventoryItemId, id));
     if (tags.length > 0) {
       await tx.insert(inventoryItemTags).values(tags.map((tag) => ({ inventoryItemId: id, tag })));
+    }
+    await tx.delete(inventoryItemNumbers).where(eq(inventoryItemNumbers.inventoryItemId, id));
+    if (numbers.length > 0) {
+      await tx.insert(inventoryItemNumbers).values(numbers.map((number) => ({ inventoryItemId: id, number })));
+    }
+    await tx.delete(inventoryItemSerials).where(eq(inventoryItemSerials.inventoryItemId, id));
+    if (serials.length > 0) {
+      await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: id, serial })));
     }
     await tx.delete(inventoryItemAssignments).where(eq(inventoryItemAssignments.inventoryItemId, id));
     if (assignments.length > 0) {
@@ -1079,6 +1236,20 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
       await tx.delete(lendingItems).where(eq(lendingItems.id, lendingItem.id));
     }
   });
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    errors.numbers = t("inventory.form.numberRace");
+    const assignmentNames = await resolveAssignmentNames(assignments);
+    return c.html(
+      <Layout title={existing.name} user={user} activeNav="inventory">
+        <InventoryForm title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames}
+          lendable={lendableField(user, wantsLendable, { error: lendableError })} />
+      </Layout>,
+      422
+    );
+  }
 
   setFlash(c, t("inventory.flash.saved"), "success");
   return c.redirect("/inventory");
