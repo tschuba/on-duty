@@ -710,7 +710,10 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             const status = itemStatus(item, !!lending);
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
-                <td>{item.name}</td>
+                <td>
+                  {item.name}
+                  {item.quantity > 1 && <span class="badge badge-outline badge-sm ml-2" title={t("inventory.table.batch")}>{item.quantity}×</span>}
+                </td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
                 <td>{due ? formatDate(due) : "—"}</td>
                 <td>
