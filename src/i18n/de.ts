@@ -703,6 +703,7 @@ export const de = {
   "inventory.form.lendableRetired": "Ausgemusterte Gegenstände können nicht verleihbar gemacht werden.",
   "inventory.filter.lendable": "Verleihbar",
   "inventory.table.available": "Verfügbar",
+  "inventory.lending.availableOf": "{count} von {total} verfügbar",
   "inventory.lending.available": "{count} verfügbar",
   "inventory.lending.lend": "Verleihen",
   "inventory.reactivate.button": "Ausmusterung rückgängig machen",
