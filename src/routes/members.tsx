@@ -432,7 +432,7 @@ function RoleRow({
         <input
           type="date"
           name="assignment_from[]"
-          class="input input-bordered w-full"
+          class="input input-bordered w-full min-w-40"
           value={assignment?.from ?? ""}
           required
         />
@@ -441,12 +441,12 @@ function RoleRow({
         <input
           type="date"
           name="assignment_to[]"
-          class="input input-bordered w-full"
+          class="input input-bordered w-full min-w-40"
           value={assignment?.to ?? ""}
         />
       </td>
       <td>
-        <input type="text" name="assignment_note[]" class="input input-bordered w-full" maxlength={200} value={assignment?.note ?? ""} />
+        <input type="text" name="assignment_note[]" class="input input-bordered w-full min-w-48" maxlength={200} value={assignment?.note ?? ""} />
       </td>
       <td>
         <button
