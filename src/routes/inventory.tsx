@@ -614,7 +614,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
     buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
-  const columnCount = 5 + (canSeeLending ? 1 : 0) + (canLend ? 1 : 0);
+  const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
     <Layout title={t("inventory.title")} user={user} activeNav="inventory">
@@ -697,7 +697,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             <th>{t("inventory.table.dueDate")}</th>
             <th>{t("inventory.table.tags")}</th>
             <th>{t("inventory.table.status")}</th>
-            {canSeeLending && <th>{t("inventory.table.available")}</th>}
+            <th>{t("inventory.table.quantity")}</th>
             {canLend && <th></th>}
           </tr>
         </thead>
@@ -710,10 +710,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             const status = itemStatus(item, !!lending);
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
-                <td>
-                  {item.name}
-                  {item.quantity > 1 && !canSeeLending && <span class="badge badge-outline badge-sm ml-2" title={t("inventory.table.batch")}>{item.quantity}×</span>}
-                </td>
+                <td>{item.name}</td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
                 <td>{due ? formatDate(due) : "—"}</td>
                 <td>
@@ -726,14 +723,11 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                   {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
                   {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
                 </td>
-                {canSeeLending && (
-                  <td>{(() => {
-                    // Nicht verleihbar: verfügbar = alles, was nicht ausgemustert ist; Einzelstücke zeigen nichts.
-                    const available = lending ? lending.available : item.quantity - item.retiredQuantity;
-                    if (!lending && item.quantity <= 1) return "—";
-                    return <span class={`badge badge-sm ${lending && available <= 0 ? "badge-warning" : "badge-ghost"}`}>{item.quantity > 1 ? t("inventory.lending.availableOf", { count: available, total: item.quantity }) : t("inventory.lending.available", { count: available })}</span>;
-                  })()}</td>
-                )}
+                <td>
+                  {lending
+                    ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-ghost"}`}>{t("inventory.lending.available", { count: lending.available })}</span>
+                    : item.quantity > 1 && <span class="badge badge-ghost badge-sm">{item.quantity - item.retiredQuantity}</span>}
+                </td>
                 {canLend && (
                   <td>
                     {lending && !item.retiredAt && (
