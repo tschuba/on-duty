@@ -656,6 +656,7 @@ export const de = {
   "inventory.form.inventoryNumbersPlaceholder": "Nummer eingeben, Enter zum Hinzufügen",
   "inventory.form.numbersCounter": "{n} von {max}",
   "inventory.form.numbersTooMany": "Mehr Inventarnummern als Stückzahl (max. {max}).",
+  "inventory.form.numberRace": "Eine Inventarnummer wurde gerade anderweitig vergeben. Bitte prüfen und erneut speichern.",
   "inventory.form.numberInvalid": "Inventarnummern dürfen keine Steuerzeichen enthalten und höchstens 100 Zeichen lang sein.",
   "inventory.form.numberTaken": "Inventarnummer „{number}“ ist bereits bei „{item}“{archived} vergeben.",
   "inventory.form.archivedSuffix": "(archiviert)",

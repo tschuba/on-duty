@@ -597,3 +597,17 @@ describe("serial numbers", () => {
     expect(deleteCalls.some((c) => c.table === inventoryItemSerials)).toBe(true);
   });
 });
+
+describe("race on unique number", () => {
+  it("returns 422 instead of 500 on unique violation", async () => {
+    transaction.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "23505" }));
+    const res = await post("/", { name: "Helm", category: "equipment", numbers: "A1" });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain("anderweitig vergeben");
+  });
+  it("rethrows other errors", async () => {
+    transaction.mockRejectedValueOnce(new Error("boom"));
+    const res = await post("/", { name: "Helm", category: "equipment" });
+    expect(res.status).toBe(500);
+  });
+});

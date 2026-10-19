@@ -256,6 +256,13 @@ async function validateNumbers(numbers: string[], quantity: number, selfId?: str
   return t("inventory.form.numberTaken", { number: taken.number, item: item.name, archived: item.retiredAt ? ` ${t("inventory.form.archivedSuffix")}` : "" });
 }
 
+// Postgres unique_violation (23505) — z. B. wenn zwischen Vorabprüfung und Insert jemand
+// dieselbe Inventarnummer vergibt. Drizzle kann den Fehler in `cause` verpacken.
+function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; cause?: { code?: string } };
+  return e?.code === "23505" || e?.cause?.code === "23505";
+}
+
 // ── Tag input (thin wrapper over the generic ChipInput) ─────────────────────
 
 export function TagInput({ tags }: { tags?: string[] }) {
@@ -896,6 +903,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     );
   }
 
+  try {
   await db.transaction(async (tx) => {
     const [item] = await tx.insert(inventoryItems).values(insertValues).returning();
     if (tags.length > 0) {
@@ -916,6 +924,19 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
       await tx.insert(inventoryItemAssignments).values(assignments.map((a) => ({ inventoryItemId: item.id, memberId: a.memberId, quantity: a.quantity })));
     }
   });
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    errors.numbers = t("inventory.form.numberRace");
+    const assignmentNames = await resolveAssignmentNames(assignments);
+    return c.html(
+      <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
+        <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable)} />
+      </Layout>,
+      422
+    );
+  }
 
   setFlash(c, t("inventory.flash.created"), "success");
   return c.redirect("/inventory");
@@ -1136,6 +1157,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     );
   }
 
+  try {
   await db.transaction(async (tx) => {
     await tx.update(inventoryItems).set(insertValues).where(eq(inventoryItems.id, id));
     await tx.delete(inventoryItemTags).where(eq(inventoryItemTags.inventoryItemId, id));
@@ -1161,6 +1183,20 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
       await tx.delete(lendingItems).where(eq(lendingItems.id, lendingItem.id));
     }
   });
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err;
+    errors.numbers = t("inventory.form.numberRace");
+    const assignmentNames = await resolveAssignmentNames(assignments);
+    return c.html(
+      <Layout title={existing.name} user={user} activeNav="inventory">
+        <InventoryForm title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames}
+          lendable={lendableField(user, wantsLendable, { error: lendableError })} />
+      </Layout>,
+      422
+    );
+  }
 
   setFlash(c, t("inventory.flash.saved"), "success");
   return c.redirect("/inventory");
