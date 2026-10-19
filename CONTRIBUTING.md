@@ -106,7 +106,6 @@ Beim Nachziehen von Coverage auf Code, der Entscheidungen mit I/O mischt (z. B. 
 ## Pull Requests
 
 - Kein direktes Pushen auf `main` — ausschließlich per PR
-- PR-Template ausfüllen
 - Squash Merge wird verwendet
 
 ## Release
