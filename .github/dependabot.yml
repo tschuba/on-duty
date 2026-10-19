@@ -5,6 +5,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "fix"
     reviewers:
       - tschuba
     groups:
@@ -18,6 +20,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "ci"
     reviewers:
       - tschuba
     groups:
@@ -31,6 +35,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    commit-message:
+      prefix: "fix"
     reviewers:
       - tschuba
     groups:

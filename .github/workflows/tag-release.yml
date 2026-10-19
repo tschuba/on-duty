@@ -1,0 +1,42 @@
+name: Tag Release
+
+# On master, when package.json's version changed: tag vX.Y.Z and create a
+# draft GitHub release. Publishing the draft triggers docker-publish.
+# RELEASE_TOKEN is required: pushes with GITHUB_TOKEN don't trigger workflows.
+
+on:
+  push:
+    branches: [master]
+    paths: [package.json]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Tag and draft release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          new=$(node -p 'require("./package.json").version')
+          old=$(git show "$BEFORE:package.json" 2>/dev/null | node -p 'JSON.parse(require("fs").readFileSync(0)).version' || echo 0.0.0)
+          if [ "$old" = "$new" ]; then echo "Version unchanged."; exit 0; fi
+          if [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -1)" != "$new" ]; then
+            echo "::error::New version $new is not greater than $old"; exit 1
+          fi
+          tag="v$new"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then echo "Tag $tag exists."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag"
+          git push origin "$tag"
+          gh release create "$tag" --draft --verify-tag --generate-notes
