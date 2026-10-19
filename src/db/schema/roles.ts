@@ -20,6 +20,7 @@ export const memberRoleAssignments = pgTable("member_role_assignments", {
   from: date("from").notNull(),
   to: date("to"),
   autoClosed: boolean("auto_closed").notNull().default(false),
+  note: text("note"),
 });
 
 export const anniversaryYears = pgTable("anniversary_years", {

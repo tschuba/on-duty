@@ -267,6 +267,20 @@
       "when": 1792400000013,
       "tag": "0037_first_entry_date",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792401000013,
+      "tag": "0038_assignment_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792402000013,
+      "tag": "0039_merge_board_command_roles",
+      "breakpoints": true
     }
   ]
 }

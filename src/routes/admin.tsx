@@ -1120,7 +1120,7 @@ adminRoutes.get("/roles", guard, async (c) => {
                     {r.grantsActiveStatus ? (
                       <span class="badge badge-success badge-sm">{t("admin.roles.filterActive")}</span>
                     ) : (
-                      <span class="badge badge-ghost badge-sm">{t("admin.roles.filterPassive")}</span>
+                      <span class="opacity-60">{t("admin.roles.filterPassive")}</span>
                     )}
                   </td>
                   <td>
