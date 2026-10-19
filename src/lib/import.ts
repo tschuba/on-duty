@@ -311,7 +311,7 @@ export function parseInventory(rows: Raw[]): ParsedItem[] {
 export type Position = {
   gid: number; items: ParsedItem[]; name: string; category: InventoryCategory; quantity: number;
   tags: string[]; numbers: string[]; serials: string[]; commissionedAt: string | null; price: string | null;
-  retiredAt: string | null; bundled: boolean; canBundle: boolean; duplicateNumbers: string[];
+  retiredAt: string | null; bundled: boolean; canBundle: boolean; groupSize: number; duplicateNumbers: string[];
 };
 export type InventoryPlan = { positions: Position[]; levels: { level: string; category: InventoryCategory }[]; rowCount: number; bundledRows: number };
 
@@ -343,7 +343,7 @@ export function planInventory(items: ParsedItem[], existingNumbers: Set<string>,
         tags: [...new Set([...first.levels, ...(first.location ? [first.location] : [])])],
         numbers, serials: [...new Set(part.map((p) => p.serial).filter((s): s is string => !!s))],
         commissionedAt: first.commissionedAt, price: first.price, retiredAt: first.retiredAt,
-        bundled, canBundle, duplicateNumbers: numbers.filter((n) => existingNumbers.has(n)),
+        bundled, canBundle, groupSize: group.length, duplicateNumbers: numbers.filter((n) => existingNumbers.has(n)),
       });
     }
   }

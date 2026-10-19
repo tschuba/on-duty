@@ -253,10 +253,12 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
 }
 
 function InventoryPreview({ plan }: { plan: InventoryPlan }) {
+  const otherLevels = plan.levels.filter((l) => l.category === "other").length;
   const existing = plan.positions.filter((p) => p.duplicateNumbers.length).length;
   return (
     <>
-      <Section title={t("import.categories.heading")} badge={plan.levels.length}>
+      <Section title={t("import.categories.heading")} badge={otherLevels ? t("import.categories.checkBadge", { count: otherLevels }) : plan.levels.length} tone={otherLevels ? "warning" : undefined} open={otherLevels > 0}>
+        {otherLevels > 0 && <div class="alert alert-warning mb-2">{t("import.categories.otherHint")}</div>}
         <table class="table table-zebra w-full">
           <thead><tr><th>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th></tr></thead>
           <tbody>
@@ -275,18 +277,27 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
           <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
           <span>{t("import.positions.onlyExisting", { count: existing })}</span>
         </label>
+        <p class="text-sm opacity-70 mb-2">{t("import.positions.bundleHint")}</p>
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.category")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.notes")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.category")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.positions.colCreateAs")}</th><th>{t("import.col.notes")}</th></tr></thead>
           <tbody>
             {plan.positions.map((p) => (
               <tr data-problem={p.duplicateNumbers.length ? "1" : undefined} class={p.duplicateNumbers.length ? "opacity-50 italic" : undefined}>
-                <td>{p.name}</td><td>{CATEGORY_LABEL[p.category]}</td><td>{p.quantity}</td>
-                <td class="text-sm">{p.numbers.join(", ")}</td>
-                <td class="space-x-1">
-                  {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
-                  {p.canBundle && (
-                    <label class="text-xs cursor-pointer"><input type="checkbox" name="nob" value={p.gid} class="checkbox checkbox-xs" checked={!p.bundled} /> {t("import.positions.noBundle")}</label>
+                <td>{p.name}</td><td class="whitespace-nowrap">{CATEGORY_LABEL[p.category]}</td><td>{p.quantity}</td>
+                <td class="text-sm">
+                  {p.numbers.slice(0, 5).join(", ")}{p.numbers.length > 5 && <span class="opacity-60" title={p.numbers.slice(5).join(", ")}> +{p.numbers.length - 5}</span>}
+                </td>
+                <td>
+                  {p.canBundle && p.items[0].id === p.gid && (
+                    <div class="join" title={t("import.positions.noBundleHelp")}>
+                      <input type="radio" class="join-item btn btn-xs" name={`nob_${p.gid}`} value="" checked={p.bundled} aria-label={t("import.positions.optBundled", { count: p.groupSize })} />
+                      <input type="radio" class="join-item btn btn-xs" name={`nob_${p.gid}`} value="1" checked={!p.bundled} aria-label={t("import.positions.optSingle", { count: p.groupSize })} />
+                    </div>
                   )}
+                </td>
+                <td class="space-x-1">
+                  {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic whitespace-nowrap" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
+                  {p.category === "other" && <span class="badge badge-warning badge-sm whitespace-nowrap">{t("import.badge.checkCategory")}</span>}
                 </td>
               </tr>
             ))}
@@ -301,8 +312,6 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
 async function handle(c: any, run: boolean) {
   const user = c.get("user");
   const body = (await c.req.parseBody({ all: true })) as Body;
-  // Checkbox „nicht bündeln“ → Lookup nob_<gid>=1 für die Planer.
-  for (const v of [body.nob].flat()) if (typeof v === "string") body[`nob_${v}`] = "1";
   try {
     const up = await readUpload(body);
     const ctx = await loadContext();
@@ -388,7 +397,7 @@ const AUTOREFRESH_SCRIPT = `
     if (v) { secs.forEach((d, i) => { d.open = v.open.includes(i); }); scrollTo(0, v.y); }
   } catch {}
   form.addEventListener("change", (e) => {
-    if (!/^(map|grants|ign|arole|askip)_/.test(e.target.name || "")) return;
+    if (!/^(map|grants|ign|arole|askip|nob|cat)_/.test(e.target.name || "")) return;
     sessionStorage.setItem(SK, JSON.stringify({ y: scrollY, open: secs.flatMap((d, i) => (d.open ? [i] : [])) }));
     form.requestSubmit(document.getElementById("refresh-btn"));
   });
