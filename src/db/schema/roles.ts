@@ -1,4 +1,4 @@
-import { boolean, date, integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, integer, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
@@ -23,7 +23,8 @@ export const memberRoleAssignments = pgTable("member_role_assignments", {
 });
 
 export const anniversaryYears = pgTable("anniversary_years", {
-  year: integer("year").primaryKey(),
+  kind: text("kind", { enum: ["service", "membership"] }).notNull(),
+  year: integer("year").notNull(),
   title: text("title"),
-});
+}, (t) => [primaryKey({ columns: [t.kind, t.year] })]);
 /* v8 ignore stop */

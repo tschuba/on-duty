@@ -281,12 +281,17 @@ describe("buildExportSheets", () => {
   it("adds gender/dates/address/contact columns per toggle", () => {
     const sheets = buildExportSheets([m1], [], { addr: true, contact: true, dates: true, gender: true, assignments: false });
     const row = sheets[0].rows[0];
-    // lastName, firstName, gender, birth, entry, exit, death, street, houseNumber, zip, city, phone, mobile, email
-    expect(row).toHaveLength(14);
+    // lastName, firstName, gender, birth, entry, firstEntry, exit, death, street, houseNumber, zip, city, phone, mobile, email
+    expect(row).toHaveLength(15);
     expect(row[2]).toBe("Weiblich");
-    expect(row[7]).toBe("Hauptstr.");
-    expect(row[11]).toBe("123");
-    expect(row[12]).toBe("0170");
+    expect(row[8]).toBe("Hauptstr.");
+    expect(row[12]).toBe("123");
+    expect(row[13]).toBe("0170");
+  });
+
+  it("exports firstEntryDate in the dates block", () => {
+    const sheets = buildExportSheets([{ ...m1, firstEntryDate: "2001-02-03" }], [], { addr: false, contact: false, dates: true, gender: false, assignments: false });
+    expect(sheets[0].rows[0]).toContainEqual(new Date("2001-02-03T00:00:00"));
   });
 
   it("maps unset gender to 'ohne Angabe'", () => {

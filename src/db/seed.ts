@@ -87,11 +87,10 @@ export async function runSeed() {
       { id: "d4bda8ff-6d64-404e-a6c2-d7b500abb6a2", title: "Ehrenmitglied",               grantsActiveStatus: false, isProtected: false },
     ]).onConflictDoNothing();
 
-    await db.insert(anniversaryYears).values([
-      { year: 25 }, { year: 40 }, { year: 50 }, { year: 60 }, { year: 65 },
-      { year: 70 }, { year: 75 }, { year: 80 }, { year: 85 }, { year: 90 },
-      { year: 95 }, { year: 100 },
-    ]).onConflictDoNothing();
+    const defaultYears = [25, 40, 50, 60, 65, 70, 75, 80, 85, 90, 95, 100];
+    await db.insert(anniversaryYears).values(
+      (["service", "membership"] as const).flatMap((kind) => defaultYears.map((year) => ({ kind, year }))),
+    ).onConflictDoNothing();
 
     await db.insert(appRoles).values(
       APP_ROLES.map(({ id, name, description, isProtected }) => ({ id, name, description, isProtected })),
