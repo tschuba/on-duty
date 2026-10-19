@@ -26,9 +26,9 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
       <label class="label"><span class="label-text chip-label">{label}</span></label>
       <div class="chip-box input input-bordered w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
         {list.map((v) => (
-          <span class="badge badge-outline gap-1" data-chip={v}>
+          <span class="badge badge-outline gap-1 pr-1" data-chip={v}>
             {v}
-            <button type="button" class="chip-remove" aria-label={t("common.remove")}>×</button>
+            <button type="button" class="chip-remove btn btn-ghost btn-circle min-h-0 h-4 w-4 p-0 ml-0.5 text-base leading-none opacity-60 hover:opacity-100" aria-label={t("common.remove")}>×</button>
             <input type="hidden" name={name} value={v} />
           </span>
         ))}
@@ -64,11 +64,11 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, labe
             });
             if (exists || root.querySelectorAll('[data-chip]').length >= chipMax(root)) return;
             var chip = document.createElement('span');
-            chip.className = 'badge badge-outline gap-1';
+            chip.className = 'badge badge-outline gap-1 pr-1';
             chip.dataset.chip = value;
             chip.appendChild(document.createTextNode(value));
             var rm = document.createElement('button');
-            rm.type = 'button'; rm.className = 'chip-remove'; rm.textContent = '×';
+            rm.type = 'button'; rm.className = 'chip-remove btn btn-ghost btn-circle min-h-0 h-4 w-4 p-0 ml-0.5 text-base leading-none opacity-60 hover:opacity-100'; rm.textContent = '×';
             rm.setAttribute('aria-label', root.dataset.removeLabel);
             chip.appendChild(rm);
             var h = document.createElement('input');
