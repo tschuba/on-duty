@@ -1176,7 +1176,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           <table class="table w-full">
             <thead>
               <tr>
-                <th>{t("members.form.role")}</th>
+                <th>{t("members.form.role")} <span class="text-error">*</span></th>
                 <th>{t("members.form.from")} <span class="text-error">*</span></th>
                 <th>{t("members.form.to")}</th><th>{t("members.form.note")}</th>
                 <th></th>
@@ -1304,7 +1304,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1603,7 +1603,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
-            <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
+            <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
                 <RoleRow key={a.id} index={i} roles={roles} assignment={a} />
@@ -1711,7 +1711,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1783,7 +1783,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
