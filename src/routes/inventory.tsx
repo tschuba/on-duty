@@ -487,10 +487,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       <div data-show-cats="scba,equipment,ppe" class="space-y-4">
         <div class="divider">{t("inventory.form.sectionInspection")}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="form-control" data-show-cats="scba,equipment,ppe" data-show-batch="false">
-            <label class="label"><span class="label-text">{t("inventory.form.serialNumber")}</span></label>
-            <input type="text" name="serialNumber" value={v.serialNumber ?? ""} class="input input-bordered w-full" />
-          </div>
           <div class="form-control" data-show-cats="scba">
             <label class="label"><span class="label-text">{t("inventory.form.lastInspectionDate")}</span></label>
             <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input input-bordered w-full" />
@@ -534,6 +530,11 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         hint={t("inventory.form.numbersCounter")}
       />
       {errors?.numbers && <span class="text-error text-sm">{errors.numbers}</span>}
+
+      <div class="form-control max-w-md" data-show-cats="scba,equipment,ppe" data-show-batch="false">
+        <label class="label"><span class="label-text">{t("inventory.form.serialNumber")}</span></label>
+        <input type="text" name="serialNumber" value={v.serialNumber ?? ""} class="input input-bordered w-full" />
+      </div>
 
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
       <BatchAssignmentFields assignments={assignments ?? []} />

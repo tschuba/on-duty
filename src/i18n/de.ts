@@ -667,7 +667,7 @@ export const de = {
   "inventory.form.licensePlate": "Kennzeichen",
   "inventory.form.yearOfManufacture": "Baujahr",
   "inventory.form.vehicleInspectionDue": "TÜV-Datum",
-  "inventory.form.sectionInspection": "Seriennummer & Prüfung",
+  "inventory.form.sectionInspection": "Prüfung",
   "inventory.form.serialNumber": "Seriennummer",
   "inventory.form.nextInspectionDue": "Nächste Prüfung",
   "inventory.form.lastInspectionDate": "Druckprüfung-Datum",

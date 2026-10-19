@@ -560,3 +560,14 @@ describe("inventory numbers", () => {
     expect(html.indexOf("N-2")).toBeLessThan(html.indexOf("N-10"));
   });
 });
+
+describe("detail view serial number", () => {
+  it("shows serial number for a single scba item", async () => {
+    currentUser = { ...currentUser, permissions: new Set(["inventory:read"]) };
+    itemsFindFirstResult = makeItem({ category: "scba", serialNumber: "SN-4711", quantity: 1 });
+    const html = await (await inventoryRoutes.request("/item1/edit")).text();
+    currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
+    expect(html).toContain("Seriennummer");
+    expect(html).toContain("SN-4711");
+  });
+});
