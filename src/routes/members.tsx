@@ -765,6 +765,7 @@ function MemberFormFields({
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("phone", t("members.form.phone"))}
+        {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
       </div>
     </>
@@ -1259,6 +1260,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       exitDate: (body.exitDate as string) || null,
       deathDate: (body.deathDate as string) || null,
       phone: body.phone as string,
+      mobile: body.mobile as string,
       email: body.email as string,
       ...(bank && { ...bank, iban: trimmed(body, "iban") }),
     };
@@ -1327,6 +1329,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     gender: (body.gender as any) || null,
     birthDate,
     phone: (body.phone as string) || null,
+    mobile: (body.mobile as string) || null,
     email: (body.email as string) || null,
   };
 
@@ -1412,7 +1415,7 @@ export function buildExportSheets(
   if (opts.gender) header.push(t("members.export.genderCol"));
   if (opts.dates) header.push(t("members.form.birthDate"), t("members.form.entryDate"), t("members.form.exitDate"), t("members.form.deathDate"));
   if (opts.addr) header.push(t("members.form.street"), t("members.form.houseNumber"), t("members.form.zip"), t("members.form.city"));
-  if (opts.contact) header.push(t("members.form.phone"), t("members.form.email"));
+  if (opts.contact) header.push(t("members.form.phone"), t("members.form.mobile"), t("members.form.email"));
 
   const GENDER: Record<string, string> = { male: t("members.form.genderMale"), female: t("members.form.genderFemale") };
   const toDate = (s: string | null) => s ? new Date(s + "T00:00:00") : null;
@@ -1422,7 +1425,7 @@ export function buildExportSheets(
     if (opts.gender) row.push(GENDER[m.gender ?? ""] ?? t("members.form.genderNone"));
     if (opts.dates) row.push(toDate(m.birthDate), toDate(m.entryDate), toDate(m.exitDate), toDate(m.deathDate));
     if (opts.addr) row.push(m.street ?? "", m.houseNumber ?? "", m.zip ?? "", m.city ?? "");
-    if (opts.contact) row.push(m.phone ?? "", m.email ?? "");
+    if (opts.contact) row.push(m.phone ?? "", m.mobile ?? "", m.email ?? "");
     return row;
   });
 
@@ -1537,6 +1540,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
           <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
           <ViewField label={t("members.form.phone")} value={m.phone} />
+          <ViewField label={t("members.form.mobile")} value={m.mobile} />
           <ViewField label={t("members.form.email")} value={m.email} />
           {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
           {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
@@ -1669,7 +1673,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       street: body.street as string, houseNumber: body.houseNumber as string,
       zip: body.zip as string, city: body.city as string,
       gender: (body.gender as any) || null,
-      phone: body.phone as string, email: body.email as string,
+      phone: body.phone as string, mobile: body.mobile as string, email: body.email as string,
       ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
@@ -1733,6 +1737,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       deathDate: deathDate ?? "",
       ...(canWriteBank && { iban: trimmed(body, "iban"), bic: trimmed(body, "bic"), accountHolder: trimmed(body, "accountHolder") }),
       phone: (body.phone as string) ?? "",
+      mobile: (body.mobile as string) ?? "",
       email: (body.email as string) ?? "",
       "assignment_id[]": assignmentIds,
       "assignment_role[]": assignmentRoles,
@@ -1751,7 +1756,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
-            phone: body.phone as string, email: body.email as string }} />
+            phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
@@ -1794,6 +1799,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       gender: (body.gender as any) || null,
       birthDate,
       phone: (body.phone as string) || null,
+      mobile: (body.mobile as string) || null,
       email: (body.email as string) || null,
     }).where(eq(persons.id, existing.personId));
 

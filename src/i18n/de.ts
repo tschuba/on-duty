@@ -92,6 +92,7 @@ export const de = {
   "members.form.exitDate": "Austrittsdatum",
   "members.form.deathDate": "Sterbedatum",
   "members.form.phone": "Telefon",
+  "members.form.mobile": "Mobil",
   "members.form.email": "E-Mail",
   "members.form.assignments": "Funktionszuweisungen",
   "members.form.addAssignment": "+ Zuweisung hinzufügen",

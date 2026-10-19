@@ -18,6 +18,7 @@ export const persons = pgTable("persons", {
   // Only set/edited via the donor form; donation context only (see donors.tsx).
   companyName: text("company_name"),
   phone: text("phone"),
+  mobile: text("mobile"),
   email: text("email"),
 });
 /* v8 ignore stop */

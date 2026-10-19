@@ -170,6 +170,7 @@ function makeMember(overrides: Record<string, unknown> = {}) {
     bic: null,
     accountHolder: null,
     phone: null,
+    mobile: null,
     email: null,
     ...overrides,
   };
@@ -267,7 +268,7 @@ describe("buildExportSheets", () => {
     for (const secret of ["DE89", "COBADEFF", "Geheim Konto"]) expect(cells).not.toContain(secret);
   });
 
-  const m1 = makeMember({ id: "m1", lastName: "Bauer", firstName: "Anna", gender: "female", street: "Hauptstr.", houseNumber: "1", zip: "12345", city: "Altenhammer", phone: "123", email: "a@b.de" });
+  const m1 = makeMember({ id: "m1", lastName: "Bauer", firstName: "Anna", gender: "female", street: "Hauptstr.", houseNumber: "1", zip: "12345", city: "Altenhammer", phone: "123", mobile: "0170", email: "a@b.de" });
   const m2 = makeMember({ id: "m2", lastName: "Adler", firstName: "Ben", gender: "male" });
 
   it("always includes lastName/firstName in the members sheet, sorted by lastName", () => {
@@ -280,11 +281,12 @@ describe("buildExportSheets", () => {
   it("adds gender/dates/address/contact columns per toggle", () => {
     const sheets = buildExportSheets([m1], [], { addr: true, contact: true, dates: true, gender: true, assignments: false });
     const row = sheets[0].rows[0];
-    // lastName, firstName, gender, birth, entry, exit, death, street, houseNumber, zip, city, phone, email
-    expect(row).toHaveLength(13);
+    // lastName, firstName, gender, birth, entry, exit, death, street, houseNumber, zip, city, phone, mobile, email
+    expect(row).toHaveLength(14);
     expect(row[2]).toBe("Weiblich");
     expect(row[7]).toBe("Hauptstr.");
     expect(row[11]).toBe("123");
+    expect(row[12]).toBe("0170");
   });
 
   it("maps unset gender to 'ohne Angabe'", () => {
