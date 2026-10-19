@@ -1359,10 +1359,14 @@ const isKind = (k: string): k is AnniversaryKind => (ANNIVERSARY_KINDS as readon
 // ── /admin/anniversaries ──────────────────────────────────────────────────────
 adminRoutes.get("/anniversaries", guard, async (c) => {
   const user = c.get("user");
-  const [years, warn] = await Promise.all([
+  const kindParam = c.req.query("kind") ?? "";
+  const kindFilter = isKind(kindParam) ? kindParam : null;
+  const [allYears, warn] = await Promise.all([
     db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.kind), asc(anniversaryYears.year)),
     backupWarnProps(),
   ]);
+
+  const years = kindFilter ? allYears.filter((y) => y.kind === kindFilter) : allYears;
 
   return c.html(
     <Layout title={t("admin.anniversaries.title")} user={user} activeNav="admin">
@@ -1381,6 +1385,13 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         >
           {t("admin.anniversaries.newYear")}
         </button>
+      </div>
+
+      <div class="join mb-4">
+        <a href="/admin/anniversaries" class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+        {ANNIVERSARY_KINDS.map((k) => (
+          <a href={`/admin/anniversaries?kind=${k}`} class={`join-item btn${kindFilter === k ? " btn-primary btn-outline" : " btn-ghost"}`}>{t(`admin.anniversaries.kind.${k}`)}</a>
+        ))}
       </div>
 
       <ClickToEditHint />

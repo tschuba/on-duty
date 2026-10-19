@@ -854,6 +854,17 @@ describe("GET /anniversaries", () => {
   });
 });
 
+describe("GET /anniversaries?kind=", () => {
+  it("filters rows by kind", async () => {
+    yearsFixture = [makeYear({ kind: "service", year: 25, title: "Dienst25" }), makeYear({ kind: "membership", year: 10, title: "Mitgl10" })];
+    const html = await (await adminRoutes.request("/anniversaries?kind=membership")).text();
+    expect(html).toContain("Mitgl10");
+    expect(html).not.toContain("Dienst25");
+    const all = await (await adminRoutes.request("/anniversaries?kind=bogus")).text();
+    expect(all).toContain("Dienst25");
+  });
+});
+
 describe("GET /anniversaries/new", () => {
   it("renders the create form", async () => {
     expect((await adminRoutes.request("/anniversaries/new")).status).toBe(200);
