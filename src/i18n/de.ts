@@ -650,6 +650,7 @@ export const de = {
   "inventory.form.category": "Kategorie",
   "inventory.form.categoryPlaceholder": "Bitte wählen…",
   "inventory.form.commissionedAt": "Indienststellung",
+  "inventory.form.inventoryNumber": "Inventarnummer",
   "inventory.form.inventoryNumbers": "Inventarnummern",
   "inventory.form.inventoryNumbersPlaceholder": "Nummer eingeben, Enter zum Hinzufügen",
   "inventory.form.numbersCounter": "{n} von {max}",

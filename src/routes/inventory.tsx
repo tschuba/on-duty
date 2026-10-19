@@ -525,6 +525,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       <ChipInput
         name="numbers"
         label={t("inventory.form.inventoryNumbers")}
+        labelSingle={t("inventory.form.inventoryNumber")}
         placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
         values={v.numbersList}
         maxFrom="#inventory-quantity"
@@ -920,7 +921,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
           <ViewField label={t("inventory.form.purchasePrice")} value={price} />
           {item.numbers.length > 0 && (
             <div class="sm:col-span-2">
-              <div class="text-sm opacity-60">{t("inventory.form.inventoryNumbers")}</div>
+              <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.inventoryNumbers" : "inventory.form.inventoryNumber")}</div>
               <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
             </div>
           )}
