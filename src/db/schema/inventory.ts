@@ -1,4 +1,4 @@
-import { date, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { date, index, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
@@ -8,7 +8,7 @@ export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   category: inventoryCategoryEnum("category").notNull(),
-  purchaseDate: date("purchase_date"),
+  commissionedAt: date("commissioned_at"),
   purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
   notes: text("notes"),
   retiredAt: date("retired_at"),
@@ -55,5 +55,18 @@ export const inventoryItemTags = pgTable(
     tag: text("tag").notNull(),
   },
   (t) => [uniqueIndex("inventory_item_tags_item_tag_idx").on(t.inventoryItemId, t.tag)],
+);
+
+// Inventarnummern: beliebiger Text, global eindeutig und schreibungsabhängig.
+export const inventoryItemNumbers = pgTable(
+  "inventory_item_numbers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    number: text("number").notNull(),
+  },
+  (t) => [uniqueIndex("inventory_item_numbers_number_idx").on(t.number), index("inventory_item_numbers_item_idx").on(t.inventoryItemId)],
 );
 /* v8 ignore stop */

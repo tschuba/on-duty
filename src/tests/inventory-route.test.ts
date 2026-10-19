@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -8,6 +8,7 @@ process.env.YOUTH_AGE_LIMIT = "18";
 let itemsFindManyResult: any[] = [];
 let itemsFindFirstResult: any = undefined;
 let membersFindManyResult: any[] = [];
+let numbersFindManyResult: any[] = [];
 let lendingItemFindFirstResult: any = undefined;
 let lendingItemsFindManyResult: any[] = [];
 let lendingLoanFindFirstResult: any = undefined;
@@ -54,6 +55,9 @@ vi.mock("../db/index.js", () => ({
         findMany: vi.fn(() => Promise.resolve(itemsFindManyResult)),
         findFirst: vi.fn(() => Promise.resolve(itemsFindFirstResult)),
       },
+      inventoryItemNumbers: {
+        findMany: vi.fn(() => Promise.resolve(numbersFindManyResult)),
+      },
       members: {
         findMany: vi.fn(() => Promise.resolve(membersFindManyResult)),
       },
@@ -92,6 +96,7 @@ beforeEach(() => {
   itemsFindManyResult = [];
   itemsFindFirstResult = undefined;
   membersFindManyResult = [];
+  numbersFindManyResult = [];
   lendingItemFindFirstResult = undefined;
   lendingItemsFindManyResult = [];
   lendingLoanFindFirstResult = undefined;
@@ -101,7 +106,7 @@ beforeEach(() => {
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
     id: "item1", name: "TSF-W", category: "vehicle",
-    purchaseDate: null, purchasePrice: null, notes: null,
+    commissionedAt: null, numbers: [], purchasePrice: null, notes: null,
     retiredAt: null, retiredReason: null, quantity: 1, retiredQuantity: 0,
     licensePlate: "ABC-123", yearOfManufacture: 2015, vehicleInspectionDue: "2026-06-01",
     serialNumber: null, nextInspectionDue: null, lastInspectionDate: null,
@@ -242,7 +247,7 @@ describe("POST /:id/retire and /:id/reactivate", () => {
 // ── Verleih-Flag im Formular ────────────────────────────────────────────────
 
 const lendingManager = () => ({ id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "lending:read", "lending:manage"]), disabled: false });
-const post = (path: string, fields: Record<string, string>) =>
+const post = (path: string, fields: Record<string, string | string[]>) =>
   inventoryRoutes.request(path, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -483,5 +488,75 @@ describe("POST /:id", () => {
     expect(deleteCalls[0].table).toBe(inventoryItemTags);
     expect(insertCalls[0].table).toBe(inventoryItemTags);
     expect(insertCalls[0].values).toEqual([{ inventoryItemId: "item1", tag: "neu" }]);
+  });
+});
+
+// ── Inventarnummern ──────────────────────────────────────────────────────────
+
+describe("inventory numbers", () => {
+  it("saves numbers, dropping duplicates and keeping commas/spaces", async () => {
+    const res = await post("/", { name: "Helm", category: "equipment", quantity: "3", numbers: ["00 211 504", "FW_12/a, x", "00 211 504"] });
+    expect(res.status).toBe(302);
+    const ins = insertCalls.find((c) => c.table === inventoryItemNumbers)!;
+    expect(ins.values).toEqual([
+      { inventoryItemId: "new-id", number: "00 211 504" },
+      { inventoryItemId: "new-id", number: "FW_12/a, x" },
+    ]);
+  });
+
+  it("rejects more numbers than quantity", async () => {
+    const res = await post("/", { name: "Helm", category: "equipment", quantity: "1", numbers: ["A", "B"] });
+    expect(res.status).toBe(422);
+    expect(insertCalls.length).toBe(0);
+  });
+
+  it("rejects control characters and >100 chars", async () => {
+    expect((await post("/", { name: "H", category: "equipment", numbers: "a\u0007b" })).status).toBe(422);
+    expect((await post("/", { name: "H", category: "equipment", numbers: "x".repeat(101) })).status).toBe(422);
+  });
+
+  it("rejects a number taken by another item, marking archived ones", async () => {
+    numbersFindManyResult = [{ number: "A1", inventoryItemId: "other", item: { name: "Alt-Helm", retiredAt: "2024-01-01" } }];
+    const res = await post("/", { name: "Helm", category: "equipment", numbers: "A1" });
+    expect(res.status).toBe(422);
+    const html = await res.text();
+    expect(html).toContain("A1");
+    expect(html).toContain("Alt-Helm");
+    expect(html).toContain("(archiviert)");
+  });
+
+  it("allows the item's own numbers on update and replaces them", async () => {
+    itemsFindFirstResult = makeItem({ numbers: [{ number: "A1" }] });
+    numbersFindManyResult = [{ number: "A1", inventoryItemId: "item1", item: { name: "x", retiredAt: null } }];
+    const res = await post("/item1", { name: "Helm", category: "equipment", numbers: "A1" });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === inventoryItemNumbers)).toBe(true);
+  });
+
+  it("rejects lowering quantity below the number count", async () => {
+    itemsFindFirstResult = makeItem({});
+    const res = await post("/item1", { name: "Helm", category: "equipment", quantity: "1", numbers: ["A", "B"] });
+    expect(res.status).toBe(422);
+  });
+
+  it("search q matches number, name and serial number", async () => {
+    itemsFindManyResult = [
+      makeItem({ id: "a", name: "Alpha", numbers: [{ number: "Zebra-1" }] }),
+      makeItem({ id: "b", name: "Beta", serialNumber: "SN-ZEBRA" }),
+      makeItem({ id: "c", name: "Gamma" }),
+    ];
+    const html = await (await inventoryRoutes.request("/?q=zebra")).text();
+    expect(html).toContain("Alpha");
+    expect(html).toContain("Beta");
+    expect(html).not.toContain("Gamma");
+  });
+
+  it("detail view shows numbers", async () => {
+    currentUser = { ...currentUser, permissions: new Set(["inventory:read"]) };
+    itemsFindFirstResult = makeItem({ numbers: [{ number: "N-10" }, { number: "N-2" }] });
+    const html = await (await inventoryRoutes.request("/item1/edit")).text();
+    currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
+    expect(html).toContain("N-10");
+    expect(html.indexOf("N-2")).toBeLessThan(html.indexOf("N-10"));
   });
 });

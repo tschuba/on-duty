@@ -1,14 +1,15 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
-import { trimmed, parseTags } from "../lib/forms.js";
+import { ChipInput } from "../components/chip-input.js";
+import { trimmed, parseTags, parseList } from "../lib/forms.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, rangePresets } from "../lib/quick-range.js";
@@ -25,10 +26,11 @@ export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 
 type InventoryItemRow = typeof inventoryItems.$inferSelect;
 type Tag = typeof inventoryItemTags.$inferSelect;
+type ItemNumber = typeof inventoryItemNumbers.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
 type Person = { firstName: string; lastName: string };
 type AssignmentWithMember = typeof inventoryItemAssignments.$inferSelect & { member: MemberRow & { person: Person } };
-type ItemWithRelations = InventoryItemRow & { tags: Tag[]; assignments: AssignmentWithMember[] };
+type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; assignments: AssignmentWithMember[] };
 
 // Which categories may be entered as a batch ("30 Helme" instead of one item per
 // piece). A plain list, not scattered if/category checks, so a future category
@@ -100,7 +102,8 @@ type AssignmentInput = { memberId: string; name: string; quantity: number };
 export type InventoryFieldValues = {
   name: string;
   category: string;
-  purchaseDate: string;
+  commissionedAt: string;
+  numbersList?: string[];
   purchasePrice: string;
   notes: string;
   tagsList?: string[];
@@ -122,7 +125,7 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
   const values: InventoryFieldValues = {
     name: trimmed(body, "name"),
     category: trimmed(body, "category"),
-    purchaseDate: trimmed(body, "purchaseDate"),
+    commissionedAt: trimmed(body, "commissionedAt"),
     purchasePrice: trimmed(body, "purchasePrice"),
     notes: trimmed(body, "notes"),
     licensePlate: trimmed(body, "licensePlate"),
@@ -202,7 +205,7 @@ export function toInsertValues(values: InventoryFieldValues) {
   return {
     name: values.name,
     category,
-    purchaseDate: values.purchaseDate || null,
+    commissionedAt: values.commissionedAt || null,
     purchasePrice: values.purchasePrice ? values.purchasePrice.replace(",", ".") : null,
     notes: values.notes || null,
     quantity,
@@ -216,64 +219,32 @@ export function toInsertValues(values: InventoryFieldValues) {
   };
 }
 
-// ── Tag input (chip UI over a comma-joined hidden field) ────────────────────
+// ── Inventory numbers ────────────────────────────────────────────────────────
+
+const NUMBER_MAX_LENGTH = 100;
+
+export function sortedNumbers(item: { numbers?: { number: string }[] }): string[] {
+  return (item.numbers ?? []).map((n) => n.number).sort((a, b) => a.localeCompare(b, "de", { numeric: true }));
+}
+
+// Returns an error message or undefined. Numbers are globally unique and case-sensitive;
+// numbers of archived items stay taken. A race past this check hits the unique index.
+async function validateNumbers(numbers: string[], quantity: number, selfId?: string): Promise<string | undefined> {
+  if (numbers.length > quantity) return t("inventory.form.numbersTooMany", { max: quantity });
+  // eslint-disable-next-line no-control-regex
+  if (numbers.some((n) => n.length > NUMBER_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(n))) return t("inventory.form.numberInvalid");
+  if (numbers.length === 0) return undefined;
+  const rows = await db.query.inventoryItemNumbers.findMany({ where: inArray(inventoryItemNumbers.number, numbers), with: { item: true } });
+  const taken = rows.find((r: any) => r.inventoryItemId !== selfId);
+  if (!taken) return undefined;
+  const item = (taken as any).item;
+  return t("inventory.form.numberTaken", { number: taken.number, item: item.name, archived: item.retiredAt ? ` ${t("inventory.form.archivedSuffix")}` : "" });
+}
+
+// ── Tag input (thin wrapper over the generic ChipInput) ─────────────────────
 
 export function TagInput({ tags }: { tags?: string[] }) {
-  const list = tags ?? [];
-  return (
-    <div class="form-control">
-      <label class="label"><span class="label-text">{t("inventory.form.tags")}</span></label>
-      <div id="tag-input" class="input input-bordered w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
-        {list.map((tag) => (
-          <span class="badge badge-outline gap-1" data-tag={tag}>
-            {tag}
-            <button type="button" class="tag-remove" aria-label={t("common.remove")}>×</button>
-          </span>
-        ))}
-        <input type="text" class="grow min-w-24 outline-none bg-transparent" placeholder={t("inventory.form.tagsPlaceholder")} />
-      </div>
-      <input type="hidden" id="tag-input-value" name="tags" value={list.join(",")} />
-      <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__tagInputBound) {
-          window.__tagInputBound = true;
-          function syncTagInput() {
-            var el = document.getElementById('tag-input');
-            if (!el) return;
-            var tags = Array.from(el.querySelectorAll('[data-tag]')).map(function(s){return s.dataset.tag});
-            document.getElementById('tag-input-value').value = tags.join(',');
-          }
-          document.body.addEventListener('keydown', function(e) {
-            if (e.key !== 'Enter' && e.key !== ',') return;
-            var input = e.target.closest('#tag-input input[type=text]');
-            if (!input) return;
-            e.preventDefault();
-            var value = input.value.trim().replace(/,$/, '');
-            if (!value) return;
-            var el = document.getElementById('tag-input');
-            if (Array.from(el.querySelectorAll('[data-tag]')).some(function(s){return s.dataset.tag.toLowerCase() === value.toLowerCase()})) { input.value = ''; return; }
-            var chip = document.createElement('span');
-            chip.className = 'badge badge-outline gap-1';
-            chip.dataset.tag = value;
-            chip.textContent = value;
-            var remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'tag-remove';
-            remove.textContent = '×';
-            chip.appendChild(remove);
-            el.insertBefore(chip, input);
-            input.value = '';
-            syncTagInput();
-          });
-          document.body.addEventListener('click', function(e) {
-            if (e.target.closest('.tag-remove')) {
-              e.target.closest('[data-tag]').remove();
-              syncTagInput();
-            }
-          });
-        }
-      ` }} />
-    </div>
-  );
+  return <ChipInput name="tags" label={t("inventory.form.tags")} placeholder={t("inventory.form.tagsPlaceholder")} values={tags} splitOnComma caseSensitive={false} />;
 }
 
 // ── Assigned-member picker(s) (search existing aktiv/jugend members, no create) ─
@@ -476,8 +447,8 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="form-control">
-          <label class="label"><span class="label-text">{t("inventory.form.purchaseDate")}</span></label>
-          <input type="date" name="purchaseDate" value={v.purchaseDate ?? ""} class="input input-bordered w-full" />
+          <label class="label"><span class="label-text">{t("inventory.form.commissionedAt")}</span></label>
+          <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input input-bordered w-full" />
         </div>
         <div class="form-control">
           <label class="label"><span class="label-text">{t("inventory.form.purchasePrice")}</span></label>
@@ -492,6 +463,16 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <textarea name="notes" class="textarea textarea-bordered w-full" rows={3}>{v.notes ?? ""}</textarea>
       </div>
 
+      <ChipInput
+        name="numbers"
+        label={t("inventory.form.inventoryNumbers")}
+        placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
+        values={v.numbersList}
+        maxFrom="#inventory-quantity"
+        max={1}
+        hint={t("inventory.form.numbersCounter")}
+      />
+      {errors?.numbers && <span class="text-error text-sm">{errors.numbers}</span>}
       <TagInput tags={v.tagsList} />
 
       <div data-show-cats="vehicle" class="space-y-4">
@@ -563,7 +544,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
 async function fetchItems(): Promise<ItemWithRelations[]> {
   return db.query.inventoryItems.findMany({
-    with: { tags: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, assignments: { with: { member: { with: { person: true } } } } },
     orderBy: (items, { asc }) => [asc(items.name)],
   }) as unknown as Promise<ItemWithRelations[]>;
 }
@@ -571,7 +552,7 @@ async function fetchItems(): Promise<ItemWithRelations[]> {
 async function fetchItem(id: string): Promise<ItemWithRelations | undefined> {
   return db.query.inventoryItems.findFirst({
     where: eq(inventoryItems.id, id),
-    with: { tags: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, assignments: { with: { member: { with: { person: true } } } } },
   }) as unknown as Promise<ItemWithRelations | undefined>;
 }
 
@@ -594,6 +575,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const q = c.req.query();
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const tagFilter = c.req.queries("tag") ?? [];
+  const search = (q.q ?? "").trim();
   const showArchived = q.archived === "1";
   const canSeeLending = user.permissions.has("lending:read");
   const canLend = user.permissions.has("lending:manage");
@@ -619,11 +601,16 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     if (categoryFilter.length > 0 && !categoryFilter.includes(item.category)) return false;
     if (tagFilter.length > 0 && !tagFilter.every((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
+    if (search) {
+      const needle = search.toLowerCase();
+      const hay = [item.name, item.serialNumber ?? "", ...item.numbers.map((n) => n.number)];
+      if (!hay.some((h) => h.toLowerCase().includes(needle))) return false;
+    }
     return true;
   });
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
+    buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
   const columnCount = 5 + (canSeeLending ? 1 : 0) + (canLend ? 1 : 0);
 
   return c.html(
@@ -640,6 +627,30 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
+        <form method="get" action="/inventory" class="contents">
+          <label class="input input-bordered flex items-center gap-2">
+            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <input
+              type="search"
+              name="q"
+              value={search}
+              autocomplete="off"
+              placeholder={t("inventory.search.placeholder")}
+              class="grow min-w-0"
+              hx-get="/inventory"
+              hx-include="closest form"
+              hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+              hx-target="#inventory-results"
+              hx-select="#inventory-results"
+              hx-swap="outerHTML"
+              hx-push-url="true"
+            />
+          </label>
+          {categoryFilter.map((v) => <input type="hidden" name="category" value={v} />)}
+          {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
+          {showArchived && <input type="hidden" name="archived" value="1" />}
+          {lendableOnly && <input type="hidden" name="lendable" value="1" />}
+        </form>
         <MultiSelectFilter
           param="category"
           autoApply
@@ -674,6 +685,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         )}
       </div>
 
+      <div id="inventory-results">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -725,6 +737,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           })}
         </tbody>
       </table>
+      </div>
     </Layout>
   );
 });
@@ -818,13 +831,16 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
 // POST /inventory
 inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
   const tags = parseTags(body, "tags");
+  const numbers = parseList(body, "numbers");
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity);
   if (assignmentError) errors.assignments = assignmentError;
+  const numbersError = await validateNumbers(numbers, insertValues.quantity);
+  if (numbersError) errors.numbers = numbersError;
   const wantsLendable = trimmed(body, "lendable") === "1";
 
   if (Object.keys(errors).length > 0) {
@@ -835,7 +851,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           title={t("inventory.newItem")}
           action="/inventory"
           formId="inventory-new-form"
-          values={{ ...values, tagsList: tags }}
+          values={{ ...values, tagsList: tags, numbersList: numbers }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -850,6 +866,9 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     const [item] = await tx.insert(inventoryItems).values(insertValues).returning();
     if (tags.length > 0) {
       await tx.insert(inventoryItemTags).values(tags.map((tag) => ({ inventoryItemId: item.id, tag })));
+    }
+    if (numbers.length > 0) {
+      await tx.insert(inventoryItemNumbers).values(numbers.map((number) => ({ inventoryItemId: item.id, number })));
     }
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
@@ -896,8 +915,14 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
           </div>
         )}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
-          <ViewField label={t("inventory.form.purchaseDate")} value={item.purchaseDate ? formatDate(item.purchaseDate) : null} />
+          <ViewField label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
           <ViewField label={t("inventory.form.purchasePrice")} value={price} />
+          {item.numbers.length > 0 && (
+            <div class="sm:col-span-2">
+              <div class="text-sm opacity-60">{t("inventory.form.inventoryNumbers")}</div>
+              <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+            </div>
+          )}
           {cat === "vehicle" && <>
             <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
             <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
@@ -931,7 +956,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
   const values: Partial<InventoryFieldValues> & { tagsList?: string[] } = {
     name: item.name,
     category: item.category,
-    purchaseDate: item.purchaseDate ?? "",
+    commissionedAt: item.commissionedAt ?? "",
     purchasePrice: item.purchasePrice ?? "",
     notes: item.notes ?? "",
     licensePlate: item.licensePlate ?? "",
@@ -943,6 +968,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     quantity: String(item.quantity),
     assignedMemberId: !isBatch ? (assignmentList[0]?.memberId ?? "") : "",
     tagsList: item.tags.map((tg) => tg.tag),
+    numbersList: sortedNumbers(item),
   };
 
   const assignedTotal = assignmentList.reduce((sum, a) => sum + a.quantity, 0);
@@ -1017,13 +1043,16 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   const existing = await fetchItem(id);
   if (!existing) return c.notFound();
 
-  const body = await c.req.parseBody();
+  const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
   const tags = parseTags(body, "tags");
+  const numbers = parseList(body, "numbers");
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity, existing.retiredQuantity);
   if (assignmentError) errors.assignments = assignmentError;
+  const numbersError = await validateNumbers(numbers, insertValues.quantity, id);
+  if (numbersError) errors.numbers = numbersError;
 
   // Verleih-Flag: nur mit lending:manage, serverseitig geprüft (UI-Disabled ist nur Komfort).
   const wantsLendable = trimmed(body, "lendable") === "1";
@@ -1051,7 +1080,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           title={existing.name}
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
-          values={{ ...values, tagsList: tags }}
+          values={{ ...values, tagsList: tags, numbersList: numbers }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1067,6 +1096,10 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     await tx.delete(inventoryItemTags).where(eq(inventoryItemTags.inventoryItemId, id));
     if (tags.length > 0) {
       await tx.insert(inventoryItemTags).values(tags.map((tag) => ({ inventoryItemId: id, tag })));
+    }
+    await tx.delete(inventoryItemNumbers).where(eq(inventoryItemNumbers.inventoryItemId, id));
+    if (numbers.length > 0) {
+      await tx.insert(inventoryItemNumbers).values(numbers.map((number) => ({ inventoryItemId: id, number })));
     }
     await tx.delete(inventoryItemAssignments).where(eq(inventoryItemAssignments.inventoryItemId, id));
     if (assignments.length > 0) {
