@@ -1156,7 +1156,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("members.newMember")}</h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
-      <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+      <form method="post" action="/members/new" class="space-y-4 max-w-4xl">
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1286,7 +1286,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
-        <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+        <form method="post" action="/members/new" class="space-y-4 max-w-4xl">
           {personId && <input type="hidden" name="personId" value={personId} />}
           {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1596,7 +1596,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
-      <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
+      <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
@@ -1704,7 +1704,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
-        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
@@ -1774,7 +1774,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
-        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
