@@ -725,8 +725,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                 </td>
                 <td>
                   {lending
-                    ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-ghost"}`}>{t("inventory.lending.available", { count: lending.available })}</span>
-                    : item.quantity > 1 && <span class="badge badge-ghost badge-sm">{item.quantity - item.retiredQuantity}</span>}
+                    ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-outline"}`}>{t("inventory.lending.available", { count: lending.available })}</span>
+                    : item.quantity > 1 && <span class="badge badge-outline badge-sm">{item.quantity - item.retiredQuantity}</span>}
                 </td>
                 {canLend && (
                   <td>
