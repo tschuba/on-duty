@@ -397,7 +397,7 @@ const AUTOREFRESH_SCRIPT = `
     if (v) { secs.forEach((d, i) => { d.open = v.open.includes(i); }); scrollTo(0, v.y); }
   } catch {}
   form.addEventListener("change", (e) => {
-    if (!/^(map|grants|ign|arole|askip|nob|cat)_/.test(e.target.name || "")) return;
+    if (!/^((map|grants|ign|arole|askip|nob|cat)_|assumed_ok$)/.test(e.target.name || "")) return;
     sessionStorage.setItem(SK, JSON.stringify({ y: scrollY, open: secs.flatMap((d, i) => (d.open ? [i] : [])) }));
     form.requestSubmit(document.getElementById("refresh-btn"));
   });
