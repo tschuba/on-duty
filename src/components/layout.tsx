@@ -15,7 +15,7 @@ const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).ver
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "donations" | "admin" | "inventory" | "organisation";
+  activeNav?: "members" | "donations" | "admin" | "inventory" | "organisation" | "import";
 }>;
 
 export function ClickToEditHint() {
@@ -111,6 +111,14 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   <CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} />
                 </a>
               )}
+              {user.permissions.has("import:run") && (
+                <a
+                  href="/import"
+                  class={navLink(activeNav === "import")}
+                >
+                  {t("common.nav.import")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -134,6 +142,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} /></a></li>}
+                {user.permissions.has("import:run") && <li><a href="/import" class={activeNav === "import" ? "active" : ""}>{t("common.nav.import")}</a></li>}
                 {user.permissions.has("system:admin") && <li><a href="/admin" class={activeNav === "admin" ? "active" : ""}>{t("common.nav.admin")}<CountBadge count={activeNav === "admin" ? 0 : pendingUsersCount} /></a></li>}
               </ul>
             </div>

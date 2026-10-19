@@ -235,7 +235,7 @@ export function MembersTable({
   }
 
   const openRoles = (m: MemberWithStatus) =>
-    m.assignments.filter((a) => !a.to).map((a) => a.role.title);
+    m.assignments.filter((a) => !a.to).map((a) => roleLabel(a.role.title, a.note));
 
   return (
     <div id="members-results">
@@ -358,6 +358,9 @@ function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
   );
 }
 
+const normalizeNote = (v?: string) => v?.trim().slice(0, 200) || null;
+const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${note})` : title);
+
 function RoleRow({
   index,
   roles,
@@ -429,7 +432,7 @@ function RoleRow({
         <input
           type="date"
           name="assignment_from[]"
-          class="input input-bordered w-full"
+          class="input input-bordered w-full min-w-40"
           value={assignment?.from ?? ""}
           required
         />
@@ -438,9 +441,12 @@ function RoleRow({
         <input
           type="date"
           name="assignment_to[]"
-          class="input input-bordered w-full"
+          class="input input-bordered w-full min-w-40"
           value={assignment?.to ?? ""}
         />
+      </td>
+      <td>
+        <input type="text" name="assignment_note[]" class="input input-bordered w-full min-w-48" maxlength={200} value={assignment?.note ?? ""} />
       </td>
       <td>
         <button
@@ -757,6 +763,9 @@ function MemberFormFields({
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("birthDate", t("members.form.birthDate"), "date", true)}
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {field("firstEntryDate", t("members.form.firstEntryDate"), "date")}
         {field("entryDate", t("members.form.entryDate"), "date", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1147,7 +1156,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("members.newMember")}</h1>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
-      <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+      <form method="post" action="/members/new" class="space-y-4 max-w-4xl">
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1167,9 +1176,9 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           <table class="table w-full">
             <thead>
               <tr>
-                <th>{t("members.form.role")}</th>
+                <th>{t("members.form.role")} <span class="text-error">*</span></th>
                 <th>{t("members.form.from")} <span class="text-error">*</span></th>
-                <th>{t("members.form.to")}</th>
+                <th>{t("members.form.to")}</th><th>{t("members.form.note")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -1222,16 +1231,19 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const firstName = trimmed(body, "firstName");
   const birthDate = trimmed(body, "birthDate");
   const entryDate = trimmed(body, "entryDate");
+  const firstEntryDate = trimmed(body, "firstEntryDate") || null;
 
   if (!lastName) errors.lastName = t("common.required");
   if (!firstName) errors.firstName = t("common.required");
   if (!birthDate) errors.birthDate = t("common.required");
   if (!entryDate) errors.entryDate = t("common.required");
+  if (firstEntryDate && entryDate && firstEntryDate > entryDate) errors.firstEntryDate = t("members.form.firstEntryDateAfterEntry");
 
   // Parse assignments (keep rows unfiltered so index i stays aligned across role/from/to)
   const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
+  const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
 
   // Validate that every non-empty row has both a role and a from date
   if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
@@ -1274,7 +1286,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
-        <form method="post" action="/members/new" class="space-y-4 max-w-2xl">
+        <form method="post" action="/members/new" class="space-y-4 max-w-4xl">
           {personId && <input type="hidden" name="personId" value={personId} />}
           {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1292,7 +1304,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1301,6 +1313,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
                     memberRoleId: assignmentRoles[i],
                     from: assignmentFroms[i] ?? "",
                     to: assignmentTos[i] || null,
+                    note: normalizeNote(assignmentNotes[i]),
                     autoClosed: false,
                     role: roles.find((r) => r.id === assignmentRoles[i])!,
                   }} />
@@ -1342,6 +1355,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       await tx.update(persons).set(personFields).where(eq(persons.id, pid));
       await tx.update(members).set({
         entryDate,
+        firstEntryDate,
         exitDate: (body.exitDate as string) || null,
         deathDate: (body.deathDate as string) || null,
       }).where(eq(members.id, linkMemberId));
@@ -1357,6 +1371,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       const [m] = await tx.insert(members).values({
         personId: pid,
         entryDate,
+        firstEntryDate,
         exitDate: (body.exitDate as string) || null,
         deathDate: (body.deathDate as string) || null,
         ...bank,
@@ -1371,6 +1386,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
+        note: normalizeNote(assignmentNotes[i]),
       });
     }
 
@@ -1398,7 +1414,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
 // ── Export sheet building ───────────────────────────────────────────────────
 
 export type ExportOptions = { addr: boolean; contact: boolean; dates: boolean; gender: boolean; assignments: boolean };
-export type ExportAssignmentRow = { memberId: string; roleTitle: string; from: string | null; to: string | null };
+export type ExportAssignmentRow = { memberId: string; roleTitle: string; note?: string | null; from: string | null; to: string | null };
 export type ExportSheet = { name: string; header: string[]; rows: (string | Date | null)[][] };
 
 export function buildExportSheets(
@@ -1413,7 +1429,7 @@ export function buildExportSheets(
 
   const header: string[] = [t("members.table.lastName"), t("members.table.firstName")];
   if (opts.gender) header.push(t("members.export.genderCol"));
-  if (opts.dates) header.push(t("members.form.birthDate"), t("members.form.entryDate"), t("members.form.exitDate"), t("members.form.deathDate"));
+  if (opts.dates) header.push(t("members.form.birthDate"), t("members.form.entryDate"), t("members.form.firstEntryDate"), t("members.form.exitDate"), t("members.form.deathDate"));
   if (opts.addr) header.push(t("members.form.street"), t("members.form.houseNumber"), t("members.form.zip"), t("members.form.city"));
   if (opts.contact) header.push(t("members.form.phone"), t("members.form.mobile"), t("members.form.email"));
 
@@ -1423,7 +1439,7 @@ export function buildExportSheets(
   const rows = allMembers.map((m) => {
     const row: (string | Date | null)[] = [m.lastName, m.firstName];
     if (opts.gender) row.push(GENDER[m.gender ?? ""] ?? t("members.form.genderNone"));
-    if (opts.dates) row.push(toDate(m.birthDate), toDate(m.entryDate), toDate(m.exitDate), toDate(m.deathDate));
+    if (opts.dates) row.push(toDate(m.birthDate), toDate(m.entryDate), toDate(m.firstEntryDate), toDate(m.exitDate), toDate(m.deathDate));
     if (opts.addr) row.push(m.street ?? "", m.houseNumber ?? "", m.zip ?? "", m.city ?? "");
     if (opts.contact) row.push(m.phone ?? "", m.mobile ?? "", m.email ?? "");
     return row;
@@ -1441,10 +1457,10 @@ export function buildExportSheets(
       return cmp2 !== 0 ? cmp2 : (a.from ?? "").localeCompare(b.from ?? "");
     });
 
-    const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to")];
+    const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to"), t("members.form.note")];
     const asgRows = asgns.map((a) => {
       const m = nameMap.get(a.memberId);
-      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
+      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to), a.note ?? ""];
     });
     sheets.push({ name: t("members.export.sheetAssignments"), header: asgHeader, rows: asgRows });
   }
@@ -1471,6 +1487,7 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
         roleTitle: memberRoles.title,
         from: memberRoleAssignments.from,
         to: memberRoleAssignments.to,
+        note: memberRoleAssignments.note,
       })
         .from(memberRoleAssignments)
         .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId))
@@ -1535,6 +1552,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
           <ViewField label={t("members.form.firstName")} value={m.firstName} />
           <ViewField label={t("members.form.birthDate")} value={formatDate(m.birthDate)} />
+          {m.firstEntryDate && <ViewField label={t("members.form.firstEntryDate")} value={formatDate(m.firstEntryDate)} />}
           <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
           <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
           <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
@@ -1550,7 +1568,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             <h2 class="font-semibold mb-2">{t("members.view.activeFunctions")}</h2>
             <div class="flex flex-wrap gap-2">
               {openRoles.map((a) => (
-                <span class="badge badge-outline">{a.role.title} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
+                <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
               ))}
             </div>
           </div>
@@ -1578,14 +1596,14 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
       </div>
-      <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
+      <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
         <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
-            <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
+            <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
                 <RoleRow key={a.id} index={i} roles={roles} assignment={a} />
@@ -1641,6 +1659,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   const firstName = trimmed(body, "firstName");
   const birthDate = trimmed(body, "birthDate");
   const entryDate = trimmed(body, "entryDate");
+  const firstEntryDate = trimmed(body, "firstEntryDate") || null;
   const exitDate = (body.exitDate as string) || null;
   const deathDate = (body.deathDate as string) || null;
 
@@ -1648,12 +1667,14 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   if (!firstName) errors.firstName = t("common.required");
   if (!birthDate) errors.birthDate = t("common.required");
   if (!entryDate) errors.entryDate = t("common.required");
+  if (firstEntryDate && entryDate && firstEntryDate > entryDate) errors.firstEntryDate = t("members.form.firstEntryDateAfterEntry");
 
   const assignmentIds = [body["assignment_id[]"]].flat() as string[];
   // Keep rows unfiltered so index i stays aligned across role/from/to
   const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
+  const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
 
   // Validate that every non-empty row has both a role and a from date
   if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
@@ -1669,7 +1690,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
 
   if (Object.keys(errors).length > 0) {
     const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
-    const m = { ...existing, lastName, firstName, birthDate, entryDate, exitDate, deathDate,
+    const m = { ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
       street: body.street as string, houseNumber: body.houseNumber as string,
       zip: body.zip as string, city: body.city as string,
       gender: (body.gender as any) || null,
@@ -1683,14 +1704,14 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
-        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1699,6 +1720,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
                     memberRoleId: assignmentRoles[i],
                     from: assignmentFroms[i] ?? "",
                     to: assignmentTos[i] || null,
+                    note: normalizeNote(assignmentNotes[i]),
                     autoClosed: false,
                     role: roles.find((r) => r.id === assignmentRoles[i])!,
                   }} />
@@ -1732,7 +1754,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       zip: (body.zip as string) ?? "",
       city: (body.city as string) ?? "",
       gender: (body.gender as string) ?? "",
-      birthDate, entryDate,
+      birthDate, entryDate, firstEntryDate: firstEntryDate ?? "",
       exitDate: exitDate ?? "",
       deathDate: deathDate ?? "",
       ...(canWriteBank && { iban: trimmed(body, "iban"), bic: trimmed(body, "bic"), accountHolder: trimmed(body, "accountHolder") }),
@@ -1752,8 +1774,8 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
-        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
-          <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, exitDate, deathDate,
+        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
+          <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
@@ -1761,7 +1783,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1770,6 +1792,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
                     memberRoleId: assignmentRoles[i],
                     from: assignmentFroms[i] ?? "",
                     to: assignmentTos[i] || null,
+                    note: normalizeNote(assignmentNotes[i]),
                     autoClosed: false,
                     role: roles.find((r) => r.id === assignmentRoles[i])!,
                   }} />
@@ -1805,6 +1828,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
 
     await tx.update(members).set({
       entryDate,
+      firstEntryDate,
       exitDate: exitDate || null,
       deathDate: deathDate || null,
       ...bank,
@@ -1841,6 +1865,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
+        note: normalizeNote(assignmentNotes[i]),
       };
       if (aid) {
         await tx.update(memberRoleAssignments).set(vals).where(eq(memberRoleAssignments.id, aid));
