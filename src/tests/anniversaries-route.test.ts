@@ -82,3 +82,44 @@ describe("GET /anniversaries/export", () => {
     expect(res.headers.get("content-type")).toContain("spreadsheetml");
   });
 });
+
+describe("GET /anniversaries filters", () => {
+  // Entry 2010-01-01, firstEntry 2000-01-01 → service 25 in 2025, membership 15 in 2025 (cutoff 01-06).
+  const setup = () => {
+    findManyResult = [makeMemberRow({ firstEntryDate: "2000-01-01" })];
+    ayFixture = [
+      { kind: "service", year: 25, title: "Dienst25" },
+      { kind: "membership", year: 15, title: "Mitglied15" },
+    ];
+  };
+  const get = async (filter: string) =>
+    (await anniversaryRoutes.request(`/?start=2025-01-01&end=2025-12-31&filter=${filter}`)).text();
+
+  it("service shows only service rows", async () => {
+    setup();
+    const html = await get("service");
+    expect(html).toContain("Dienst25");
+    expect(html).not.toContain("Mitglied15");
+  });
+
+  it("membership shows only membership rows", async () => {
+    setup();
+    const html = await get("membership");
+    expect(html).toContain("Mitglied15");
+    expect(html).not.toContain("Dienst25");
+  });
+
+  it("legacy alias anniversaries shows both", async () => {
+    setup();
+    const html = await get("anniversaries");
+    expect(html).toContain("Dienst25");
+    expect(html).toContain("Mitglied15");
+  });
+
+  it("merges identical service and membership rows", async () => {
+    findManyResult = [makeMemberRow()];
+    ayFixture = [{ kind: "service", year: 15, title: null }, { kind: "membership", year: 15, title: null }];
+    const html = await get("all");
+    expect(html).toContain("Dienst + Mitgliedschaft");
+  });
+});

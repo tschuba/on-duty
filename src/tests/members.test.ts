@@ -520,6 +520,36 @@ describe("GET /role-row", () => {
   });
 });
 
+describe("firstEntryDate", () => {
+  const base = { lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01" };
+
+  it("rejects firstEntryDate after entryDate on create and edit", async () => {
+    const c = await memberRoutes.request("/new", { method: "POST", body: formBody({ ...base, firstEntryDate: "2011-01-01" }) });
+    expect(c.status).toBe(422);
+    expect(insert).not.toHaveBeenCalled();
+    findFirstResult = memberWithAssignments();
+    const e = await memberRoutes.request("/m1", { method: "POST", body: formBody({ ...base, firstEntryDate: "2011-01-01" }) });
+    expect(e.status).toBe(422);
+    expect(updateCalls.some((u) => u.table === members)).toBe(false);
+  });
+
+  it("accepts empty and earlier values, stores them", async () => {
+    await memberRoutes.request("/new", { method: "POST", body: formBody({ ...base, firstEntryDate: "2000-01-01" }) });
+    expect(insertCalls.find((x) => x.table === members)?.values).toMatchObject({ firstEntryDate: "2000-01-01" });
+    insertCalls.length = 0;
+    await memberRoutes.request("/new", { method: "POST", body: formBody(base) });
+    expect(insertCalls.find((x) => x.table === members)?.values).toMatchObject({ firstEntryDate: null });
+  });
+
+  it("shows it in the detail view only when set", async () => {
+    currentUser = { id: "u1", permissions: new Set(), disabled: false };
+    findFirstResult = memberWithAssignments({ firstEntryDate: "2000-01-01" });
+    expect(await (await memberRoutes.request("/m1")).text()).toContain("01.01.2000");
+    findFirstResult = memberWithAssignments({ firstEntryDate: null });
+    expect(await (await memberRoutes.request("/m1")).text()).not.toContain("Erstes Eintrittsdatum");
+  });
+});
+
 describe("POST /new", () => {
   it("re-renders the form with 422 when required fields are missing", async () => {
     const res = await memberRoutes.request("/new", { method: "POST", body: formBody({ lastName: "" }) });
