@@ -57,6 +57,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "org:write": t("admin.permissions.key.orgWrite"),
   "org:tax-data:read": t("admin.permissions.key.orgTaxDataRead"),
   "org:tax-data:write": t("admin.permissions.key.orgTaxDataWrite"),
+  "import:run": t("admin.permissions.key.importRun"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {

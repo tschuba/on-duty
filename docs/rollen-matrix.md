@@ -27,6 +27,7 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `org:write`                |   | ✔ |   | ✔ | ✔ |   |
 | `org:tax-data:read`        |   |   |   | ✔ |   | ✔ |
 | `org:tax-data:write`       |   |   |   |   |   | ✔ |
+| `import:run`               | ✔ |   |   |   |   |   |
 
 ## Hinweis
 

@@ -295,6 +295,13 @@
       "when": 1792412284559,
       "tag": "0041_inventory_serials",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792419374078,
+      "tag": "0042_import_permission",
+      "breakpoints": true
     }
   ]
 }
