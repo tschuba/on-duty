@@ -263,6 +263,59 @@ function isUniqueViolation(err: unknown): boolean {
   return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
+// Menge 1: einfaches Textfeld; ab Menge 2: ChipInput. Beide tragen denselben Feldnamen,
+// das jeweils verborgene Feld ist disabled (wird nicht gesendet) — Umschalten per Skript.
+function NumberListField({ name, label, labelSingle, placeholder, placeholderSingle, values, quantity, error }: {
+  name: string; label: string; labelSingle: string; placeholder: string; placeholderSingle: string;
+  values?: string[]; quantity: number; error?: string;
+}) {
+  const multi = quantity > 1;
+  const list = values ?? [];
+  return (
+    <div data-numlist>
+      <div data-numlist-single class={multi ? "hidden" : ""}>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{labelSingle}</span></label>
+          <input type="text" name={name} value={list[0] ?? ""} placeholder={placeholderSingle} disabled={multi} maxlength={NUMBER_MAX_LENGTH}
+            class={`input input-bordered w-full${error ? " input-error" : ""}`} />
+        </div>
+      </div>
+      <div data-numlist-multi class={multi ? "" : "hidden"}>
+        <ChipInput name={name} label={label} placeholder={placeholder} values={multi ? list : []} maxFrom="#inventory-quantity" max={quantity}
+          hint={t("inventory.form.numbersCounter")} />
+      </div>
+      {error && <span class="text-error text-sm">{error}</span>}
+      <script dangerouslySetInnerHTML={{ __html: `
+        if (!window.__numListBound) {
+          window.__numListBound = true;
+          function syncNumLists() {
+            var qf = document.getElementById('inventory-quantity');
+            var multi = (parseInt(qf && qf.value, 10) || 1) > 1;
+            document.querySelectorAll('[data-numlist]').forEach(function(root) {
+              var was = root.dataset.mode;
+              var mode = multi ? 'multi' : 'single';
+              if (was === mode) return;
+              root.dataset.mode = mode;
+              var single = root.querySelector('[data-numlist-single] input');
+              var chipRoot = root.querySelector('[data-chip-input]');
+              root.querySelector('[data-numlist-single]').classList.toggle('hidden', multi);
+              root.querySelector('[data-numlist-multi]').classList.toggle('hidden', !multi);
+              single.disabled = multi;
+              chipRoot.querySelectorAll('[data-chip] input[type=hidden]').forEach(function(h){ h.disabled = !multi; });
+              if (was && !multi && !single.value) { var first = chipRoot.querySelector('[data-chip]'); if (first) single.value = first.dataset.chip; }
+              if (was && multi && single.value.trim()) chipAdd(chipRoot, single.value);
+              chipRefresh(chipRoot);
+            });
+          }
+          document.addEventListener('input', syncNumLists);
+          document.addEventListener('DOMContentLoaded', syncNumLists);
+        }
+        if (typeof syncNumLists === 'function') syncNumLists();
+      ` }} />
+    </div>
+  );
+}
+
 // ── Tag input (thin wrapper over the generic ChipInput) ─────────────────────
 
 export function TagInput({ tags }: { tags?: string[] }) {
@@ -544,32 +597,28 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         </div>
       </div>
 
-      <ChipInput
+      <NumberListField
         name="numbers"
         label={t("inventory.form.inventoryNumbers")}
         labelSingle={t("inventory.form.inventoryNumber")}
         placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
         placeholderSingle={t("inventory.form.inventoryNumberPlaceholder")}
         values={v.numbersList}
-        maxFrom="#inventory-quantity"
-        max={1}
-        hint={t("inventory.form.numbersCounter")}
+        quantity={quantity}
+        error={errors?.numbers}
       />
-      {errors?.numbers && <span class="text-error text-sm">{errors.numbers}</span>}
 
       <div data-show-cats="scba,equipment,ppe">
-        <ChipInput
+        <NumberListField
           name="serials"
           label={t("inventory.form.serialNumbers")}
           labelSingle={t("inventory.form.serialNumber")}
           placeholder={t("inventory.form.serialNumbersPlaceholder")}
           placeholderSingle={t("inventory.form.serialNumberPlaceholder")}
           values={v.serialsList}
-          maxFrom="#inventory-quantity"
-          max={1}
-          hint={t("inventory.form.numbersCounter")}
+          quantity={quantity}
+          error={errors?.serials}
         />
-        {errors?.serials && <span class="text-error text-sm">{errors.serials}</span>}
       </div>
 
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
