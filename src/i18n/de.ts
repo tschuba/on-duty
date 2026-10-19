@@ -103,6 +103,7 @@ export const de = {
   "members.form.roleNoMatch": "Keine Treffer",
   "members.form.from": "Von",
   "members.form.to": "Bis",
+  "members.form.note": "Hinweis",
   "members.form.role": "Funktion",
   "members.view.streetNr": "Straße / Nr.",
   "members.view.zipCity": "PLZ / Ort",

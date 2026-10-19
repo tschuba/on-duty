@@ -235,7 +235,7 @@ export function MembersTable({
   }
 
   const openRoles = (m: MemberWithStatus) =>
-    m.assignments.filter((a) => !a.to).map((a) => a.role.title);
+    m.assignments.filter((a) => !a.to).map((a) => roleLabel(a.role.title, a.note));
 
   return (
     <div id="members-results">
@@ -358,6 +358,9 @@ function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
   );
 }
 
+const normalizeNote = (v?: string) => v?.trim().slice(0, 200) || null;
+const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${note})` : title);
+
 function RoleRow({
   index,
   roles,
@@ -441,6 +444,9 @@ function RoleRow({
           class="input input-bordered w-full"
           value={assignment?.to ?? ""}
         />
+      </td>
+      <td>
+        <input type="text" name="assignment_note[]" class="input input-bordered w-full" maxlength={200} value={assignment?.note ?? ""} />
       </td>
       <td>
         <button
@@ -1172,7 +1178,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
               <tr>
                 <th>{t("members.form.role")}</th>
                 <th>{t("members.form.from")} <span class="text-error">*</span></th>
-                <th>{t("members.form.to")}</th>
+                <th>{t("members.form.to")}</th><th>{t("members.form.note")}</th>
                 <th></th>
               </tr>
             </thead>
@@ -1237,6 +1243,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
+  const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
 
   // Validate that every non-empty row has both a role and a from date
   if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
@@ -1297,7 +1304,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1306,6 +1313,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
                     memberRoleId: assignmentRoles[i],
                     from: assignmentFroms[i] ?? "",
                     to: assignmentTos[i] || null,
+                    note: normalizeNote(assignmentNotes[i]),
                     autoClosed: false,
                     role: roles.find((r) => r.id === assignmentRoles[i])!,
                   }} />
@@ -1378,6 +1386,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
+        note: normalizeNote(assignmentNotes[i]),
       });
     }
 
@@ -1405,7 +1414,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
 // ── Export sheet building ───────────────────────────────────────────────────
 
 export type ExportOptions = { addr: boolean; contact: boolean; dates: boolean; gender: boolean; assignments: boolean };
-export type ExportAssignmentRow = { memberId: string; roleTitle: string; from: string | null; to: string | null };
+export type ExportAssignmentRow = { memberId: string; roleTitle: string; note?: string | null; from: string | null; to: string | null };
 export type ExportSheet = { name: string; header: string[]; rows: (string | Date | null)[][] };
 
 export function buildExportSheets(
@@ -1448,10 +1457,10 @@ export function buildExportSheets(
       return cmp2 !== 0 ? cmp2 : (a.from ?? "").localeCompare(b.from ?? "");
     });
 
-    const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to")];
+    const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to"), t("members.form.note")];
     const asgRows = asgns.map((a) => {
       const m = nameMap.get(a.memberId);
-      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to)];
+      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to), a.note ?? ""];
     });
     sheets.push({ name: t("members.export.sheetAssignments"), header: asgHeader, rows: asgRows });
   }
@@ -1478,6 +1487,7 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
         roleTitle: memberRoles.title,
         from: memberRoleAssignments.from,
         to: memberRoleAssignments.to,
+        note: memberRoleAssignments.note,
       })
         .from(memberRoleAssignments)
         .innerJoin(memberRoles, eq(memberRoles.id, memberRoleAssignments.memberRoleId))
@@ -1558,7 +1568,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             <h2 class="font-semibold mb-2">{t("members.view.activeFunctions")}</h2>
             <div class="flex flex-wrap gap-2">
               {openRoles.map((a) => (
-                <span class="badge badge-outline">{a.role.title} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
+                <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
               ))}
             </div>
           </div>
@@ -1593,7 +1603,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <StatusPreview roles={roles} />
         <div class="overflow-x-auto">
           <table class="table w-full">
-            <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th></th></tr></thead>
+            <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
             <tbody id="role-rows">
               {m.assignments.map((a, i) => (
                 <RoleRow key={a.id} index={i} roles={roles} assignment={a} />
@@ -1664,6 +1674,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
   const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
+  const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
 
   // Validate that every non-empty row has both a role and a from date
   if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
@@ -1700,7 +1711,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1709,6 +1720,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
                     memberRoleId: assignmentRoles[i],
                     from: assignmentFroms[i] ?? "",
                     to: assignmentTos[i] || null,
+                    note: normalizeNote(assignmentNotes[i]),
                     autoClosed: false,
                     role: roles.find((r) => r.id === assignmentRoles[i])!,
                   }} />
@@ -1771,7 +1783,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <StatusPreview roles={roles} />
           <div class="overflow-x-auto">
             <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th></th></tr></thead>
+              <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
               <tbody id="role-rows">
                 {assignmentRoles.map((_, i) => (
                   <RoleRow key={i} index={i} roles={roles} assignment={{
@@ -1780,6 +1792,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
                     memberRoleId: assignmentRoles[i],
                     from: assignmentFroms[i] ?? "",
                     to: assignmentTos[i] || null,
+                    note: normalizeNote(assignmentNotes[i]),
                     autoClosed: false,
                     role: roles.find((r) => r.id === assignmentRoles[i])!,
                   }} />
@@ -1852,6 +1865,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         memberRoleId: assignmentRoles[i],
         from: assignmentFroms[i],
         to: assignmentTos[i] || null,
+        note: normalizeNote(assignmentNotes[i]),
       };
       if (aid) {
         await tx.update(memberRoleAssignments).set(vals).where(eq(memberRoleAssignments.id, aid));
