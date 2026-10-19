@@ -54,6 +54,7 @@ function makeMemberRow(overrides: Record<string, unknown> = {}) {
       zip: "12345",
       city: "Altenhammer",
       phone: "123",
+      mobile: "0170",
       email: "a@b.de",
       gender: "female",
     },

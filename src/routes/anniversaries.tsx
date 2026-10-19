@@ -356,7 +356,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
     t("anniversaries.export.colDate"), t("members.form.lastName"), t("members.form.firstName"),
     t("members.table.status"), t("anniversaries.export.colEventType"), t("anniversaries.export.colYears"), t("anniversaries.export.colTitle"),
   ];
-  if (inclContact) header.push(t("members.form.phone"), t("members.form.email"));
+  if (inclContact) header.push(t("members.form.phone"), t("members.form.mobile"), t("members.form.email"));
   if (inclAddr) header.push(t("members.form.street"), t("members.form.houseNumber"), t("members.form.zip"), t("members.form.city"));
 
   const rows = events.map((e) => {
@@ -370,7 +370,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
       e.title ?? "",
     ];
     const m = memberMap.get(e.memberId);
-    if (inclContact) row.push(m?.phone ?? "", m?.email ?? "");
+    if (inclContact) row.push(m?.phone ?? "", m?.mobile ?? "", m?.email ?? "");
     if (inclAddr) row.push(m?.street ?? "", m?.houseNumber ?? "", m?.zip ?? "", m?.city ?? "");
     return row;
   });

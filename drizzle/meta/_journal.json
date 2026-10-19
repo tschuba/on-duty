@@ -253,6 +253,13 @@
       "when": 1792400000011,
       "tag": "0035_donation_improvements",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792398524861,
+      "tag": "0036_person_mobile",
+      "breakpoints": true
     }
   ]
 }
