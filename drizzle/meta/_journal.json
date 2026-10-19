@@ -288,6 +288,13 @@
       "when": 1792407258963,
       "tag": "0040_inventory_numbers_commissioned_at",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792412284559,
+      "tag": "0041_inventory_serials",
+      "breakpoints": true
     }
   ]
 }

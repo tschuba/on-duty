@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -109,7 +109,7 @@ function makeItem(overrides: Record<string, unknown> = {}) {
     commissionedAt: null, numbers: [], purchasePrice: null, notes: null,
     retiredAt: null, retiredReason: null, quantity: 1, retiredQuantity: 0,
     licensePlate: "ABC-123", yearOfManufacture: 2015, vehicleInspectionDue: "2026-06-01",
-    serialNumber: null, nextInspectionDue: null, lastInspectionDate: null,
+    serials: [], nextInspectionDue: null, lastInspectionDate: null,
     tags: [], assignments: [],
     ...overrides,
   };
@@ -437,7 +437,7 @@ describe("GET /:id/edit", () => {
 
   it("renders the ppe assignment picker with the current member pre-filled", async () => {
     itemsFindFirstResult = makeItem({
-      category: "ppe", serialNumber: "SN-1",
+      category: "ppe", serials: [{ serial: "SN-1" }],
       assignments: [{ id: "a1", inventoryItemId: "item1", memberId: "m1", quantity: 1, member: { id: "m1", person: { firstName: "Anna", lastName: "Bauer" } } }],
     });
     const res = await inventoryRoutes.request("/item1/edit");
@@ -542,7 +542,7 @@ describe("inventory numbers", () => {
   it("search q matches number, name and serial number", async () => {
     itemsFindManyResult = [
       makeItem({ id: "a", name: "Alpha", numbers: [{ number: "Zebra-1" }] }),
-      makeItem({ id: "b", name: "Beta", serialNumber: "SN-ZEBRA" }),
+      makeItem({ id: "b", name: "Beta", serials: [{ serial: "SN-ZEBRA" }] }),
       makeItem({ id: "c", name: "Gamma" }),
     ];
     const html = await (await inventoryRoutes.request("/?q=zebra")).text();
@@ -564,10 +564,36 @@ describe("inventory numbers", () => {
 describe("detail view serial number", () => {
   it("shows serial number for a single scba item", async () => {
     currentUser = { ...currentUser, permissions: new Set(["inventory:read"]) };
-    itemsFindFirstResult = makeItem({ category: "scba", serialNumber: "SN-4711", quantity: 1 });
+    itemsFindFirstResult = makeItem({ category: "scba", serials: [{ serial: "SN-4711" }], quantity: 1 });
     const html = await (await inventoryRoutes.request("/item1/edit")).text();
     currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
     expect(html).toContain("Seriennummer");
     expect(html).toContain("SN-4711");
+  });
+});
+
+describe("serial numbers", () => {
+  it("saves one serial per piece for a batch category", async () => {
+    const res = await post("/", { name: "Pager", category: "equipment", quantity: "3", serials: ["S1", "S2", "S1"] });
+    expect(res.status).toBe(302);
+    const ins = insertCalls.find((c) => c.table === inventoryItemSerials)!;
+    expect(ins.values).toEqual([{ inventoryItemId: "new-id", serial: "S1" }, { inventoryItemId: "new-id", serial: "S2" }]);
+  });
+
+  it("rejects more serials than quantity", async () => {
+    const res = await post("/", { name: "Pager", category: "equipment", quantity: "1", serials: ["S1", "S2"] });
+    expect(res.status).toBe(422);
+  });
+
+  it("ignores serials for categories without them", async () => {
+    await post("/", { name: "TSF", category: "vehicle", serials: "S1" });
+    expect(insertCalls.some((c) => c.table === inventoryItemSerials)).toBe(false);
+  });
+
+  it("replaces serials on update", async () => {
+    itemsFindFirstResult = makeItem({ category: "equipment" });
+    const res = await post("/item1", { name: "Pager", category: "equipment", quantity: "2", serials: ["A", "B"] });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === inventoryItemSerials)).toBe(true);
   });
 });

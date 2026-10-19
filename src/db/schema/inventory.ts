@@ -24,7 +24,6 @@ export const inventoryItems = pgTable("inventory_items", {
   yearOfManufacture: integer("year_of_manufacture"),
   vehicleInspectionDue: date("vehicle_inspection_due"),
   // SCBA / Gerät / PSA
-  serialNumber: text("serial_number"),
   nextInspectionDue: date("next_inspection_due"),
   lastInspectionDate: date("last_inspection_date"),
 });
@@ -68,5 +67,19 @@ export const inventoryItemNumbers = pgTable(
     number: text("number").notNull(),
   },
   (t) => [uniqueIndex("inventory_item_numbers_number_idx").on(t.number), index("inventory_item_numbers_item_idx").on(t.inventoryItemId)],
+);
+
+// Seriennummern (Hersteller): pro Stück eine, bewusst nicht eindeutig — verschiedene
+// Hersteller können dieselbe Nummer vergeben.
+export const inventoryItemSerials = pgTable(
+  "inventory_item_serials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    serial: text("serial").notNull(),
+  },
+  (t) => [uniqueIndex("inventory_item_serials_item_serial_idx").on(t.inventoryItemId, t.serial)],
 );
 /* v8 ignore stop */

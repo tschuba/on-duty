@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -27,10 +27,11 @@ export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 type InventoryItemRow = typeof inventoryItems.$inferSelect;
 type Tag = typeof inventoryItemTags.$inferSelect;
 type ItemNumber = typeof inventoryItemNumbers.$inferSelect;
+type ItemSerial = typeof inventoryItemSerials.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
 type Person = { firstName: string; lastName: string };
 type AssignmentWithMember = typeof inventoryItemAssignments.$inferSelect & { member: MemberRow & { person: Person } };
-type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; assignments: AssignmentWithMember[] };
+type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[] };
 
 // Which categories may be entered as a batch ("30 Helme" instead of one item per
 // piece). A plain list, not scattered if/category checks, so a future category
@@ -110,7 +111,7 @@ export type InventoryFieldValues = {
   licensePlate: string;
   yearOfManufacture: string;
   vehicleInspectionDue: string;
-  serialNumber: string;
+  serialsList?: string[];
   nextInspectionDue: string;
   lastInspectionDate: string;
   quantity: string;
@@ -131,7 +132,6 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     licensePlate: trimmed(body, "licensePlate"),
     yearOfManufacture: trimmed(body, "yearOfManufacture"),
     vehicleInspectionDue: trimmed(body, "vehicleInspectionDue"),
-    serialNumber: trimmed(body, "serialNumber"),
     nextInspectionDue: trimmed(body, "nextInspectionDue"),
     lastInspectionDate: trimmed(body, "lastInspectionDate"),
     quantity: trimmed(body, "quantity") || "1",
@@ -213,7 +213,6 @@ export function toInsertValues(values: InventoryFieldValues) {
     yearOfManufacture: category === "vehicle" && values.yearOfManufacture ? Number(values.yearOfManufacture) : null,
     vehicleInspectionDue: category === "vehicle" ? values.vehicleInspectionDue || null : null,
     // A batch's serial number doesn't identify one piece — dropped once quantity > 1.
-    serialNumber: (category === "scba" || category === "equipment" || category === "ppe") && !isBatch ? values.serialNumber || null : null,
     nextInspectionDue: category === "scba" || category === "equipment" || category === "ppe" ? values.nextInspectionDue || null : null,
     lastInspectionDate: category === "scba" ? values.lastInspectionDate || null : null,
   };
@@ -223,8 +222,24 @@ export function toInsertValues(values: InventoryFieldValues) {
 
 const NUMBER_MAX_LENGTH = 100;
 
+const natural = (a: string, b: string) => a.localeCompare(b, "de", { numeric: true });
+
 export function sortedNumbers(item: { numbers?: { number: string }[] }): string[] {
-  return (item.numbers ?? []).map((n) => n.number).sort((a, b) => a.localeCompare(b, "de", { numeric: true }));
+  return (item.numbers ?? []).map((n) => n.number).sort(natural);
+}
+
+export function sortedSerials(item: { serials?: { serial: string }[] }): string[] {
+  return (item.serials ?? []).map((n) => n.serial).sort(natural);
+}
+
+const SERIAL_CATEGORIES = new Set<string>(["scba", "equipment", "ppe"]);
+
+// Seriennummern: höchstens eine pro Stück, nicht global eindeutig. Andere Kategorien ignorieren sie.
+function validateSerials(serials: string[], quantity: number): string | undefined {
+  if (serials.length > quantity) return t("inventory.form.serialsTooMany", { max: quantity });
+  // eslint-disable-next-line no-control-regex
+  if (serials.some((n) => n.length > NUMBER_MAX_LENGTH || /[\u0000-\u001f\u007f]/.test(n))) return t("inventory.form.numberInvalid");
+  return undefined;
 }
 
 // Returns an error message or undefined. Numbers are globally unique and case-sensitive;
@@ -531,9 +546,19 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       />
       {errors?.numbers && <span class="text-error text-sm">{errors.numbers}</span>}
 
-      <div class="form-control max-w-md" data-show-cats="scba,equipment,ppe" data-show-batch="false">
-        <label class="label"><span class="label-text">{t("inventory.form.serialNumber")}</span></label>
-        <input type="text" name="serialNumber" value={v.serialNumber ?? ""} class="input input-bordered w-full" />
+      <div data-show-cats="scba,equipment,ppe">
+        <ChipInput
+          name="serials"
+          label={t("inventory.form.serialNumbers")}
+          labelSingle={t("inventory.form.serialNumber")}
+          placeholder={t("inventory.form.serialNumbersPlaceholder")}
+          placeholderSingle={t("inventory.form.serialNumberPlaceholder")}
+          values={v.serialsList}
+          maxFrom="#inventory-quantity"
+          max={1}
+          hint={t("inventory.form.numbersCounter")}
+        />
+        {errors?.serials && <span class="text-error text-sm">{errors.serials}</span>}
       </div>
 
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
@@ -548,7 +573,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
 async function fetchItems(): Promise<ItemWithRelations[]> {
   return db.query.inventoryItems.findMany({
-    with: { tags: true, numbers: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, assignments: { with: { member: { with: { person: true } } } } },
     orderBy: (items, { asc }) => [asc(items.name)],
   }) as unknown as Promise<ItemWithRelations[]>;
 }
@@ -556,7 +581,7 @@ async function fetchItems(): Promise<ItemWithRelations[]> {
 async function fetchItem(id: string): Promise<ItemWithRelations | undefined> {
   return db.query.inventoryItems.findFirst({
     where: eq(inventoryItems.id, id),
-    with: { tags: true, numbers: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, assignments: { with: { member: { with: { person: true } } } } },
   }) as unknown as Promise<ItemWithRelations | undefined>;
 }
 
@@ -607,7 +632,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
     if (search) {
       const needle = search.toLowerCase();
-      const hay = [item.name, item.serialNumber ?? "", ...item.numbers.map((n) => n.number)];
+      const hay = [item.name, ...item.serials.map((n) => n.serial), ...item.numbers.map((n) => n.number)];
       if (!hay.some((h) => h.toLowerCase().includes(needle))) return false;
     }
     return true;
@@ -841,12 +866,15 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const { values, errors } = parseInventoryFields(body);
   const tags = parseTags(body, "tags");
   const numbers = parseList(body, "numbers");
+  const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity);
   if (assignmentError) errors.assignments = assignmentError;
   const numbersError = await validateNumbers(numbers, insertValues.quantity);
   if (numbersError) errors.numbers = numbersError;
+  const serialsError = validateSerials(serials, insertValues.quantity);
+  if (serialsError) errors.serials = serialsError;
   const wantsLendable = trimmed(body, "lendable") === "1";
 
   if (Object.keys(errors).length > 0) {
@@ -857,7 +885,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           title={t("inventory.newItem")}
           action="/inventory"
           formId="inventory-new-form"
-          values={{ ...values, tagsList: tags, numbersList: numbers }}
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -875,6 +903,9 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     }
     if (numbers.length > 0) {
       await tx.insert(inventoryItemNumbers).values(numbers.map((number) => ({ inventoryItemId: item.id, number })));
+    }
+    if (serials.length > 0) {
+      await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: item.id, serial })));
     }
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
@@ -929,13 +960,18 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
               <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
             </div>
           )}
+          {SERIAL_CATEGORIES.has(cat) && item.serials.length > 0 && (
+            <div class="sm:col-span-2">
+              <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.serialNumbers" : "inventory.form.serialNumber")}</div>
+              <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+            </div>
+          )}
           {cat === "vehicle" && <>
             <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
             <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
             <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />
           </>}
           {(cat === "scba" || cat === "equipment" || cat === "ppe") && <>
-            {item.quantity <= 1 && <ViewField label={t("inventory.form.serialNumber")} value={item.serialNumber} />}
             {cat === "scba" && <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />}
             <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
           </>}
@@ -968,7 +1004,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     licensePlate: item.licensePlate ?? "",
     yearOfManufacture: item.yearOfManufacture ? String(item.yearOfManufacture) : "",
     vehicleInspectionDue: item.vehicleInspectionDue ?? "",
-    serialNumber: item.serialNumber ?? "",
+    serialsList: sortedSerials(item),
     nextInspectionDue: item.nextInspectionDue ?? "",
     lastInspectionDate: item.lastInspectionDate ?? "",
     quantity: String(item.quantity),
@@ -1053,12 +1089,15 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   const { values, errors } = parseInventoryFields(body);
   const tags = parseTags(body, "tags");
   const numbers = parseList(body, "numbers");
+  const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity, existing.retiredQuantity);
   if (assignmentError) errors.assignments = assignmentError;
   const numbersError = await validateNumbers(numbers, insertValues.quantity, id);
   if (numbersError) errors.numbers = numbersError;
+  const serialsError = validateSerials(serials, insertValues.quantity);
+  if (serialsError) errors.serials = serialsError;
 
   // Verleih-Flag: nur mit lending:manage, serverseitig geprüft (UI-Disabled ist nur Komfort).
   const wantsLendable = trimmed(body, "lendable") === "1";
@@ -1086,7 +1125,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           title={existing.name}
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
-          values={{ ...values, tagsList: tags, numbersList: numbers }}
+          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1106,6 +1145,10 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     await tx.delete(inventoryItemNumbers).where(eq(inventoryItemNumbers.inventoryItemId, id));
     if (numbers.length > 0) {
       await tx.insert(inventoryItemNumbers).values(numbers.map((number) => ({ inventoryItemId: id, number })));
+    }
+    await tx.delete(inventoryItemSerials).where(eq(inventoryItemSerials.inventoryItemId, id));
+    if (serials.length > 0) {
+      await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: id, serial })));
     }
     await tx.delete(inventoryItemAssignments).where(eq(inventoryItemAssignments.inventoryItemId, id));
     if (assignments.length > 0) {

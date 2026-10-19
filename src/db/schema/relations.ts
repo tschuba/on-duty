@@ -5,7 +5,7 @@ import { memberRoleAssignments, memberRoles } from "./roles";
 import { donors, donations } from "./donations";
 import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemAssignments } from "./inventory";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments } from "./inventory";
 import { lendingItems, lendingLoans } from "./lending";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
@@ -48,6 +48,7 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => (
   assignments: many(inventoryItemAssignments),
   tags: many(inventoryItemTags),
   numbers: many(inventoryItemNumbers),
+  serials: many(inventoryItemSerials),
   lendingItem: many(lendingItems),
 }));
 
@@ -72,6 +73,10 @@ export const inventoryItemTagsRelations = relations(inventoryItemTags, ({ one })
 
 export const inventoryItemNumbersRelations = relations(inventoryItemNumbers, ({ one }) => ({
   item: one(inventoryItems, { fields: [inventoryItemNumbers.inventoryItemId], references: [inventoryItems.id] }),
+}));
+
+export const inventoryItemSerialsRelations = relations(inventoryItemSerials, ({ one }) => ({
+  item: one(inventoryItems, { fields: [inventoryItemSerials.inventoryItemId], references: [inventoryItems.id] }),
 }));
 
 export const assignmentsRelations = relations(memberRoleAssignments, ({ one }) => ({
