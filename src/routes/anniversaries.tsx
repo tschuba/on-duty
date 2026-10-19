@@ -56,6 +56,19 @@ const STATUS_LABEL: Partial<Record<MemberStatus, string>> = {
 
 // ── Components ────────────────────────────────────────────────────────────────
 
+// "anniversaries" is the legacy alias for service + membership.
+function filterEvents(events: AnniversaryEvent[], filter: string): AnniversaryEvent[] {
+  if (filter === "birthdays") return events.filter((e) => e.kind === "birthday");
+  if (filter === "anniversaries") return events.filter((e) => e.kind === "anniversary");
+  if (filter === "service" || filter === "membership") return events.filter((e) => e.types?.includes(filter));
+  return events;
+}
+
+function anniversaryLabel(e: AnniversaryEvent): string {
+  if (e.types?.length === 2) return t("anniversaries.event.serviceAndMembership");
+  return t(e.types?.[0] === "membership" ? "anniversaries.event.membership" : "anniversaries.event.service");
+}
+
 function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: boolean; divider: boolean }) {
   const yearsCol = e.kind === "birthday"
     ? t("anniversaries.event.yearsDisplay", { years: e.years })
@@ -76,7 +89,7 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
       <td class={border}>
         {e.kind === "birthday"
           ? <span class="badge badge-outline badge-sm">{t("anniversaries.event.birthday")}</span>
-          : <span class="badge badge-warning badge-outline badge-sm">{t("anniversaries.event.anniversary")}</span>
+          : <span class="badge badge-warning badge-outline badge-sm">{anniversaryLabel(e)}</span>
         }
       </td>
       <td class={`text-right text-sm tabular-nums${border}`}>{yearsCol}</td>
@@ -85,11 +98,7 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
 }
 
 function EventList({ events, today, filter }: { events: AnniversaryEvent[]; today: string; filter: string }) {
-  const filtered = filter === "anniversaries"
-    ? events.filter((e) => e.kind === "anniversary")
-    : filter === "birthdays"
-    ? events.filter((e) => e.kind === "birthday")
-    : events;
+  const filtered = filterEvents(events, filter);
 
   if (!filtered.length) {
     return <p class="text-base-content/60 py-8">{t("anniversaries.empty")}</p>;
@@ -195,7 +204,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   const [memberRows, ayRows] = await Promise.all([
     db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
-    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
+    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.kind), asc(anniversaryYears.year)),
   ]);
 
   const membersWithStatus = memberRows.map((row) => {
@@ -262,7 +271,8 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
           {/* Typ-Filter */}
           <div class="join">
             <a href={filterLink("all")} class={`join-item btn${filter === "all" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-            <a href={filterLink("anniversaries")} class={`join-item btn${filter === "anniversaries" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.anniversariesOnly")}</a>
+            <a href={filterLink("service")} class={`join-item btn${filter === "service" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.serviceOnly")}</a>
+            <a href={filterLink("membership")} class={`join-item btn${filter === "membership" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.membershipOnly")}</a>
             <a href={filterLink("birthdays")} class={`join-item btn${filter === "birthdays" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
           </div>
 
@@ -329,7 +339,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
 
   const [memberRows, ayRows] = await Promise.all([
     db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
-    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year)),
+    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.kind), asc(anniversaryYears.year)),
   ]);
 
   const flatMembers = memberRows.map((row) => flattenMember(row as any));
@@ -340,8 +350,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   }));
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
-  if (filter === "anniversaries") events = events.filter((e) => e.kind === "anniversary");
-  else if (filter === "birthdays") events = events.filter((e) => e.kind === "birthday");
+  events = filterEvents(events, filter);
   if (gte > 0) events = events.filter((e) => e.years >= gte);
   if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
   else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
@@ -365,7 +374,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
       e.lastName,
       e.firstName,
       STATUS_LABEL[e.status] ?? e.status,
-      e.kind === "birthday" ? t("anniversaries.event.birthday") : t("anniversaries.event.anniversary"),
+      e.kind === "birthday" ? t("anniversaries.event.birthday") : anniversaryLabel(e),
       e.years,
       e.title ?? "",
     ];

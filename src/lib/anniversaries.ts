@@ -1,6 +1,7 @@
 import { isFormer, type MemberStatus } from "./status.js";
 
 export type EventKind = "birthday" | "anniversary";
+export type AnniversaryType = "service" | "membership";
 
 export type AnniversaryEvent = {
   date: string;      // YYYY-MM-DD
@@ -11,15 +12,17 @@ export type AnniversaryEvent = {
   status: MemberStatus;
   years: number;     // age (birthday) or service years (anniversary)
   title?: string;    // from anniversary_years.title, anniversaries only
+  types?: AnniversaryType[]; // anniversaries only; both when service and membership coincide
 };
 
-type AnniversaryYear = { year: number; title: string | null };
+type AnniversaryYear = { kind: AnniversaryType; year: number; title: string | null };
 type MemberInput = {
   id: string;
   firstName: string;
   lastName: string;
   birthDate: string;
   entryDate: string;
+  firstEntryDate?: string | null;
   status: MemberStatus;
 };
 
@@ -58,16 +61,29 @@ export function generateEvents(
       }
     }
 
-    // Anniversaries: aktiv + jugend only
-    if (m.status === "passiv") continue;
-    const entryMD = m.entryDate.slice(5);
-    for (const ay of anniversaryYears) {
-      const ceremonyYear = getCeremonyYear(m.entryDate, cutoff, ay.year);
-      const date = `${ceremonyYear}-${entryMD}`;
-      if (date >= start && date <= end) {
-        events.push({ date, kind: "anniversary", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: ay.year, title: ay.title ?? undefined });
+    // Service: aktiv only, based on first entry into any fire brigade.
+    // Membership: everyone who has not left, based on entry into ours.
+    const bases: { type: AnniversaryType; base: string }[] = [];
+    if (m.status === "aktiv") bases.push({ type: "service", base: m.firstEntryDate ?? m.entryDate });
+    bases.push({ type: "membership", base: m.entryDate });
+
+    const found = new Map<string, AnniversaryEvent>();
+    for (const { type, base } of bases) {
+      for (const ay of anniversaryYears) {
+        if (ay.kind !== type) continue;
+        const date = `${getCeremonyYear(base, cutoff, ay.year)}-${base.slice(5)}`;
+        if (date < start || date > end) continue;
+        const key = `${date}|${ay.year}`;
+        const prev = found.get(key);
+        if (prev) {
+          prev.types!.push(type);
+          if (ay.title && ay.title !== prev.title) prev.title = prev.title ? `${prev.title} / ${ay.title}` : ay.title;
+        } else {
+          found.set(key, { date, kind: "anniversary", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: ay.year, title: ay.title ?? undefined, types: [type] });
+        }
       }
     }
+    events.push(...found.values());
   }
 
   events.sort((a, b) => a.date.localeCompare(b.date) || a.lastName.localeCompare(b.lastName, "de"));
