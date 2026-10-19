@@ -865,6 +865,16 @@ describe("GET /anniversaries?kind=", () => {
   });
 });
 
+describe("GET /anniversaries?sort=", () => {
+  it("sorts by year descending and ignores bogus sort values", async () => {
+    yearsFixture = [makeYear({ year: 10, title: "Aa" }), makeYear({ year: 50, title: "Zz" })];
+    const html = await (await adminRoutes.request("/anniversaries?sort=year&dir=desc")).text();
+    expect(html.indexOf("Zz")).toBeLessThan(html.indexOf("Aa"));
+    const bogus = await (await adminRoutes.request("/anniversaries?sort=x")).text();
+    expect(bogus.indexOf("Aa")).toBeLessThan(bogus.indexOf("Zz"));
+  });
+});
+
 describe("GET /anniversaries/new", () => {
   it("renders the create form", async () => {
     expect((await adminRoutes.request("/anniversaries/new")).status).toBe(200);

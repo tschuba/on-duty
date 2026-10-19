@@ -14,6 +14,7 @@ import {
   userAppRoles,
 } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
@@ -1366,7 +1367,25 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
     backupWarnProps(),
   ]);
 
-  const years = kindFilter ? allYears.filter((y) => y.kind === kindFilter) : allYears;
+  type YearSort = "kind" | "year" | "title";
+  const sortParam = c.req.query("sort");
+  const sort: YearSort = sortParam === "year" || sortParam === "title" ? sortParam : "kind";
+  const dir = c.req.query("dir") === "desc" ? "desc" : "asc";
+  const sign = dir === "desc" ? -1 : 1;
+  // Ties fall back to kind, year so the order stays stable.
+  const cmp = (a: (typeof allYears)[number], b: (typeof allYears)[number]) =>
+    (sort === "year" ? a.year - b.year
+      : sort === "title" ? (a.title ?? "").localeCompare(b.title ?? "", "de")
+      : a.kind.localeCompare(b.kind)) * sign
+    || a.kind.localeCompare(b.kind) || a.year - b.year;
+  const years = (kindFilter ? allYears.filter((y) => y.kind === kindFilter) : allYears).sort(cmp);
+  const sortUrl = (col: YearSort) => {
+    const q = new URLSearchParams();
+    if (kindFilter) q.set("kind", kindFilter);
+    q.set("sort", col);
+    q.set("dir", sort === col && dir === "asc" ? "desc" : "asc");
+    return `/admin/anniversaries?${q}`;
+  };
 
   return c.html(
     <Layout title={t("admin.anniversaries.title")} user={user} activeNav="admin">
@@ -1388,9 +1407,9 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
       </div>
 
       <div class="join mb-4">
-        <a href="/admin/anniversaries" class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+        <a href={`/admin/anniversaries?sort=${sort}&dir=${dir}`} class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
         {ANNIVERSARY_KINDS.map((k) => (
-          <a href={`/admin/anniversaries?kind=${k}`} class={`join-item btn${kindFilter === k ? " btn-primary btn-outline" : " btn-ghost"}`}>{t(`admin.anniversaries.kind.${k}`)}</a>
+          <a href={`/admin/anniversaries?kind=${k}&sort=${sort}&dir=${dir}`} class={`join-item btn${kindFilter === k ? " btn-primary btn-outline" : " btn-ghost"}`}>{t(`admin.anniversaries.kind.${k}`)}</a>
         ))}
       </div>
 
@@ -1399,9 +1418,9 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         <table class="table table-zebra w-full">
           <thead>
             <tr>
-              <th>{t("admin.anniversaries.table.kind")}</th>
-              <th>{t("admin.anniversaries.table.years")}</th>
-              <th>{t("admin.anniversaries.table.title")}</th>
+              <th><a href={sortUrl("kind")} class="link link-hover">{t("admin.anniversaries.table.kind")} <SortIcon col="kind" active={sort} dir={dir} /></a></th>
+              <th><a href={sortUrl("year")} class="link link-hover">{t("admin.anniversaries.table.years")} <SortIcon col="year" active={sort} dir={dir} /></a></th>
+              <th><a href={sortUrl("title")} class="link link-hover">{t("admin.anniversaries.table.title")} <SortIcon col="title" active={sort} dir={dir} /></a></th>
               <th />
             </tr>
           </thead>
