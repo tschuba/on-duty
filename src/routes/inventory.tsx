@@ -463,16 +463,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <textarea name="notes" class="textarea textarea-bordered w-full" rows={3}>{v.notes ?? ""}</textarea>
       </div>
 
-      <ChipInput
-        name="numbers"
-        label={t("inventory.form.inventoryNumbers")}
-        placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
-        values={v.numbersList}
-        maxFrom="#inventory-quantity"
-        max={1}
-        hint={t("inventory.form.numbersCounter")}
-      />
-      {errors?.numbers && <span class="text-error text-sm">{errors.numbers}</span>}
       <TagInput tags={v.tagsList} />
 
       <div data-show-cats="vehicle" class="space-y-4">
@@ -531,6 +521,17 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
         </div>
       </div>
+
+      <ChipInput
+        name="numbers"
+        label={t("inventory.form.inventoryNumbers")}
+        placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
+        values={v.numbersList}
+        maxFrom="#inventory-quantity"
+        max={1}
+        hint={t("inventory.form.numbersCounter")}
+      />
+      {errors?.numbers && <span class="text-error text-sm">{errors.numbers}</span>}
 
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
       <BatchAssignmentFields assignments={assignments ?? []} />
