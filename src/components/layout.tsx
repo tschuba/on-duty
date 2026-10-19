@@ -111,6 +111,14 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                   <CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} />
                 </a>
               )}
+              {user.permissions.has("import:run") && (
+                <a
+                  href="/import"
+                  class={navLink(activeNav === "import")}
+                >
+                  {t("common.nav.import")}
+                </a>
+              )}
               {user.permissions.has("system:admin") && (
                 <a
                   href="/admin"
@@ -118,14 +126,6 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 >
                   {t("common.nav.admin")}
                   <CountBadge count={activeNav === "admin" ? 0 : pendingUsersCount} />
-                </a>
-              )}
-              {user.permissions.has("import:run") && (
-                <a
-                  href="/import"
-                  class={navLink(activeNav === "import")}
-                >
-                  {t("common.nav.import")}
                 </a>
               )}
             </div>
