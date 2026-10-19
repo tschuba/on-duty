@@ -757,8 +757,10 @@ function MemberFormFields({
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("birthDate", t("members.form.birthDate"), "date", true)}
-        {field("entryDate", t("members.form.entryDate"), "date", true)}
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("firstEntryDate", t("members.form.firstEntryDate"), "date")}
+        {field("entryDate", t("members.form.entryDate"), "date", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("exitDate", t("members.form.exitDate"), "date")}
@@ -1540,8 +1542,8 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
           <ViewField label={t("members.form.firstName")} value={m.firstName} />
           <ViewField label={t("members.form.birthDate")} value={formatDate(m.birthDate)} />
-          <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
           {m.firstEntryDate && <ViewField label={t("members.form.firstEntryDate")} value={formatDate(m.firstEntryDate)} />}
+          <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
           <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
           <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
           <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
