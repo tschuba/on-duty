@@ -7,3 +7,4 @@
 ## Checklist
 - [ ] Tests pass
 - [ ] Self-reviewed the diff
+- [ ] PR-Titel im Conventional-Commit-Format (`feat:`, `fix:`, `perf:`, `feat!:` …)

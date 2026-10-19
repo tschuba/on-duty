@@ -108,3 +108,18 @@ Beim Nachziehen von Coverage auf Code, der Entscheidungen mit I/O mischt (z. B. 
 - Kein direktes Pushen auf `main` — ausschließlich per PR
 - PR-Template ausfüllen
 - Squash Merge wird verwendet
+
+## Release
+
+Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit-Nachricht). Der Check `Bump Version` setzt daraus die Version in `package.json` und pusht einen Bump-Commit auf den PR-Branch:
+
+| Titel | Bump |
+| --- | --- |
+| `fix:`, `perf:` | patch |
+| `feat:` | minor |
+| `feat!:` / `BREAKING CHANGE` im PR-Text | major |
+| `chore:`, `docs:`, `test:`, `ci:`, `style:`, `build:`, `refactor:`, `revert:` | kein Bump |
+
+Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, Build-Configs, `scripts/zitadel-init.mjs`, `scripts/copy-*.mjs`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
+
+Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft**. Das Veröffentlichen des Drafts baut die Docker-Tags `latest`, `X.Y.Z`, `X.Y`, `X`; `edge` kommt bei jedem Push auf `master`.

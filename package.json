@@ -20,10 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs",
-    "prepare": "git config core.hooksPath .githooks || true",
-    "release:patch": "bash scripts/release.sh patch",
-    "release:minor": "bash scripts/release.sh minor",
-    "release:major": "bash scripts/release.sh major"
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",
