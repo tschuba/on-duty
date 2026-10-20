@@ -1255,10 +1255,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                             checked={r.grantsActiveStatus}
                             disabled={r.isProtected || !ty.allowsActiveStatus}
                             onchange="this.form.submit()"
+                            aria-label={t("admin.roles.table.activeStatus")}
                           />
-                          <span class={r.grantsActiveStatus ? "font-semibold text-success" : "opacity-70"}>
-                            {r.grantsActiveStatus ? t("admin.roles.filterActive") : t("admin.roles.filterPassive")}
-                          </span>
                         </label>
                       </form>
                     </td>
@@ -1333,8 +1331,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                   <td>
                     <form method="post" action={`/admin/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
                       <label class="flex items-center gap-3 cursor-pointer w-fit">
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-success border-2 border-base-content/50 text-base-content/60 hover:border-base-content disabled:opacity-40" checked={ty.allowsActiveStatus} onchange="this.form.submit()" />
-                        <span class={ty.allowsActiveStatus ? "font-semibold text-success" : "opacity-70"}>{ty.allowsActiveStatus ? t("common.yes") : t("common.no")}</span>
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-success border-2 border-base-content/50 text-base-content/60 hover:border-base-content disabled:opacity-40" checked={ty.allowsActiveStatus} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActive")} />
                       </label>
                     </form>
                   </td>
