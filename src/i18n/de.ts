@@ -355,6 +355,7 @@ export const de = {
   "admin.permissions.resource.lending": "Verleih",
   "admin.permissions.resource.org": "Organisation",
   "admin.permissions.resource.member-roles": "Funktionen",
+  "admin.permissions.resource.member-role-types": "Funktionstypen",
   "admin.permissions.resource.anniversary-years": "Jubiläumsjahre",
   "admin.permissions.key.orgRead": "Organisation ansehen",
   "admin.permissions.key.orgWrite": "Organisation bearbeiten",
@@ -364,9 +365,12 @@ export const de = {
   "admin.permissions.key.anniversaryYearsRead": "Jubiläumsjahre ansehen",
   "admin.permissions.key.anniversaryYearsWrite": "Jubiläumsjahre anlegen und bearbeiten",
   "admin.permissions.key.anniversaryYearsDelete": "Jubiläumsjahre löschen",
-  "admin.permissions.key.memberRolesRead": "Funktionen und Funktionstypen ansehen",
-  "admin.permissions.key.memberRolesWrite": "Funktionen und Funktionstypen anlegen und bearbeiten",
-  "admin.permissions.key.memberRolesDelete": "Funktionen und Funktionstypen löschen",
+  "admin.permissions.key.memberRoleTypesRead": "Funktionstypen ansehen",
+  "admin.permissions.key.memberRoleTypesWrite": "Funktionstypen anlegen und bearbeiten",
+  "admin.permissions.key.memberRoleTypesDelete": "Funktionstypen löschen",
+  "admin.permissions.key.memberRolesRead": "Funktionen ansehen",
+  "admin.permissions.key.memberRolesWrite": "Funktionen anlegen und bearbeiten",
+  "admin.permissions.key.memberRolesDelete": "Funktionen löschen",
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",

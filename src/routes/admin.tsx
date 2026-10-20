@@ -34,6 +34,9 @@ const guard = requireAuth("system:admin");
 const rolesRead = requireAuth("member-roles:read");
 const rolesWrite = requireAuth("member-roles:write");
 const rolesDelete = requireAuth("member-roles:delete");
+const typesRead = requireAuth("member-role-types:read");
+const typesWrite = requireAuth("member-role-types:write");
+const typesDelete = requireAuth("member-role-types:delete");
 const yearsRead = requireAuth("anniversary-years:read");
 const yearsWrite = requireAuth("anniversary-years:write");
 const yearsDelete = requireAuth("anniversary-years:delete");
@@ -69,6 +72,9 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "member-roles:read": t("admin.permissions.key.memberRolesRead"),
   "member-roles:write": t("admin.permissions.key.memberRolesWrite"),
   "member-roles:delete": t("admin.permissions.key.memberRolesDelete"),
+  "member-role-types:read": t("admin.permissions.key.memberRoleTypesRead"),
+  "member-role-types:write": t("admin.permissions.key.memberRoleTypesWrite"),
+  "member-role-types:delete": t("admin.permissions.key.memberRoleTypesDelete"),
   "anniversary-years:read": t("admin.permissions.key.anniversaryYearsRead"),
   "anniversary-years:write": t("admin.permissions.key.anniversaryYearsWrite"),
   "anniversary-years:delete": t("admin.permissions.key.anniversaryYearsDelete"),
@@ -84,6 +90,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   org: t("admin.permissions.resource.org"),
   "anniversary-years": t("admin.permissions.resource.anniversary-years"),
   "member-roles": t("admin.permissions.resource.member-roles"),
+  "member-role-types": t("admin.permissions.resource.member-role-types"),
 };
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
@@ -1180,6 +1187,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   for (const r of allRoleRows) typeCounts.set(r.typeId, (typeCounts.get(r.typeId) ?? 0) + 1);
   const canWrite = user.permissions.has("member-roles:write");
   const canDeletePerm = user.permissions.has("member-roles:delete");
+  const canWriteTypes = user.permissions.has("member-role-types:write");
+  const canDeleteTypes = user.permissions.has("member-role-types:delete");
   const canReorder = canWrite && !activeFilter;
 
   return c.html(
@@ -1314,7 +1323,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       {tab === "types" && (<>
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("admin.roleTypes.title")}</h1>
-        {canWrite && <button class="btn btn-primary" hx-get="/admin/role-types/new" hx-target="#modal-content" hx-swap="innerHTML">
+        {canWriteTypes && <button class="btn btn-primary" hx-get="/admin/role-types/new" hx-target="#modal-content" hx-swap="innerHTML">
           {t("admin.roleTypes.new")}
         </button>}
       </div>
@@ -1334,7 +1343,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                 <tr
                   key={ty.id}
                   data-id={ty.id}
-                  {...(canWrite && {
+                  {...(canWriteTypes && {
                     class: "cursor-pointer hover",
                     "hx-get": `/admin/role-types/${ty.id}/edit`,
                     "hx-target": "#modal-content",
@@ -1345,20 +1354,20 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                   <td>
                     <form method="post" action={`/admin/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
                       <label class="flex items-center gap-3 cursor-pointer w-fit">
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} disabled={!canWrite} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActive")} />
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} disabled={!canWriteTypes} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActive")} />
                       </label>
                     </form>
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end items-center">
-                      {canDeletePerm && !ty.isProtected && n === 0 ? (
+                      {canDeleteTypes && !ty.isProtected && n === 0 ? (
                         <DeleteDialog
                           id={`type-${ty.id}`}
                           action={`/admin/role-types/${ty.id}/delete`}
                           title={t("admin.roleTypes.confirmDelete.title")}
                           body={t("admin.roleTypes.confirmDelete.body", { name: ty.name })}
                         />
-                      ) : canDeletePerm && (
+                      ) : canDeleteTypes && (
                         <button
                           class="btn btn-ghost btn-xs text-base-content/30"
                           disabled
@@ -1384,7 +1393,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   );
 };
 adminRoutes.get("/roles", rolesRead, rolesPage("roles"));
-adminRoutes.get("/role-types", rolesRead, rolesPage("types"));
+adminRoutes.get("/role-types", typesRead, rolesPage("types"));
 
 function RoleForm({ types, role, hasAssignments, affected }: {
   types: (typeof memberRoleTypes.$inferSelect)[];
@@ -1645,7 +1654,7 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
   );
 }
 
-adminRoutes.get("/role-types/new", rolesWrite, (c) =>
+adminRoutes.get("/role-types/new", typesWrite, (c) =>
   c.html(
     <>
       <h3 class="font-bold text-lg mb-4">{t("admin.roleTypes.new")}</h3>
@@ -1657,7 +1666,7 @@ adminRoutes.get("/role-types/new", rolesWrite, (c) =>
     </>
   ));
 
-adminRoutes.get("/role-types/:id/edit", rolesWrite, async (c) => {
+adminRoutes.get("/role-types/:id/edit", typesWrite, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1673,7 +1682,7 @@ adminRoutes.get("/role-types/:id/edit", rolesWrite, async (c) => {
   );
 });
 
-adminRoutes.post("/role-types", rolesWrite, async (c) => {
+adminRoutes.post("/role-types", typesWrite, async (c) => {
   const body = await c.req.parseBody();
   const name = String(body.name ?? "").trim();
   if (!name) {
@@ -1703,7 +1712,7 @@ async function flaggedRolesBlocking(type: typeof memberRoleTypes.$inferSelect, n
   return flagged.map((r) => r.title);
 }
 
-adminRoutes.post("/role-types/:id/allows-active", rolesWrite, async (c) => {
+adminRoutes.post("/role-types/:id/allows-active", typesWrite, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1714,7 +1723,7 @@ adminRoutes.post("/role-types/:id/allows-active", rolesWrite, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
-adminRoutes.post("/role-types/:id", rolesWrite, async (c) => {
+adminRoutes.post("/role-types/:id", typesWrite, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1732,7 +1741,7 @@ adminRoutes.post("/role-types/:id", rolesWrite, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
-adminRoutes.post("/role-types/:id/delete", rolesDelete, async (c) => {
+adminRoutes.post("/role-types/:id/delete", typesDelete, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.redirect("/admin/role-types");

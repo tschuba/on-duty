@@ -120,7 +120,7 @@ vi.mock("../db/index.js", () => ({
   db: { select, insert, update, delete: del },
 }));
 
-let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
+let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -162,7 +162,7 @@ beforeEach(() => {
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
-  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
+  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
   backupConfigured = false;
   lastBackupResult = null;
   scheduleResult = { prev: null, next: null };
@@ -1197,5 +1197,17 @@ describe("role types (Spec 47)", () => {
     const rw = await (await adminRoutes.request("/anniversaries")).text();
     expect(rw).toContain(t("admin.anniversaries.newYear"));
     expect(rw).toContain("delete-year-");
+  });
+
+  it("role types have their own permissions, independent of roles", async () => {
+    typesFixture = [makeType()];
+    currentUser = { id: "u1", disabled: false, permissions: new Set(["member-role-types:read"]) };
+    const ro = await (await adminRoutes.request("/role-types")).text();
+    expect(ro).not.toContain(t("admin.roleTypes.new"));
+    expect(ro).not.toContain("/admin/role-types/t1/edit");
+    expect(ro).not.toContain("delete-type-");
+    currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete"]) };
+    const rw = await (await adminRoutes.request("/role-types")).text();
+    expect(rw).toContain(t("admin.roleTypes.new"));
   });
 });

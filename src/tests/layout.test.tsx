@@ -124,8 +124,8 @@ describe("role tabs (MemberTabs)", () => {
       app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith(perm)} />));
       return (await app.request("/")).text();
     };
-    expect(await render("member-roles:read")).toContain("/admin/role-types");
-    expect(await render("members:write")).not.toContain("/admin/role-types");
+    expect(await render("member-roles:read")).toContain("/admin/roles");
+    expect(await render("members:write")).not.toContain("/admin/roles");
   });
 });
 
@@ -136,5 +136,21 @@ describe("Mitglieder nav item for roles-only users", () => {
     const html = await (await app.request("/")).text();
     expect(html).toContain("/admin/roles");
     expect(html).not.toContain('href="/members"');
+  });
+});
+
+describe("separate tabs for roles and role types", () => {
+  it("shows only the tab the user may read", async () => {
+    const render = async (perm: string) => {
+      const app = new Hono();
+      app.get("/", (c) => c.html(<MemberTabs active="roles" user={userWith(perm)} />));
+      return (await app.request("/")).text();
+    };
+    const roles = await render("member-roles:read");
+    expect(roles).toContain('href="/admin/roles"');
+    expect(roles).not.toContain("/admin/role-types");
+    const types = await render("member-role-types:read");
+    expect(types).toContain("/admin/role-types");
+    expect(types).not.toContain('href="/admin/roles"');
   });
 });

@@ -351,6 +351,13 @@
       "when": 1793200000000,
       "tag": "0049_anniversary_years_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793300000000,
+      "tag": "0050_member_role_types_permission",
+      "breakpoints": true
     }
   ]
 }
