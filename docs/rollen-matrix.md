@@ -35,3 +35,4 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 ## Hinweis
 
 - Änderungen an Standardrollen brauchen immer eine Migration, weil der Seed nur fehlende Einträge ergänzt (zuletzt `drizzle/0026_role_permissions_backfill.sql`).
+- Neue Permission-Werte (Enum) und ihre Vergabe an Standardrollen dürfen nicht in derselben Migration stehen, und Drizzle führt alle offenen Migrationen in einer Transaktion aus (Postgres: „unsafe use of new value"). Deshalb legt eine Migration nur den Enum-Wert an, die Vergabe übernimmt `APP_ROLES` im Seed beim nächsten Start (`src/entrypoint.ts` führt Migration und Seed nacheinander aus).
