@@ -360,7 +360,9 @@ export const de = {
   "admin.permissions.key.orgTaxDataRead": "Steuerdaten ansehen",
   "admin.permissions.key.orgTaxDataWrite": "Steuerdaten bearbeiten",
   "admin.permissions.key.importRun": "Daten importieren",
-  "admin.permissions.key.memberRolesManage": "Funktionen und Funktionstypen verwalten",
+  "admin.permissions.key.memberRolesRead": "Funktionen ansehen",
+  "admin.permissions.key.memberRolesWrite": "Funktionen und Funktionstypen anlegen und bearbeiten",
+  "admin.permissions.key.memberRolesDelete": "Funktionen und Funktionstypen löschen",
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",

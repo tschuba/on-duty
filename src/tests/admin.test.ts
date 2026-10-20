@@ -120,7 +120,7 @@ vi.mock("../db/index.js", () => ({
   db: { select, insert, update, delete: del },
 }));
 
-let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
+let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete"]) };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -162,7 +162,7 @@ beforeEach(() => {
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
-  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
+  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete"]) };
   backupConfigured = false;
   lastBackupResult = null;
   scheduleResult = { prev: null, next: null };
@@ -1169,5 +1169,20 @@ describe("role types (Spec 47)", () => {
     expect(updateCalls.some((c) => c.table === memberRoleTypes && c.set.description === "Neu")).toBe(true);
     await post("/role-types", { name: "X", description: "  " });
     expect(insertCalls.some((c) => c.table === memberRoleTypes && c.values.description === null)).toBe(true);
+  });
+
+  it("hides write and delete controls without those permissions", async () => {
+    typesFixture = [makeType()];
+    rolesFixture = [makeRoleRow()];
+    currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read"]) };
+    const roles = await (await adminRoutes.request("/roles")).text();
+    expect(roles).not.toContain(t("admin.roles.newRole"));
+    expect(roles).not.toContain("/admin/roles/r1/edit");
+    expect(roles).not.toContain("/admin/roles/r1/move");
+    expect(roles).not.toContain("/admin/roles/r1/delete");
+    currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read", "member-roles:write"]) };
+    const writer = await (await adminRoutes.request("/roles")).text();
+    expect(writer).toContain(t("admin.roles.newRole"));
+    expect(writer).not.toContain("/admin/roles/r1/delete");
   });
 });

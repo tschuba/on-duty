@@ -31,7 +31,9 @@ import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSetti
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
-const rolesGuard = requireAuth("member-roles:manage");
+const rolesRead = requireAuth("member-roles:read");
+const rolesWrite = requireAuth("member-roles:write");
+const rolesDelete = requireAuth("member-roles:delete");
 
 // system:admin is reserved for the built-in protected `admin` role — never offered
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
@@ -61,7 +63,9 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "org:tax-data:read": t("admin.permissions.key.orgTaxDataRead"),
   "org:tax-data:write": t("admin.permissions.key.orgTaxDataWrite"),
   "import:run": t("admin.permissions.key.importRun"),
-  "member-roles:manage": t("admin.permissions.key.memberRolesManage"),
+  "member-roles:read": t("admin.permissions.key.memberRolesRead"),
+  "member-roles:write": t("admin.permissions.key.memberRolesWrite"),
+  "member-roles:delete": t("admin.permissions.key.memberRolesDelete"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -1170,7 +1174,9 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   const typeCounts = new Map<string, number>();
   const allRoleRows = await db.select({ typeId: memberRoles.typeId }).from(memberRoles);
   for (const r of allRoleRows) typeCounts.set(r.typeId, (typeCounts.get(r.typeId) ?? 0) + 1);
-  const canReorder = !activeFilter;
+  const canWrite = user.permissions.has("member-roles:write");
+  const canDeletePerm = user.permissions.has("member-roles:delete");
+  const canReorder = canWrite && !activeFilter;
 
   return c.html(
     <Layout title={t("admin.roles.title")} user={user} activeNav="members">
@@ -1190,17 +1196,17 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
             <a href="/admin/roles?active=0" class={`btn join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
           </div>
         </div>
-        <button
+        {canWrite && <button
           class="btn btn-primary"
           hx-get="/admin/roles/new"
           hx-target="#modal-content"
           hx-swap="innerHTML"
         >
           {t("admin.roles.newRole")}
-        </button>
+        </button>}
       </div>
 
-      <ClickToEditHint />
+      {canWrite && <ClickToEditHint />}
       {types.map((ty) => {
         const typeRoles = rolesWithCount.filter((r) => r.typeId === ty.id);
         return (
@@ -1222,13 +1228,13 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
           </thead>
             <tbody data-reorder-url="/admin/roles/reorder">
               {rolesWithCount.filter((r) => r.typeId === ty.id).map((r) => {
-                const canDelete = !r.isProtected && r.assignmentCount === 0;
+                const canDelete = canDeletePerm && !r.isProtected && r.assignmentCount === 0;
                 return (
                   <tr
                     key={r.id}
                     data-id={r.id}
                     draggable={canReorder}
-                    {...(!r.isProtected && {
+                    {...(canWrite && !r.isProtected && {
                       class: "cursor-pointer hover",
                       "hx-get": `/admin/roles/${r.id}/edit`,
                       "hx-target": "#modal-content",
@@ -1254,7 +1260,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                             value="1"
                             class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40"
                             checked={r.grantsActiveStatus}
-                            disabled={r.isProtected}
+                            disabled={r.isProtected || !canWrite}
                             onchange="this.form.submit()"
                             aria-label={t("admin.roles.table.activeStatus")}
                           />
@@ -1264,7 +1270,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     )}
                     <td>
                       <div class="flex gap-2 justify-end items-center">
-                        <MoveButtons action={`/admin/roles/${r.id}/move`} id={r.id} />
+                        {canWrite && <MoveButtons action={`/admin/roles/${r.id}/move`} id={r.id} />}
                         {canDelete ? (
                           <DeleteDialog
                             id={`role-${r.id}`}
@@ -1272,7 +1278,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                             title={t("admin.roles.confirmDelete.title")}
                             body={t("admin.roles.confirmDelete.body", { title: r.title })}
                           />
-                        ) : (
+                        ) : canDeletePerm && (
                           <button
                             class="btn btn-ghost btn-xs text-base-content/30"
                             disabled
@@ -1304,9 +1310,9 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       {tab === "types" && (<>
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("admin.roleTypes.title")}</h1>
-        <button class="btn btn-primary" hx-get="/admin/role-types/new" hx-target="#modal-content" hx-swap="innerHTML">
+        {canWrite && <button class="btn btn-primary" hx-get="/admin/role-types/new" hx-target="#modal-content" hx-swap="innerHTML">
           {t("admin.roleTypes.new")}
-        </button>
+        </button>}
       </div>
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
@@ -1324,29 +1330,31 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                 <tr
                   key={ty.id}
                   data-id={ty.id}
-                  class="cursor-pointer hover"
-                  hx-get={`/admin/role-types/${ty.id}/edit`}
-                  hx-target="#modal-content"
-                  hx-swap="innerHTML"
+                  {...(canWrite && {
+                    class: "cursor-pointer hover",
+                    "hx-get": `/admin/role-types/${ty.id}/edit`,
+                    "hx-target": "#modal-content",
+                    "hx-swap": "innerHTML",
+                  })}
                 >
                   <td class="font-medium">{ty.isProtected && <span class="mr-1" title={t("admin.roles.systemRole")}>🔒</span>}{ty.name}</td>
                   <td>
                     <form method="post" action={`/admin/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
                       <label class="flex items-center gap-3 cursor-pointer w-fit">
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActive")} />
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} disabled={!canWrite} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActive")} />
                       </label>
                     </form>
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end items-center">
-                      {!ty.isProtected && n === 0 ? (
+                      {canDeletePerm && !ty.isProtected && n === 0 ? (
                         <DeleteDialog
                           id={`type-${ty.id}`}
                           action={`/admin/role-types/${ty.id}/delete`}
                           title={t("admin.roleTypes.confirmDelete.title")}
                           body={t("admin.roleTypes.confirmDelete.body", { name: ty.name })}
                         />
-                      ) : (
+                      ) : canDeletePerm && (
                         <button
                           class="btn btn-ghost btn-xs text-base-content/30"
                           disabled
@@ -1371,8 +1379,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
     </Layout>
   );
 };
-adminRoutes.get("/roles", rolesGuard, rolesPage("roles"));
-adminRoutes.get("/role-types", rolesGuard, rolesPage("types"));
+adminRoutes.get("/roles", rolesRead, rolesPage("roles"));
+adminRoutes.get("/role-types", rolesRead, rolesPage("types"));
 
 function RoleForm({ types, role, hasAssignments, affected }: {
   types: (typeof memberRoleTypes.$inferSelect)[];
@@ -1441,7 +1449,7 @@ function ModalActions({ submit }: { submit: string }) {
 const SHOW_MODAL = <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />;
 
 // HTMX fragment: new role modal
-adminRoutes.get("/roles/new", rolesGuard, async (c) => {
+adminRoutes.get("/roles/new", rolesWrite, async (c) => {
   const types = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   return c.html(
     <>
@@ -1456,7 +1464,7 @@ adminRoutes.get("/roles/new", rolesGuard, async (c) => {
 });
 
 // HTMX fragment: edit role modal
-adminRoutes.get("/roles/:id/edit", rolesGuard, async (c) => {
+adminRoutes.get("/roles/:id/edit", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1485,7 +1493,7 @@ adminRoutes.get("/roles/:id/edit", rolesGuard, async (c) => {
 });
 
 // POST /admin/roles — create
-adminRoutes.post("/roles", rolesGuard, async (c) => {
+adminRoutes.post("/roles", rolesWrite, async (c) => {
   const body = await c.req.parseBody();
   const title = String(body.title ?? "").trim();
   const grantsActiveStatus = body.grantsActiveStatus === "1";
@@ -1513,7 +1521,7 @@ adminRoutes.post("/roles", rolesGuard, async (c) => {
 });
 
 // POST /admin/roles/reorder — body: id=…&id=… (all roles of ONE type, in new order)
-adminRoutes.post("/roles/reorder", rolesGuard, async (c) => {
+adminRoutes.post("/roles/reorder", rolesWrite, async (c) => {
   const posted = ((await c.req.parseBody({ all: true })).id ?? []) as string | string[];
   const ids = Array.isArray(posted) ? posted : [posted];
   const [first] = ids.length ? await db.select().from(memberRoles).where(eq(memberRoles.id, ids[0])) : [];
@@ -1525,7 +1533,7 @@ adminRoutes.post("/roles/reorder", rolesGuard, async (c) => {
 });
 
 // POST /admin/roles/:id/move — dir=up|down within the role's type
-adminRoutes.post("/roles/:id/move", rolesGuard, async (c) => {
+adminRoutes.post("/roles/:id/move", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
@@ -1536,7 +1544,7 @@ adminRoutes.post("/roles/:id/move", rolesGuard, async (c) => {
 });
 
 // POST /admin/roles/:id/active — toggle the active-status flag from the list
-adminRoutes.post("/roles/:id/active", rolesGuard, async (c) => {
+adminRoutes.post("/roles/:id/active", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const body = await c.req.parseBody();
   const back = body.active === "1" || body.active === "0" ? `/admin/roles?active=${body.active}` : "/admin/roles";
@@ -1552,7 +1560,7 @@ adminRoutes.post("/roles/:id/active", rolesGuard, async (c) => {
 });
 
 // POST /admin/roles/:id — update
-adminRoutes.post("/roles/:id", rolesGuard, async (c) => {
+adminRoutes.post("/roles/:id", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1588,7 +1596,7 @@ adminRoutes.post("/roles/:id", rolesGuard, async (c) => {
 });
 
 // POST /admin/roles/:id/delete
-adminRoutes.post("/roles/:id/delete", rolesGuard, async (c) => {
+adminRoutes.post("/roles/:id/delete", rolesDelete, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role) return c.redirect("/admin/roles");
@@ -1633,7 +1641,7 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
   );
 }
 
-adminRoutes.get("/role-types/new", rolesGuard, (c) =>
+adminRoutes.get("/role-types/new", rolesWrite, (c) =>
   c.html(
     <>
       <h3 class="font-bold text-lg mb-4">{t("admin.roleTypes.new")}</h3>
@@ -1645,7 +1653,7 @@ adminRoutes.get("/role-types/new", rolesGuard, (c) =>
     </>
   ));
 
-adminRoutes.get("/role-types/:id/edit", rolesGuard, async (c) => {
+adminRoutes.get("/role-types/:id/edit", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1661,7 +1669,7 @@ adminRoutes.get("/role-types/:id/edit", rolesGuard, async (c) => {
   );
 });
 
-adminRoutes.post("/role-types", rolesGuard, async (c) => {
+adminRoutes.post("/role-types", rolesWrite, async (c) => {
   const body = await c.req.parseBody();
   const name = String(body.name ?? "").trim();
   if (!name) {
@@ -1691,7 +1699,7 @@ async function flaggedRolesBlocking(type: typeof memberRoleTypes.$inferSelect, n
   return flagged.map((r) => r.title);
 }
 
-adminRoutes.post("/role-types/:id/allows-active", rolesGuard, async (c) => {
+adminRoutes.post("/role-types/:id/allows-active", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1702,7 +1710,7 @@ adminRoutes.post("/role-types/:id/allows-active", rolesGuard, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
-adminRoutes.post("/role-types/:id", rolesGuard, async (c) => {
+adminRoutes.post("/role-types/:id", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1720,7 +1728,7 @@ adminRoutes.post("/role-types/:id", rolesGuard, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
-adminRoutes.post("/role-types/:id/delete", rolesGuard, async (c) => {
+adminRoutes.post("/role-types/:id/delete", rolesDelete, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.redirect("/admin/role-types");

@@ -28,7 +28,9 @@ export const permissionEnum = pgEnum("permission", [
   "org:tax-data:read",
   "org:tax-data:write",
   "import:run",
-  "member-roles:manage",
+  "member-roles:read",
+  "member-roles:write",
+  "member-roles:delete",
 ]);
 
 export const appRoles = pgTable("app_roles", {

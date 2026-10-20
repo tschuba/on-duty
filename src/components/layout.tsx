@@ -247,7 +247,7 @@ export async function MemberTabs({ active, user }: { active: "members" | "annive
     { key: "anniversaries", href: "/anniversaries", count: 0 },
     ...(canReviewApplications ? [{ key: "applications", href: "/applications", count: await countOpenApplications() }] : []),
     // Role configuration has its own permission (the /admin/role* routes enforce it too).
-    ...(user.permissions.has("member-roles:manage")
+    ...(user.permissions.has("member-roles:read")
       ? [{ key: "roles", href: "/admin/roles", count: 0 }, { key: "roleTypes", href: "/admin/role-types", count: 0 }]
       : []),
   ] as const;
