@@ -1209,11 +1209,11 @@ adminRoutes.get("/roles", guard, async (c) => {
       {types.map((ty) => {
         const typeRoles = rolesWithCount.filter((r) => r.typeId === ty.id);
         return (
-          <details key={ty.id} data-section={ty.id} open class="collapse collapse-arrow bg-base-100 border border-base-300 mb-4">
-            <summary class="collapse-title font-semibold">
+          <details key={ty.id} data-section={ty.id} open class="collapse collapse-arrow border border-base-300 bg-base-100 mb-3">
+            <summary class="collapse-title bg-base-300 text-lg font-bold flex items-center gap-2" style="font-family: var(--font-heading)">
               {ty.name} <span class="badge badge-ghost badge-sm ml-2">{typeRoles.length}</span>
             </summary>
-            <div class="collapse-content overflow-x-auto">
+            <div class="collapse-content overflow-x-auto pt-4">
               <table class="table table-zebra w-full">
           <thead>
             <tr>
