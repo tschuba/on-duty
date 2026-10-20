@@ -81,7 +81,7 @@ function EventRow({ event: e, past, divider, showJub }: { event: AnniversaryEven
     <tr class={past ? "opacity-40" : ""}>
       <td class={`whitespace-nowrap text-sm pl-6${border}`}>
         {formatDate(e.refDate ?? e.date)}
-        {showJub && e.jubDate && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.jubDate) })}</div>}
+        {showJub && e.kind === "anniversary" && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.date) })}</div>}
       </td>
       <td class={border}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">

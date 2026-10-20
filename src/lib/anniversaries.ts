@@ -6,7 +6,6 @@ export type AnniversaryType = "service" | "membership";
 export type AnniversaryEvent = {
   date: string;      // YYYY-MM-DD
   refDate?: string;  // anniversaries only: ceremony year + entry day/month, shown in the table
-  jubDate?: string;  // anniversaries only: actual anniversary (entry + n years)
   kind: EventKind;
   memberId: string;
   firstName: string;
@@ -81,7 +80,7 @@ export function generateEvents(
           prev.types!.push(type);
           if (ay.title && ay.title !== prev.title) prev.title = prev.title ? `${prev.title} / ${ay.title}` : ay.title;
         } else {
-          found.set(key, { date, refDate: `${date.slice(0, 4)}-${base.slice(5)}`, jubDate: `${parseInt(base.slice(0, 4), 10) + ay.year}-${base.slice(5)}`, kind: "anniversary", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: ay.year, title: ay.title ?? undefined, types: [type] });
+          found.set(key, { date, refDate: `${date.slice(0, 4)}-${base.slice(5)}`, kind: "anniversary", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: ay.year, title: ay.title ?? undefined, types: [type] });
         }
       }
     }
