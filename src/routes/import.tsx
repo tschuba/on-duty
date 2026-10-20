@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { eq, isNotNull } from "drizzle-orm";
+import { eq, isNotNull, sql } from "drizzle-orm";
+import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
 import { db } from "../db/index.js";
 import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, memberRoleAssignments, memberRoles, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -514,7 +515,9 @@ async function runMembers(plan: MemberPlan, roles: RoleOption[], _user: unknown)
       for (const { m, assignments } of rows) {
         for (const a of assignments) {
           if (a.skipped || a.roleChoice.kind !== "new" || roleIdByTitle.has(a.title)) continue;
-          const [r] = await tx.insert(memberRoles).values({ title: a.title, grantsActiveStatus: a.grants }).returning({ id: memberRoles.id });
+          const typeId = a.grants ? ROLE_TYPE_IDS.rank : ROLE_TYPE_IDS.other;
+          const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${memberRoles.sortOrder}), 0)` }).from(memberRoles).where(eq(memberRoles.typeId, typeId));
+          const [r] = await tx.insert(memberRoles).values({ title: a.title, grantsActiveStatus: a.grants, typeId, sortOrder: Number(max) + 1 }).returning({ id: memberRoles.id });
           roleIdByTitle.set(a.title, r.id);
           newRoles.push(`${a.title}${a.grants ? t("import.report.grantsActiveSuffix") : ""}`);
         }

@@ -157,3 +157,17 @@ describe("inventory", () => {
     expect(plan.positions).toHaveLength(2);
   });
 });
+
+describe("suggestRole with separate 1./2. roles (Spec 47)", () => {
+  const sep = [
+    { id: "k", title: "Kommandant", grantsActiveStatus: true }, { id: "k1", title: "1. Kommandant", grantsActiveStatus: true },
+    { id: "k2", title: "2. Kommandant", grantsActiveStatus: true },
+  ];
+  it("prefers the separate role without a note", () => {
+    expect(suggestRole("1. Kommandant", sep)).toEqual({ choice: { kind: "role", roleId: "k1" }, note: null });
+    expect(suggestRole("stellvertretender Kommandant", sep)).toEqual({ choice: { kind: "role", roleId: "k2" }, note: null });
+  });
+  it("falls back to the merged role with the note", () => {
+    expect(suggestRole("1. Kommandant", [sep[0]])).toEqual({ choice: { kind: "role", roleId: "k" }, note: "1." });
+  });
+});

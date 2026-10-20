@@ -162,11 +162,12 @@ export function unmappedColumns(kind: ImportKind, headers: string[], rows: Raw[]
 }
 
 // Synonyme fwportal-Titel → on-duty-Rollentitel (+ Freitext an der Zuweisung).
-export const ROLE_SYNONYMS: Record<string, { role: string; note: string | null }> = {
-  "1. kommandant": { role: "Kommandant", note: "1." },
-  "stellvertretender kommandant": { role: "Kommandant", note: "2. (Stellvertreter)" },
-  "1. vorsitzender": { role: "Vorstand", note: "1. Vorsitzender" },
-  "stellvertretende vorsitzende": { role: "Vorstand", note: "2. Vorsitzende" },
+type Synonym = { role: string; note: string | null; fallback?: { role: string; note: string | null } };
+export const ROLE_SYNONYMS: Record<string, Synonym> = {
+  "1. kommandant": { role: "1. Kommandant", note: null, fallback: { role: "Kommandant", note: "1." } },
+  "stellvertretender kommandant": { role: "2. Kommandant", note: null, fallback: { role: "Kommandant", note: "2. (Stellvertreter)" } },
+  "1. vorsitzender": { role: "1. Vorstand", note: null, fallback: { role: "Vorstand", note: "1. Vorsitzender" } },
+  "stellvertretende vorsitzende": { role: "2. Vorstand", note: null, fallback: { role: "Vorstand", note: "2. Vorsitzende" } },
   "schriftführerin": { role: "Schriftführer", note: null },
 };
 
@@ -175,8 +176,11 @@ export type RoleChoice = { kind: "role"; roleId: string } | { kind: "new" };
 
 export function suggestRole(title: string, roles: RoleOption[]): { choice: RoleChoice; note: string | null } {
   const syn = ROLE_SYNONYMS[title.toLowerCase().trim()];
-  const bySyn = syn && roles.find((r) => norm(r.title) === norm(syn.role));
+  const find = (name: string) => roles.find((r) => norm(r.title) === norm(name));
+  const bySyn = syn && find(syn.role);
   if (bySyn) return { choice: { kind: "role", roleId: bySyn.id }, note: syn.note };
+  const byFallback = syn?.fallback && find(syn.fallback.role);
+  if (byFallback) return { choice: { kind: "role", roleId: byFallback.id }, note: syn.fallback!.note };
   const same = roles.find((r) => norm(r.title) === norm(title));
   return { choice: same ? { kind: "role", roleId: same.id } : { kind: "new" }, note: null };
 }

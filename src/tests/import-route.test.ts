@@ -11,7 +11,7 @@ vi.mock("../db/index.js", () => {
     get: (_t, k) => (k === "then" ? (r: any) => r([{ id: "x" }]) : txChain),
     apply: () => txChain,
   });
-  return { db: { select: () => chain, transaction: async (fn: any) => fn({ insert: () => txChain }) } };
+  return { db: { select: () => chain, transaction: async (fn: any) => fn({ insert: () => txChain, select: () => txChain }) } };
 });
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {

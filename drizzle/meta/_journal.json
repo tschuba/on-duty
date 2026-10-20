@@ -309,6 +309,13 @@
       "when": 1792500000000,
       "tag": "0043_member_status_foerdernd",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792600000000,
+      "tag": "0044_member_role_types",
+      "breakpoints": true
     }
   ]
 }

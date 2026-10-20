@@ -1068,3 +1068,18 @@ describe("POST /:id", () => {
     expect(updateCalls.some((c) => c.table === memberRoleAssignments && c.set.memberRoleId === roleAktiv.id)).toBe(true);
   });
 });
+
+describe("role combobox tabs (Spec 47)", () => {
+  it("renders one tab per type in type order, defaulting to the first", async () => {
+    const { RoleRow } = await import("../routes/members.js");
+    const roles: any[] = [
+      { id: "a", title: "Brandmeister", typeId: "t1", typeName: "Dienstgrad", grantsActiveStatus: true },
+      { id: "b", title: "Kassier", typeId: "t3", typeName: "Verein", grantsActiveStatus: false },
+    ];
+    const html = String(RoleRow({ index: 0, roles }));
+    expect(html.indexOf("Dienstgrad")).toBeGreaterThan(-1);
+    expect(html.indexOf("Dienstgrad")).toBeLessThan(html.indexOf("Verein"));
+    expect(html).toMatch(/data-type="t1"[^>]*class="[^"]*tab-active/);
+    expect(html).not.toMatch(/data-type="t3"[^>]*class="[^"]*tab-active/);
+  });
+});

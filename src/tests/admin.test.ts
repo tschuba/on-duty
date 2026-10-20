@@ -4,6 +4,7 @@ import {
   sessions,
   accounts,
   memberRoles,
+  memberRoleTypes,
   memberRoleAssignments,
   anniversaryYears,
   backupHistory,
@@ -41,6 +42,7 @@ function chainOf(rows: unknown) {
 
 let usersFixture: any[] = [];
 let rolesFixture: any[] = [];
+let typesFixture: any[] = [makeType()];
 let assignmentCountFixture: any[] = [{ cnt: 0 }];
 let yearsFixture: any[] = [];
 let backupHistoryFixture: any[] = [];
@@ -70,6 +72,7 @@ const select = vi.fn(() => ({
   from: vi.fn((table: any) => {
     if (table === users) return chainOf(nextRows(users, usersFixture));
     if (table === memberRoles) return chainOf(nextRows(memberRoles, rolesFixture));
+    if (table === memberRoleTypes) return chainOf(nextRows(memberRoleTypes, typesFixture));
     if (table === memberRoleAssignments) return chainOf(nextRows(memberRoleAssignments, assignmentCountFixture));
     if (table === anniversaryYears) return chainOf(nextRows(anniversaryYears, yearsFixture));
     if (table === backupHistory) return chainOf(nextRows(backupHistory, backupHistoryFixture));
@@ -151,6 +154,7 @@ beforeEach(() => {
   queues.clear();
   usersFixture = [];
   rolesFixture = [];
+  typesFixture = [makeType()];
   assignmentCountFixture = [{ cnt: 0 }];
   yearsFixture = [];
   backupHistoryFixture = [];
@@ -180,8 +184,12 @@ function makeUser(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeType(overrides: Record<string, unknown> = {}) {
+  return { id: "t1", name: "Dienstgrad", allowsActiveStatus: true, sortOrder: 1, isProtected: false, ...overrides };
+}
+
 function makeRole(overrides: Record<string, unknown> = {}) {
-  return { id: "r1", title: "Vorstand", grantsActiveStatus: true, isProtected: false, ...overrides };
+  return { id: "r1", title: "Vorstand", typeId: "t1", sortOrder: 1, grantsActiveStatus: true, isProtected: false, ...overrides };
 }
 
 function makeRoleRow(overrides: Record<string, unknown> = {}) {
@@ -727,6 +735,7 @@ describe("GET /roles/new", () => {
 describe("GET /roles/:id/edit", () => {
   it("404s for an unknown role", async () => {
     rolesFixture = [];
+  typesFixture = [makeType()];
     expect((await adminRoutes.request("/roles/nope/edit")).status).toBe(404);
   });
 
@@ -758,7 +767,7 @@ describe("POST /roles", () => {
   });
 
   it("creates the role", async () => {
-    const res = await adminRoutes.request("/roles", { method: "POST", body: formBody({ title: "Kassier", grantsActiveStatus: "1" }) });
+    const res = await adminRoutes.request("/roles", { method: "POST", body: formBody({ title: "Kassier", typeId: "t1", grantsActiveStatus: "1" }) });
     expect(res.status).toBe(302);
     expect(insertCalls.some((c) => c.table === memberRoles && c.values.grantsActiveStatus === true)).toBe(true);
   });
@@ -767,6 +776,7 @@ describe("POST /roles", () => {
 describe("POST /roles/:id", () => {
   it("404s for an unknown role", async () => {
     rolesFixture = [];
+  typesFixture = [makeType()];
     expect((await adminRoutes.request("/roles/nope", { method: "POST", body: formBody({}) })).status).toBe(404);
   });
 
@@ -786,7 +796,7 @@ describe("POST /roles/:id", () => {
   it("updates title and status when unused", async () => {
     rolesFixture = [makeRole()];
     assignmentCountFixture = [{ cnt: 0 }];
-    const res = await adminRoutes.request("/roles/r1", { method: "POST", body: formBody({ title: "Neu", grantsActiveStatus: "1" }) });
+    const res = await adminRoutes.request("/roles/r1", { method: "POST", body: formBody({ title: "Neu", typeId: "t1", grantsActiveStatus: "1" }) });
     expect(res.status).toBe(302);
     expect(updateCalls.some((c) => c.table === memberRoles && c.set.title === "Neu")).toBe(true);
   });
@@ -803,6 +813,7 @@ describe("POST /roles/:id", () => {
 describe("POST /roles/:id/delete", () => {
   it("silently redirects for an unknown role", async () => {
     rolesFixture = [];
+  typesFixture = [makeType()];
     const res = await adminRoutes.request("/roles/nope/delete", { method: "POST" });
     expect(res.status).toBe(302);
     expect(res.headers.get("set-cookie")).toBeNull();
@@ -1066,5 +1077,49 @@ describe("POST /backup/run", () => {
     await new Promise((r) => setImmediate(r));
     expect(errSpy).toHaveBeenCalledWith("[backup] manual run failed:", expect.any(Error));
     errSpy.mockRestore();
+  });
+});
+
+describe("role types (Spec 47)", () => {
+  const post = (path: string, fields: Record<string, string>) => adminRoutes.request(path, { method: "POST", body: formBody(fields) });
+
+  it("rejects the active flag on a type that does not allow it (400)", async () => {
+    typesFixture = [makeType({ allowsActiveStatus: false })];
+    expect((await post("/roles", { title: "X", typeId: "t1", grantsActiveStatus: "1" })).status).toBe(400);
+    rolesFixture = [makeRole()];
+    expect((await post("/roles/r1", { title: "X", typeId: "t1", grantsActiveStatus: "1" })).status).toBe(400);
+    expect(updateCalls.some((c) => c.table === memberRoles)).toBe(false);
+  });
+
+  it("rejects removing allows_active_status while roles carry the flag", async () => {
+    typesFixture = [makeType()];
+    queue(memberRoles, [makeRole()]);
+    const res = await post("/role-types/t1", { name: "Dienstgrad" });
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Vorstand");
+    expect(updateCalls.some((c) => c.table === memberRoleTypes)).toBe(false);
+  });
+
+  it("refuses to delete a non-empty type, lists its roles", async () => {
+    queue(memberRoles, [makeRole()]);
+    const res = await post("/role-types/t1/delete", {});
+    expect(res.status).toBe(400);
+    expect(deleteCalls.some((c) => c.table === memberRoleTypes)).toBe(false);
+  });
+
+  it("refuses to delete a protected type", async () => {
+    typesFixture = [makeType({ isProtected: true })];
+    expect((await post("/role-types/t1/delete", {})).status).toBe(400);
+  });
+
+  it("deletes an empty, unprotected type", async () => {
+    queue(memberRoles, []);
+    expect((await post("/role-types/t1/delete", {})).status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === memberRoleTypes)).toBe(true);
+  });
+
+  it("reorder rejects ids that are not a permutation of the type's roles", async () => {
+    queue(memberRoles, [makeRole()], [makeRole(), makeRole({ id: "r2" })]);
+    expect((await adminRoutes.request("/roles/reorder", { method: "POST", body: formBody({ id: "r1" }) })).status).toBe(400);
   });
 });

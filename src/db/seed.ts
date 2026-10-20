@@ -8,11 +8,13 @@ import {
   users,
   accounts,
   memberRoles,
+  memberRoleTypes,
   anniversaryYears,
   appRoles,
   appRolePermissions,
   userAppRoles,
 } from "./schema/index.js";
+import { ROLE_SEED, ROLE_TYPES } from "./role-seed-data.js";
 import type { Permission } from "../lib/roles.js";
 
 const APP_ROLES: { id: string; name: string; description: string; isProtected: boolean; permissions: Permission[] }[] = [
@@ -68,21 +70,11 @@ export async function runSeed() {
   const db = drizzle(client);
 
   try {
-    await db.insert(memberRoles).values([
-      { id: "8bf6c0be-faa1-4149-b116-ef6bebf7cece", title: "Vorstand",                   grantsActiveStatus: false, isProtected: false },
-      { id: "b76895ab-577d-4fcf-a567-300fa1bfba91", title: "Schriftführer",               grantsActiveStatus: false, isProtected: false },
-      { id: "5054f7c6-61fa-4692-93a6-2256f16de546", title: "Kassier",                     grantsActiveStatus: false, isProtected: false },
-      { id: "e10a3bb7-ed77-46a9-a7fe-f1d1f8326ed3", title: "Beisitzer",                   grantsActiveStatus: false, isProtected: false },
-      { id: "9540a309-6b49-48f8-b39b-2349018a6119", title: "Kommandant",                 grantsActiveStatus: true,  isProtected: false },
-      { id: "77700bd9-6c64-43d6-af49-02d3c8e7d665", title: "Gruppenführer",               grantsActiveStatus: true,  isProtected: false },
-      { id: "bc7a50c6-a0c9-4d1a-a212-6d39ba833fed", title: "Maschinist",                  grantsActiveStatus: true,  isProtected: false },
-      { id: "bda48bcc-d4f3-464f-9067-732d3f35675c", title: "Jugendfeuerwehrwart",         grantsActiveStatus: false, isProtected: false },
-      { id: "b2b821ce-30aa-4b14-a6aa-c63d09daf37c", title: "Stellv. Jugendfeuerwehrwart", grantsActiveStatus: false, isProtected: false },
-      { id: "f2dd276b-027b-4b82-8313-918bc4f9d5c5", title: "Feuerwehr-Anwärter",          grantsActiveStatus: true,  isProtected: false },
-      { id: "8a6372ef-4561-4f0d-aa2e-3ed80ac2b003", title: "Ehrenkommandant",             grantsActiveStatus: false, isProtected: false },
-      { id: "4005b6b5-bbf3-4d52-98c1-3893bf7db574", title: "Ehrenvorstand",               grantsActiveStatus: false, isProtected: false },
-      { id: "d4bda8ff-6d64-404e-a6c2-d7b500abb6a2", title: "Ehrenmitglied",               grantsActiveStatus: false, isProtected: false },
-    ]).onConflictDoNothing();
+    await db.insert(memberRoleTypes).values(ROLE_TYPES.map(({ key: _key, ...t }) => t)).onConflictDoNothing();
+    const typeId = Object.fromEntries(ROLE_TYPES.map((t) => [t.key, t.id]));
+    await db.insert(memberRoles).values(
+      ROLE_SEED.map(({ type, ...r }) => ({ ...r, typeId: typeId[type], isProtected: false })),
+    ).onConflictDoNothing();
 
     const defaultYears = [25, 40, 50, 60, 65, 70, 75, 80, 85, 90, 95, 100];
     await db.insert(anniversaryYears).values(

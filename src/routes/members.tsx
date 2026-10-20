@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, getTableColumns } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
-import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
+import { members, persons, memberRoles, memberRoleTypes, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
@@ -31,7 +31,16 @@ type MemberRow = typeof members.$inferSelect;
 // birthDate is nullable in `persons` (donor-only persons need none) but this route's
 // own form validation always requires it for a member — re-asserted non-null here.
 type Member = Omit<Person, "id" | "birthDate"> & MemberRow & { birthDate: string };
-type Role = typeof memberRoles.$inferSelect;
+type Role = typeof memberRoles.$inferSelect & { typeName?: string };
+
+// Sorted by (type.sort_order, role.sort_order); typeName feeds tabs and filter groups.
+export function fetchRoles(): Promise<Role[]> {
+  return db
+    .select({ ...getTableColumns(memberRoles), typeName: memberRoleTypes.name })
+    .from(memberRoles)
+    .innerJoin(memberRoleTypes, eq(memberRoleTypes.id, memberRoles.typeId))
+    .orderBy(asc(memberRoleTypes.sortOrder), asc(memberRoles.sortOrder));
+}
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };
 
@@ -381,10 +390,16 @@ function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
   );
 }
 
+function roleTypeTabs(roles: Role[]) {
+  const seen = new Map<string, { id: string; name: string }>();
+  for (const r of roles) if (!seen.has(r.typeId)) seen.set(r.typeId, { id: r.typeId, name: r.typeName ?? "" });
+  return [...seen.values()];
+}
+
 const normalizeNote = (v?: string) => v?.trim().slice(0, 200) || null;
 const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${note})` : title);
 
-function RoleRow({
+export function RoleRow({
   index,
   roles,
   assignment,
@@ -395,7 +410,10 @@ function RoleRow({
   assignment?: Assignment;
   auto?: boolean;
 }) {
-  const selectedTitle = assignment ? (roles.find((r) => r.id === assignment.memberRoleId)?.title ?? "") : "";
+  const selected = assignment ? roles.find((r) => r.id === assignment.memberRoleId) : undefined;
+  const selectedTitle = selected?.title ?? "";
+  const types = roleTypeTabs(roles);
+  const activeType = selected?.typeId ?? types[0]?.id;
   return (
     <>
     <tr id={`role-row-${index}`} data-autofrom={auto ? "1" : undefined}>
@@ -434,6 +452,21 @@ function RoleRow({
                 placeholder={t("common.searchPlaceholder")}
               />
             </label>
+            {types.length > 1 && (
+              <div role="tablist" class="role-combobox-tabs tabs tabs-border mb-1">
+                {types.map((ty) => (
+                  <button
+                    key={ty.id}
+                    type="button"
+                    role="tab"
+                    data-type={ty.id}
+                    class={`role-combobox-tab tab${ty.id === activeType ? " tab-active" : ""}`}
+                  >
+                    {ty.name}
+                  </button>
+                ))}
+              </div>
+            )}
             <ul id={`role-combobox-list-${index}`} role="listbox" class="role-combobox-list menu p-0">
               {roles.map((r) => (
                 <li
@@ -442,6 +475,7 @@ function RoleRow({
                   role="option"
                   data-id={r.id}
                   data-title={r.title}
+                  data-type={r.typeId}
                   aria-selected={r.id === assignment?.memberRoleId ? "true" : "false"}
                 >
                   <a class="min-h-11 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
@@ -514,9 +548,11 @@ function RoleRow({
           function rcFilter(trigger) {
             var list = rcList(trigger);
             var needle = rcSearch(trigger).value.trim().toLowerCase();
+            var tab = rcPopover(trigger).querySelector('.role-combobox-tab.tab-active');
             var anyVisible = false;
             rcOptions(list).forEach(function (li) {
-              var match = li.dataset.title.toLowerCase().includes(needle);
+              // Search spans all types; without a search term only the active tab shows.
+              var match = needle ? li.dataset.title.toLowerCase().includes(needle) : (!tab || li.dataset.type === tab.dataset.type);
               li.style.display = match ? '' : 'none';
               if (match) anyVisible = true;
             });
@@ -530,6 +566,12 @@ function RoleRow({
             rcPopover(trigger).showPopover();
             trigger.setAttribute('aria-expanded', 'true');
             rcSearch(trigger).value = '';
+            var tabs = Array.from(rcPopover(trigger).querySelectorAll('.role-combobox-tab'));
+            if (tabs.length) {
+              var sel = rcOptions(rcList(trigger)).find(function (o) { return o.getAttribute('aria-selected') === 'true'; });
+              var want = sel ? sel.dataset.type : tabs[0].dataset.type;
+              tabs.forEach(function (tb) { tb.classList.toggle('tab-active', tb.dataset.type === want); });
+            }
             rcFilter(trigger);
             rcSearch(trigger).focus();
           }
@@ -561,6 +603,15 @@ function RoleRow({
             var trigger = e.target.closest('.role-combobox-trigger');
             if (trigger) {
               if (rcIsOpen(trigger)) { rcClose(trigger); } else { rcOpen(trigger); }
+              return;
+            }
+            var tabBtn = e.target.closest('.role-combobox-tab');
+            if (tabBtn) {
+              var tabTrigger = rcWrap(tabBtn.closest('.role-combobox-popover')).querySelector('.role-combobox-trigger');
+              rcPopover(tabTrigger).querySelectorAll('.role-combobox-tab').forEach(function (tb) { tb.classList.toggle('tab-active', tb === tabBtn); });
+              rcSearch(tabTrigger).value = '';
+              rcFilter(tabTrigger);
+              rcSearch(tabTrigger).focus();
               return;
             }
             var resetBtn = e.target.closest('.role-combobox-reset');
@@ -1003,7 +1054,7 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
       param="role"
       autoApply
       searchable
-      options={roles.map((r) => ({ value: r.id, label: r.title, dim: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" }))}
+      options={roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" }))}
       selected={roleFilter}
       allLabel={t("members.filter.allRoles")}
       countLabel={(count) => t("members.table.roleCount", { count })}
@@ -1052,7 +1103,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   const [all, allRoles] = await Promise.all([
     fetchMembersWithStatus(search || undefined),
-    db.query.memberRoles.findMany({ orderBy: [asc(memberRoles.title)] }),
+    fetchRoles(),
   ]);
   const activeRoleIds = new Set(
     all.flatMap((m) => m.assignments.filter((a) => !a.to).map((a) => a.memberRoleId))
@@ -1170,7 +1221,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const user = c.get("user");
   const canWriteBank = user.permissions.has("members:bank-data:write");
-  const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+  const roles = await fetchRoles();
   const personId = c.req.query("personId");
   const linkMemberId = c.req.query("linkMemberId");
   const applicationId = c.req.query("applicationId");
@@ -1347,7 +1398,7 @@ function checkStartStatus(
 // GET /members/role-row — HTMX fragment: one assignment row
 memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   const index = Number(c.req.query("index") ?? 0);
-  const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+  const roles = await fetchRoles();
   // Optional prefill (used for the "aktiv" start choice): ?roleId=&from=&auto=1
   const roleId = c.req.query("roleId");
   const assignment = roleId
@@ -1426,7 +1477,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   }
 
   if (Object.keys(errors).length > 0) {
-    const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+    const roles = await fetchRoles();
     const m: Partial<Member> = {
       lastName, firstName,
       street: body.street as string,
@@ -1706,7 +1757,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const isEditor = user.permissions.has("members:write");
   const canWriteBank = user.permissions.has("members:bank-data:write");
   const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");
-  const roles = isEditor ? await db.select().from(memberRoles).orderBy(memberRoles.title) : [];
+  const roles = isEditor ? await fetchRoles() : [];
 
   const canDelete = user.permissions.has("members:delete");
   const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
@@ -1873,7 +1924,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   }
 
   if (Object.keys(errors).length > 0) {
-    const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+    const roles = await fetchRoles();
     const m = { ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
       street: body.street as string, houseNumber: body.houseNumber as string,
       zip: body.zip as string, city: body.city as string,
@@ -1933,7 +1984,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   const autoClosedAssignments = existing.assignments.filter((a) => a.autoClosed);
 
   if (isReactivation && autoClosedAssignments.length > 0 && reactivateParam === undefined) {
-    const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
+    const roles = await fetchRoles();
     const formData: Record<string, string | string[]> = {
       lastName, firstName,
       street: (body.street as string) ?? "",
