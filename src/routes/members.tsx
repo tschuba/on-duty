@@ -492,7 +492,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
             <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
           </label>
           {types.length > 1 && (
-            <div role="tablist" class="tabs tabs-border mb-1">
+            <div role="tablist" class="role-picker-tabs tabs tabs-border mb-1">
               {types.map((ty) => (
                 <button key={ty.id} type="button" role="tab" data-type={ty.id} class={`role-picker-tab tab${ty.id === activeType ? " tab-active" : ""}`}>{ty.name}</button>
               ))}
@@ -501,7 +501,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
           <ul id="role-picker-list" role="listbox" class="role-picker-list menu menu-sm p-0 w-full flex-nowrap overflow-y-auto border border-base-300 rounded-box" style="max-height:min(16rem,32vh)">
             {roles.map((r) => (
               <li key={r.id} role="option" data-id={r.id} data-title={r.title} data-type={r.typeId} aria-selected={r.id === selectedId ? "true" : "false"}>
-                <a class="min-h-9 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
+                <a class="min-h-9 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}<span class="role-picker-type ml-auto text-xs opacity-60 hidden">{r.typeName}</span></a>
               </li>
             ))}
             <li class="role-picker-no-match hidden"><a class="disabled pointer-events-none opacity-50">{t("members.form.roleNoMatch")}</a></li>
@@ -540,6 +540,10 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
             var q = search.value.trim().toLowerCase(), type = q ? null : activeType();
             opts.forEach(function (o) { o.hidden = !(o.dataset.title.toLowerCase().includes(q) && (!type || o.dataset.type === type)); });
             noMatch.classList.toggle('hidden', visible().length > 0);
+            // Suche geht über alle Typen: Tabs abblenden, Typ pro Treffer zeigen.
+            var bar = root.querySelector('.role-picker-tabs');
+            if (bar) { bar.classList.toggle('opacity-40', !!q); bar.classList.toggle('pointer-events-none', !!q); }
+            opts.forEach(function (o) { o.querySelector('.role-picker-type').classList.toggle('hidden', !q); });
             mark(null);
           }
           function pick(li) {
