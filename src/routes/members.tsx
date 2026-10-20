@@ -7,6 +7,7 @@ import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleTypes, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import { RolePopover } from "../components/role-popover.js";
 import { ACTIVE_ROLE_ID } from "../lib/import.js";
@@ -735,10 +736,9 @@ function BankDataSection({
   // Zustand pro Tab in sessionStorage, damit er Ansicht ↔ Bearbeiten überdauert.
   return (
     <>
-      <details data-bank-key={key} class="collapse collapse-arrow border border-base-300 bg-base-100 mt-6 max-w-2xl" open={!!errors?.iban}>
-        <summary class="collapse-title font-semibold">{t("members.bank.title")}</summary>
-        <div class="collapse-content space-y-4">{body}</div>
-      </details>
+      <Section title={t("members.bank.title")} open={!!errors?.iban} class="mt-6 max-w-2xl" attrs={{ "data-bank-key": key }}>
+        <div class="space-y-4">{body}</div>
+      </Section>
       <script dangerouslySetInnerHTML={{ __html: `(function(){var d=document.currentScript.previousElementSibling,k=d.dataset.bankKey;
 try{if(sessionStorage.getItem(k))d.open=true;}catch(e){}
 d.addEventListener('toggle',function(){try{d.open?sessionStorage.setItem(k,'1'):sessionStorage.removeItem(k);}catch(e){}});})();` }} />
@@ -878,7 +878,7 @@ function MemberFormFields({
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("exitDate", t("members.form.exitDate"), "date")}
       </div>
-      <div class="divider">{t("members.contact.title")}</div>
+      <Section title={t("members.contact.title")} open>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("street", t("members.form.street"))}
         {field("houseNumber", t("members.form.houseNumber"))}
@@ -892,6 +892,7 @@ function MemberFormFields({
         {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
       </div>
+      </Section>
     </>
   );
 }
@@ -1286,7 +1287,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
             <span class="label-text">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
-        <div class="divider">{t("members.form.assignments")}</div>
+        <Section title={t("members.form.assignments")} open>
         <StatusPreview />
         <PassiveHint show={false} />
         <div class="overflow-x-auto">
@@ -1304,6 +1305,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         </div>
         <RoleRowsAddButton initialCount={0} />
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
+        </Section>
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
@@ -1538,7 +1540,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span class="label-text">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
-          <div class="divider">{t("members.form.assignments")}</div>
+          <Section title={t("members.form.assignments")} open>
           <StatusPreview />
           <PassiveHint show={startStatus === "passiv"} />
           <div class="overflow-x-auto">
@@ -1561,6 +1563,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </table>
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          </Section>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
@@ -1797,8 +1800,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
           {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
         </div>
-        <div class="mt-6 max-w-2xl">
-          <h2 class="font-semibold mb-2">{t("members.contact.title")}</h2>
+        <Section title={t("members.contact.title")} open class="mt-6 max-w-2xl">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
             <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
@@ -1806,16 +1808,15 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             <ViewField label={t("members.form.mobile")} value={m.mobile} />
             <ViewField label={t("members.form.email")} value={m.email} />
           </div>
-        </div>
+        </Section>
         {openRoles.length > 0 && (
-          <div class="mt-6">
-            <h2 class="font-semibold mb-2">{t("members.view.activeFunctions")}</h2>
+          <Section title={t("members.view.activeFunctions")} open class="max-w-2xl">
             <div class="flex flex-wrap gap-2">
               {openRoles.map((a) => (
                 <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
               ))}
             </div>
-          </div>
+          </Section>
         )}
         {canWriteBank ? (
           <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
@@ -1843,7 +1844,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
-        <div class="divider">{t("members.form.assignments")}</div>
+        <Section title={t("members.form.assignments")} open>
         <StatusPreview saved={m.status} />
         <div class="overflow-x-auto">
           <table class="table w-full">
@@ -1856,6 +1857,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           </table>
         </div>
         <RoleRowsAddButton initialCount={m.assignments.length} />
+        </Section>
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
@@ -1954,7 +1956,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
-          <div class="divider">{t("members.form.assignments")}</div>
+          <Section title={t("members.form.assignments")} open>
           <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
@@ -1976,6 +1978,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             </table>
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          </Section>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
@@ -2029,7 +2032,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
-          <div class="divider">{t("members.form.assignments")}</div>
+          <Section title={t("members.form.assignments")} open>
           <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
@@ -2051,6 +2054,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             </table>
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          </Section>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
