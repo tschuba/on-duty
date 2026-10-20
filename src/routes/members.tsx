@@ -1192,7 +1192,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
         var raw = localStorage.getItem(KEY), d; try { d = raw && JSON.parse(raw); } catch (e) {}
         if (d && Date.now() - d.at > TTL) { localStorage.removeItem(KEY); d = null; }
         if (!d) return;
-        var bar = document.createElement('div'); bar.className = 'alert alert-info text-sm flex-wrap';
+        var bar = document.createElement('div'); bar.className = 'alert alert-info text-sm flex-wrap max-w-4xl mb-4';
         var msg = document.createElement('span'); msg.textContent = TX.banner; bar.appendChild(msg);
         function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm'; b.textContent = label; b.onclick = fn; bar.appendChild(b); }
         btn(TX.restore, function () {
