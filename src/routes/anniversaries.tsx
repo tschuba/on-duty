@@ -69,7 +69,7 @@ function anniversaryLabel(e: AnniversaryEvent): string {
   return t(e.types?.[0] === "membership" ? "anniversaries.event.membership" : "anniversaries.event.service");
 }
 
-function EventRow({ event: e, past, divider, showJub }: { event: AnniversaryEvent; past: boolean; divider: boolean; showJub: boolean }) {
+function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: boolean; divider: boolean }) {
   const yearsCol = e.kind === "birthday"
     ? t("anniversaries.event.yearsDisplay", { years: e.years })
     : e.title
@@ -81,7 +81,7 @@ function EventRow({ event: e, past, divider, showJub }: { event: AnniversaryEven
     <tr class={past ? "opacity-40" : ""}>
       <td class={`whitespace-nowrap text-sm pl-6${border}`}>
         {formatDate(e.refDate ?? e.date)}
-        {showJub && e.kind === "anniversary" && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.date) })}</div>}
+        {e.kind === "anniversary" && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.date) })}</div>}
       </td>
       <td class={border}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">
@@ -100,7 +100,7 @@ function EventRow({ event: e, past, divider, showJub }: { event: AnniversaryEven
   );
 }
 
-function EventList({ events, today, filter, showJub }: { events: AnniversaryEvent[]; today: string; filter: string; showJub: boolean }) {
+function EventList({ events, today, filter }: { events: AnniversaryEvent[]; today: string; filter: string }) {
   const filtered = filterEvents(events, filter);
 
   if (!filtered.length) {
@@ -127,7 +127,7 @@ function EventList({ events, today, filter, showJub }: { events: AnniversaryEven
                 </td>
               </tr>
               {evs.map((e, i) => (
-                <EventRow event={e} past={e.date < today} divider={i > 0} showJub={showJub} />
+                <EventRow event={e} past={e.date < today} divider={i > 0} />
               ))}
             </>
           ))}
@@ -204,7 +204,6 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const gteRaw = c.req.query("gte") || "";
   const gte = parseInt(gteRaw, 10) || 0;
   const mods = c.req.queries("mod") ?? [];
-  const showJub = c.req.query("jub") === "1";
 
   const [memberRows, ayRows] = await Promise.all([
     db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
@@ -231,7 +230,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   }
 
   const qs = (extra: Record<string, string | string[]>) =>
-    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods, jub: showJub ? "1" : undefined }, extra);
+    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
   const filterLink = (f: string) => qs({ filter: f });
   // toggle a mod value in/out of the active set
@@ -269,7 +268,6 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
             <input type="hidden" name="filter" value={filter} />
             {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
-            {showJub && <input type="hidden" name="jub" value="1" />}
             <button type="submit" class="btn">{t("common.show")}</button>
           </form>
 
@@ -288,7 +286,6 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
               <input type="hidden" name="end" value={end} />
               <input type="hidden" name="filter" value={filter} />
               {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
-              {showJub && <input type="hidden" name="jub" value="1" />}
               <label class="text-sm text-base-content/70" for="gte-input">{t("anniversaries.minYears.label")}</label>
               <input
                 id="gte-input"
@@ -305,12 +302,11 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
               <a href={modToggle("5")} class={`join-item btn${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
               <a href={modToggle("10")} class={`join-item btn${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>
             </div>
-            <a href={qs({ jub: showJub ? "" : "1" })} class={`btn${showJub ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.showJubDate")}</a>
           </div>
         </div>
       </div>
 
-      <EventList events={events} today={today} filter={filter} showJub={showJub} />
+      <EventList events={events} today={today} filter={filter} />
       <AnniversariesExportModal />
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
