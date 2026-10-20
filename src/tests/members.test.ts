@@ -508,17 +508,6 @@ describe("GET /new", () => {
   });
 });
 
-describe("GET /role-row", () => {
-  it("renders one read-only row fragment with hidden inputs", async () => {
-    rolesFixture = [roleAktiv];
-    const res = await memberRoutes.request(`/role-row?index=2&roleId=${roleAktiv.id}&from=2020-01-01`);
-    const html = await res.text();
-    expect(html).toContain("role-hint-2");
-    expect(html).toContain(`name="assignment_role[]" value="${roleAktiv.id}"`);
-    expect(html).toContain(roleAktiv.title);
-  });
-});
-
 describe("firstEntryDate", () => {
   const base = { lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01" };
 
@@ -646,7 +635,7 @@ describe("POST /new", () => {
     expect(res.status).toBe(302);
   });
 
-  it("rejects start status 'foerdernd' when a running function makes the member aktiv", async () => {
+  it("ignores submitted functions for start status 'foerdernd'", async () => {
     rolesFixture = [roleAktiv];
     const res = await memberRoutes.request("/new", {
       method: "POST",
@@ -655,8 +644,16 @@ describe("POST /new", () => {
         "assignment_role[]": roleAktiv.id, "assignment_from[]": "2020-01-01", "assignment_to[]": "",
       }),
     });
+    expect(res.status).toBe(302);
+  });
+
+  it("rejects start status 'aktiv' without a function and keeps the form values", async () => {
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "aktiv" }),
+    });
     expect(res.status).toBe(422);
-    expect(await res.text()).toContain('name="switchStatus" value="aktiv"');
+    expect(await res.text()).toContain('value="Bauer"');
   });
 
   it("status preview shows derived status and the conflict", async () => {

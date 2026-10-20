@@ -11,7 +11,6 @@ import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { RolePopover } from "../components/role-popover.js";
-import { ACTIVE_ROLE_ID } from "../lib/import.js";
 import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -355,10 +354,10 @@ const sortRows = (rows: AssignmentRowData[]) => [...rows].sort((a, b) => (a.to ?
 const ADD_CLICK = "if(event.detail.successful){var d=document.getElementById('assignment-modal');d.showModal();setTimeout(function(){var f=d.querySelector('.role-picker-search');if(f)f.focus()},50)}";
 
 // Eine Zeile der read-only Tabelle. Neuanlage (kein memberId): Werte stecken als Hidden-Inputs im Hauptformular.
-function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRowData; memberId?: string; index?: string; auto?: boolean; readOnly?: boolean }) {
+function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData; memberId?: string; index?: string; readOnly?: boolean }) {
   return (
     <>
-      <tr data-autofrom={auto ? "1" : undefined}>
+      <tr>
         <td>
           {!memberId && (
             <>
@@ -1157,11 +1156,11 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
             <span class="label-text">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
-        <Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
+        <div id="assignments-wrap"><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
         <StatusPreview />
         <PassiveHint show={false} />
         <AssignmentsBox rows={[]} />
-        </Section>
+        </Section></div>
       </form>
         <AssignmentModalScaffold />
     </Layout>
@@ -1193,7 +1192,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
         var raw = localStorage.getItem(KEY), d; try { d = raw && JSON.parse(raw); } catch (e) {}
         if (d && Date.now() - d.at > TTL) { localStorage.removeItem(KEY); d = null; }
         if (!d) return;
-        var bar = document.createElement('div'); bar.className = 'alert alert-info text-sm flex-wrap';
+        var bar = document.createElement('div'); bar.className = 'alert alert-info text-sm flex-wrap max-w-4xl mb-4';
         var msg = document.createElement('span'); msg.textContent = TX.banner; bar.appendChild(msg);
         function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm'; b.textContent = label; b.onclick = fn; bar.appendChild(b); }
         btn(TX.restore, function () {
@@ -1204,7 +1203,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
             els.forEach(function (el) { if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === kv[1]; else el.value = kv[1]; });
           });
           if (rows['assignment_role[]']) htmx.ajax('POST', '/members/assignments/rows', { values: rows, target: '#assignments-box', swap: 'outerHTML' });
-          else form.dispatchEvent(new Event('change', { bubbles: true }));
+          else { var sr = form.querySelector('input[name="startStatus"]:checked'); if (sr) sr.dispatchEvent(new Event('change', { bubbles: true })); }
           bar.remove();
         });
         btn(TX.discard, function () { localStorage.removeItem(KEY); bar.remove(); });
@@ -1240,14 +1239,16 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
       <p id="startStatusError" class="text-error text-sm" role="alert" hidden>{t("members.form.startStatusRequired")}</p>
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function () {
-          var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
+          var form = document.querySelector('input[name="startStatus"]').closest('form');
           function current() { var c = form.querySelector('input[name="startStatus"]:checked'); return c ? c.value : ''; }
-          function prefill() {
-            if (current() !== 'aktiv' || rows.querySelector('tr:not(.assignment-empty)')) return;
-            var i = parseInt(rows.dataset.nextIndex || '0', 10);
-            rows.dataset.nextIndex = String(i + 1);
-            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' }).then(function () { form.dispatchEvent(new Event('change', { bubbles: true })); });
+          // Fördernd: Funktionen ausblenden und deaktivieren (nichts wird gesendet); Zeilen bleiben im DOM erhalten.
+          var wrap = document.getElementById('assignments-wrap');
+          function sync() {
+            var off = current() === 'foerdernd';
+            wrap.hidden = off;
+            wrap.querySelectorAll('input,select,textarea,button').forEach(function (el) { el.disabled = off; });
           }
+          document.body.addEventListener('htmx:afterSettle', sync);
           var err = document.getElementById('startStatusError');
           form.querySelectorAll('input[name="startStatus"]').forEach(function (r) {
             // Eigene Meldung bei der Kartengruppe statt der Browser-Blase am einzelnen Radio.
@@ -1255,13 +1256,10 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
             r.addEventListener('change', function () {
               err.hidden = true;
               document.getElementById('startStatusPassiveHint').hidden = current() !== 'passiv';
-              prefill();
+              sync();
             });
           });
-          form.elements.entryDate.addEventListener('input', function (e) {
-            rows.querySelectorAll('tr[data-autofrom]').forEach(function (tr) { tr.querySelector('input[name="assignment_from[]"]').value = e.target.value; var p = e.target.value.split('-'); tr.querySelector('.assignment-from').textContent = p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '—'; });
-          });
-          prefill();
+          sync();
         });
       ` }} />
     </fieldset>
@@ -1326,15 +1324,6 @@ function validateAssignment(
 function parseAssignmentForm(body: Record<string, any>) {
   return { roleId: trimmed(body, "role"), from: trimmed(body, "from"), to: trimmed(body, "to") || null, note: normalizeNote(trimmed(body, "note")) };
 }
-
-// GET /members/role-row — Zeile für die automatische Aktiv-Zuweisung der Neuanlage: ?index=&roleId=&from=
-memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
-  const roles = await fetchRoles();
-  const role = roles.find((r) => r.id === c.req.query("roleId"));
-  if (!role) return c.body(null, 404);
-  const r: AssignmentRowData = { id: "", roleId: role.id, roleTitle: role.title, from: c.req.query("from") ?? "", to: null, note: null };
-  return c.html(<AssignmentRow r={r} index={c.req.query("index") ?? "0"} auto />);
-});
 
 // Modal-Antwort nach Speichern: Tabelle (+ Badge im Edit) und je nach Button Modal schließen oder leeres Formular.
 async function assignmentResult(c: Context<{ Variables: Variables }>, box: any, more: boolean, form: any, badge?: any) {
@@ -1402,6 +1391,9 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   if (!birthDate) errors.birthDate = t("common.required");
   if (!entryDate) errors.entryDate = t("common.required");
   if (firstEntryDate && entryDate && firstEntryDate > entryDate) errors.firstEntryDate = t("members.form.firstEntryDateAfterEntry");
+
+  // Fördernd: keine Funktionen, gesendete Felder ignorieren.
+  if ((trimmed(body, "switchStatus") || trimmed(body, "startStatus")) === "foerdernd") for (const k of ["id", "role", "from", "to", "note", "idx"]) delete body[`assignment_${k}[]`];
 
   // Parse assignments (keep rows unfiltered so index i stays aligned across role/from/to)
   const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
@@ -1481,11 +1473,11 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span class="label-text">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
-          <Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
+          <div id="assignments-wrap" hidden={startStatus === "foerdernd"}><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
           <StatusPreview />
           <PassiveHint show={startStatus === "passiv"} />
         <AssignmentsBox rows={rowsFromBody(body, await db.select().from(memberRoles))} />
-          </Section>
+          </Section></div>
         </form>
         <AssignmentModalScaffold />
       </Layout>,
