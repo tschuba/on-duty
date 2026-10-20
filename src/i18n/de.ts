@@ -146,7 +146,7 @@ export const de = {
   "members.error.status.activeAgeLimit": "Mit {grenze} Jahren (erreicht am {datum}) ist {name} nicht mehr im aktiven Dienst, sondern passiv.",
   "members.error.status.activeNoRole": "„Aktiv“ braucht eine laufende Funktion im aktiven Dienst, also ohne Enddatum. Trag sie ein, oder lege {name} als fördernd an.",
   "members.error.status.passiveNoRole": "„Passiv“ braucht eine Funktion im aktiven Dienst, die offen ist oder frühestens am {datum} ({grenze}. Geburtstag) endet. Trag sie ein, oder lege {name} als fördernd an.",
-  "members.error.status.passiveRunning": "{name} erreicht die Altersgrenze von {grenze} Jahren erst am {datum}, die Funktion „{titel}“ läuft noch. Damit ist {name} aktiv.",
+  "members.error.status.passiveRunning": "Vor dem {datum} ({grenze}. Geburtstag) zählt die laufende Funktion „{titel}“ als aktiver Dienst. {name} ist damit aktiv, nicht passiv.",
   "members.error.status.supportingHasRole": "Die Funktion „{titel}“ macht {name} zu {status}. Entferne die Funktion, oder lege {name} als {status} an.",
   "members.form.roleAgeLimitHint": "Altersgrenze ab {datum} erreicht: Funktion „{title}“ zählt nicht mehr als aktiver Dienst.",
   "admin.permissions.key.membersBankDataRead": "Bankdaten ansehen",
