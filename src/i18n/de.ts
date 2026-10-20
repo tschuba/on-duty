@@ -163,7 +163,6 @@ export const de = {
   "members.assignment.empty": "Keine Funktionszuweisungen.",
   "members.assignment.titleNew": "Funktionszuweisung hinzufügen",
   "members.assignment.titleEdit": "Funktionszuweisung bearbeiten",
-  "members.assignment.saveAndMore": "Speichern und weitere hinzufügen",
   "members.assignment.confirmDelete": "Zuweisung wirklich löschen?",
   "members.draft.banner": "Es gibt einen nicht gespeicherten Entwurf.",
   "members.draft.restore": "Entwurf wiederherstellen",

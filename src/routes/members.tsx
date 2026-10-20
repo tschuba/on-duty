@@ -525,7 +525,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
       </div>
       <div class="modal-action flex-wrap">
         <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
-        <button type="submit" name="more" value="1" class="btn btn-outline btn-primary"><Icon name="plus" class="w-4 h-4" />{t("members.assignment.saveAndMore")}</button>
+        <button type="submit" name="more" value="1" class="btn btn-outline btn-primary"><Icon name="plus" class="w-4 h-4" />{t("common.saveAndNew")}</button>
         <button type="submit" class="btn btn-primary"><Icon name="check" class="w-4 h-4" />{t("common.save")}</button>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
