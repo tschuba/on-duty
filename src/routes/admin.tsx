@@ -441,18 +441,18 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
       <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" cancelHref="/admin/users" />} />
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-x-3">
           <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" value={f.name} class="input input-bordered w-full" required />
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
           <div class="flex flex-col gap-1">
             <input type="email" name="email" value={f.email} class="input input-bordered w-full" required />
             {f.id && <span class="label-text-alt text-sm opacity-60">{t("admin.users.modal.emailWarning")}</span>}
           </div>
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </div>
@@ -779,7 +779,7 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
       <PageHeader title={title} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" cancelHref="/admin/permissions" />} />
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-permissions-form" method="post" action={f.id ? `/admin/permissions/${f.id}` : "/admin/permissions"} class="flex flex-col gap-3 max-w-2xl">
-        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
           {f.nameLocked ? (
             <div class="flex flex-col gap-1">
@@ -791,11 +791,11 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
             <input type="text" name="name" value={f.name} class="input input-bordered w-full" required />
           )}
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
           <textarea name="description" rows={2} class="textarea textarea-bordered w-full">{f.description}</textarea>
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
           <PermissionCheckboxes checked={f.checked} />
         </div>
