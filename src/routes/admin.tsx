@@ -1305,14 +1305,13 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
               <th />
             </tr>
           </thead>
-          <tbody data-reorder-url="/admin/role-types/reorder">
+          <tbody>
             {types.map((ty) => {
               const n = typeCounts.get(ty.id) ?? 0;
               return (
                 <tr
                   key={ty.id}
                   data-id={ty.id}
-                  draggable
                   class="cursor-pointer hover"
                   hx-get={`/admin/role-types/${ty.id}/edit`}
                   hx-target="#modal-content"
@@ -1322,7 +1321,6 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                   <td>{ty.allowsActiveStatus ? t("common.yes") : t("common.no")}</td>
                   <td>
                     <div class="flex gap-2 justify-end items-center">
-                      <MoveButtons action={`/admin/role-types/${ty.id}/move`} id={ty.id} />
                       {!ty.isProtected && n === 0 ? (
                         <DeleteDialog
                           id={`type-${ty.id}`}
@@ -1641,23 +1639,6 @@ adminRoutes.post("/role-types", guard, async (c) => {
     isProtected: false,
   });
   setFlash(c, t("admin.roleTypes.flash.created", { name }), "success");
-  return c.redirect("/admin/role-types");
-});
-
-adminRoutes.post("/role-types/reorder", guard, async (c) => {
-  const posted = ((await c.req.parseBody({ all: true })).id ?? []) as string | string[];
-  const ids = Array.isArray(posted) ? posted : [posted];
-  const current = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
-  if (!isPermutation(ids, current.map((r) => r.id))) return c.body(null, HTTP_STATUS.BAD_REQUEST);
-  await writeOrder(memberRoleTypes, ids);
-  return c.body(null, 204);
-});
-
-adminRoutes.post("/role-types/:id/move", guard, async (c) => {
-  const id = c.req.param("id");
-  const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
-  const current = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
-  await writeOrder(memberRoleTypes, moveId(current.map((r) => r.id), id, dir));
   return c.redirect("/admin/role-types");
 });
 
