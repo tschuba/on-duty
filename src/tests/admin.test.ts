@@ -840,3 +840,41 @@ describe("permissionSearchText", () => {
     expect(txt).toContain("bankdaten");
   });
 });
+
+// Guards the duplicated grouping logic: the inline script in EffectivePermissions must
+// render the same badges as the server-side groupPermissionsForBadges.
+describe("effective permissions inline script", () => {
+  it("matches groupPermissionsForBadges for several role combinations", async () => {
+    const { PERMISSIONS, groupPermissionsForBadges } = await import("../lib/roles.js");
+    const res0 = PERMISSIONS[0].split(":")[0];
+    const resPerms = PERMISSIONS.filter((p) => p.split(":")[0] === res0);
+    const roleDefs: Record<string, string[]> = { all: [...PERMISSIONS], res: resPerms, one: [PERMISSIONS[PERMISSIONS.length - 1]], none: [] };
+    appRolesFixture = Object.keys(roleDefs).map((id) => makeAppRole({ id, name: id }));
+    appRolePermissionsFixture = Object.entries(roleDefs).flatMap(([roleId, ps]) => ps.map((permission) => ({ roleId, permission })));
+    const html = await (await adminRoutes.request("/users/new")).text();
+    const json = html.match(/<script type="application\/json">(.*?)<\/script>/s)![1];
+    const code = html.match(/<script>(\(function\(\)\{var s=document\.currentScript.*?)<\/script>/s)![1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+    const cfg = JSON.parse(json.replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+
+    for (const combo of [["all"], ["res"], ["one"], ["res", "one"], ["none"], []]) {
+      let listener: (e: any) => void = () => {};
+      const out: { className: string; textContent: string }[] = [];
+      const outEl = { replaceChildren: () => (out.length = 0), append: (e: any) => out.push(e) };
+      const form = {
+        querySelectorAll: () => combo.map((value) => ({ value })),
+        addEventListener: (_: string, fn: any) => (listener = fn),
+      };
+      const box = { parentElement: null, closest: () => form, querySelector: () => outEl };
+      const script = { previousElementSibling: { textContent: json.replace(/&quot;/g, '"').replace(/&amp;/g, "&") }, parentElement: box };
+      new Function("document", code)({ currentScript: script, createElement: () => ({ className: "", textContent: "" }) });
+      listener({ target: { name: "roles" } });
+
+      const perms = [...new Set(combo.flatMap((id) => roleDefs[id]))] as any[];
+      const expected = groupPermissionsForBadges(perms).map((g) =>
+        g.kind === "full" ? t("admin.permissions.badge.full")
+        : g.kind === "resource-full" ? t("admin.permissions.badge.resourceFull", { resource: cfg.resources[g.resource] ?? g.resource })
+        : cfg.labels[g.permission]);
+      expect(out.map((e) => e.textContent)).toEqual(expected);
+    }
+  });
+});
