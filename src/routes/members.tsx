@@ -401,14 +401,14 @@ function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRo
         <td class="text-right whitespace-nowrap">
           {!readOnly && memberId && (
             <>
-              <button type="button" class="btn btn-ghost btn-sm" hx-get={`/members/${memberId}/assignments/${r.id}/edit`} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>{t("common.edit")}</button>
-              <button type="button" class="btn btn-ghost btn-sm text-error" hx-post={`/members/${memberId}/assignments/${r.id}/delete`} hx-confirm={t("members.assignment.confirmDelete")} hx-target="#assignments-box" hx-swap="outerHTML">{t("common.delete")}</button>
+              <button type="button" class="btn btn-ghost btn-xs" hx-get={`/members/${memberId}/assignments/${r.id}/edit`} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>{t("common.edit")}</button>
+              <button type="button" class="btn btn-outline btn-error btn-xs" hx-post={`/members/${memberId}/assignments/${r.id}/delete`} hx-confirm={t("members.assignment.confirmDelete")} hx-target="#assignments-box" hx-swap="outerHTML">{t("common.delete")}</button>
             </>
           )}
           {!readOnly && !memberId && (
             <button
               type="button"
-              class="btn btn-ghost btn-sm text-error"
+              class="btn btn-outline btn-error btn-xs"
               onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))"
             >
               {t("common.delete")}
@@ -429,6 +429,7 @@ function AssignmentsBox({ rows, memberId, readOnly }: { rows: AssignmentRowData[
         <table class="table w-full">
           <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
           <tbody id="role-rows" data-next-index={String(rows.length)}>
+            <tr class="assignment-empty hidden only:table-row"><td colSpan={5} class="text-center opacity-50 py-4">{t("members.assignment.empty")}</td></tr>
             {sortRows(rows).map((r, i) => <AssignmentRow key={r.id || i} r={r} memberId={memberId} index={r.idx ?? String(i)} readOnly={readOnly} />)}
           </tbody>
         </table>
@@ -568,7 +569,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         <input type="text" name="note" class="input input-bordered w-full" maxlength={200} value={values.note ?? ""} />
       </div>
       <div class="modal-action">
-        <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
+        <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
         <button type="submit" name="more" value="1" class="btn btn-ghost">{t("members.assignment.saveAndMore")}</button>
         <button type="submit" class="btn btn-primary">{t("common.save")}</button>
       </div>
@@ -1404,7 +1405,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
           var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
           function current() { var c = form.querySelector('input[name="startStatus"]:checked'); return c ? c.value : ''; }
           function prefill() {
-            if (current() !== 'aktiv' || rows.children.length) return;
+            if (current() !== 'aktiv' || rows.querySelector('tr:not(.assignment-empty)')) return;
             var i = parseInt(rows.dataset.nextIndex || '0', 10);
             rows.dataset.nextIndex = String(i + 1);
             htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' }).then(function () { form.dispatchEvent(new Event('change', { bubbles: true })); });
