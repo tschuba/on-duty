@@ -34,7 +34,7 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `member-role-types:read`   | ✔ | ✔ |   | ✔ | ✔ |   |
 | `member-role-types:write`  | ✔ |   |   |   |   |   |
 | `member-role-types:delete` | ✔ |   |   |   |   |   |
-| `anniversary-years:read`   | ✔ | ✔ |   |   |   |   |
+| `anniversary-years:read`   | ✔ | ✔ |   | ✔ | ✔ |   |
 | `anniversary-years:write`  | ✔ | ✔ |   |   |   |   |
 | `anniversary-years:delete` | ✔ |   |   |   |   |   |
 
