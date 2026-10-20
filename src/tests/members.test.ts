@@ -918,7 +918,7 @@ describe("bank data gating", () => {
     const res = await memberRoutes.request("/m1", { method: "POST", body: formBody({ iban: "DE00 1234" }) });
     expect(res.status).toBe(422);
     expect(updateCalls.some((c) => c.table === members)).toBe(false);
-    expect(await res.text()).toMatch(/<details data-bank-key="[^"]*" class="[^"]*" open>/);
+    expect(await res.text()).toMatch(/<details data-bank-key="[^"]*" class="[^"]*" open="">/);
   });
 });
 
