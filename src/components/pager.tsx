@@ -1,6 +1,6 @@
 import { t } from "../i18n/index.js";
 
-// Sticky bottom pager. Must be placed OUTSIDE any overflow-x-auto wrapper, otherwise
+// Sticky pager; bottom-6 keeps it above the fixed version footer (layout.tsx, 1.5rem). Must be placed OUTSIDE any overflow-x-auto wrapper, otherwise
 // sticky binds to that scroll container instead of the viewport.
 export function Pager(props: {
   countLabel: string;
@@ -13,7 +13,7 @@ export function Pager(props: {
 }) {
   const { countLabel, page, totalPages, pageUrl, pageSize, pageSizeOptions, pageSizeStorageKey } = props;
   return (
-    <div class="sticky bottom-0 z-10 bg-base-100 border-t border-base-300 py-2 mt-4 flex flex-wrap items-center justify-end gap-4">
+    <div class="sticky bottom-6 z-10 bg-base-100 border-t border-base-300 py-2 mt-4 flex flex-wrap items-center justify-end gap-4">
       <span class="text-sm opacity-70 mr-auto">{countLabel}</span>
       {pageSizeOptions && (
         <div class="flex items-center gap-2 text-sm opacity-70">
