@@ -337,6 +337,13 @@
       "when": 1792900000000,
       "tag": "0047_commanders_first",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793000000000,
+      "tag": "0048_member_roles_permission",
+      "breakpoints": true
     }
   ]
 }

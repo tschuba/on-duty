@@ -354,11 +354,13 @@ export const de = {
   "admin.permissions.resource.inventory": "Inventar",
   "admin.permissions.resource.lending": "Verleih",
   "admin.permissions.resource.org": "Organisation",
+  "admin.permissions.resource.member-roles": "Funktionen",
   "admin.permissions.key.orgRead": "Organisation ansehen",
   "admin.permissions.key.orgWrite": "Organisation bearbeiten",
   "admin.permissions.key.orgTaxDataRead": "Steuerdaten ansehen",
   "admin.permissions.key.orgTaxDataWrite": "Steuerdaten bearbeiten",
   "admin.permissions.key.importRun": "Daten importieren",
+  "admin.permissions.key.memberRolesManage": "Funktionen und Funktionstypen verwalten",
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",

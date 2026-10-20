@@ -31,6 +31,7 @@ import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSetti
 
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
+const rolesGuard = requireAuth("member-roles:manage");
 
 // system:admin is reserved for the built-in protected `admin` role — never offered
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
@@ -60,6 +61,7 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "org:tax-data:read": t("admin.permissions.key.orgTaxDataRead"),
   "org:tax-data:write": t("admin.permissions.key.orgTaxDataWrite"),
   "import:run": t("admin.permissions.key.importRun"),
+  "member-roles:manage": t("admin.permissions.key.memberRolesManage"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -70,6 +72,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   inventory: t("admin.permissions.resource.inventory"),
   lending: t("admin.permissions.resource.lending"),
   org: t("admin.permissions.resource.org"),
+  "member-roles": t("admin.permissions.resource.member-roles"),
 };
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "anniversaries" | "config" | "backup" }) {
@@ -1368,8 +1371,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
     </Layout>
   );
 };
-adminRoutes.get("/roles", guard, rolesPage("roles"));
-adminRoutes.get("/role-types", guard, rolesPage("types"));
+adminRoutes.get("/roles", rolesGuard, rolesPage("roles"));
+adminRoutes.get("/role-types", rolesGuard, rolesPage("types"));
 
 function RoleForm({ types, role, hasAssignments, affected }: {
   types: (typeof memberRoleTypes.$inferSelect)[];
@@ -1438,7 +1441,7 @@ function ModalActions({ submit }: { submit: string }) {
 const SHOW_MODAL = <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />;
 
 // HTMX fragment: new role modal
-adminRoutes.get("/roles/new", guard, async (c) => {
+adminRoutes.get("/roles/new", rolesGuard, async (c) => {
   const types = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   return c.html(
     <>
@@ -1453,7 +1456,7 @@ adminRoutes.get("/roles/new", guard, async (c) => {
 });
 
 // HTMX fragment: edit role modal
-adminRoutes.get("/roles/:id/edit", guard, async (c) => {
+adminRoutes.get("/roles/:id/edit", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1482,7 +1485,7 @@ adminRoutes.get("/roles/:id/edit", guard, async (c) => {
 });
 
 // POST /admin/roles — create
-adminRoutes.post("/roles", guard, async (c) => {
+adminRoutes.post("/roles", rolesGuard, async (c) => {
   const body = await c.req.parseBody();
   const title = String(body.title ?? "").trim();
   const grantsActiveStatus = body.grantsActiveStatus === "1";
@@ -1510,7 +1513,7 @@ adminRoutes.post("/roles", guard, async (c) => {
 });
 
 // POST /admin/roles/reorder — body: id=…&id=… (all roles of ONE type, in new order)
-adminRoutes.post("/roles/reorder", guard, async (c) => {
+adminRoutes.post("/roles/reorder", rolesGuard, async (c) => {
   const posted = ((await c.req.parseBody({ all: true })).id ?? []) as string | string[];
   const ids = Array.isArray(posted) ? posted : [posted];
   const [first] = ids.length ? await db.select().from(memberRoles).where(eq(memberRoles.id, ids[0])) : [];
@@ -1522,7 +1525,7 @@ adminRoutes.post("/roles/reorder", guard, async (c) => {
 });
 
 // POST /admin/roles/:id/move — dir=up|down within the role's type
-adminRoutes.post("/roles/:id/move", guard, async (c) => {
+adminRoutes.post("/roles/:id/move", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
@@ -1533,7 +1536,7 @@ adminRoutes.post("/roles/:id/move", guard, async (c) => {
 });
 
 // POST /admin/roles/:id/active — toggle the active-status flag from the list
-adminRoutes.post("/roles/:id/active", guard, async (c) => {
+adminRoutes.post("/roles/:id/active", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const body = await c.req.parseBody();
   const back = body.active === "1" || body.active === "0" ? `/admin/roles?active=${body.active}` : "/admin/roles";
@@ -1549,7 +1552,7 @@ adminRoutes.post("/roles/:id/active", guard, async (c) => {
 });
 
 // POST /admin/roles/:id — update
-adminRoutes.post("/roles/:id", guard, async (c) => {
+adminRoutes.post("/roles/:id", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1585,7 +1588,7 @@ adminRoutes.post("/roles/:id", guard, async (c) => {
 });
 
 // POST /admin/roles/:id/delete
-adminRoutes.post("/roles/:id/delete", guard, async (c) => {
+adminRoutes.post("/roles/:id/delete", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role) return c.redirect("/admin/roles");
@@ -1630,7 +1633,7 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
   );
 }
 
-adminRoutes.get("/role-types/new", guard, (c) =>
+adminRoutes.get("/role-types/new", rolesGuard, (c) =>
   c.html(
     <>
       <h3 class="font-bold text-lg mb-4">{t("admin.roleTypes.new")}</h3>
@@ -1642,7 +1645,7 @@ adminRoutes.get("/role-types/new", guard, (c) =>
     </>
   ));
 
-adminRoutes.get("/role-types/:id/edit", guard, async (c) => {
+adminRoutes.get("/role-types/:id/edit", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1658,7 +1661,7 @@ adminRoutes.get("/role-types/:id/edit", guard, async (c) => {
   );
 });
 
-adminRoutes.post("/role-types", guard, async (c) => {
+adminRoutes.post("/role-types", rolesGuard, async (c) => {
   const body = await c.req.parseBody();
   const name = String(body.name ?? "").trim();
   if (!name) {
@@ -1688,7 +1691,7 @@ async function flaggedRolesBlocking(type: typeof memberRoleTypes.$inferSelect, n
   return flagged.map((r) => r.title);
 }
 
-adminRoutes.post("/role-types/:id/allows-active", guard, async (c) => {
+adminRoutes.post("/role-types/:id/allows-active", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1699,7 +1702,7 @@ adminRoutes.post("/role-types/:id/allows-active", guard, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
-adminRoutes.post("/role-types/:id", guard, async (c) => {
+adminRoutes.post("/role-types/:id", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -1717,7 +1720,7 @@ adminRoutes.post("/role-types/:id", guard, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
-adminRoutes.post("/role-types/:id/delete", guard, async (c) => {
+adminRoutes.post("/role-types/:id/delete", rolesGuard, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.redirect("/admin/role-types");

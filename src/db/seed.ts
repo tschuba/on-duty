@@ -23,14 +23,14 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Benutzerverwaltung, Systemkonfiguration und Antragsformulare",
     isProtected: true,
-    permissions: ["system:admin", "applications:manage-forms", "import:run"],
+    permissions: ["system:admin", "applications:manage-forms", "import:run", "member-roles:manage"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
     name: "Bearbeiter",
     description: "Kann Mitglieder, Spenden und Anträge bearbeiten sowie Stammdaten pflegen",
     isProtected: true,
-    permissions: ["members:read", "members:write", "donations:read", "donations:record", "applications:read", "applications:record", "applications:manage-forms", "org:write"],
+    permissions: ["members:read", "members:write", "donations:read", "donations:record", "applications:read", "applications:record", "applications:manage-forms", "org:write", "member-roles:manage"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",

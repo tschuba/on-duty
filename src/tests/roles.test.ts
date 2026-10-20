@@ -4,7 +4,7 @@ import { groupPermissionsForBadges } from "../lib/roles.js";
 describe("groupPermissionsForBadges", () => {
   it("collapses every permission into one full-access badge", () => {
     expect(
-      groupPermissionsForBadges(["members:read", "members:write", "members:delete", "members:bank-data:read", "members:bank-data:write", "system:admin", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "org:tax-data:write", "import:run"]),
+      groupPermissionsForBadges(["members:read", "members:write", "members:delete", "members:bank-data:read", "members:bank-data:write", "system:admin", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "org:tax-data:write", "import:run", "member-roles:manage"]),
     ).toEqual([{ kind: "full" }]);
   });
 
