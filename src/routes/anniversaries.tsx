@@ -269,6 +269,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
             <input type="hidden" name="filter" value={filter} />
             {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
+            {showJub && <input type="hidden" name="jub" value="1" />}
             <button type="submit" class="btn">{t("common.show")}</button>
           </form>
 
