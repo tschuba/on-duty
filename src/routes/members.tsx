@@ -719,6 +719,7 @@ function BankDataSection({
   return (
     <>
       <div class="divider">{t("members.bank.title")}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
         <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
@@ -727,6 +728,7 @@ function BankDataSection({
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
         <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
+      </div>
       </div>
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
