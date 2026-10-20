@@ -1246,17 +1246,17 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     <td>
                       <form method="post" action={`/admin/roles/${r.id}/active`} onclick="event.stopPropagation()">
                         {activeFilter && <input type="hidden" name="active" value={activeFilter} />}
-                        <label class="flex items-center gap-2 cursor-pointer" title={!ty.allowsActiveStatus ? t("admin.roles.type.flagNotAllowed") : undefined}>
+                        <label class="flex items-center gap-3 cursor-pointer w-fit" title={!ty.allowsActiveStatus ? t("admin.roles.type.flagNotAllowed") : undefined}>
                           <input
                             type="checkbox"
                             name="grantsActiveStatus"
                             value="1"
-                            class="toggle toggle-success toggle-sm"
+                            class="toggle toggle-success border-2 border-base-content/50 text-base-content/60 hover:border-base-content disabled:opacity-40"
                             checked={r.grantsActiveStatus}
                             disabled={r.isProtected || !ty.allowsActiveStatus}
                             onchange="this.form.submit()"
                           />
-                          <span class={r.grantsActiveStatus ? "" : "opacity-60"}>
+                          <span class={r.grantsActiveStatus ? "font-semibold text-success" : "opacity-70"}>
                             {r.grantsActiveStatus ? t("admin.roles.filterActive") : t("admin.roles.filterPassive")}
                           </span>
                         </label>
@@ -1332,9 +1332,9 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                   <td class="font-medium">{ty.isProtected && <span class="mr-1" title={t("admin.roles.systemRole")}>🔒</span>}{ty.name}</td>
                   <td>
                     <form method="post" action={`/admin/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
-                      <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-success toggle-sm" checked={ty.allowsActiveStatus} onchange="this.form.submit()" />
-                        <span class={ty.allowsActiveStatus ? "" : "opacity-60"}>{ty.allowsActiveStatus ? t("common.yes") : t("common.no")}</span>
+                      <label class="flex items-center gap-3 cursor-pointer w-fit">
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-success border-2 border-base-content/50 text-base-content/60 hover:border-base-content disabled:opacity-40" checked={ty.allowsActiveStatus} onchange="this.form.submit()" />
+                        <span class={ty.allowsActiveStatus ? "font-semibold text-success" : "opacity-70"}>{ty.allowsActiveStatus ? t("common.yes") : t("common.no")}</span>
                       </label>
                     </form>
                   </td>
