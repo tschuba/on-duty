@@ -240,12 +240,16 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
 }
 
 // Async like Layout: the Applications tab (permission + open count) is resolved here.
-export async function MemberTabs({ active, user }: { active: "members" | "anniversaries" | "applications"; user: AuthedUser }) {
+export async function MemberTabs({ active, user }: { active: "members" | "anniversaries" | "applications" | "roles" | "roleTypes"; user: AuthedUser }) {
   const canReviewApplications = user.permissions.has("applications:read");
   const tabs = [
     { key: "members", href: "/members", count: 0 },
     { key: "anniversaries", href: "/anniversaries", count: 0 },
     ...(canReviewApplications ? [{ key: "applications", href: "/applications", count: await countOpenApplications() }] : []),
+    // Role configuration lives behind system:admin (the /admin/* routes enforce it too).
+    ...(user.permissions.has("system:admin")
+      ? [{ key: "roles", href: "/admin/roles", count: 0 }, { key: "roleTypes", href: "/admin/role-types", count: 0 }]
+      : []),
   ] as const;
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">

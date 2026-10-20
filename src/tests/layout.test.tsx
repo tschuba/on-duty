@@ -117,3 +117,14 @@ describe("user menu", () => {
   });
 });
 
+describe("role tabs (MemberTabs)", () => {
+  it("shows Funktionen and Funktionstypen only with system:admin", async () => {
+    const render = async (perm: string) => {
+      const app = new Hono();
+      app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith(perm)} />));
+      return (await app.request("/")).text();
+    };
+    expect(await render("system:admin")).toContain("/admin/role-types");
+    expect(await render("members:write")).not.toContain("/admin/role-types");
+  });
+});

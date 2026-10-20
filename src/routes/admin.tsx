@@ -19,7 +19,7 @@ import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
@@ -72,7 +72,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   org: t("admin.permissions.resource.org"),
 };
 
-function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "roleTypes" | "anniversaries" | "config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "anniversaries" | "config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -80,12 +80,6 @@ function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "ro
       </a>
       <a href="/admin/permissions" role="tab" class={`tab${active === "permissions" ? " tab-active" : ""}`}>
         {t("admin.tabs.permissions")}
-      </a>
-      <a href="/admin/roles" role="tab" class={`tab${active === "roles" ? " tab-active" : ""}`}>
-        {t("admin.tabs.roles")}
-      </a>
-      <a href="/admin/role-types" role="tab" class={`tab${active === "roleTypes" ? " tab-active" : ""}`}>
-        {t("admin.tabs.roleTypes")}
       </a>
       <a href="/admin/anniversaries" role="tab" class={`tab${active === "anniversaries" ? " tab-active" : ""}`}>
         {t("admin.tabs.anniversaries")}
@@ -1041,7 +1035,7 @@ adminRoutes.post("/permissions/:id/delete", guard, async (c) => {
 // ── /admin/roles ──────────────────────────────────────────────────────────────
 function badRequest(c: any, message: string, detail?: string[]) {
   return c.html(
-    <Layout title={t("admin.roles.title")} user={c.get("user")} activeNav="admin">
+    <Layout title={t("admin.roles.title")} user={c.get("user")} activeNav="members">
       <div class="alert alert-error max-w-2xl mx-auto mb-4" role="alert">
         <div>
           <p>{message}</p>
@@ -1176,9 +1170,9 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   const canReorder = !activeFilter;
 
   return c.html(
-    <Layout title={t("admin.roles.title")} user={user} activeNav="admin">
+    <Layout title={t("admin.roles.title")} user={user} activeNav="members">
       <BackupWarnBanner {...warn} />
-      <AdminTabs active={tab === "types" ? "roleTypes" : "roles"} />
+      <MemberTabs active={tab === "types" ? "roleTypes" : "roles"} user={user} />
 
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>

@@ -40,6 +40,8 @@ export const de = {
   "donations.tabs.donors": "Spender",
   "common.nav.admin": "Admin",
   "common.nav.import": "Import",
+  "common.nav.roles": "Funktionen",
+  "common.nav.roleTypes": "Funktionstypen",
   "common.nav.applications": "Anträge",
   "common.nav.inventory": "Inventar",
   "common.nav.organisation": "Organisation",
