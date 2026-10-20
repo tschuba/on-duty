@@ -28,6 +28,9 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `org:tax-data:read`        |   |   |   | ✔ |   | ✔ |
 | `org:tax-data:write`       |   |   |   |   |   | ✔ |
 | `import:run`               | ✔ |   |   |   |   |   |
+| `member-roles:read`        | ✔ | ✔ |   |   |   |   |
+| `member-roles:write`       | ✔ | ✔ |   |   |   |   |
+| `member-roles:delete`      | ✔ |   |   |   |   |   |
 
 ## Hinweis
 
