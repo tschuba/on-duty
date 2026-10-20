@@ -225,6 +225,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         document.body.addEventListener("htmx:beforeRequest", (e) => e.detail.elt.classList.add("loading", "loading-spinner"));
         document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));
       ` }} />
+    <script dangerouslySetInnerHTML={{ __html: `(function(){var m=document.cookie.match(/(?:^|; )draft-clear=([^;]*)/);if(m){localStorage.removeItem('member-draft:'+decodeURIComponent(m[1]));document.cookie='draft-clear=; Max-Age=0; path=/';}})();` }} />
     </body>
   </html>
   );

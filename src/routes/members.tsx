@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import { eq, and, asc, getTableColumns } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
@@ -1307,7 +1307,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     <Layout title={t("members.newMember")} user={user} activeNav="members">
       <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
       <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
-        <NewMemberDraft ctx={personId ? `person:${personId}` : linkMemberId ? `link:${linkMemberId}` : applicationId ? `app:${applicationId}` : "new"} />
+        <NewMemberDraft ctx={draftCtx({ personId, linkMemberId, applicationId })} />
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1333,6 +1333,9 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   );
 });
 
+const draftCtx = (o: { personId?: string; linkMemberId?: string; applicationId?: string }) =>
+  o.personId ? `person:${o.personId}` : o.linkMemberId ? `link:${o.linkMemberId}` : o.applicationId ? `app:${o.applicationId}` : "new";
+
 // Entwurf der Neuanlage (localStorage, ohne Bankdaten, 7 Tage). Schlüssel je Kontext; Banner statt Auto-Wiederherstellung.
 function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) {
   const texts = JSON.stringify({ banner: t("members.draft.banner"), restore: t("members.draft.restore"), discard: t("members.draft.discard") });
@@ -1349,7 +1352,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
         var timer; function later() { clearTimeout(timer); timer = setTimeout(save, 500); }
         form.addEventListener('input', later); form.addEventListener('change', later);
         document.body.addEventListener('assignment-modal', function () { setTimeout(save, 600); });
-        form.addEventListener('submit', function () { clearTimeout(timer); localStorage.removeItem(KEY); });
+        form.addEventListener('submit', function () { clearTimeout(timer); });
         window.addEventListener('pagehide', function () { clearTimeout(timer); });
         if (${rerender ? "true" : "false"}) { save(); return; }
         var raw = localStorage.getItem(KEY), d; try { d = raw && JSON.parse(raw); } catch (e) {}
@@ -1618,7 +1621,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
-          <NewMemberDraft ctx={personId ? `person:${personId}` : linkMemberId ? `link:${linkMemberId}` : applicationId ? `app:${applicationId}` : "new"} rerender />
+          <NewMemberDraft ctx={draftCtx({ personId, linkMemberId, applicationId })} rerender />
           {personId && <input type="hidden" name="personId" value={personId} />}
           {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1729,6 +1732,8 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   }
 
   setFlash(c, t("members.flash.created"), "success");
+  // Entwurf erst nach erfolgreichem Anlegen löschen: Layout-Skript entfernt den Schlüssel auf der Folgeseite.
+  setCookie(c, "draft-clear", draftCtx({ personId, linkMemberId, applicationId }), { path: "/", maxAge: 60, httpOnly: false });
   const saveAndNew = String(body._action ?? "") === "save_and_new";
   return c.redirect(saveAndNew ? "/members/new" : "/members");
 });
