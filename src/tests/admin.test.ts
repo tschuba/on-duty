@@ -1132,4 +1132,11 @@ describe("role types (Spec 47)", () => {
     expect(types).toContain(t("admin.roleTypes.new"));
     expect(types).not.toContain(t("admin.roles.newRole"));
   });
+
+  it("renders one collapsible section per type", async () => {
+    typesFixture = [makeType(), makeType({ id: "t2", name: "Verein", sortOrder: 2 })];
+    rolesFixture = [makeRoleRow()];
+    const html = await (await adminRoutes.request("/roles")).text();
+    expect(html.match(/<details[^>]*data-section=/g)?.length).toBe(2);
+  });
 });

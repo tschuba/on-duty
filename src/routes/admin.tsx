@@ -1068,6 +1068,15 @@ async function nextRoleSortOrder(typeId: string) {
 
 const REORDER_SCRIPT = `
 (function () {
+  // Remember collapsed sections across reloads (reorder reloads the page).
+  var closed = JSON.parse(localStorage.getItem('roleSectionsClosed') || '[]');
+  document.querySelectorAll('details[data-section]').forEach(function (d) {
+    if (closed.indexOf(d.dataset.section) >= 0) d.open = false;
+    d.addEventListener('toggle', function () {
+      var c = Array.prototype.filter.call(document.querySelectorAll('details[data-section]'), function (x) { return !x.open; }).map(function (x) { return x.dataset.section; });
+      localStorage.setItem('roleSectionsClosed', JSON.stringify(c));
+    });
+  });
   var drag = null;
   document.addEventListener('dragstart', function (e) {
     var tr = e.target.closest && e.target.closest('tr[data-id]');
@@ -1197,8 +1206,15 @@ adminRoutes.get("/roles", guard, async (c) => {
       </div>
 
       <ClickToEditHint />
-      <div class="overflow-x-auto mb-10">
-        <table class="table table-zebra w-full">
+      {types.map((ty) => {
+        const typeRoles = rolesWithCount.filter((r) => r.typeId === ty.id);
+        return (
+          <details key={ty.id} data-section={ty.id} open class="collapse collapse-arrow bg-base-100 border border-base-300 mb-4">
+            <summary class="collapse-title font-semibold">
+              {ty.name} <span class="badge badge-ghost badge-sm ml-2">{typeRoles.length}</span>
+            </summary>
+            <div class="collapse-content overflow-x-auto">
+              <table class="table table-zebra w-full">
           <thead>
             <tr>
               <th>{t("admin.roles.table.name")}</th>
@@ -1206,11 +1222,7 @@ adminRoutes.get("/roles", guard, async (c) => {
               <th />
             </tr>
           </thead>
-          {types.map((ty) => (
-            <tbody key={ty.id} data-reorder-url="/admin/roles/reorder">
-              <tr class="bg-base-200">
-                <th colspan={3} class="text-sm uppercase tracking-wide opacity-70">{ty.name}</th>
-              </tr>
+            <tbody data-reorder-url="/admin/roles/reorder">
               {rolesWithCount.filter((r) => r.typeId === ty.id).map((r) => {
                 const canDelete = !r.isProtected && r.assignmentCount === 0;
                 return (
@@ -1271,9 +1283,11 @@ adminRoutes.get("/roles", guard, async (c) => {
                 );
               })}
             </tbody>
-          ))}
-        </table>
-      </div>
+              </table>
+            </div>
+          </details>
+        );
+      })}
 
       </>)}
 
