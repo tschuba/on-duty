@@ -490,6 +490,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
           <label class="input input-bordered flex items-center gap-2 w-full mb-1">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
+            <button type="button" class="role-picker-clear btn btn-ghost btn-xs btn-circle hidden" aria-label={t("common.reset")}><Icon name="x-mark" class="w-4 h-4" /></button>
           </label>
           {types.length > 1 && (
             <div role="tablist" class="role-picker-tabs tabs tabs-border mb-1">
@@ -522,16 +523,16 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         <label class="label"><span class="label-text">{t("members.form.note")}</span></label>
         <input type="text" name="note" class="input input-bordered w-full" maxlength={200} value={values.note ?? ""} />
       </div>
-      <div class="modal-action">
-        <button type="button" class="btn btn-ghost" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
-        <button type="submit" name="more" value="1" class="btn btn-ghost">{t("members.assignment.saveAndMore")}</button>
-        <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+      <div class="modal-action flex-wrap">
+        <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
+        <button type="submit" name="more" value="1" class="btn btn-outline btn-primary"><Icon name="plus" class="w-4 h-4" />{t("members.assignment.saveAndMore")}</button>
+        <button type="submit" class="btn btn-primary"><Icon name="check" class="w-4 h-4" />{t("common.save")}</button>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
         (function () {
           var root = document.currentScript.parentNode.querySelector('.role-picker');
           var value = root.querySelector('.role-picker-value'), search = root.querySelector('.role-picker-search');
-          var list = root.querySelector('.role-picker-list'), noMatch = root.querySelector('.role-picker-no-match');
+          var clear = root.querySelector('.role-picker-clear'), list = root.querySelector('.role-picker-list'), noMatch = root.querySelector('.role-picker-no-match');
           var opts = Array.from(list.querySelectorAll('li[role=option]')), tabs = Array.from(root.querySelectorAll('.role-picker-tab'));
           function activeType() { var t = root.querySelector('.role-picker-tab.tab-active'); return t ? t.dataset.type : null; }
           function visible() { return opts.filter(function (o) { return !o.hidden; }); }
@@ -541,6 +542,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
             opts.forEach(function (o) { o.hidden = !(o.dataset.title.toLowerCase().includes(q) && (!type || o.dataset.type === type)); });
             noMatch.classList.toggle('hidden', visible().length > 0);
             // Suche geht über alle Typen: Tabs abblenden, Typ pro Treffer zeigen.
+            clear.classList.toggle('hidden', !q);
             var bar = root.querySelector('.role-picker-tabs');
             if (bar) { bar.classList.toggle('opacity-40', !!q); bar.classList.toggle('pointer-events-none', !!q); }
             opts.forEach(function (o) { o.querySelector('.role-picker-type').classList.toggle('hidden', !q); });
@@ -554,7 +556,10 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
           tabs.forEach(function (t) { t.addEventListener('click', function () { search.value = ''; setTab(t); search.focus(); }); });
           list.addEventListener('click', function (e) { var li = e.target.closest('li[role=option]'); if (li) pick(li); });
           search.addEventListener('input', filter);
+          clear.addEventListener('click', function () { search.value = ''; filter(); search.focus(); });
           search.addEventListener('keydown', function (e) {
+            // Escape leert zuerst den Suchbegriff; erst bei leerem Feld schließt es das Modal (Browser-Standard).
+            if (e.key === 'Escape' && search.value) { e.preventDefault(); e.stopPropagation(); search.value = ''; filter(); return; }
             var v = visible(), cur = v.findIndex(function (o) { return o.classList.contains('menu-active'); });
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mark(v[Math.max(0, Math.min(v.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1)))]); }
             else if (e.key === 'Enter') { e.preventDefault(); if (cur >= 0) pick(v[cur]); else if (v.length === 1) pick(v[0]); else root.closest('form').querySelector('[name=from]').focus(); }
