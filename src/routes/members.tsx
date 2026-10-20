@@ -9,6 +9,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { RolePopover } from "../components/role-popover.js";
+import { ACTIVE_ROLE_ID } from "../lib/import.js";
 import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -371,14 +372,16 @@ function RoleRow({
   index,
   roles,
   assignment,
+  auto,
 }: {
   index: number;
   roles: Role[];
   assignment?: Assignment;
+  auto?: boolean;
 }) {
   const selectedTitle = assignment ? (roles.find((r) => r.id === assignment.memberRoleId)?.title ?? "") : "";
   return (
-    <tr id={`role-row-${index}`}>
+    <tr id={`role-row-${index}`} data-autofrom={auto ? "1" : undefined}>
       <td>
         <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
         <input type="hidden" name="assignment_role[]" class="role-combobox-value" value={assignment?.memberRoleId ?? ""} />
@@ -458,7 +461,7 @@ function RoleRow({
         <button
           type="button"
           class="btn btn-ghost text-error"
-          onclick={`this.closest('tr').remove()`}
+          onclick={`var f=this.closest('form');this.closest('tr').remove();f.dispatchEvent(new Event('change'))`}
         >
           ✕
         </button>
@@ -521,6 +524,7 @@ function RoleRow({
 
           function rcSetValue(trigger, id, title) {
             rcHidden(trigger).value = id;
+            rcHidden(trigger).dispatchEvent(new Event('change', { bubbles: true }));
             trigger.textContent = title || trigger.dataset.placeholder;
             trigger.classList.toggle('opacity-50', !id);
             trigger.classList.remove('btn-error');
@@ -662,61 +666,63 @@ function BankDataSection({
   );
 }
 
-// Live preview of the derived status; mirrors deriveMemberStatus (src/lib/status.ts) client-side.
-function StatusPreview({ roles }: { roles: Role[] }) {
-  const cfg = {
-    active: roles.filter((r) => r.grantsActiveStatus).map((r) => r.id),
-    children: env.CHILDREN_AGE_LIMIT,
-    youth: env.YOUTH_AGE_LIMIT,
-    limit: env.ACTIVE_AGE_LIMIT,
-    labels: STATUS_LABELS,
-  };
+// Live preview of the derived status: HTMX posts the whole form to /members/status-preview,
+// which uses the same deriveMemberStatus as saving.
+function StatusPreview() {
   return (
-    <p class="text-sm opacity-60" id="status-preview" data-cfg={JSON.stringify(cfg)}>
-      {t("members.form.activeHint")} {t("members.form.statusPreview")} <strong class="status-preview-value"></strong>
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function () {
-          var box = document.getElementById('status-preview');
-          var cfg = JSON.parse(box.dataset.cfg);
-          var form = box.closest('form');
-          function val(n) { var el = form.querySelector('[name="' + n + '"]'); return el ? el.value : ''; }
-          function update() {
-            var status = 'foerdernd';
-            if (val('deathDate')) status = 'verstorben';
-            else if (val('exitDate')) status = 'ausgetreten';
-            else {
-              var roles = form.querySelectorAll('[name="assignment_role[]"]');
-              var tos = form.querySelectorAll('[name="assignment_to[]"]');
-              var froms = form.querySelectorAll('[name="assignment_from[]"]');
-              var b = new Date(val('birthDate')), now = new Date();
-              var age = now.getFullYear() - b.getFullYear();
-              if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
-              var isActive = function (r) { return r.value && cfg.active.indexOf(r.value) !== -1; };
-              var hasActive = Array.prototype.some.call(roles, function (r, i) { return isActive(r) && !tos[i].value; });
-              if (hasActive && (isNaN(age) || age < cfg.limit)) {
-                status = isNaN(age) ? 'aktiv' : age < cfg.children ? 'kinder' : age < cfg.youth ? 'jugend' : 'aktiv';
-              } else if (val('birthDate')) {
-                var cutoff = (b.getFullYear() + cfg.limit) + val('birthDate').slice(4);
-                var atCutoff = Array.prototype.some.call(roles, function (r, i) {
-                  return isActive(r) && froms[i].value <= cutoff && (!tos[i].value || tos[i].value >= cutoff);
-                });
-                if (atCutoff) status = 'passiv';
-              }
-            }
-            var out = box.querySelector('.status-preview-value');
-            // write only on change: this node sits inside the observed form, an unconditional write would retrigger the observer forever
-            if (out.textContent !== cfg.labels[status]) out.textContent = cfg.labels[status];
-          }
-          form.addEventListener('input', update);
-          form.addEventListener('change', update);
-          // role combobox sets a hidden input programmatically, which fires no event
-          new MutationObserver(update).observe(form, { subtree: true, attributes: true, childList: true, attributeFilter: ['value', 'aria-selected'] });
-          update();
-        })();
-      ` }} />
-    </p>
+    <div
+      hx-post="/members/status-preview"
+      hx-include="closest form"
+      hx-trigger="load, input from:closest form delay:300ms, change from:closest form"
+      hx-target="#status-preview"
+      hx-swap="innerHTML"
+    >
+      <div id="status-preview" class="text-sm opacity-80 space-y-1" />
+    </div>
   );
 }
+
+function parseFormAssignments(body: Record<string, any>, allRoles: Role[]): Assignment[] {
+  const roles = [body["assignment_role[]"]].flat() as string[];
+  const froms = [body["assignment_from[]"]].flat() as string[];
+  const tos = [body["assignment_to[]"]].flat() as string[];
+  return roles.flatMap((r, i) => {
+    const role = allRoles.find((x) => x.id === r);
+    return role && froms[i] ? [{ from: froms[i], to: tos[i] || null, role } as Assignment] : [];
+  });
+}
+
+// POST /members/status-preview — HTMX fragment: derived status, conflict with the start choice, age-limit hints
+memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  const birthDate = trimmed(body, "birthDate");
+  const allRoles = await db.select().from(memberRoles);
+  const planned = parseFormAssignments(body, allRoles);
+  const member = { exitDate: trimmed(body, "exitDate") || null, deathDate: trimmed(body, "deathDate") || null, birthDate };
+  if (!birthDate) return c.html(<p>{t("members.form.activeHint")}</p>);
+  const status = deriveMemberStatus(member, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
+  const choice = trimmed(body, "startStatus");
+  const name = `${trimmed(body, "firstName")} ${trimmed(body, "lastName")}`.trim() || t("members.form.thisMember");
+  const conflict = ["aktiv", "passiv", "foerdernd"].includes(choice)
+    ? checkStartStatus(choice as StartStatus, member, planned, name)
+    : undefined;
+  const cutoff = ageLimitDate(birthDate, env.ACTIVE_AGE_LIMIT);
+  const limitReached = new Date().toISOString().slice(0, 10) >= cutoff;
+  const hints = limitReached
+    ? planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff))
+    : [];
+  return c.html(
+    <>
+      <p>{t("members.form.activeHint")} {t("members.form.statusPreview")} <strong>{STATUS_LABELS[status]}</strong></p>
+      {conflict && <p class="text-warning">{conflict.message}</p>}
+      {hints.map((a) => (
+        <p class="text-warning">
+          {t("members.form.roleAgeLimitHint", { datum: new Date(cutoff).toLocaleDateString("de-DE"), title: a.role.title })}
+        </p>
+      ))}
+    </>
+  );
+});
 
 function MemberFormFields({
   m,
@@ -1185,7 +1191,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           </label>
         )}
         <div class="divider">{t("members.form.assignments")}</div>
-        <StatusPreview roles={roles} />
+        <StatusPreview />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
@@ -1223,7 +1229,29 @@ function StartStatusSelect({ value }: { value: StartStatus }) {
         ))}
       </select>
       <p class="text-xs opacity-60 mt-1">{t("members.form.startStatusHint")}</p>
-      {value === "passiv" && <p class="text-xs opacity-60">{t("members.form.startStatusPassiveHint")}</p>}
+      <p id="startStatusPassiveHint" class="text-xs opacity-60" hidden={value !== "passiv"}>{t("members.form.startStatusPassiveHint")}</p>
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.addEventListener('DOMContentLoaded', function () {
+          var sel = document.getElementById('startStatus'), form = sel.closest('form'), rows = document.getElementById('role-rows');
+          function prefill() {
+            if (sel.value !== 'aktiv' || rows.children.length) return;
+            var i = parseInt(rows.dataset.nextIndex || '0', 10);
+            rows.dataset.nextIndex = String(i + 1);
+            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' });
+          }
+          sel.addEventListener('change', function () {
+            document.getElementById('startStatusPassiveHint').hidden = sel.value !== 'passiv';
+            prefill();
+          });
+          form.elements.entryDate.addEventListener('input', function (e) {
+            rows.querySelectorAll('tr[data-autofrom] input[name="assignment_from[]"]').forEach(function (el) { el.value = e.target.value; });
+          });
+          rows.addEventListener('input', function (e) {
+            if (e.target.name === 'assignment_from[]') e.target.closest('tr').removeAttribute('data-autofrom');
+          });
+          prefill();
+        });
+      ` }} />
     </div>
   );
 }
@@ -1265,7 +1293,12 @@ function checkStartStatus(
 memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   const index = Number(c.req.query("index") ?? 0);
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
-  return c.html(<RoleRow index={index} roles={roles} />);
+  // Optional prefill (used for the "aktiv" start choice): ?roleId=&from=&auto=1
+  const roleId = c.req.query("roleId");
+  const assignment = roleId
+    ? ({ id: "", memberRoleId: roleId, from: c.req.query("from") ?? "", to: null, note: null } as Assignment)
+    : undefined;
+  return c.html(<RoleRow index={index} roles={roles} assignment={assignment} auto={c.req.query("auto") === "1"} />);
 });
 
 // POST /members/new — create member (or link an existing person, see GET /new)
@@ -1391,7 +1424,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </label>
           )}
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview roles={roles} />
+          <StatusPreview />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1690,7 +1723,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
-        <StatusPreview roles={roles} />
+        <StatusPreview />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1798,7 +1831,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview roles={roles} />
+          <StatusPreview />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1870,7 +1903,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview roles={roles} />
+          <StatusPreview />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>

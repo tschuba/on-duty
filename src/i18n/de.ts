@@ -139,6 +139,7 @@ export const de = {
   "members.form.startStatus": "Status beim Anlegen",
   "members.form.startStatusHint": "Wird nicht gespeichert, sondern gegen die eingetragenen Funktionen geprüft.",
   "members.form.startStatusPassiveHint": "Passiv wird aus einer aktiv machenden Funktion abgeleitet, die bei Erreichen der Altersgrenze noch galt. Bitte diese Funktion mit ihrem Zeitraum eintragen.",
+  "members.form.thisMember": "das Mitglied",
   "members.form.createAs": "Als {status} anlegen",
   "members.error.status.activeAgeLimit": "Mit {grenze} Jahren (erreicht am {datum}) ist {name} nicht mehr im aktiven Dienst. Nach den eingetragenen Funktionen wäre {name} passiv.",
   "members.error.status.activeNoRole": "Für „aktiv“ fehlt eine laufende Funktion im aktiven Dienst. Trag eine Funktion ohne Enddatum ein, oder lege {name} als fördernd an.",
