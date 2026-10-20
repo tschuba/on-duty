@@ -50,6 +50,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
     const missing = missingReceiptFields(await loadOrgConfig());
     orgMissingCount = (["master", "tax"] as OrgTab[]).filter((tab) => canReadOrgTab(user.permissions, tab)).reduce((n, tab) => n + missing[tab].length, 0);
   }
+  // "Mitglieder" also serves roles-only users (e.g. the local Administrator): they land on the role pages.
+  const membersNavHref = user?.permissions.has("members:read") ? "/members" : user?.permissions.has("member-roles:read") ? "/admin/roles" : null;
   const pendingUsersCount = user?.permissions.has("system:admin") ? await countPendingUsers() : 0;
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
   const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
@@ -75,9 +77,9 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           </a>
           {user && (
             <div class="hidden md:flex gap-4 items-baseline">
-              {user.permissions.has("members:read") && (
+              {membersNavHref && (
                 <a
-                  href="/members"
+                  href={membersNavHref}
                   class={navLink(activeNav === "members")}
                 >
                   {t("common.nav.members")}
@@ -138,7 +140,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <Icon name="bars-3" class="h-5 w-5 text-gold" />
               </button>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
-                {user.permissions.has("members:read") && <li><a href="/members" class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>}
+                {membersNavHref && <li><a href={membersNavHref} class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}
                 {canSeeOrganisation && <li><a href="/organisation" class={activeNav === "organisation" ? "active" : ""}>{t("common.nav.organisation")}<CountBadge count={activeNav === "organisation" ? 0 : orgMissingCount} /></a></li>}
@@ -243,8 +245,9 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
 export async function MemberTabs({ active, user }: { active: "members" | "anniversaries" | "applications" | "roles" | "roleTypes"; user: AuthedUser }) {
   const canReviewApplications = user.permissions.has("applications:read");
   const tabs = [
-    { key: "members", href: "/members", count: 0 },
-    { key: "anniversaries", href: "/anniversaries", count: 0 },
+    ...(user.permissions.has("members:read")
+      ? [{ key: "members", href: "/members", count: 0 }, { key: "anniversaries", href: "/anniversaries", count: 0 }]
+      : []),
     ...(canReviewApplications ? [{ key: "applications", href: "/applications", count: await countOpenApplications() }] : []),
     // Role configuration has its own permission (the /admin/role* routes enforce it too).
     ...(user.permissions.has("member-roles:read")

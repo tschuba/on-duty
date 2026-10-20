@@ -128,3 +128,13 @@ describe("role tabs (MemberTabs)", () => {
     expect(await render("members:write")).not.toContain("/admin/role-types");
   });
 });
+
+describe("Mitglieder nav item for roles-only users", () => {
+  it("links to the role pages without members:read and hides member tabs", async () => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<MemberTabs active="roles" user={userWith("member-roles:read")} />));
+    const html = await (await app.request("/")).text();
+    expect(html).toContain("/admin/roles");
+    expect(html).not.toContain('href="/members"');
+  });
+});
