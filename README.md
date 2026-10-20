@@ -104,7 +104,7 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `REGISTRATION_AUTO_APPROVE` | — | `false` | Startwert (einmalig): Registrierungen automatisch freigeben (braucht `REGISTRATION_DEFAULT_ROLE_ID`) |
 | `REGISTRATION_DEFAULT_ROLE_ID` | — | — | Startwert (einmalig): Rollen-ID für automatisch freigegebene Nutzer |
 | `YOUTH_AGE_LIMIT` | — | `18` | Altersgrenze Jugendfeuerwehr (Jahre) |
-| `ANNIVERSARY_CUTOFF` | — | `01-06` | Jubiläumsstichtag (MM-DD) |
+| `ANNIVERSARY_CUTOFF` | — | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
 | `BACKUP_SCHEDULE` | — | `0 2 * * 0` | Backup-Intervall (Cron-Ausdruck) |
 | `BACKUP_LOCAL_PATH` | — | — | Pfad für lokales Backup-Volume |
 | `BACKUP_RETENTION_COUNT` | — | `4` | Max. Backup-Dateien pro Ziel |

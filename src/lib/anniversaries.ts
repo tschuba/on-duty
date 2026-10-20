@@ -71,7 +71,7 @@ export function generateEvents(
     for (const { type, base } of bases) {
       for (const ay of anniversaryYears) {
         if (ay.kind !== type) continue;
-        const date = `${getCeremonyYear(base, cutoff, ay.year)}-${base.slice(5)}`;
+        const date = `${getCeremonyYear(base, cutoff, ay.year)}-${cutoff}`;
         if (date < start || date > end) continue;
         const key = `${date}|${ay.year}`;
         const prev = found.get(key);

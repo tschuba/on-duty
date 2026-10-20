@@ -44,7 +44,7 @@ Optional (Defaults in der App):
 | `SESSION_LIFETIME` | `7d` | Session-Gültigkeitsdauer |
 | `BACKUP_SCHEDULE` | `0 2 * * 0` | Cron-Ausdruck für automatisches Backup |
 | `BACKUP_RETENTION_COUNT` | `4` | Anzahl aufbewahrter Backups |
-| `ANNIVERSARY_CUTOFF` | `01-06` | Stichtag für Jubiläumsberechnung (MM-DD) |
+| `ANNIVERSARY_CUTOFF` | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
 | `SMTP_HOST` | — | SMTP-Server für E-Mail-Benachrichtigungen bei Anträgen (leer = Versand deaktiviert) |
 | `SMTP_PORT` | `587` | SMTP-Port |
 | `SMTP_USER` | — | SMTP-Benutzername |
