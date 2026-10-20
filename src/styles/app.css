@@ -183,3 +183,8 @@
     position: static;
   }
 }
+
+/* Section-Aktionen im Titel nur zeigen, solange der einklappbare Bereich offen ist. */
+details:not([open]) > summary .section-actions {
+  display: none;
+}

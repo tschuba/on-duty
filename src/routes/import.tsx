@@ -9,7 +9,7 @@ import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Section } from "../components/section.js";
-import { HTTP_STATUS } from "../lib/constants.js";
+import { HTTP_STATUS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import {
   ASSUMED_NOTE, ACTIVE_ROLE_ID, CATEGORY_OPTIONS, ImportError, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
   parseInventory, parseMembers, planInventory, planMembers, readWorkbook, unmappedColumns,
@@ -225,7 +225,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                 <td>
                   <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} />
                 </td>
-                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={200} class="input input-bordered input-sm" disabled={a.skipped} /></td>
+                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input input-bordered input-sm" disabled={a.skipped} /></td>
                 <td>
                   <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from} class="input input-bordered input-sm" disabled={a.skipped} />
                   {a.assumed && <span class="badge badge-warning badge-sm ml-1">{t("import.badge.assumed")}</span>}
@@ -525,7 +525,7 @@ async function runMembers(plan: MemberPlan, roles: RoleOption[], _user: unknown)
           if (a.assumed) assumed = true;
           await tx.insert(memberRoleAssignments).values({
             memberId: member.id, memberRoleId: roleId, from: a.from,
-            note: a.assumed ? [a.note, ASSUMED_NOTE].filter(Boolean).join("; ").slice(0, 200) : a.note,
+            note: a.assumed ? [a.note, ASSUMED_NOTE].filter(Boolean).join("; ").slice(0, ASSIGNMENT_NOTE_MAX_LENGTH) : a.note,
           });
         }
         if (assumed) links.push({ id: member.id, label: current });

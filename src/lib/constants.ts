@@ -14,3 +14,6 @@ export const HTTP_STATUS = {
 } as const;
 
 export const SEARCH_DEBOUNCE_MS = 300;
+
+// Maximale Länge der Notiz einer Funktionszuweisung (inkl. Umbrüche, je 1 Zeichen).
+export const ASSIGNMENT_NOTE_MAX_LENGTH = 200;

@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import { eq, and, asc, getTableColumns } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
@@ -9,7 +9,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { RolePopover } from "../components/role-popover.js";
 import { ACTIVE_ROLE_ID } from "../lib/import.js";
 import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
@@ -18,7 +18,7 @@ import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
+import { SEARCH_DEBOUNCE_MS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
@@ -360,31 +360,117 @@ export function MembersTable({
   );
 }
 
-// "Zeile hinzufügen"-Button: liest/schreibt data-next-index auf #role-rows statt
-// querySelectorAll(...).length zu zählen — letzteres kollidiert nach Löschen einer
-// Zwischenzeile (gleicher index für zwei Zeilen), was mit popovertarget (eindeutige
-// id-Referenz) sichtbar würde statt wie bisher eine folgenlose doppelte DOM-id zu sein.
-function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
+function roleTypeTabs(roles: Role[]) {
+  const seen = new Map<string, { id: string; name: string }>();
+  for (const r of roles) if (!seen.has(r.typeId)) seen.set(r.typeId, { id: r.typeId, name: r.typeName ?? "" });
+  return [...seen.values()];
+}
+
+// Umbrüche werden als \n gespeichert (\r\n → \n), damit der Zähler im Browser und das Limit hier gleich zählen.
+const normalizeNote = (v?: string) => v?.replace(/\r\n?/g, "\n").trim().slice(0, ASSIGNMENT_NOTE_MAX_LENGTH) || null;
+// Einzeilige Darstellung (Badge, Klammer-Label, Export): Umbrüche werden zu Leerzeichen.
+const singleLine = (v: string) => v.replace(/\s*\n\s*/g, " ");
+const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${singleLine(note)})` : title);
+
+type AssignmentRowData = { id: string; roleId: string; roleTitle: string; from: string; to: string | null; note: string | null; idx?: string };
+
+const toRowData = (a: Assignment): AssignmentRowData => ({ id: a.id, roleId: a.memberRoleId, roleTitle: a.role.title, from: a.from, to: a.to, note: a.note });
+// Offene (ohne „bis“) zuerst, danach „von“ absteigend.
+const sortRows = (rows: AssignmentRowData[]) => [...rows].sort((a, b) => (a.to ? 1 : 0) - (b.to ? 1 : 0) || b.from.localeCompare(a.from));
+
+const ADD_CLICK = "if(event.detail.successful){var d=document.getElementById('assignment-modal');d.showModal();setTimeout(function(){var f=d.querySelector('.role-picker-search');if(f)f.focus()},50)}";
+
+// Eine Zeile der read-only Tabelle. Neuanlage (kein memberId): Werte stecken als Hidden-Inputs im Hauptformular.
+function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRowData; memberId?: string; index?: string; auto?: boolean; readOnly?: boolean }) {
   return (
     <>
-      <button
-        type="button"
-        class="btn btn-ghost"
-        hx-get="/members/role-row"
-        hx-target="#role-rows"
-        hx-swap="beforeend"
-        hx-include="[id='role-rows'] input[name='assignment_id[]']"
-      >
-        {t("members.form.addAssignment")}
-      </button>
+      <tr data-autofrom={auto ? "1" : undefined}>
+        <td>
+          {!memberId && (
+            <>
+              <input type="hidden" name="assignment_idx[]" value={index} />
+              <input type="hidden" name="assignment_id[]" value="" />
+              <input type="hidden" name="assignment_role[]" value={r.roleId} />
+              <input type="hidden" name="assignment_from[]" value={r.from} />
+              <input type="hidden" name="assignment_to[]" value={r.to ?? ""} />
+              <input type="hidden" name="assignment_note[]" value={r.note ?? ""} />
+            </>
+          )}
+          {r.roleTitle}
+        </td>
+        <td class="assignment-from">{formatDate(r.from)}</td>
+        <td>{r.to ? formatDate(r.to) : ""}</td>
+        <td class="whitespace-pre-line">{r.note}</td>
+        <td class="text-right whitespace-nowrap">
+          {!readOnly && memberId && (
+            <>
+              <button type="button" class="btn btn-ghost btn-xs" hx-get={`/members/${memberId}/assignments/${r.id}/edit`} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>{t("common.edit")}</button>
+              <button type="button" class="btn btn-outline btn-error btn-xs" hx-post={`/members/${memberId}/assignments/${r.id}/delete`} hx-confirm={t("members.assignment.confirmDelete")} hx-target="#assignments-box" hx-swap="outerHTML">{t("common.delete")}</button>
+            </>
+          )}
+          {!readOnly && !memberId && (
+            <button
+              type="button"
+              class="btn btn-outline btn-error btn-xs"
+              onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))"
+            >
+              {t("common.delete")}
+            </button>
+          )}
+        </td>
+      </tr>
+      {!memberId && <tr class="border-0"><td colSpan={5} class="p-0"><div id={`role-hint-${index}`} /></td></tr>}
+    </>
+  );
+}
+
+// „Hinzufügen“ im Bereichstitel (nur bei offenem Bereich sichtbar, siehe .section-actions in app.css).
+function AssignmentAddButton({ memberId }: { memberId?: string }) {
+  return (
+    <button type="button" class="btn btn-outline btn-primary" aria-label={t("members.form.addAssignment")} title={t("members.form.addAssignment")} onclick="event.preventDefault();event.stopPropagation()" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
+      <ActionContent icon="plus" label={t("members.form.addAssignment")} />
+    </button>
+  );
+}
+
+// Read-only Tabelle; Änderungen laufen über das Modal (#assignment-modal).
+function AssignmentsBox({ rows, memberId, readOnly }: { rows: AssignmentRowData[]; memberId?: string; readOnly?: boolean }) {
+  return (
+    <div id="assignments-box">
+      <div class="overflow-x-auto">
+        <table class="table w-full">
+          <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
+          <tbody id="role-rows" data-next-index={String(rows.length)}>
+            <tr class="assignment-empty hidden only:table-row"><td colSpan={5} class="text-center opacity-50 py-4">{t("members.assignment.empty")}</td></tr>
+            {sortRows(rows).map((r, i) => <AssignmentRow key={r.id || i} r={r} memberId={memberId} index={r.idx ?? String(i)} readOnly={readOnly} />)}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Dialog außerhalb des Hauptformulars (kein verschachteltes <form>).
+function AssignmentModalScaffold() {
+  return (
+    <>
+      <dialog id="assignment-modal" class="modal">
+        <div class="modal-box max-w-xl" id="assignment-modal-body" />
+        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+      </dialog>
       <script dangerouslySetInnerHTML={{ __html: `
         (function () {
-          var rows = document.getElementById('role-rows');
-          if (!rows.dataset.nextIndex) rows.dataset.nextIndex = '${initialCount}';
-          document.querySelector('[hx-get="/members/role-row"]').addEventListener('htmx:configRequest', function (e) {
-            var next = parseInt(rows.dataset.nextIndex, 10);
-            e.detail.parameters['index'] = next;
-            rows.dataset.nextIndex = String(next + 1);
+          var d = document.getElementById('assignment-modal');
+          // htmx swappt 4xx nicht: Validierungsfehler (422) ins Modal statt in die Tabelle.
+          document.body.addEventListener('htmx:beforeSwap', function (e) {
+            if (e.detail.xhr.status === 422 && d.contains(e.detail.requestConfig.elt)) {
+              e.detail.shouldSwap = true; e.detail.isError = false;
+              e.detail.target = document.getElementById('assignment-modal-body'); e.detail.swapOverride = 'innerHTML';
+            }
+          });
+          document.body.addEventListener('assignment-modal', function (e) {
+            if (e.detail.value === 'close') d.close();
+            else { var t = d.querySelector('.role-picker-search'); if (t) t.focus(); }
           });
         })();
       ` }} />
@@ -392,300 +478,122 @@ function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
   );
 }
 
-function roleTypeTabs(roles: Role[]) {
-  const seen = new Map<string, { id: string; name: string }>();
-  for (const r of roles) if (!seen.has(r.typeId)) seen.set(r.typeId, { id: r.typeId, name: r.typeName ?? "" });
-  return [...seen.values()];
-}
+type AssignmentFormValues = { roleId?: string; from?: string; to?: string | null; note?: string | null };
 
-const normalizeNote = (v?: string) => v?.trim().slice(0, 200) || null;
-const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${note})` : title);
-
-export function RoleRow({
-  index,
-  roles,
-  assignment,
-  auto,
-}: {
-  index: number;
-  roles: Role[];
-  assignment?: Assignment;
-  auto?: boolean;
-}) {
-  const selected = assignment ? roles.find((r) => r.id === assignment.memberRoleId) : undefined;
+export function AssignmentModalForm({ roles, action, values = {}, error, title, collect }: { roles: Role[]; action: string; values?: AssignmentFormValues; error?: string; title: string; collect?: boolean }) {
+  const selectedId = values.roleId;
+  const selected = roles.find((r) => r.id === selectedId);
   const selectedTitle = selected?.title ?? "";
   const types = roleTypeTabs(roles);
   const activeType = selected?.typeId ?? types[0]?.id;
   return (
-    <>
-    <tr id={`role-row-${index}`} data-autofrom={auto ? "1" : undefined}>
-      <td>
-        <input type="hidden" name="assignment_idx[]" value={String(index)} />
-        <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
-        <input type="hidden" name="assignment_role[]" class="role-combobox-value" value={assignment?.memberRoleId ?? ""} />
-        <div class="relative">
-          <button
-            type="button"
-            role="combobox"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-controls={`role-combobox-popover-${index}`}
-            class={`role-combobox-trigger btn btn-outline justify-start font-normal min-w-48${selectedTitle ? "" : " opacity-50"}`}
-            style={`anchor-name:--role-combobox-anchor-${index}`}
-            data-placeholder={t("members.form.roleSelect")}
-          >
-            {selectedTitle || t("members.form.roleSelect")}
-          </button>
-          <div
-            id={`role-combobox-popover-${index}`}
-            popover="auto"
-            class="role-combobox-popover dropdown-content bg-base-100 rounded-box shadow p-2"
-            style={`position-anchor:--role-combobox-anchor-${index}`}
-          >
-            <label class="input input-bordered input-sm flex items-center gap-2 w-full mb-1">
-              <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-              <input
-                type="text"
-                autocomplete="off"
-                role="searchbox"
-                aria-autocomplete="list"
-                aria-controls={`role-combobox-list-${index}`}
-                class="role-combobox-search grow min-w-0"
-                placeholder={t("common.searchPlaceholder")}
-              />
-            </label>
-            {types.length > 1 && (
-              <div role="tablist" class="role-combobox-tabs tabs tabs-border mb-1">
-                {types.map((ty) => (
-                  <button
-                    key={ty.id}
-                    type="button"
-                    role="tab"
-                    data-type={ty.id}
-                    class={`role-combobox-tab tab${ty.id === activeType ? " tab-active" : ""}`}
-                  >
-                    {ty.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <ul id={`role-combobox-list-${index}`} role="listbox" class="role-combobox-list menu p-0">
-              {roles.map((r) => (
-                <li
-                  key={r.id}
-                  id={`role-combobox-option-${index}-${r.id}`}
-                  role="option"
-                  data-id={r.id}
-                  data-title={r.title}
-                  data-type={r.typeId}
-                  aria-selected={r.id === assignment?.memberRoleId ? "true" : "false"}
-                >
-                  <a class="min-h-11 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
-                </li>
+    <form hx-post={action} hx-target="#assignments-box" hx-swap="outerHTML" hx-include={collect ? "#assignments-box" : undefined} class="space-y-4">
+      <h3 class="font-bold text-lg">{title}</h3>
+      {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.form.role")}<span class="text-error ml-1">*</span></span></label>
+        <div class="role-picker" data-selected={selectedId ?? ""}>
+          <input type="hidden" name="role" class="role-picker-value" value={selectedId ?? ""} />
+          <label class="input input-bordered flex items-center gap-2 w-full mb-1">
+            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
+            <button type="button" class="role-picker-clear btn btn-ghost btn-xs btn-circle hidden" aria-label={t("common.reset")}><Icon name="x-mark" class="w-4 h-4" /></button>
+          </label>
+          {types.length > 1 && (
+            <div role="tablist" class="role-picker-tabs tabs tabs-border mb-1">
+              {types.map((ty) => (
+                <button key={ty.id} type="button" role="tab" data-type={ty.id} class={`role-picker-tab tab${ty.id === activeType ? " tab-active" : ""}`}>{ty.name}</button>
               ))}
-              <li class="role-combobox-no-match hidden"><a class="disabled pointer-events-none opacity-50 min-h-11 flex items-center">{t("members.form.roleNoMatch")}</a></li>
-            </ul>
-            <button type="button" class={`role-combobox-reset btn btn-sm btn-ghost w-full mt-1${selectedTitle ? "" : " hidden"}`}>
-              {t("common.reset")}
-            </button>
-          </div>
+            </div>
+          )}
+          <ul id="role-picker-list" role="listbox" class="role-picker-list menu menu-sm p-0 w-full flex-nowrap overflow-y-auto border border-base-300 rounded-box" style="max-height:min(16rem,32vh)">
+            {roles.map((r) => (
+              <li key={r.id} role="option" data-id={r.id} data-title={r.title} data-type={r.typeId} aria-selected={r.id === selectedId ? "true" : "false"}>
+                <a class="min-h-9 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}<span class="role-picker-type ml-auto text-xs opacity-60 hidden">{r.typeName}</span></a>
+              </li>
+            ))}
+            <li class="role-picker-no-match hidden"><a class="disabled pointer-events-none opacity-50">{t("members.form.roleNoMatch")}</a></li>
+          </ul>
         </div>
-      </td>
-      <td>
-        <input
-          type="date"
-          name="assignment_from[]"
-          class="input input-bordered w-full min-w-40"
-          value={assignment?.from ?? ""}
-          required
-        />
-      </td>
-      <td>
-        <input
-          type="date"
-          name="assignment_to[]"
-          class="input input-bordered w-full min-w-40"
-          value={assignment?.to ?? ""}
-        />
-      </td>
-      <td>
-        <input type="text" name="assignment_note[]" class="input input-bordered w-full min-w-48" maxlength={200} value={assignment?.note ?? ""} />
-      </td>
-      <td>
-        <button
-          type="button"
-          class="btn btn-ghost text-error"
-          onclick={`var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change'))`}
-        >
-          ✕
-        </button>
-      </td>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.form.from")}<span class="text-error ml-1">*</span></span></label>
+          <input type="date" name="from" class="input input-bordered w-full" value={values.from ?? ""} required />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.form.to")}</span></label>
+          <input type="date" name="to" class="input input-bordered w-full" value={values.to ?? ""} />
+        </div>
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.form.note")}</span></label>
+        <textarea name="note" rows={3} class="note-input textarea textarea-bordered w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH}>{values.note ?? ""}</textarea>
+        <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
+      </div>
+      <div class="modal-action @container">
+        <div class="flex w-full justify-end gap-2">
+          <button type="button" class="btn" aria-label={t("common.cancel")} title={t("common.cancel")} onclick="this.closest('dialog').close()"><ActionContent icon="x-mark" label={t("common.cancel")} variant="primary" /></button>
+          <button type="submit" name="more" value="1" class="btn btn-outline btn-primary" aria-label={t("common.saveAndNew")} title={t("common.saveAndNew")}><ActionContent icon="plus" label={t("common.saveAndNew")} variant="primary" /></button>
+          <button type="submit" class="btn btn-primary" aria-label={t("common.save")} title={t("common.save")}><ActionContent icon="check" label={t("common.save")} variant="primary" /></button>
+        </div>
+      </div>
       <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__roleComboboxBound) {
-          window.__roleComboboxBound = true;
-
-          function rcWrap(trigger) { return trigger.closest('.relative'); }
-          function rcPopover(trigger) { return rcWrap(trigger).querySelector('.role-combobox-popover'); }
-          function rcSearch(trigger) { return rcPopover(trigger).querySelector('.role-combobox-search'); }
-          function rcList(trigger) { return rcPopover(trigger).querySelector('.role-combobox-list'); }
-          function rcHidden(trigger) { return trigger.closest('td').querySelector('.role-combobox-value'); }
-          function rcResetBtn(trigger) { return rcPopover(trigger).querySelector('.role-combobox-reset'); }
-          function rcOptions(list) { return Array.from(list.querySelectorAll('li[role=option]')); }
-          function rcNoMatch(list) { return list.querySelector('.role-combobox-no-match'); }
-
-          function rcClearActive(list) {
-            rcOptions(list).forEach(function (li) { li.classList.remove('menu-active'); });
+        (function () {
+          var root = document.currentScript.parentNode.querySelector('.role-picker');
+          var value = root.querySelector('.role-picker-value'), search = root.querySelector('.role-picker-search');
+          var clear = root.querySelector('.role-picker-clear'), list = root.querySelector('.role-picker-list'), noMatch = root.querySelector('.role-picker-no-match');
+          var opts = Array.from(list.querySelectorAll('li[role=option]')), tabs = Array.from(root.querySelectorAll('.role-picker-tab'));
+          function activeType() { var t = root.querySelector('.role-picker-tab.tab-active'); return t ? t.dataset.type : null; }
+          function visible() { return opts.filter(function (o) { return !o.hidden; }); }
+          function mark(li) { opts.forEach(function (o) { o.classList.toggle('menu-active', o === li); }); if (li) li.scrollIntoView({ block: 'nearest' }); }
+          function filter() {
+            var q = search.value.trim().toLowerCase(), type = q ? null : activeType();
+            opts.forEach(function (o) { o.hidden = !(o.dataset.title.toLowerCase().includes(q) && (!type || o.dataset.type === type)); });
+            noMatch.classList.toggle('hidden', visible().length > 0);
+            // Suche geht über alle Typen: Tabs abblenden, Typ pro Treffer zeigen.
+            clear.classList.toggle('hidden', !q);
+            var bar = root.querySelector('.role-picker-tabs');
+            if (bar) { bar.classList.toggle('opacity-40', !!q); bar.classList.toggle('pointer-events-none', !!q); }
+            opts.forEach(function (o) { o.querySelector('.role-picker-type').classList.toggle('hidden', !q); });
+            mark(null);
           }
-
-          function rcSetActive(trigger, li) {
-            var list = rcList(trigger);
-            rcClearActive(list);
-            if (li) li.classList.add('menu-active');
+          function pick(li) {
+            value.value = li.dataset.id; value.dispatchEvent(new Event('change', { bubbles: true }));
+            opts.forEach(function (o) { o.setAttribute('aria-selected', o === li ? 'true' : 'false'); o.classList.toggle('menu-active', o === li); });
           }
-
-          function rcVisibleOptions(list) {
-            return rcOptions(list).filter(function (li) { return li.style.display !== 'none'; });
-          }
-
-          function rcFilter(trigger) {
-            var list = rcList(trigger);
-            var needle = rcSearch(trigger).value.trim().toLowerCase();
-            var tab = rcPopover(trigger).querySelector('.role-combobox-tab.tab-active');
-            var anyVisible = false;
-            rcOptions(list).forEach(function (li) {
-              // Search spans all types; without a search term only the active tab shows.
-              var match = needle ? li.dataset.title.toLowerCase().includes(needle) : (!tab || li.dataset.type === tab.dataset.type);
-              li.style.display = match ? '' : 'none';
-              if (match) anyVisible = true;
-            });
-            rcNoMatch(list).classList.toggle('hidden', anyVisible);
-            rcClearActive(list);
-          }
-
-          function rcIsOpen(trigger) { return rcPopover(trigger).matches(':popover-open'); }
-
-          function rcOpen(trigger) {
-            rcPopover(trigger).showPopover();
-            trigger.setAttribute('aria-expanded', 'true');
-            rcSearch(trigger).value = '';
-            var tabs = Array.from(rcPopover(trigger).querySelectorAll('.role-combobox-tab'));
-            if (tabs.length) {
-              var sel = rcOptions(rcList(trigger)).find(function (o) { return o.getAttribute('aria-selected') === 'true'; });
-              var want = sel ? sel.dataset.type : tabs[0].dataset.type;
-              tabs.forEach(function (tb) { tb.classList.toggle('tab-active', tb.dataset.type === want); });
-            }
-            rcFilter(trigger);
-            rcSearch(trigger).focus();
-          }
-
-          function rcClose(trigger) {
-            rcPopover(trigger).hidePopover();
-            trigger.setAttribute('aria-expanded', 'false');
-            rcClearActive(rcList(trigger));
-          }
-
-          function rcSetValue(trigger, id, title) {
-            rcHidden(trigger).value = id;
-            rcHidden(trigger).dispatchEvent(new Event('change', { bubbles: true }));
-            trigger.textContent = title || trigger.dataset.placeholder;
-            trigger.classList.toggle('opacity-50', !id);
-            trigger.classList.remove('btn-error');
-            trigger.removeAttribute('aria-invalid');
-            rcResetBtn(trigger).classList.toggle('hidden', !id);
-          }
-
-          function rcSelect(trigger, li) {
-            rcSetValue(trigger, li.dataset.id, li.dataset.title);
-            rcOptions(rcList(trigger)).forEach(function (o) { o.setAttribute('aria-selected', o === li ? 'true' : 'false'); });
-            rcClose(trigger);
-            trigger.focus();
-          }
-
-          document.body.addEventListener('click', function (e) {
-            var trigger = e.target.closest('.role-combobox-trigger');
-            if (trigger) {
-              if (rcIsOpen(trigger)) { rcClose(trigger); } else { rcOpen(trigger); }
-              return;
-            }
-            var tabBtn = e.target.closest('.role-combobox-tab');
-            if (tabBtn) {
-              var tabTrigger = rcWrap(tabBtn.closest('.role-combobox-popover')).querySelector('.role-combobox-trigger');
-              rcPopover(tabTrigger).querySelectorAll('.role-combobox-tab').forEach(function (tb) { tb.classList.toggle('tab-active', tb === tabBtn); });
-              rcSearch(tabTrigger).value = '';
-              rcFilter(tabTrigger);
-              rcSearch(tabTrigger).focus();
-              return;
-            }
-            var resetBtn = e.target.closest('.role-combobox-reset');
-            if (resetBtn) {
-              var t = rcWrap(resetBtn).querySelector('.role-combobox-trigger');
-              rcSetValue(t, '', '');
-              rcOptions(rcList(t)).forEach(function (o) { o.setAttribute('aria-selected', 'false'); });
-              rcClose(t);
-              t.focus();
-              return;
-            }
-            var li = e.target.closest('.role-combobox-list li[role=option]');
-            if (li) {
-              var trig = rcWrap(li.closest('.role-combobox-popover')).querySelector('.role-combobox-trigger');
-              rcSelect(trig, li);
-              return;
-            }
-            var openTrigger = document.querySelector('.role-combobox-trigger[aria-expanded=true]');
-            if (openTrigger && !rcPopover(openTrigger).contains(e.target)) rcClose(openTrigger);
+          function setTab(t) { tabs.forEach(function (x) { x.classList.toggle('tab-active', x === t); }); filter(); }
+          tabs.forEach(function (t) { t.addEventListener('click', function () { search.value = ''; setTab(t); search.focus(); }); });
+          list.addEventListener('click', function (e) { var li = e.target.closest('li[role=option]'); if (li) pick(li); });
+          search.addEventListener('input', filter);
+          clear.addEventListener('click', function () { search.value = ''; filter(); search.focus(); });
+          search.addEventListener('keydown', function (e) {
+            // Escape leert zuerst den Suchbegriff; erst bei leerem Feld schließt es das Modal (Browser-Standard).
+            if (e.key === 'Escape' && search.value) { e.preventDefault(); e.stopPropagation(); search.value = ''; filter(); return; }
+            var v = visible(), cur = v.findIndex(function (o) { return o.classList.contains('menu-active'); });
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mark(v[Math.max(0, Math.min(v.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1)))]); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (cur >= 0) pick(v[cur]); else if (v.length === 1) pick(v[0]); else root.closest('form').querySelector('[name=from]').focus(); }
           });
-
-          document.body.addEventListener('input', function (e) {
-            var trigger = e.target.closest('.role-combobox-search') && rcWrap(e.target).querySelector('.role-combobox-trigger');
-            if (!trigger) return;
-            rcFilter(trigger);
-          });
-
-          document.body.addEventListener('keydown', function (e) {
-            var trigger = e.target.closest('.role-combobox-trigger');
-            if (trigger && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown')) {
-              e.preventDefault();
-              if (!rcIsOpen(trigger)) rcOpen(trigger);
-              return;
-            }
-            var searchInput = e.target.closest('.role-combobox-search');
-            if (!searchInput) return;
-            var trig = rcWrap(searchInput).querySelector('.role-combobox-trigger');
-            var list = rcList(trig);
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault();
-              var visible = rcVisibleOptions(list);
-              if (!visible.length) return;
-              var current = visible.findIndex(function (li) { return li.classList.contains('menu-active'); });
-              var next = e.key === 'ArrowDown' ? current + 1 : current - 1;
-              if (next < 0) next = 0;
-              if (next > visible.length - 1) next = visible.length - 1;
-              rcSetActive(trig, visible[next]);
-            } else if (e.key === 'Enter') {
-              e.preventDefault();
-              var active = list.querySelector('li.menu-active');
-              if (active) rcSelect(trig, active);
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              rcClose(trig);
-              trig.focus();
-            }
-          });
-
-          document.currentScript.closest('form').addEventListener('submit', function (e) {
-            var missing = Array.from(document.querySelectorAll('.role-combobox-trigger')).filter(function (trig) {
-              return !rcHidden(trig).value;
-            });
-            missing.forEach(function (trig) { trig.classList.add('btn-error'); trig.setAttribute('aria-invalid', 'true'); });
-            if (missing.length) { e.preventDefault(); missing[0].focus(); }
-          });
-        }
+          var sel = opts.find(function (o) { return o.getAttribute('aria-selected') === 'true'; });
+          if (sel) { var t = tabs.find(function (x) { return x.dataset.type === sel.dataset.type; }); if (t) setTab(t); sel.classList.add('menu-active'); sel.scrollIntoView({ block: 'nearest' }); }
+          else filter();
+          search.focus();
+          var note = root.closest('form').querySelector('.note-input'), counter = root.closest('form').querySelector('.note-counter');
+          function count() {
+            // Browser und Server zählen einen Umbruch gleich als 1 Zeichen.
+            var n = note.value.length, max = note.maxLength;
+            counter.querySelector('.note-count').textContent = n;
+            counter.classList.toggle('text-error', n >= max);
+            counter.classList.toggle('text-warning', n >= max * 0.9 && n < max);
+            counter.classList.toggle('opacity-60', n < max * 0.9);
+          }
+          note.addEventListener('input', count); count();
+        })();
       ` }} />
-    </tr>
-    <tr class="border-0"><td colSpan={5} class="p-0"><div id={`role-hint-${index}`} /></td></tr>
-    </>
+    </form>
   );
 }
+
 
 // Bank data is plaintext, protected by permission only (backlog 34). Without read
 // permission the section is not rendered at all — not even a hint that data exists.
@@ -754,7 +662,7 @@ function StatusPreview({ saved }: { saved?: MemberStatus }) {
     <div
       hx-post="/members/status-preview"
       hx-include="closest form"
-      hx-trigger="load, input from:closest form delay:300ms, change from:closest form"
+      hx-trigger="load, input from:closest form delay:300ms, change from:closest form, assignment-modal from:body delay:100ms, htmx:afterSettle from:#role-rows delay:100ms"
       hx-target="#status-preview"
       hx-swap="innerHTML"
     >
@@ -1260,6 +1168,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     <Layout title={t("members.newMember")} user={user} activeNav="members">
       <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
       <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
+        <NewMemberDraft ctx={draftCtx({ personId, linkMemberId, applicationId })} />
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1274,29 +1183,62 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
             <span class="label-text">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
-        <Section title={t("members.form.assignments")} open>
+        <Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
         <StatusPreview />
         <PassiveHint show={false} />
-        <div class="overflow-x-auto">
-          <table class="table w-full">
-            <thead>
-              <tr>
-                <th>{t("members.form.role")} <span class="text-error">*</span></th>
-                <th>{t("members.form.from")} <span class="text-error">*</span></th>
-                <th>{t("members.form.to")}</th><th>{t("members.form.note")}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="role-rows"></tbody>
-          </table>
-        </div>
-        <RoleRowsAddButton initialCount={0} />
-        <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
+        <AssignmentsBox rows={[]} />
         </Section>
       </form>
+        <AssignmentModalScaffold />
     </Layout>
   );
 });
+
+const draftCtx = (o: { personId?: string; linkMemberId?: string; applicationId?: string }) =>
+  o.personId ? `person:${o.personId}` : o.linkMemberId ? `link:${o.linkMemberId}` : o.applicationId ? `app:${o.applicationId}` : "new";
+
+// Entwurf der Neuanlage (localStorage, ohne Bankdaten, 7 Tage). Schlüssel je Kontext; Banner statt Auto-Wiederherstellung.
+function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) {
+  const texts = JSON.stringify({ banner: t("members.draft.banner"), restore: t("members.draft.restore"), discard: t("members.draft.discard") });
+  return (
+    <script dangerouslySetInnerHTML={{ __html: `
+      document.addEventListener('DOMContentLoaded', function () {
+        var KEY = 'member-draft:' + ${JSON.stringify(ctx)}, TTL = 7 * 864e5, TX = ${texts};
+        var form = document.getElementById('member-form'), skip = /^(iban|bic|accountHolder|personId|linkMemberId|applicationId|switchStatus|_action)$/;
+        function save() {
+          var data = [];
+          new FormData(form).forEach(function (v, k) { if (!skip.test(k) && typeof v === 'string') data.push([k, v]); });
+          localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), data: data }));
+        }
+        var timer; function later() { clearTimeout(timer); timer = setTimeout(save, 500); }
+        form.addEventListener('input', later); form.addEventListener('change', later);
+        document.body.addEventListener('assignment-modal', function () { setTimeout(save, 600); });
+        form.addEventListener('submit', function () { clearTimeout(timer); });
+        window.addEventListener('pagehide', function () { clearTimeout(timer); });
+        if (${rerender ? "true" : "false"}) { save(); return; }
+        var raw = localStorage.getItem(KEY), d; try { d = raw && JSON.parse(raw); } catch (e) {}
+        if (d && Date.now() - d.at > TTL) { localStorage.removeItem(KEY); d = null; }
+        if (!d) return;
+        var bar = document.createElement('div'); bar.className = 'alert alert-info text-sm flex-wrap';
+        var msg = document.createElement('span'); msg.textContent = TX.banner; bar.appendChild(msg);
+        function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm'; b.textContent = label; b.onclick = fn; bar.appendChild(b); }
+        btn(TX.restore, function () {
+          var rows = {};
+          d.data.forEach(function (kv) {
+            if (/^assignment_/.test(kv[0])) { (rows[kv[0]] = rows[kv[0]] || []).push(kv[1]); return; }
+            var els = form.querySelectorAll('[name="' + kv[0] + '"]');
+            els.forEach(function (el) { if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === kv[1]; else el.value = kv[1]; });
+          });
+          if (rows['assignment_role[]']) htmx.ajax('POST', '/members/assignments/rows', { values: rows, target: '#assignments-box', swap: 'outerHTML' });
+          else form.dispatchEvent(new Event('change', { bubbles: true }));
+          bar.remove();
+        });
+        btn(TX.discard, function () { localStorage.removeItem(KEY); bar.remove(); });
+        form.parentNode.insertBefore(bar, form);
+      });
+    ` }} />
+  );
+}
 
 type StartStatus = "aktiv" | "passiv" | "foerdernd";
 
@@ -1327,10 +1269,10 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
           var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
           function current() { var c = form.querySelector('input[name="startStatus"]:checked'); return c ? c.value : ''; }
           function prefill() {
-            if (current() !== 'aktiv' || rows.children.length) return;
+            if (current() !== 'aktiv' || rows.querySelector('tr:not(.assignment-empty)')) return;
             var i = parseInt(rows.dataset.nextIndex || '0', 10);
             rows.dataset.nextIndex = String(i + 1);
-            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' });
+            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' }).then(function () { form.dispatchEvent(new Event('change', { bubbles: true })); });
           }
           var err = document.getElementById('startStatusError');
           form.querySelectorAll('input[name="startStatus"]').forEach(function (r) {
@@ -1343,10 +1285,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
             });
           });
           form.elements.entryDate.addEventListener('input', function (e) {
-            rows.querySelectorAll('tr[data-autofrom] input[name="assignment_from[]"]').forEach(function (el) { el.value = e.target.value; });
-          });
-          rows.addEventListener('input', function (e) {
-            if (e.target.name === 'assignment_from[]') e.target.closest('tr').removeAttribute('data-autofrom');
+            rows.querySelectorAll('tr[data-autofrom]').forEach(function (tr) { tr.querySelector('input[name="assignment_from[]"]').value = e.target.value; var p = e.target.value.split('-'); tr.querySelector('.assignment-from').textContent = p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '—'; });
           });
           prefill();
         });
@@ -1388,16 +1327,71 @@ function checkStartStatus(
   return undefined;
 }
 
-// GET /members/role-row — HTMX fragment: one assignment row
+function rowsFromBody(body: Record<string, any>, allRoles: Role[]): AssignmentRowData[] {
+  const col = (k: string) => [body[`assignment_${k}[]`]].flat().filter((v) => v !== undefined) as string[];
+  const [ids, roleIds, froms, tos, notes, idxs] = ["id", "role", "from", "to", "note", "idx"].map(col);
+  return roleIds.flatMap((roleId, i) => {
+    const role = allRoles.find((r) => r.id === roleId);
+    return role && froms[i] ? [{ id: ids[i] ?? "", roleId, roleTitle: role.title, from: froms[i], to: tos[i] || null, note: notes[i] || null, idx: idxs[i] ?? String(i) }] : [];
+  });
+}
+
+// Gemeinsame Validierung (Neuanlage und Edit): Pflichtfelder, bis ≥ von, keine zwei offenen Zuweisungen derselben Funktion.
+function validateAssignment(
+  v: { id?: string; roleId: string; from: string; to?: string | null },
+  others: { id?: string; roleId: string; to?: string | null }[],
+  roles: { id: string; title: string }[],
+): string | undefined {
+  if (!v.roleId || !v.from) return t("members.error.assignmentIncomplete");
+  if (v.to && v.to < v.from) return t("members.error.assignmentRange");
+  if (!v.to && others.some((o) => o.roleId === v.roleId && !o.to && (!v.id || o.id !== v.id))) {
+    return t("members.error.duplicateRole", { role: roles.find((r) => r.id === v.roleId)?.title ?? v.roleId });
+  }
+}
+
+function parseAssignmentForm(body: Record<string, any>) {
+  return { roleId: trimmed(body, "role"), from: trimmed(body, "from"), to: trimmed(body, "to") || null, note: normalizeNote(trimmed(body, "note")) };
+}
+
+// GET /members/role-row — Zeile für die automatische Aktiv-Zuweisung der Neuanlage: ?index=&roleId=&from=
 memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
-  const index = Number(c.req.query("index") ?? 0);
   const roles = await fetchRoles();
-  // Optional prefill (used for the "aktiv" start choice): ?roleId=&from=&auto=1
-  const roleId = c.req.query("roleId");
-  const assignment = roleId
-    ? ({ id: "", memberRoleId: roleId, from: c.req.query("from") ?? "", to: null, note: null } as Assignment)
-    : undefined;
-  return c.html(<RoleRow index={index} roles={roles} assignment={assignment} auto={c.req.query("auto") === "1"} />);
+  const role = roles.find((r) => r.id === c.req.query("roleId"));
+  if (!role) return c.body(null, 404);
+  const r: AssignmentRowData = { id: "", roleId: role.id, roleTitle: role.title, from: c.req.query("from") ?? "", to: null, note: null };
+  return c.html(<AssignmentRow r={r} index={c.req.query("index") ?? "0"} auto />);
+});
+
+// Modal-Antwort nach Speichern: Tabelle (+ Badge im Edit) und je nach Button Modal schließen oder leeres Formular.
+async function assignmentResult(c: Context<{ Variables: Variables }>, box: any, more: boolean, form: any, badge?: any) {
+  c.header("HX-Trigger", JSON.stringify({ "assignment-modal": more ? "more" : "close" }));
+  return c.html(<>{box}{badge}{more && <div id="assignment-modal-body" hx-swap-oob="innerHTML">{form}</div>}</>);
+}
+
+// POST /members/assignments/rows — Tabelle aus gesammelten Zeilen (Entwurf wiederherstellen)
+memberRoutes.post("/assignments/rows", requireAuth("members:write"), async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  return c.html(<AssignmentsBox rows={rowsFromBody(body, await fetchRoles())} />);
+});
+
+// GET /members/assignments/new — Modal-Inhalt der Neuanlage (kollektiert Zeilen clientseitig)
+memberRoutes.get("/assignments/new", requireAuth("members:write"), async (c) => {
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action="/members/assignments/validate" title={t("members.assignment.titleNew")} collect />);
+});
+
+// POST /members/assignments/validate — zustandslos: neue Zeile + bereits gesammelte Zeilen
+memberRoutes.post("/assignments/validate", requireAuth("members:write"), async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  const roles = await fetchRoles();
+  const rows = rowsFromBody(body, roles);
+  const v = parseAssignmentForm(body);
+  const err = validateAssignment(v, rows, roles);
+  const form = (values: AssignmentFormValues, error?: string) => <AssignmentModalForm roles={roles} action="/members/assignments/validate" title={t("members.assignment.titleNew")} collect values={values} error={error} />;
+  if (err) return c.html(form(v, err), 422);
+  const idx = String(Math.max(-1, ...rows.map((r) => Number(r.idx))) + 1);
+  const role = roles.find((r) => r.id === v.roleId)!;
+  rows.push({ id: "", roleId: v.roleId, roleTitle: role.title, from: v.from, to: v.to, note: v.note, idx });
+  return assignmentResult(c, <AssignmentsBox rows={rows} />, trimmed(body, "more") === "1", form({}));
 });
 
 // POST /members/new — create member (or link an existing person, see GET /new)
@@ -1441,17 +1435,11 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
   const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
 
-  // Validate that every non-empty row has both a role and a from date
-  if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
-    errors._assignments = t("members.error.assignmentIncomplete");
-  }
-
-  // Check for duplicate open assignments (same role without to-date)
-  const openRoles = assignmentRoles.filter((r, i) => r && !assignmentTos[i]);
-  const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
-  if (dupRole && !errors._assignments) {
-    const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
-    errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
+  const allRolesForCheck = await fetchRoles();
+  const submitted = assignmentRoles.map((roleId, i) => ({ roleId, from: assignmentFroms[i], to: assignmentTos[i] })).filter((r) => r.roleId || r.from);
+  for (let i = 0; i < submitted.length && !errors._assignments; i++) {
+    const err = validateAssignment(submitted[i], submitted.slice(0, i), allRolesForCheck);
+    if (err) errors._assignments = err;
   }
 
   // Auswahl aktiv/passiv/fördernd gegen den abgeleiteten Status prüfen (nur Anlegen, Server entscheidet).
@@ -1494,6 +1482,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
+          <NewMemberDraft ctx={draftCtx({ personId, linkMemberId, applicationId })} rerender />
           {personId && <input type="hidden" name="personId" value={personId} />}
           {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1518,31 +1507,13 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span class="label-text">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
-          <Section title={t("members.form.assignments")} open>
+          <Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
           <StatusPreview />
           <PassiveHint show={startStatus === "passiv"} />
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-              <tbody id="role-rows">
-                {assignmentRoles.map((_, i) => (
-                  <RoleRow key={i} index={i} roles={roles} assignment={{
-                    id: "",
-                    memberId: "",
-                    memberRoleId: assignmentRoles[i],
-                    from: assignmentFroms[i] ?? "",
-                    to: assignmentTos[i] || null,
-                    note: normalizeNote(assignmentNotes[i]),
-                    autoClosed: false,
-                    role: roles.find((r) => r.id === assignmentRoles[i])!,
-                  }} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <RoleRowsAddButton initialCount={assignmentRoles.length} />
+        <AssignmentsBox rows={rowsFromBody(body, await db.select().from(memberRoles))} />
           </Section>
         </form>
+        <AssignmentModalScaffold />
       </Layout>,
       422
     );
@@ -1622,6 +1593,8 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   }
 
   setFlash(c, t("members.flash.created"), "success");
+  // Entwurf erst nach erfolgreichem Anlegen löschen: Layout-Skript entfernt den Schlüssel auf der Folgeseite.
+  setCookie(c, "draft-clear", draftCtx({ personId, linkMemberId, applicationId }), { path: "/", maxAge: 60, httpOnly: false });
   const saveAndNew = String(body._action ?? "") === "save_and_new";
   return c.redirect(saveAndNew ? "/members/new" : "/members");
 });
@@ -1675,7 +1648,7 @@ export function buildExportSheets(
     const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to"), t("members.form.note")];
     const asgRows = asgns.map((a) => {
       const m = nameMap.get(a.memberId);
-      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to), a.note ?? ""];
+      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to), singleLine(a.note ?? "")];
     });
     sheets.push({ name: t("members.export.sheetAssignments"), header: asgHeader, rows: asgRows });
   }
@@ -1798,21 +1771,11 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
-        <Section title={t("members.form.assignments")} open>
-        <StatusPreview saved={m.status} />
-        <div class="overflow-x-auto">
-          <table class="table w-full">
-            <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-            <tbody id="role-rows">
-              {m.assignments.map((a, i) => (
-                <RoleRow key={a.id} index={i} roles={roles} assignment={a} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <RoleRowsAddButton initialCount={m.assignments.length} />
+        <Section title={t("members.form.assignments")} open actions={!(m.exitDate || m.deathDate) && <AssignmentAddButton memberId={m.id} />}>
+        <AssignmentsBox rows={m.assignments.map(toRowData)} memberId={m.id} readOnly={!!(m.exitDate || m.deathDate)} />
         </Section>
       </form>
+        <AssignmentModalScaffold />
     </Layout>
   );
 });
@@ -1865,25 +1828,6 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   if (!entryDate) errors.entryDate = t("common.required");
   if (firstEntryDate && entryDate && firstEntryDate > entryDate) errors.firstEntryDate = t("members.form.firstEntryDateAfterEntry");
 
-  const assignmentIds = [body["assignment_id[]"]].flat() as string[];
-  // Keep rows unfiltered so index i stays aligned across role/from/to
-  const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
-  const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
-  const assignmentTos = [body["assignment_to[]"]].flat() as string[];
-  const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
-
-  // Validate that every non-empty row has both a role and a from date
-  if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
-    errors._assignments = t("members.error.assignmentIncomplete");
-  }
-
-  const openRoles = assignmentRoles.filter((r, i) => r && !assignmentTos[i]);
-  const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
-  if (dupRole && !errors._assignments) {
-    const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
-    errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
-  }
-
   if (Object.keys(errors).length > 0) {
     const roles = await fetchRoles();
     const m = { ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
@@ -1895,34 +1839,14 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
-        {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
-          <Section title={t("members.form.assignments")} open>
-          <StatusPreview saved={existing.status} />
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-              <tbody id="role-rows">
-                {assignmentRoles.map((_, i) => (
-                  <RoleRow key={i} index={i} roles={roles} assignment={{
-                    id: assignmentIds[i] ?? "",
-                    memberId: id,
-                    memberRoleId: assignmentRoles[i],
-                    from: assignmentFroms[i] ?? "",
-                    to: assignmentTos[i] || null,
-                    note: normalizeNote(assignmentNotes[i]),
-                    autoClosed: false,
-                    role: roles.find((r) => r.id === assignmentRoles[i])!,
-                  }} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          <Section title={t("members.form.assignments")} open actions={!(existing.exitDate || existing.deathDate) && <AssignmentAddButton memberId={id} />}>
+        <AssignmentsBox rows={existing.assignments.map(toRowData)} memberId={id} readOnly={!!(existing.exitDate || existing.deathDate)} />
           </Section>
         </form>
+        <AssignmentModalScaffold />
       </Layout>,
       422
     );
@@ -1950,10 +1874,6 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       phone: (body.phone as string) ?? "",
       mobile: (body.mobile as string) ?? "",
       email: (body.email as string) ?? "",
-      "assignment_id[]": assignmentIds,
-      "assignment_role[]": assignmentRoles,
-      "assignment_from[]": assignmentFroms,
-      "assignment_to[]": assignmentTos.map((t) => t ?? ""),
     };
 
     return c.html(
@@ -1964,30 +1884,11 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
-          <Section title={t("members.form.assignments")} open>
-          <StatusPreview saved={existing.status} />
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-              <tbody id="role-rows">
-                {assignmentRoles.map((_, i) => (
-                  <RoleRow key={i} index={i} roles={roles} assignment={{
-                    id: assignmentIds[i] ?? "",
-                    memberId: id,
-                    memberRoleId: assignmentRoles[i],
-                    from: assignmentFroms[i] ?? "",
-                    to: assignmentTos[i] || null,
-                    note: normalizeNote(assignmentNotes[i]),
-                    autoClosed: false,
-                    role: roles.find((r) => r.id === assignmentRoles[i])!,
-                  }} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          <Section title={t("members.form.assignments")} open actions={!(existing.exitDate || existing.deathDate) && <AssignmentAddButton memberId={id} />}>
+        <AssignmentsBox rows={existing.assignments.map(toRowData)} memberId={id} readOnly={!!(existing.exitDate || existing.deathDate)} />
           </Section>
         </form>
+        <AssignmentModalScaffold />
         <ReactivationModal memberId={id} formData={formData} />
       </Layout>
     );
@@ -2029,36 +1930,66 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         .set({ to: null, autoClosed: false })
         .where(eq(memberRoleAssignments.memberId, id));
     }
-
-    // Reconcile role assignments: delete removed, upsert existing/new
-    const submittedIds = assignmentIds.filter(Boolean);
-    const existingIds = existing.assignments.map((a) => a.id);
-    const deletedIds = existingIds.filter((eid) => !submittedIds.includes(eid));
-
-    for (const did of deletedIds) {
-      await tx.delete(memberRoleAssignments).where(eq(memberRoleAssignments.id, did));
-    }
-
-    for (let i = 0; i < assignmentRoles.length; i++) {
-      if (!assignmentRoles[i]) continue;
-      const aid = assignmentIds[i];
-      const vals = {
-        memberId: id,
-        memberRoleId: assignmentRoles[i],
-        from: assignmentFroms[i],
-        to: assignmentTos[i] || null,
-        note: normalizeNote(assignmentNotes[i]),
-      };
-      if (aid) {
-        await tx.update(memberRoleAssignments).set(vals).where(eq(memberRoleAssignments.id, aid));
-      } else {
-        await tx.insert(memberRoleAssignments).values(vals);
-      }
-    }
   });
 
   setFlash(c, t("members.flash.saved"), "success");
   return c.redirect(`/members/${id}`);
+});
+
+// ── Funktionszuweisungen (Edit: sofort persistent) ───────────────────────────
+
+async function assignmentsAfterChange(c: Context<{ Variables: Variables }>, id: string, more: boolean) {
+  const m = (await fetchMember(id))!;
+  const roles = await fetchRoles();
+  const form = <AssignmentModalForm roles={roles} action={`/members/${id}/assignments`} title={t("members.assignment.titleNew")} />;
+  return assignmentResult(c, <AssignmentsBox rows={m.assignments.map(toRowData)} memberId={id} />, more, form, <StatusBadgeSlot saved={m.status} oob />);
+}
+
+const isArchived = (m: { exitDate: string | null; deathDate: string | null }) => !!(m.exitDate || m.deathDate);
+
+memberRoutes.get("/:id/assignments/new", requireAuth("members:write"), async (c) => {
+  const id = c.req.param("id");
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments`} title={t("members.assignment.titleNew")} />);
+});
+
+memberRoutes.get("/:id/assignments/:aid/edit", requireAuth("members:write"), async (c) => {
+  const id = c.req.param("id");
+  const a = (await fetchMember(id))?.assignments.find((x) => x.id === c.req.param("aid"));
+  if (!a) return c.notFound();
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments/${a.id}`} title={t("members.assignment.titleEdit")} values={{ roleId: a.memberRoleId, from: a.from, to: a.to ?? "", note: a.note ?? "" }} />);
+});
+
+async function saveAssignment(c: Context<{ Variables: Variables }>, aid?: string) {
+  const id = c.req.param("id")!;
+  const m = await fetchMember(id);
+  if (!m) return c.notFound();
+  if (isArchived(m)) return c.body(null, 403);
+  if (aid && !m.assignments.some((a) => a.id === aid)) return c.notFound();
+  const body = await c.req.parseBody({ all: true });
+  const roles = await fetchRoles();
+  const v = parseAssignmentForm(body);
+  const err = validateAssignment({ ...v, id: aid }, m.assignments.map((a) => ({ id: a.id, roleId: a.memberRoleId, to: a.to })), roles);
+  if (err) {
+    const action = aid ? `/members/${id}/assignments/${aid}` : `/members/${id}/assignments`;
+    return c.html(<AssignmentModalForm roles={roles} action={action} title={t(aid ? "members.assignment.titleEdit" : "members.assignment.titleNew")} values={v} error={err} />, 422);
+  }
+  const vals = { memberId: id, memberRoleId: v.roleId, from: v.from, to: v.to, note: v.note };
+  if (aid) await db.update(memberRoleAssignments).set(vals).where(and(eq(memberRoleAssignments.id, aid), eq(memberRoleAssignments.memberId, id)));
+  else await db.insert(memberRoleAssignments).values(vals);
+  return assignmentsAfterChange(c, id, trimmed(body, "more") === "1" && !aid);
+}
+
+memberRoutes.post("/:id/assignments", requireAuth("members:write"), (c) => saveAssignment(c));
+memberRoutes.post("/:id/assignments/:aid", requireAuth("members:write"), (c) => saveAssignment(c, c.req.param("aid")));
+
+memberRoutes.post("/:id/assignments/:aid/delete", requireAuth("members:write"), async (c) => {
+  const id = c.req.param("id");
+  const m = await fetchMember(id);
+  if (!m) return c.notFound();
+  if (isArchived(m)) return c.body(null, 403);
+  await db.delete(memberRoleAssignments).where(and(eq(memberRoleAssignments.id, c.req.param("aid")), eq(memberRoleAssignments.memberId, id)));
+  const fresh = (await fetchMember(id))!;
+  return c.html(<><AssignmentsBox rows={fresh.assignments.map(toRowData)} memberId={id} /><StatusBadgeSlot saved={fresh.status} oob /></>);
 });
 
 // POST /members/:id/delete — permanently deletes the member AND its person record
