@@ -723,10 +723,6 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
               trig.focus();
             }
           });
-
-            missing.forEach(function (trig) { trig.classList.add('btn-error'); trig.setAttribute('aria-invalid', 'true'); });
-            if (missing.length) { e.preventDefault(); missing[0].focus(); }
-          });
         }
       ` }} />
     </form>
