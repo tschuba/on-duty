@@ -199,7 +199,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     key={r.id}
                     data-id={r.id}
                     draggable={canReorder}
-                    {...(canWrite && !r.isProtected && {
+                    {...((canWrite || r.isProtected) && {
                       class: "cursor-pointer hover",
                       "hx-get": `/roles/${r.id}/edit`,
                       "hx-target": "#modal-content",
@@ -424,10 +424,12 @@ roleRoutes.get("/roles/new", rolesWrite, async (c) => {
 });
 
 // HTMX fragment: edit role modal
-roleRoutes.get("/roles/:id/edit", rolesWrite, async (c) => {
+// Read access shows the form; it is editable only with write permission on an unprotected role.
+roleRoutes.get("/roles/:id/edit", rolesRead, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
+  if (!role) return c.html("", HTTP_STATUS.NOT_FOUND);
+  const readOnly = role.isProtected || !c.get("user").permissions.has("member-roles:write");
 
   const types = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   const [{ cnt }] = await db
@@ -443,9 +445,18 @@ roleRoutes.get("/roles/:id/edit", rolesWrite, async (c) => {
   return c.html(
     <>
       <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.edit")}</h3>
+      {role.isProtected && <div class="alert alert-info mb-3">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
       <form method="post" action={`/roles/${id}`} class="flex flex-col gap-3">
-        <RoleForm types={types} role={role} hasAssignments={cnt > 0} affected={Number(affected)} />
-        <ModalActions submit={t("common.save")} />
+        <fieldset disabled={readOnly} class="contents">
+          <RoleForm types={types} role={role} hasAssignments={cnt > 0} affected={Number(affected)} />
+        </fieldset>
+        {readOnly ? (
+          <div class="modal-action mt-2">
+            <button type="button" class="btn" onclick="document.getElementById('admin-modal').close()">{t("common.close")}</button>
+          </div>
+        ) : (
+          <ModalActions submit={t("common.save")} />
+        )}
       </form>
       {SHOW_MODAL}
     </>

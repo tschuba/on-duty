@@ -329,6 +329,8 @@ export const de = {
   "admin.permissions.modal.create": "Neue Rolle",
   "admin.permissions.modal.edit": "Rolle bearbeiten",
   "admin.permissions.modal.nameLabel": "Anzeigename",
+  "admin.permissions.searchPlaceholder": "Rolle oder Berechtigung suchen …",
+  "admin.permissions.readOnlyHint": "nicht änderbar",
   "admin.permissions.modal.nameLocked": "Anzeigename kann nicht mehr geändert werden, da bereits Zuweisungen existieren.",
   "admin.permissions.modal.permissionsLabel": "Berechtigungen",
   "admin.permissions.modal.descriptionLabel": "Beschreibung",
