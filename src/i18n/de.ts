@@ -130,6 +130,7 @@ export const de = {
   "members.flash.saved": "Mitglied gespeichert.",
   "members.flash.deleted": "Mitglied und Person endgültig gelöscht.",
   "members.error.ibanInvalid": "Ungültige IBAN.",
+  "members.contact.title": "Kontaktdaten",
   "members.bank.title": "Bankverbindung",
   "members.bank.iban": "IBAN",
   "members.bank.bic": "BIC",
