@@ -30,7 +30,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Bearbeiter",
     description: "Kann Mitglieder, Spenden und Anträge bearbeiten sowie Stammdaten pflegen",
     isProtected: true,
-    permissions: ["members:read", "members:write", "donations:read", "donations:record", "applications:read", "applications:record", "applications:manage-forms", "org:write", "member-roles:read", "member-roles:write", "member-role-types:read"],
+    permissions: ["members:read", "members:write", "donations:read", "donations:record", "applications:read", "applications:record", "applications:manage-forms", "org:write", "member-roles:read", "member-roles:write", "member-role-types:read", "anniversary-years:read", "anniversary-years:write"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
