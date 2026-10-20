@@ -7,6 +7,7 @@ import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleTypes, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import { RolePopover } from "../components/role-popover.js";
 import { ACTIVE_ROLE_ID } from "../lib/import.js";
@@ -704,37 +705,43 @@ function BankDataSection({
   errors?: Record<string, string>;
 }) {
   const iban = m.iban ? formatIban(m.iban) : "";
-  if (!editable) {
-    return (
-      <div class="mt-6 max-w-2xl">
-        <h2 class="font-semibold mb-2">{t("members.bank.title")}</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <ViewField label={t("members.bank.iban")} value={iban} />
-          <ViewField label={t("members.bank.bic")} value={m.bic} />
-          <ViewField label={t("members.bank.accountHolder")} value={m.accountHolder || `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim()} />
-        </div>
-      </div>
-    );
-  }
-  return (
+  const key = `bank-open:${m.id ?? "new"}`;
+  const body = editable ? (
     <>
-      <div class="divider">{t("members.bank.title")}</div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
-        <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
-        {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
-      </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
-        <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
-      </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
+          <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
+          {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
+          <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
+        </div>
       </div>
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
         <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input-bordered w-full" />
         <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
       </div>
+    </>
+  ) : (
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <ViewField label={t("members.bank.iban")} value={iban} />
+      <ViewField label={t("members.bank.bic")} value={m.bic} />
+      <ViewField label={t("members.bank.accountHolder")} value={m.accountHolder || `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim()} />
+    </div>
+  );
+  // Zugeklappt, außer bei IBAN-Fehler; Felder bleiben im DOM und werden mitgeschickt.
+  // Zustand pro Tab in sessionStorage, damit er Ansicht ↔ Bearbeiten überdauert.
+  return (
+    <>
+      <Section title={t("members.bank.title")} open={!!errors?.iban} class="mt-6" attrs={{ "data-bank-key": key }}>
+        <div class="space-y-4">{body}</div>
+      </Section>
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var d=document.currentScript.previousElementSibling,k=d.dataset.bankKey;
+try{if(sessionStorage.getItem(k))d.open=true;}catch(e){}
+d.addEventListener('toggle',function(){try{d.open?sessionStorage.setItem(k,'1'):sessionStorage.removeItem(k);}catch(e){}});})();` }} />
     </>
   );
 }
@@ -871,7 +878,7 @@ function MemberFormFields({
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("exitDate", t("members.form.exitDate"), "date")}
       </div>
-      <div class="divider">{t("members.contact.title")}</div>
+      <Section title={t("members.contact.title")} open>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("street", t("members.form.street"))}
         {field("houseNumber", t("members.form.houseNumber"))}
@@ -885,6 +892,7 @@ function MemberFormFields({
         {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
       </div>
+      </Section>
     </>
   );
 }
@@ -1279,7 +1287,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
             <span class="label-text">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
-        <div class="divider">{t("members.form.assignments")}</div>
+        <Section title={t("members.form.assignments")} open>
         <StatusPreview />
         <PassiveHint show={false} />
         <div class="overflow-x-auto">
@@ -1297,6 +1305,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         </div>
         <RoleRowsAddButton initialCount={0} />
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
+        </Section>
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
@@ -1531,7 +1540,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span class="label-text">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
-          <div class="divider">{t("members.form.assignments")}</div>
+          <Section title={t("members.form.assignments")} open>
           <StatusPreview />
           <PassiveHint show={startStatus === "passiv"} />
           <div class="overflow-x-auto">
@@ -1554,6 +1563,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </table>
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          </Section>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
@@ -1790,8 +1800,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
           {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
         </div>
-        <div class="mt-6 max-w-2xl">
-          <h2 class="font-semibold mb-2">{t("members.contact.title")}</h2>
+        <Section title={t("members.contact.title")} open class="mt-6">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
             <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
@@ -1799,19 +1808,18 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             <ViewField label={t("members.form.mobile")} value={m.mobile} />
             <ViewField label={t("members.form.email")} value={m.email} />
           </div>
-        </div>
+        </Section>
         {openRoles.length > 0 && (
-          <div class="mt-6">
-            <h2 class="font-semibold mb-2">{t("members.view.activeFunctions")}</h2>
+          <Section title={t("members.view.activeFunctions")} open>
             <div class="flex flex-wrap gap-2">
               {openRoles.map((a) => (
                 <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
               ))}
             </div>
-          </div>
+          </Section>
         )}
         {canWriteBank ? (
-          <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
+          <form method="post" action={`/members/${m.id}`} class="space-y-4">
             <BankDataSection m={m} editable />
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           </form>
@@ -1836,7 +1844,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
-        <div class="divider">{t("members.form.assignments")}</div>
+        <Section title={t("members.form.assignments")} open>
         <StatusPreview saved={m.status} />
         <div class="overflow-x-auto">
           <table class="table w-full">
@@ -1849,6 +1857,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           </table>
         </div>
         <RoleRowsAddButton initialCount={m.assignments.length} />
+        </Section>
         <div class="flex gap-2 pt-4">
           <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
@@ -1878,7 +1887,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     if (errors.iban) {
       return c.html(
         <Layout title={`${existing.firstName} ${existing.lastName}`} user={user} activeNav="members">
-          <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+          <form method="post" action={`/members/${id}`} class="space-y-4">
             <BankDataSection m={{ ...existing, ...bank, iban: trimmed(body, "iban") }} editable errors={errors} />
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           </form>
@@ -1947,7 +1956,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
-          <div class="divider">{t("members.form.assignments")}</div>
+          <Section title={t("members.form.assignments")} open>
           <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
@@ -1969,6 +1978,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             </table>
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          </Section>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
@@ -2022,7 +2032,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
-          <div class="divider">{t("members.form.assignments")}</div>
+          <Section title={t("members.form.assignments")} open>
           <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
@@ -2044,6 +2054,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             </table>
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
+          </Section>
           <div class="flex gap-2 pt-4">
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>

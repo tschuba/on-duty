@@ -7,6 +7,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
+import { Section } from "../components/section.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import {
   ASSUMED_NOTE, ACTIVE_ROLE_ID, CATEGORY_OPTIONS, ImportError, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
@@ -67,8 +68,8 @@ function UploadPage({ user, error }: { user: any; error?: string }) {
         {error && <div class="alert alert-error mb-4">{error}</div>}
         <div class="alert alert-info mb-6">{t("import.backupHint")}</div>
 
-        <h2 class="text-lg font-bold mb-1" style="font-family: var(--font-heading)">{t("import.upload.supported")}</h2>
-        <p class="text-sm opacity-70 mb-3">{t("import.upload.help")}</p>
+        <Section title={t("import.upload.supported")} collapsible={false}>
+        <p class="text-sm opacity-70">{t("import.upload.help")}</p>
         <div class="grid gap-4 sm:grid-cols-2 mb-2">
           {([["members", "membersDetect", "membersFields"], ["inventory", "inventoryDetect", "inventoryFields"]] as const).map(([kind, detect, fields]) => (
             <div class="card bg-base-200 shadow">
@@ -82,7 +83,8 @@ function UploadPage({ user, error }: { user: any; error?: string }) {
             </div>
           ))}
         </div>
-        <p class="text-sm opacity-60 mb-6">{t("import.upload.unsupported")}</p>
+        <p class="text-sm opacity-60">{t("import.upload.unsupported")}</p>
+        </Section>
 
         <form method="post" action="/import/preview" enctype="multipart/form-data" class="card bg-base-200 shadow">
           <div class="card-body gap-3">
@@ -131,22 +133,6 @@ function RoleCombo({ name, value, roles, disabled }: { name: string; value: stri
         class={`input input-bordered input-sm w-56 ${value === "new" ? "input-warning" : ""}`} />
       <input type="hidden" name={name} value={value} disabled={disabled} />
     </>
-  );
-}
-
-type Tone = "error" | "warning";
-const toneClass = (tone?: Tone) => (tone ? `badge-${tone}` : "badge-ghost");
-
-// Einklappbarer Abschnitt; offen, wenn dort etwas zu tun ist.
-function Section({ id, title, badge, tone, open, children }: { id?: string; title: string; badge?: string | number; tone?: Tone; open?: boolean; children: unknown }) {
-  return (
-    <details id={id} class="collapse collapse-arrow border border-base-300 bg-base-100 mb-3 scroll-mt-32" open={open}>
-      <summary class="collapse-title bg-base-300 text-lg font-bold flex items-center gap-2" style="font-family: var(--font-heading)">
-        {title}
-        {badge !== undefined && badge !== "" && <span class={`badge badge-sm ${toneClass(tone)}`}>{badge}</span>}
-      </summary>
-      <div class="collapse-content overflow-x-auto pt-4">{children as never}</div>
-    </details>
   );
 }
 
@@ -428,7 +414,7 @@ const COMBO_SCRIPT = `
   });
 })();`;
 
-type Summary = { label: string; value: number; tone?: Tone }[];
+type Summary = { label: string; value: number; tone?: "error" | "warning" }[];
 
 function PreviewShell(props: { user: any; kind: ImportKind; fp: string; hidden: unknown; canRun: boolean; unmapped: { column: string; count: number }[]; notices: (string | { text: string; href: string } | false)[]; summary: Summary; children: unknown }) {
   const notices = props.notices.filter((n): n is string | { text: string; href: string } => !!n);
