@@ -1222,7 +1222,7 @@ type StartStatus = "aktiv" | "passiv" | "foerdernd";
 function StartStatusSelect({ value }: { value: StartStatus }) {
   return (
     <fieldset class="space-y-2">
-      <legend class="label-text font-medium">{t("members.form.startStatus")}</legend>
+      <legend class="sr-only">{t("members.form.startStatus")}</legend>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {(["aktiv", "passiv", "foerdernd"] as const).map((s) => (
           <label class="card bg-base-200 border-2 border-transparent cursor-pointer has-[:checked]:border-primary">
