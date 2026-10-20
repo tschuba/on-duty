@@ -581,9 +581,15 @@ describe("GET /permissions/:id/edit", () => {
     expect((await adminRoutes.request("/permissions/nope/edit")).status).toBe(404);
   });
 
-  it("404s for a protected role", async () => {
+  it("renders a protected role read-only", async () => {
     appRolesFixture = [makeAppRole({ isProtected: true })];
-    expect((await adminRoutes.request("/permissions/ar1/edit")).status).toBe(404);
+    userAppRolesFixture = [{ cnt: 0 }];
+    const res = await adminRoutes.request("/permissions/ar1/edit");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("<fieldset disabled");
+    expect(html).toContain(t("admin.permissions.readOnlyHint"));
+    expect(html).not.toContain('data-discard');
   });
 
   it("locks the name field when assignments exist", async () => {
@@ -798,5 +804,14 @@ describe("POST /backup/run", () => {
     await new Promise((r) => setImmediate(r));
     expect(errSpy).toHaveBeenCalledWith("[backup] manual run failed:", expect.any(Error));
     errSpy.mockRestore();
+  });
+});
+
+describe("permissionSearchText", () => {
+  it("finds permissions by key and German label", async () => {
+    const { permissionSearchText } = await import("../routes/admin.js");
+    const txt = permissionSearchText(["members:read", "members:bank-data:read"]);
+    expect(txt).toContain("members:read");
+    expect(txt).toContain("bankdaten");
   });
 });

@@ -30,6 +30,14 @@ import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSetti
 export const adminRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("system:admin");
 
+// Lowercase search haystack: permission keys plus their German resource/permission labels.
+export function permissionSearchText(perms: readonly Permission[]): string {
+  return perms
+    .map((p) => `${p} ${PERMISSION_LABELS[p] ?? ""} ${RESOURCE_LABELS[p.split(":")[0]] ?? ""}`)
+    .join(" ")
+    .toLowerCase();
+}
+
 // system:admin is reserved for the built-in protected `admin` role — never offered
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
 const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
@@ -635,6 +643,15 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
+      <label class="input input-bordered input-sm flex items-center gap-2 mb-3 max-w-xs">
+        <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+        <input
+          type="search"
+          class="grow min-w-0"
+          placeholder={t("admin.permissions.searchPlaceholder")}
+          oninput="const q=this.value.toLowerCase();this.closest('div').querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)})"
+        />
+      </label>
       <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
@@ -652,10 +669,9 @@ adminRoutes.get("/permissions", guard, async (c) => {
               return (
                 <tr
                   key={r.id}
-                  {...(!r.isProtected && {
-                    class: "cursor-pointer hover",
-                    onclick: `location.href='/admin/permissions/${r.id}/edit'`,
-                  })}
+                  data-search={`${r.name} ${r.description ?? ""} ${permissionSearchText(permsByRole.get(r.id) ?? [])}`.toLowerCase()}
+                  class="cursor-pointer hover"
+                  onclick={`location.href='/admin/permissions/${r.id}/edit'`}
                 >
                   <td class="font-medium">
                     {r.isProtected && (
@@ -769,16 +785,18 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
   );
 }
 
-type PermFormState = { id?: string; name: string; nameLocked?: boolean; description: string; checked: Set<Permission>; error?: string };
+type PermFormState = { id?: string; readOnly?: boolean; name: string; nameLocked?: boolean; description: string; checked: Set<Permission>; error?: string };
 
 async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: PermFormState, status: 200 | 422 = 200) {
   const title = t(f.id ? "admin.permissions.modal.edit" : "admin.permissions.modal.create");
   return c.html(
     <Layout title={title} user={c.get("user")} activeNav="admin">
       <AdminTabs active="permissions" />
-      <PageHeader title={title} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" />} />
+      <PageHeader title={title} backHref="/admin/permissions" actions={f.readOnly ? undefined : <FormActions formId="admin-permissions-form" />} />
+      {f.readOnly && <div class="alert alert-info mb-4 max-w-2xl">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-permissions-form" method="post" action={f.id ? `/admin/permissions/${f.id}` : "/admin/permissions"} class="flex flex-col gap-3 max-w-2xl">
+        <fieldset disabled={f.readOnly} class="contents">
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
           {f.nameLocked ? (
@@ -799,6 +817,7 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
           <PermissionCheckboxes checked={f.checked} />
         </div>
+        </fieldset>
       </form>
     </Layout>,
     status
@@ -810,10 +829,10 @@ adminRoutes.get("/permissions/new", guard, (c) => renderPermissionForm(c, { name
 adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
-  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
+  if (!role) return c.html("", HTTP_STATUS.NOT_FOUND);
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
   const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
-  return renderPermissionForm(c, { id, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
+  return renderPermissionForm(c, { id, readOnly: role.isProtected, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
 });
 
 function parsePermissions(body: Record<string, unknown>): Permission[] {

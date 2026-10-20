@@ -263,9 +263,14 @@ describe("GET /roles/:id/edit", () => {
     expect((await roleRoutes.request("/roles/nope/edit")).status).toBe(404);
   });
 
-  it("404s for a protected role", async () => {
+  it("renders a protected role read-only", async () => {
     rolesFixture = [makeRole({ isProtected: true })];
-    expect((await roleRoutes.request("/roles/r1/edit")).status).toBe(404);
+    const res = await roleRoutes.request("/roles/r1/edit");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("<fieldset disabled");
+    expect(html).toContain(t("admin.permissions.readOnlyHint"));
+    expect(html).not.toContain(t("common.save"));
   });
 
   it("locks the name field when assignments exist", async () => {
