@@ -729,9 +729,9 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
     : undefined;
   const saved = trimmed(body, "savedStatus") as MemberStatus;
   const cutoff = ageLimitDate(birthDate, env.ACTIVE_AGE_LIMIT);
-  const limitReached = new Date().toISOString().slice(0, 10) >= cutoff;
+  const hintKey = new Date().toISOString().slice(0, 10) >= cutoff ? "members.form.roleAgeLimitHint.past" : "members.form.roleAgeLimitHint.future";
   const hinted = new Set(
-    limitReached ? planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff)).map((a) => a.rowIdx) : []
+    planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff)).map((a) => a.rowIdx)
   );
   const datum = new Date(cutoff).toLocaleDateString("de-DE");
   // Alle Zeilen schicken, damit nicht mehr zutreffende Hinweise wieder verschwinden.
@@ -742,7 +742,7 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
       {conflict && <p class="text-warning">{conflict.message}</p>}
       {allIdx.map((i) => (
         <div id={`role-hint-${i}`} hx-swap-oob="true" class={hinted.has(i) ? "text-warning text-sm px-4 pb-2" : ""}>
-          {hinted.has(i) && t("members.form.roleAgeLimitHint", { datum })}
+          {hinted.has(i) && t(hintKey, { datum })}
         </div>
       ))}
     </>

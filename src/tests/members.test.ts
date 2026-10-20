@@ -682,8 +682,20 @@ describe("POST /new", () => {
       }),
     });
     const html = await res.text();
-    expect(html).toMatch(/id="role-hint-1"[^>]*text-warning/);
+    expect(html).toMatch(/id="role-hint-1"[^>]*text-warning[^>]*>Seit dem/);
     expect(html).not.toMatch(/id="role-hint-0"[^>]*text-warning/);
+  });
+
+  it("status preview uses 'Ab dem' when the age limit lies in the future", async () => {
+    rolesFixture = [roleAktiv];
+    const res = await memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: `${new Date().getFullYear() - 30}-01-01`,
+        "assignment_idx[]": "0", "assignment_role[]": roleAktiv.id, "assignment_from[]": "2020-01-01", "assignment_to[]": "",
+      }),
+    });
+    expect(await res.text()).toMatch(/id="role-hint-0"[^>]*>Ab dem/);
   });
 
   it("status preview overlays the new badge only when the status changes", async () => {
