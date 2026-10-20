@@ -161,7 +161,7 @@ function StatusBadgeSlot({ saved, next, oob }: { saved: MemberStatus; next?: Mem
     <span id="status-badge-slot" class="relative inline-block" hx-swap-oob={oob ? "true" : undefined}>
       <span class={changed ? "opacity-40" : ""}><StatusBadge status={saved} /></span>
       {changed && (
-        <span class="absolute left-3/4 top-3/4 inline-flex rounded-full ring-2 ring-warning shadow-[0_0_8px_var(--color-warning)]" aria-live="polite">
+        <span class="absolute left-1/2 top-3/4 inline-flex rounded-full ring-2 ring-warning shadow-[0_0_8px_var(--color-warning)]" aria-live="polite">
           <span class="sr-only">{t("members.form.statusBecomes")} </span>
           <StatusBadge status={next} />
         </span>
