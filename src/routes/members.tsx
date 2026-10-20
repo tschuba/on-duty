@@ -704,37 +704,44 @@ function BankDataSection({
   errors?: Record<string, string>;
 }) {
   const iban = m.iban ? formatIban(m.iban) : "";
-  if (!editable) {
-    return (
-      <div class="mt-6 max-w-2xl">
-        <h2 class="font-semibold mb-2">{t("members.bank.title")}</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <ViewField label={t("members.bank.iban")} value={iban} />
-          <ViewField label={t("members.bank.bic")} value={m.bic} />
-          <ViewField label={t("members.bank.accountHolder")} value={m.accountHolder || `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim()} />
-        </div>
-      </div>
-    );
-  }
-  return (
+  const key = `bank-open:${m.id ?? "new"}`;
+  const body = editable ? (
     <>
-      <div class="divider">{t("members.bank.title")}</div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
-        <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
-        {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
-      </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
-        <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
-      </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
+          <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
+          {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
+          <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
+        </div>
       </div>
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
         <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input-bordered w-full" />
         <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
       </div>
+    </>
+  ) : (
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <ViewField label={t("members.bank.iban")} value={iban} />
+      <ViewField label={t("members.bank.bic")} value={m.bic} />
+      <ViewField label={t("members.bank.accountHolder")} value={m.accountHolder || `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim()} />
+    </div>
+  );
+  // Zugeklappt, außer bei IBAN-Fehler; Felder bleiben im DOM und werden mitgeschickt.
+  // Zustand pro Tab in sessionStorage, damit er Ansicht ↔ Bearbeiten überdauert.
+  return (
+    <>
+      <details data-bank-key={key} class="collapse collapse-arrow border border-base-300 bg-base-100 mt-6 max-w-2xl" open={!!errors?.iban}>
+        <summary class="collapse-title font-semibold">{t("members.bank.title")}</summary>
+        <div class="collapse-content space-y-4">{body}</div>
+      </details>
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var d=document.currentScript.previousElementSibling,k=d.dataset.bankKey;
+try{if(sessionStorage.getItem(k))d.open=true;}catch(e){}
+d.addEventListener('toggle',function(){try{d.open?sessionStorage.setItem(k,'1'):sessionStorage.removeItem(k);}catch(e){}});})();` }} />
     </>
   );
 }

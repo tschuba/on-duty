@@ -878,6 +878,13 @@ describe("bank data gating", () => {
     expect(html).toContain('name="iban"');
   });
 
+  it("renders the section collapsed by default, keyed per member", async () => {
+    findFirstResult = memberWithAssignments({ iban: "DE89370400440532013000" });
+    perms("members:read", "members:bank-data:read");
+    const html = await (await memberRoutes.request("/m1")).text();
+    expect(html).toMatch(/<details data-bank-key="bank-open:m1" class="[^"]*"><summary/);
+  });
+
   it("bank-only writer saves bank data and ignores master data", async () => {
     perms("members:bank-data:write");
     findFirstResult = memberWithAssignments();
@@ -911,6 +918,7 @@ describe("bank data gating", () => {
     const res = await memberRoutes.request("/m1", { method: "POST", body: formBody({ iban: "DE00 1234" }) });
     expect(res.status).toBe(422);
     expect(updateCalls.some((c) => c.table === members)).toBe(false);
+    expect(await res.text()).toMatch(/<details data-bank-key="[^"]*" class="[^"]*" open>/);
   });
 });
 
