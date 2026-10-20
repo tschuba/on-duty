@@ -360,38 +360,6 @@ export function MembersTable({
   );
 }
 
-// "Zeile hinzufügen"-Button: liest/schreibt data-next-index auf #role-rows statt
-// querySelectorAll(...).length zu zählen — letzteres kollidiert nach Löschen einer
-// Zwischenzeile (gleicher index für zwei Zeilen), was mit popovertarget (eindeutige
-// id-Referenz) sichtbar würde statt wie bisher eine folgenlose doppelte DOM-id zu sein.
-function RoleRowsAddButton({ initialCount }: { initialCount: number }) {
-  return (
-    <>
-      <button
-        type="button"
-        class="btn btn-ghost"
-        hx-get="/members/role-row"
-        hx-target="#role-rows"
-        hx-swap="beforeend"
-        hx-include="[id='role-rows'] input[name='assignment_id[]']"
-      >
-        {t("members.form.addAssignment")}
-      </button>
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function () {
-          var rows = document.getElementById('role-rows');
-          if (!rows.dataset.nextIndex) rows.dataset.nextIndex = '${initialCount}';
-          document.querySelector('[hx-get="/members/role-row"]').addEventListener('htmx:configRequest', function (e) {
-            var next = parseInt(rows.dataset.nextIndex, 10);
-            e.detail.parameters['index'] = next;
-            rows.dataset.nextIndex = String(next + 1);
-          });
-        })();
-      ` }} />
-    </>
-  );
-}
-
 function roleTypeTabs(roles: Role[]) {
   const seen = new Map<string, { id: string; name: string }>();
   for (const r of roles) if (!seen.has(r.typeId)) seen.set(r.typeId, { id: r.typeId, name: r.typeName ?? "" });
@@ -401,46 +369,140 @@ function roleTypeTabs(roles: Role[]) {
 const normalizeNote = (v?: string) => v?.trim().slice(0, 200) || null;
 const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${note})` : title);
 
-export function RoleRow({
-  index,
-  roles,
-  assignment,
-  auto,
-}: {
-  index: number;
-  roles: Role[];
-  assignment?: Assignment;
-  auto?: boolean;
-}) {
-  const selected = assignment ? roles.find((r) => r.id === assignment.memberRoleId) : undefined;
+type AssignmentRowData = { id: string; roleId: string; roleTitle: string; from: string; to: string | null; note: string | null; idx?: string };
+
+const toRowData = (a: Assignment): AssignmentRowData => ({ id: a.id, roleId: a.memberRoleId, roleTitle: a.role.title, from: a.from, to: a.to, note: a.note });
+// Offene (ohne „bis“) zuerst, danach „von“ absteigend.
+const sortRows = (rows: AssignmentRowData[]) => [...rows].sort((a, b) => (a.to ? 1 : 0) - (b.to ? 1 : 0) || b.from.localeCompare(a.from));
+
+const ADD_CLICK = "if(event.detail.successful)document.getElementById('assignment-modal').showModal()";
+
+// Eine Zeile der read-only Tabelle. Neuanlage (kein memberId): Werte stecken als Hidden-Inputs im Hauptformular.
+function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRowData; memberId?: string; index?: string; auto?: boolean; readOnly?: boolean }) {
+  return (
+    <>
+      <tr data-autofrom={auto ? "1" : undefined}>
+        <td>
+          {!memberId && (
+            <>
+              <input type="hidden" name="assignment_idx[]" value={index} />
+              <input type="hidden" name="assignment_id[]" value="" />
+              <input type="hidden" name="assignment_role[]" value={r.roleId} />
+              <input type="hidden" name="assignment_from[]" value={r.from} />
+              <input type="hidden" name="assignment_to[]" value={r.to ?? ""} />
+              <input type="hidden" name="assignment_note[]" value={r.note ?? ""} />
+            </>
+          )}
+          {r.roleTitle}
+        </td>
+        <td class="assignment-from">{formatDate(r.from)}</td>
+        <td>{r.to ? formatDate(r.to) : ""}</td>
+        <td>{r.note}</td>
+        <td class="text-right whitespace-nowrap">
+          {!readOnly && memberId && (
+            <>
+              <button type="button" class="btn btn-ghost btn-sm" hx-get={`/members/${memberId}/assignments/${r.id}/edit`} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>{t("common.edit")}</button>
+              <button type="button" class="btn btn-ghost btn-sm text-error" hx-post={`/members/${memberId}/assignments/${r.id}/delete`} hx-confirm={t("members.assignment.confirmDelete")} hx-target="#assignments-box" hx-swap="outerHTML">{t("common.delete")}</button>
+            </>
+          )}
+          {!readOnly && !memberId && (
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm text-error"
+              onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))"
+            >
+              {t("common.delete")}
+            </button>
+          )}
+        </td>
+      </tr>
+      {!memberId && <tr class="border-0"><td colSpan={5} class="p-0"><div id={`role-hint-${index}`} /></td></tr>}
+    </>
+  );
+}
+
+// Read-only Tabelle + „Hinzufügen“; Änderungen laufen über das Modal (#assignment-modal).
+function AssignmentsBox({ rows, memberId, readOnly }: { rows: AssignmentRowData[]; memberId?: string; readOnly?: boolean }) {
+  return (
+    <div id="assignments-box">
+      <div class="overflow-x-auto">
+        <table class="table w-full">
+          <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
+          <tbody id="role-rows" data-next-index={String(rows.length)}>
+            {sortRows(rows).map((r, i) => <AssignmentRow key={r.id || i} r={r} memberId={memberId} index={r.idx ?? String(i)} readOnly={readOnly} />)}
+          </tbody>
+        </table>
+      </div>
+      {!readOnly && (
+        <button type="button" class="btn btn-ghost" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
+          {t("members.form.addAssignment")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Dialog außerhalb des Hauptformulars (kein verschachteltes <form>).
+function AssignmentModalScaffold() {
+  return (
+    <>
+      <dialog id="assignment-modal" class="modal">
+        <div class="modal-box max-w-xl" id="assignment-modal-body" />
+        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+      </dialog>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function () {
+          var d = document.getElementById('assignment-modal');
+          // htmx swappt 4xx nicht: Validierungsfehler (422) ins Modal statt in die Tabelle.
+          document.body.addEventListener('htmx:beforeSwap', function (e) {
+            if (e.detail.xhr.status === 422 && d.contains(e.detail.requestConfig.elt)) {
+              e.detail.shouldSwap = true; e.detail.isError = false;
+              e.detail.target = document.getElementById('assignment-modal-body'); e.detail.swapOverride = 'innerHTML';
+            }
+          });
+          document.body.addEventListener('assignment-modal', function (e) {
+            if (e.detail.value === 'close') d.close();
+            else { var t = d.querySelector('.role-combobox-trigger'); if (t) t.focus(); }
+          });
+        })();
+      ` }} />
+    </>
+  );
+}
+
+type AssignmentFormValues = { roleId?: string; from?: string; to?: string | null; note?: string | null };
+
+export function AssignmentModalForm({ roles, action, values = {}, error, title, collect }: { roles: Role[]; action: string; values?: AssignmentFormValues; error?: string; title: string; collect?: boolean }) {
+  const selectedId = values.roleId;
+  const selected = roles.find((r) => r.id === selectedId);
   const selectedTitle = selected?.title ?? "";
   const types = roleTypeTabs(roles);
   const activeType = selected?.typeId ?? types[0]?.id;
   return (
-    <>
-    <tr id={`role-row-${index}`} data-autofrom={auto ? "1" : undefined}>
-      <td>
-        <input type="hidden" name="assignment_idx[]" value={String(index)} />
-        <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
-        <input type="hidden" name="assignment_role[]" class="role-combobox-value" value={assignment?.memberRoleId ?? ""} />
+    <form hx-post={action} hx-target="#assignments-box" hx-swap="outerHTML" hx-include={collect ? "#assignments-box" : undefined} class="space-y-4">
+      <h3 class="font-bold text-lg">{title}</h3>
+      {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.form.role")}<span class="text-error ml-1">*</span></span></label>
         <div class="relative">
+          <input type="hidden" name="role" class="role-combobox-value" value={selectedId ?? ""} />
           <button
             type="button"
             role="combobox"
             aria-haspopup="listbox"
             aria-expanded="false"
-            aria-controls={`role-combobox-popover-${index}`}
+            aria-controls={`role-combobox-popover-m`}
             class={`role-combobox-trigger btn btn-outline justify-start font-normal min-w-48${selectedTitle ? "" : " opacity-50"}`}
-            style={`anchor-name:--role-combobox-anchor-${index}`}
+            style={`anchor-name:--role-combobox-anchor-m`}
             data-placeholder={t("members.form.roleSelect")}
           >
             {selectedTitle || t("members.form.roleSelect")}
           </button>
           <div
-            id={`role-combobox-popover-${index}`}
+            id={`role-combobox-popover-m`}
             popover="auto"
             class="role-combobox-popover dropdown-content bg-base-100 rounded-box shadow p-2"
-            style={`position-anchor:--role-combobox-anchor-${index}`}
+            style={`position-anchor:--role-combobox-anchor-m`}
           >
             <label class="input input-bordered input-sm flex items-center gap-2 w-full mb-1">
               <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
@@ -449,7 +511,7 @@ export function RoleRow({
                 autocomplete="off"
                 role="searchbox"
                 aria-autocomplete="list"
-                aria-controls={`role-combobox-list-${index}`}
+                aria-controls={`role-combobox-list-m`}
                 class="role-combobox-search grow min-w-0"
                 placeholder={t("common.searchPlaceholder")}
               />
@@ -469,16 +531,16 @@ export function RoleRow({
                 ))}
               </div>
             )}
-            <ul id={`role-combobox-list-${index}`} role="listbox" class="role-combobox-list menu p-0">
+            <ul id={`role-combobox-list-m`} role="listbox" class="role-combobox-list menu p-0">
               {roles.map((r) => (
                 <li
                   key={r.id}
-                  id={`role-combobox-option-${index}-${r.id}`}
+                  id={`role-combobox-option-m-${r.id}`}
                   role="option"
                   data-id={r.id}
                   data-title={r.title}
                   data-type={r.typeId}
-                  aria-selected={r.id === assignment?.memberRoleId ? "true" : "false"}
+                  aria-selected={r.id === selectedId ? "true" : "false"}
                 >
                   <a class="min-h-11 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
                 </li>
@@ -490,36 +552,26 @@ export function RoleRow({
             </button>
           </div>
         </div>
-      </td>
-      <td>
-        <input
-          type="date"
-          name="assignment_from[]"
-          class="input input-bordered w-full min-w-40"
-          value={assignment?.from ?? ""}
-          required
-        />
-      </td>
-      <td>
-        <input
-          type="date"
-          name="assignment_to[]"
-          class="input input-bordered w-full min-w-40"
-          value={assignment?.to ?? ""}
-        />
-      </td>
-      <td>
-        <input type="text" name="assignment_note[]" class="input input-bordered w-full min-w-48" maxlength={200} value={assignment?.note ?? ""} />
-      </td>
-      <td>
-        <button
-          type="button"
-          class="btn btn-ghost text-error"
-          onclick={`var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change'))`}
-        >
-          ✕
-        </button>
-      </td>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.form.from")}<span class="text-error ml-1">*</span></span></label>
+          <input type="date" name="from" class="input input-bordered w-full" value={values.from ?? ""} required />
+        </div>
+        <div class="form-control">
+          <label class="label"><span class="label-text">{t("members.form.to")}</span></label>
+          <input type="date" name="to" class="input input-bordered w-full" value={values.to ?? ""} />
+        </div>
+      </div>
+      <div class="form-control">
+        <label class="label"><span class="label-text">{t("members.form.note")}</span></label>
+        <input type="text" name="note" class="input input-bordered w-full" maxlength={200} value={values.note ?? ""} />
+      </div>
+      <div class="modal-action">
+        <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
+        <button type="submit" name="more" value="1" class="btn btn-ghost">{t("members.assignment.saveAndMore")}</button>
+        <button type="submit" class="btn btn-primary">{t("common.save")}</button>
+      </div>
       <script dangerouslySetInnerHTML={{ __html: `
         if (!window.__roleComboboxBound) {
           window.__roleComboboxBound = true;
@@ -528,7 +580,7 @@ export function RoleRow({
           function rcPopover(trigger) { return rcWrap(trigger).querySelector('.role-combobox-popover'); }
           function rcSearch(trigger) { return rcPopover(trigger).querySelector('.role-combobox-search'); }
           function rcList(trigger) { return rcPopover(trigger).querySelector('.role-combobox-list'); }
-          function rcHidden(trigger) { return trigger.closest('td').querySelector('.role-combobox-value'); }
+          function rcHidden(trigger) { return rcWrap(trigger).querySelector('.role-combobox-value'); }
           function rcResetBtn(trigger) { return rcPopover(trigger).querySelector('.role-combobox-reset'); }
           function rcOptions(list) { return Array.from(list.querySelectorAll('li[role=option]')); }
           function rcNoMatch(list) { return list.querySelector('.role-combobox-no-match'); }
@@ -672,20 +724,15 @@ export function RoleRow({
             }
           });
 
-          document.currentScript.closest('form').addEventListener('submit', function (e) {
-            var missing = Array.from(document.querySelectorAll('.role-combobox-trigger')).filter(function (trig) {
-              return !rcHidden(trig).value;
-            });
             missing.forEach(function (trig) { trig.classList.add('btn-error'); trig.setAttribute('aria-invalid', 'true'); });
             if (missing.length) { e.preventDefault(); missing[0].focus(); }
           });
         }
       ` }} />
-    </tr>
-    <tr class="border-0"><td colSpan={5} class="p-0"><div id={`role-hint-${index}`} /></td></tr>
-    </>
+    </form>
   );
 }
+
 
 // Bank data is plaintext, protected by permission only (backlog 34). Without read
 // permission the section is not rendered at all — not even a hint that data exists.
@@ -754,7 +801,7 @@ function StatusPreview({ saved }: { saved?: MemberStatus }) {
     <div
       hx-post="/members/status-preview"
       hx-include="closest form"
-      hx-trigger="load, input from:closest form delay:300ms, change from:closest form"
+      hx-trigger="load, input from:closest form delay:300ms, change from:closest form, assignment-modal from:body delay:100ms"
       hx-target="#status-preview"
       hx-swap="innerHTML"
     >
@@ -1260,6 +1307,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     <Layout title={t("members.newMember")} user={user} activeNav="members">
       <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
       <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
+        <NewMemberDraft ctx={personId ? `person:${personId}` : linkMemberId ? `link:${linkMemberId}` : applicationId ? `app:${applicationId}` : "new"} />
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1277,26 +1325,56 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <Section title={t("members.form.assignments")} open>
         <StatusPreview />
         <PassiveHint show={false} />
-        <div class="overflow-x-auto">
-          <table class="table w-full">
-            <thead>
-              <tr>
-                <th>{t("members.form.role")} <span class="text-error">*</span></th>
-                <th>{t("members.form.from")} <span class="text-error">*</span></th>
-                <th>{t("members.form.to")}</th><th>{t("members.form.note")}</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="role-rows"></tbody>
-          </table>
-        </div>
-        <RoleRowsAddButton initialCount={0} />
-        <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
+        <AssignmentsBox rows={[]} />
         </Section>
       </form>
+        <AssignmentModalScaffold />
     </Layout>
   );
 });
+
+// Entwurf der Neuanlage (localStorage, ohne Bankdaten, 7 Tage). Schlüssel je Kontext; Banner statt Auto-Wiederherstellung.
+function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) {
+  const texts = JSON.stringify({ banner: t("members.draft.banner"), restore: t("members.draft.restore"), discard: t("members.draft.discard") });
+  return (
+    <script dangerouslySetInnerHTML={{ __html: `
+      document.addEventListener('DOMContentLoaded', function () {
+        var KEY = 'member-draft:' + ${JSON.stringify(ctx)}, TTL = 7 * 864e5, TX = ${texts};
+        var form = document.getElementById('member-form'), skip = /^(iban|bic|accountHolder|personId|linkMemberId|applicationId|switchStatus|_action)$/;
+        function save() {
+          var data = [];
+          new FormData(form).forEach(function (v, k) { if (!skip.test(k) && typeof v === 'string') data.push([k, v]); });
+          localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), data: data }));
+        }
+        var timer; function later() { clearTimeout(timer); timer = setTimeout(save, 500); }
+        form.addEventListener('input', later); form.addEventListener('change', later);
+        document.body.addEventListener('assignment-modal', function () { setTimeout(save, 600); });
+        form.addEventListener('submit', function () { clearTimeout(timer); localStorage.removeItem(KEY); });
+        window.addEventListener('pagehide', function () { clearTimeout(timer); });
+        if (${rerender ? "true" : "false"}) { save(); return; }
+        var raw = localStorage.getItem(KEY), d; try { d = raw && JSON.parse(raw); } catch (e) {}
+        if (d && Date.now() - d.at > TTL) { localStorage.removeItem(KEY); d = null; }
+        if (!d) return;
+        var bar = document.createElement('div'); bar.className = 'alert alert-info text-sm flex-wrap';
+        var msg = document.createElement('span'); msg.textContent = TX.banner; bar.appendChild(msg);
+        function btn(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm'; b.textContent = label; b.onclick = fn; bar.appendChild(b); }
+        btn(TX.restore, function () {
+          var rows = {};
+          d.data.forEach(function (kv) {
+            if (/^assignment_/.test(kv[0])) { (rows[kv[0]] = rows[kv[0]] || []).push(kv[1]); return; }
+            var els = form.querySelectorAll('[name="' + kv[0] + '"]');
+            els.forEach(function (el) { if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === kv[1]; else el.value = kv[1]; });
+          });
+          if (rows['assignment_role[]']) htmx.ajax('POST', '/members/assignments/rows', { values: rows, target: '#assignments-box', swap: 'outerHTML' }).then(function () { form.dispatchEvent(new Event('change', { bubbles: true })); });
+          else form.dispatchEvent(new Event('change', { bubbles: true }));
+          bar.remove();
+        });
+        btn(TX.discard, function () { localStorage.removeItem(KEY); bar.remove(); });
+        form.parentNode.insertBefore(bar, form);
+      });
+    ` }} />
+  );
+}
 
 type StartStatus = "aktiv" | "passiv" | "foerdernd";
 
@@ -1343,10 +1421,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
             });
           });
           form.elements.entryDate.addEventListener('input', function (e) {
-            rows.querySelectorAll('tr[data-autofrom] input[name="assignment_from[]"]').forEach(function (el) { el.value = e.target.value; });
-          });
-          rows.addEventListener('input', function (e) {
-            if (e.target.name === 'assignment_from[]') e.target.closest('tr').removeAttribute('data-autofrom');
+            rows.querySelectorAll('tr[data-autofrom]').forEach(function (tr) { tr.querySelector('input[name="assignment_from[]"]').value = e.target.value; var p = e.target.value.split('-'); tr.querySelector('.assignment-from').textContent = p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : '—'; });
           });
           prefill();
         });
@@ -1388,16 +1463,71 @@ function checkStartStatus(
   return undefined;
 }
 
-// GET /members/role-row — HTMX fragment: one assignment row
+function rowsFromBody(body: Record<string, any>, allRoles: Role[]): AssignmentRowData[] {
+  const col = (k: string) => [body[`assignment_${k}[]`]].flat().filter((v) => v !== undefined) as string[];
+  const [ids, roleIds, froms, tos, notes, idxs] = ["id", "role", "from", "to", "note", "idx"].map(col);
+  return roleIds.flatMap((roleId, i) => {
+    const role = allRoles.find((r) => r.id === roleId);
+    return role && froms[i] ? [{ id: ids[i] ?? "", roleId, roleTitle: role.title, from: froms[i], to: tos[i] || null, note: notes[i] || null, idx: idxs[i] ?? String(i) }] : [];
+  });
+}
+
+// Gemeinsame Validierung (Neuanlage und Edit): Pflichtfelder, bis ≥ von, keine zwei offenen Zuweisungen derselben Funktion.
+function validateAssignment(
+  v: { id?: string; roleId: string; from: string; to?: string | null },
+  others: { id?: string; roleId: string; to?: string | null }[],
+  roles: { id: string; title: string }[],
+): string | undefined {
+  if (!v.roleId || !v.from) return t("members.error.assignmentIncomplete");
+  if (v.to && v.to < v.from) return t("members.error.assignmentRange");
+  if (!v.to && others.some((o) => o.roleId === v.roleId && !o.to && (!v.id || o.id !== v.id))) {
+    return t("members.error.duplicateRole", { role: roles.find((r) => r.id === v.roleId)?.title ?? v.roleId });
+  }
+}
+
+function parseAssignmentForm(body: Record<string, any>) {
+  return { roleId: trimmed(body, "role"), from: trimmed(body, "from"), to: trimmed(body, "to") || null, note: normalizeNote(trimmed(body, "note")) };
+}
+
+// GET /members/role-row — Zeile für die automatische Aktiv-Zuweisung der Neuanlage: ?index=&roleId=&from=
 memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
-  const index = Number(c.req.query("index") ?? 0);
   const roles = await fetchRoles();
-  // Optional prefill (used for the "aktiv" start choice): ?roleId=&from=&auto=1
-  const roleId = c.req.query("roleId");
-  const assignment = roleId
-    ? ({ id: "", memberRoleId: roleId, from: c.req.query("from") ?? "", to: null, note: null } as Assignment)
-    : undefined;
-  return c.html(<RoleRow index={index} roles={roles} assignment={assignment} auto={c.req.query("auto") === "1"} />);
+  const role = roles.find((r) => r.id === c.req.query("roleId"));
+  if (!role) return c.body(null, 404);
+  const r: AssignmentRowData = { id: "", roleId: role.id, roleTitle: role.title, from: c.req.query("from") ?? "", to: null, note: null };
+  return c.html(<AssignmentRow r={r} index={c.req.query("index") ?? "0"} auto />);
+});
+
+// Modal-Antwort nach Speichern: Tabelle (+ Badge im Edit) und je nach Button Modal schließen oder leeres Formular.
+async function assignmentResult(c: Context<{ Variables: Variables }>, box: any, more: boolean, form: any, badge?: any) {
+  c.header("HX-Trigger", JSON.stringify({ "assignment-modal": more ? "more" : "close" }));
+  return c.html(<>{box}{badge}{more && <div id="assignment-modal-body" hx-swap-oob="innerHTML">{form}</div>}</>);
+}
+
+// POST /members/assignments/rows — Tabelle aus gesammelten Zeilen (Entwurf wiederherstellen)
+memberRoutes.post("/assignments/rows", requireAuth("members:write"), async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  return c.html(<AssignmentsBox rows={rowsFromBody(body, await fetchRoles())} />);
+});
+
+// GET /members/assignments/new — Modal-Inhalt der Neuanlage (kollektiert Zeilen clientseitig)
+memberRoutes.get("/assignments/new", requireAuth("members:write"), async (c) => {
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action="/members/assignments/validate" title={t("members.assignment.titleNew")} collect />);
+});
+
+// POST /members/assignments/validate — zustandslos: neue Zeile + bereits gesammelte Zeilen
+memberRoutes.post("/assignments/validate", requireAuth("members:write"), async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  const roles = await fetchRoles();
+  const rows = rowsFromBody(body, roles);
+  const v = parseAssignmentForm(body);
+  const err = validateAssignment(v, rows, roles);
+  const form = (values: AssignmentFormValues, error?: string) => <AssignmentModalForm roles={roles} action="/members/assignments/validate" title={t("members.assignment.titleNew")} collect values={values} error={error} />;
+  if (err) return c.html(form(v, err), 422);
+  const idx = String(Math.max(-1, ...rows.map((r) => Number(r.idx))) + 1);
+  const role = roles.find((r) => r.id === v.roleId)!;
+  rows.push({ id: "", roleId: v.roleId, roleTitle: role.title, from: v.from, to: v.to, note: v.note, idx });
+  return assignmentResult(c, <AssignmentsBox rows={rows} />, trimmed(body, "more") === "1", form({}));
 });
 
 // POST /members/new — create member (or link an existing person, see GET /new)
@@ -1441,17 +1571,11 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   const assignmentTos = [body["assignment_to[]"]].flat() as string[];
   const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
 
-  // Validate that every non-empty row has both a role and a from date
-  if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
-    errors._assignments = t("members.error.assignmentIncomplete");
-  }
-
-  // Check for duplicate open assignments (same role without to-date)
-  const openRoles = assignmentRoles.filter((r, i) => r && !assignmentTos[i]);
-  const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
-  if (dupRole && !errors._assignments) {
-    const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
-    errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
+  const allRolesForCheck = await fetchRoles();
+  const submitted = assignmentRoles.map((roleId, i) => ({ roleId, from: assignmentFroms[i], to: assignmentTos[i] })).filter((r) => r.roleId || r.from);
+  for (let i = 0; i < submitted.length && !errors._assignments; i++) {
+    const err = validateAssignment(submitted[i], submitted.slice(0, i), allRolesForCheck);
+    if (err) errors._assignments = err;
   }
 
   // Auswahl aktiv/passiv/fördernd gegen den abgeleiteten Status prüfen (nur Anlegen, Server entscheidet).
@@ -1494,6 +1618,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
         <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
+          <NewMemberDraft ctx={personId ? `person:${personId}` : linkMemberId ? `link:${linkMemberId}` : applicationId ? `app:${applicationId}` : "new"} rerender />
           {personId && <input type="hidden" name="personId" value={personId} />}
           {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1521,28 +1646,10 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <Section title={t("members.form.assignments")} open>
           <StatusPreview />
           <PassiveHint show={startStatus === "passiv"} />
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-              <tbody id="role-rows">
-                {assignmentRoles.map((_, i) => (
-                  <RoleRow key={i} index={i} roles={roles} assignment={{
-                    id: "",
-                    memberId: "",
-                    memberRoleId: assignmentRoles[i],
-                    from: assignmentFroms[i] ?? "",
-                    to: assignmentTos[i] || null,
-                    note: normalizeNote(assignmentNotes[i]),
-                    autoClosed: false,
-                    role: roles.find((r) => r.id === assignmentRoles[i])!,
-                  }} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <RoleRowsAddButton initialCount={assignmentRoles.length} />
+        <AssignmentsBox rows={rowsFromBody(body, await db.select().from(memberRoles))} />
           </Section>
         </form>
+        <AssignmentModalScaffold />
       </Layout>,
       422
     );
@@ -1799,20 +1906,10 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <Section title={t("members.form.assignments")} open>
-        <StatusPreview saved={m.status} />
-        <div class="overflow-x-auto">
-          <table class="table w-full">
-            <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-            <tbody id="role-rows">
-              {m.assignments.map((a, i) => (
-                <RoleRow key={a.id} index={i} roles={roles} assignment={a} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <RoleRowsAddButton initialCount={m.assignments.length} />
+        <AssignmentsBox rows={m.assignments.map(toRowData)} memberId={m.id} readOnly={!!(m.exitDate || m.deathDate)} />
         </Section>
       </form>
+        <AssignmentModalScaffold />
     </Layout>
   );
 });
@@ -1865,25 +1962,6 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   if (!entryDate) errors.entryDate = t("common.required");
   if (firstEntryDate && entryDate && firstEntryDate > entryDate) errors.firstEntryDate = t("members.form.firstEntryDateAfterEntry");
 
-  const assignmentIds = [body["assignment_id[]"]].flat() as string[];
-  // Keep rows unfiltered so index i stays aligned across role/from/to
-  const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
-  const assignmentFroms = [body["assignment_from[]"]].flat() as string[];
-  const assignmentTos = [body["assignment_to[]"]].flat() as string[];
-  const assignmentNotes = [body["assignment_note[]"]].flat() as (string | undefined)[];
-
-  // Validate that every non-empty row has both a role and a from date
-  if (assignmentRoles.some((r, i) => (r || assignmentFroms[i]) && (!r || !assignmentFroms[i]))) {
-    errors._assignments = t("members.error.assignmentIncomplete");
-  }
-
-  const openRoles = assignmentRoles.filter((r, i) => r && !assignmentTos[i]);
-  const dupRole = openRoles.find((r, i) => openRoles.indexOf(r) !== i);
-  if (dupRole && !errors._assignments) {
-    const role = await db.select().from(memberRoles).where(eq(memberRoles.id, dupRole)).then((r) => r[0]);
-    errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
-  }
-
   if (Object.keys(errors).length > 0) {
     const roles = await fetchRoles();
     const m = { ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
@@ -1895,34 +1973,14 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
-        {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <Section title={t("members.form.assignments")} open>
-          <StatusPreview saved={existing.status} />
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-              <tbody id="role-rows">
-                {assignmentRoles.map((_, i) => (
-                  <RoleRow key={i} index={i} roles={roles} assignment={{
-                    id: assignmentIds[i] ?? "",
-                    memberId: id,
-                    memberRoleId: assignmentRoles[i],
-                    from: assignmentFroms[i] ?? "",
-                    to: assignmentTos[i] || null,
-                    note: normalizeNote(assignmentNotes[i]),
-                    autoClosed: false,
-                    role: roles.find((r) => r.id === assignmentRoles[i])!,
-                  }} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <RoleRowsAddButton initialCount={assignmentRoles.length} />
+        <AssignmentsBox rows={existing.assignments.map(toRowData)} memberId={id} readOnly={!!(existing.exitDate || existing.deathDate)} />
           </Section>
         </form>
+        <AssignmentModalScaffold />
       </Layout>,
       422
     );
@@ -1950,10 +2008,6 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       phone: (body.phone as string) ?? "",
       mobile: (body.mobile as string) ?? "",
       email: (body.email as string) ?? "",
-      "assignment_id[]": assignmentIds,
-      "assignment_role[]": assignmentRoles,
-      "assignment_from[]": assignmentFroms,
-      "assignment_to[]": assignmentTos.map((t) => t ?? ""),
     };
 
     return c.html(
@@ -1965,29 +2019,10 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
           <Section title={t("members.form.assignments")} open>
-          <StatusPreview saved={existing.status} />
-          <div class="overflow-x-auto">
-            <table class="table w-full">
-              <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
-              <tbody id="role-rows">
-                {assignmentRoles.map((_, i) => (
-                  <RoleRow key={i} index={i} roles={roles} assignment={{
-                    id: assignmentIds[i] ?? "",
-                    memberId: id,
-                    memberRoleId: assignmentRoles[i],
-                    from: assignmentFroms[i] ?? "",
-                    to: assignmentTos[i] || null,
-                    note: normalizeNote(assignmentNotes[i]),
-                    autoClosed: false,
-                    role: roles.find((r) => r.id === assignmentRoles[i])!,
-                  }} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <RoleRowsAddButton initialCount={assignmentRoles.length} />
+        <AssignmentsBox rows={existing.assignments.map(toRowData)} memberId={id} readOnly={!!(existing.exitDate || existing.deathDate)} />
           </Section>
         </form>
+        <AssignmentModalScaffold />
         <ReactivationModal memberId={id} formData={formData} />
       </Layout>
     );
@@ -2029,36 +2064,66 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         .set({ to: null, autoClosed: false })
         .where(eq(memberRoleAssignments.memberId, id));
     }
-
-    // Reconcile role assignments: delete removed, upsert existing/new
-    const submittedIds = assignmentIds.filter(Boolean);
-    const existingIds = existing.assignments.map((a) => a.id);
-    const deletedIds = existingIds.filter((eid) => !submittedIds.includes(eid));
-
-    for (const did of deletedIds) {
-      await tx.delete(memberRoleAssignments).where(eq(memberRoleAssignments.id, did));
-    }
-
-    for (let i = 0; i < assignmentRoles.length; i++) {
-      if (!assignmentRoles[i]) continue;
-      const aid = assignmentIds[i];
-      const vals = {
-        memberId: id,
-        memberRoleId: assignmentRoles[i],
-        from: assignmentFroms[i],
-        to: assignmentTos[i] || null,
-        note: normalizeNote(assignmentNotes[i]),
-      };
-      if (aid) {
-        await tx.update(memberRoleAssignments).set(vals).where(eq(memberRoleAssignments.id, aid));
-      } else {
-        await tx.insert(memberRoleAssignments).values(vals);
-      }
-    }
   });
 
   setFlash(c, t("members.flash.saved"), "success");
   return c.redirect(`/members/${id}`);
+});
+
+// ── Funktionszuweisungen (Edit: sofort persistent) ───────────────────────────
+
+async function assignmentsAfterChange(c: Context<{ Variables: Variables }>, id: string, more: boolean) {
+  const m = (await fetchMember(id))!;
+  const roles = await fetchRoles();
+  const form = <AssignmentModalForm roles={roles} action={`/members/${id}/assignments`} title={t("members.assignment.titleNew")} />;
+  return assignmentResult(c, <AssignmentsBox rows={m.assignments.map(toRowData)} memberId={id} />, more, form, <StatusBadgeSlot saved={m.status} oob />);
+}
+
+const isArchived = (m: { exitDate: string | null; deathDate: string | null }) => !!(m.exitDate || m.deathDate);
+
+memberRoutes.get("/:id/assignments/new", requireAuth("members:write"), async (c) => {
+  const id = c.req.param("id");
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments`} title={t("members.assignment.titleNew")} />);
+});
+
+memberRoutes.get("/:id/assignments/:aid/edit", requireAuth("members:write"), async (c) => {
+  const id = c.req.param("id");
+  const a = (await fetchMember(id))?.assignments.find((x) => x.id === c.req.param("aid"));
+  if (!a) return c.notFound();
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments/${a.id}`} title={t("members.assignment.titleEdit")} values={{ roleId: a.memberRoleId, from: a.from, to: a.to ?? "", note: a.note ?? "" }} />);
+});
+
+async function saveAssignment(c: Context<{ Variables: Variables }>, aid?: string) {
+  const id = c.req.param("id")!;
+  const m = await fetchMember(id);
+  if (!m) return c.notFound();
+  if (isArchived(m)) return c.body(null, 403);
+  if (aid && !m.assignments.some((a) => a.id === aid)) return c.notFound();
+  const body = await c.req.parseBody({ all: true });
+  const roles = await fetchRoles();
+  const v = parseAssignmentForm(body);
+  const err = validateAssignment({ ...v, id: aid }, m.assignments.map((a) => ({ id: a.id, roleId: a.memberRoleId, to: a.to })), roles);
+  if (err) {
+    const action = aid ? `/members/${id}/assignments/${aid}` : `/members/${id}/assignments`;
+    return c.html(<AssignmentModalForm roles={roles} action={action} title={t(aid ? "members.assignment.titleEdit" : "members.assignment.titleNew")} values={v} error={err} />, 422);
+  }
+  const vals = { memberId: id, memberRoleId: v.roleId, from: v.from, to: v.to, note: v.note };
+  if (aid) await db.update(memberRoleAssignments).set(vals).where(and(eq(memberRoleAssignments.id, aid), eq(memberRoleAssignments.memberId, id)));
+  else await db.insert(memberRoleAssignments).values(vals);
+  return assignmentsAfterChange(c, id, trimmed(body, "more") === "1" && !aid);
+}
+
+memberRoutes.post("/:id/assignments", requireAuth("members:write"), (c) => saveAssignment(c));
+memberRoutes.post("/:id/assignments/:aid", requireAuth("members:write"), (c) => saveAssignment(c, c.req.param("aid")));
+
+memberRoutes.post("/:id/assignments/:aid/delete", requireAuth("members:write"), async (c) => {
+  const id = c.req.param("id");
+  const m = await fetchMember(id);
+  if (!m) return c.notFound();
+  if (isArchived(m)) return c.body(null, 403);
+  await db.delete(memberRoleAssignments).where(and(eq(memberRoleAssignments.id, c.req.param("aid")), eq(memberRoleAssignments.memberId, id)));
+  const fresh = (await fetchMember(id))!;
+  return c.html(<><AssignmentsBox rows={fresh.assignments.map(toRowData)} memberId={id} /><StatusBadgeSlot saved={fresh.status} oob /></>);
 });
 
 // POST /members/:id/delete — permanently deletes the member AND its person record

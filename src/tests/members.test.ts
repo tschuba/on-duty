@@ -457,7 +457,7 @@ describe("GET /new", () => {
     rolesFixture = [roleAktiv];
     const res = await memberRoutes.request("/new");
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain(roleAktiv.title);
+    expect(await res.text()).toContain("assignments-box");
   });
 
   it("prefills from an existing person when ?personId is given", async () => {
@@ -509,14 +509,13 @@ describe("GET /new", () => {
 });
 
 describe("GET /role-row", () => {
-  it("renders one role-row fragment", async () => {
+  it("renders one read-only row fragment with hidden inputs", async () => {
     rolesFixture = [roleAktiv];
-    const res = await memberRoutes.request("/role-row?index=2");
+    const res = await memberRoutes.request(`/role-row?index=2&roleId=${roleAktiv.id}&from=2020-01-01`);
     const html = await res.text();
-    expect(html).toContain("role-row-2");
-    expect(html).toContain(`data-id="${roleAktiv.id}"`);
-    expect(html).toContain(`data-title="${roleAktiv.title}"`);
-    expect(html).not.toContain("<select");
+    expect(html).toContain("role-hint-2");
+    expect(html).toContain(`name="assignment_role[]" value="${roleAktiv.id}"`);
+    expect(html).toContain(roleAktiv.title);
   });
 });
 
@@ -815,7 +814,8 @@ describe("GET /:id", () => {
     const res = await memberRoutes.request("/m1");
     const html = await res.text();
     expect(html).toContain("<form");
-    expect(html).toContain("role-row-0");
+    expect(html).toContain("assignments-box");
+    expect(html).toContain("assignment-modal");
   });
 
   it("hides the delete button without the members:delete permission", async () => {
@@ -1034,57 +1034,63 @@ describe("POST /:id", () => {
     expect(updateCalls.some((c) => c.table === memberRoleAssignments && c.set.autoClosed === true)).toBe(true);
   });
 
-  it("rejects a role assignment missing its role on edit (same as create)", async () => {
-    findFirstResult = memberWithAssignments({}, []);
+  it("ignores assignment_* fields and never touches assignments on master-data save", async () => {
+    findFirstResult = memberWithAssignments({}, [makeAssignment({ id: "old-a" })]);
     const res = await memberRoutes.request("/m1", {
       method: "POST",
-      body: formBody({
-        lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01",
-        "assignment_role[]": "", "assignment_from[]": "2024-01-01", "assignment_to[]": "",
-      }),
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01" }),
     });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === memberRoleAssignments)).toBe(false);
     expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(false);
     expect(updateCalls.some((c) => c.table === memberRoleAssignments)).toBe(false);
   });
 
-  it("deletes removed assignments and inserts new ones on reconciliation", async () => {
-    findFirstResult = memberWithAssignments({}, [makeAssignment({ id: "old-a" })]);
-    const res = await memberRoutes.request("/m1", {
-      method: "POST",
-      body: formBody({
-        lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01",
-        "assignment_id[]": "", "assignment_role[]": roleVorstand.id, "assignment_from[]": "2024-01-01", "assignment_to[]": "",
-      }),
-    });
-    expect(res.status).toBe(302);
-    expect(deleteCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
-    expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
+  it("validates a new assignment via POST /assignments/validate (missing role, range, duplicate open role)", async () => {
+    rolesFixture = [roleAktiv];
+    const post = (f: Record<string, string | string[]>) => memberRoutes.request("/assignments/validate", { method: "POST", body: formBody(f) });
+    expect((await post({ role: "", from: "2024-01-01" })).status).toBe(422);
+    expect((await post({ role: roleAktiv.id, from: "2024-02-01", to: "2024-01-01" })).status).toBe(422);
+    const dup = await post({ role: roleAktiv.id, from: "2024-01-01", "assignment_role[]": roleAktiv.id, "assignment_from[]": "2023-01-01", "assignment_to[]": "", "assignment_id[]": "", "assignment_idx[]": "0", "assignment_note[]": "" });
+    expect(dup.status).toBe(422);
+    const ok = await post({ role: roleAktiv.id, from: "2024-01-01" });
+    expect(ok.status).toBe(200);
+    const html = await ok.text();
+    expect(html).toContain('name="assignment_role[]"');
+    expect(ok.headers.get("hx-trigger")).toContain("close");
   });
 
-  it("updates an existing assignment in place when its id is resubmitted", async () => {
+  it("saves, updates and deletes assignments immediately on the edit routes", async () => {
+    rolesFixture = [roleAktiv];
     findFirstResult = memberWithAssignments({}, [makeAssignment({ id: "old-a" })]);
-    const res = await memberRoutes.request("/m1", {
-      method: "POST",
-      body: formBody({
-        lastName: "Bauer", firstName: "Anna", birthDate: "1985-05-01", entryDate: "2010-01-01",
-        "assignment_id[]": "old-a", "assignment_role[]": roleAktiv.id, "assignment_from[]": "2024-01-01", "assignment_to[]": "",
-      }),
-    });
-    expect(res.status).toBe(302);
-    expect(deleteCalls.some((c) => c.table === memberRoleAssignments)).toBe(false);
+    const add = await memberRoutes.request("/m1/assignments", { method: "POST", body: formBody({ role: roleVorstand.id, from: "2024-01-01" }) });
+    expect(add.status).toBe(200);
+    expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
+    const upd = await memberRoutes.request("/m1/assignments/old-a", { method: "POST", body: formBody({ role: roleAktiv.id, from: "2024-01-01" }) });
+    expect(upd.status).toBe(200);
     expect(updateCalls.some((c) => c.table === memberRoleAssignments && c.set.memberRoleId === roleAktiv.id)).toBe(true);
+    const del = await memberRoutes.request("/m1/assignments/old-a/delete", { method: "POST" });
+    expect(del.status).toBe(200);
+    expect(deleteCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
+    const bad = await memberRoutes.request("/m1/assignments", { method: "POST", body: formBody({ role: "", from: "2024-01-01" }) });
+    expect(bad.status).toBe(422);
+  });
+
+  it("blocks assignment changes for archived members", async () => {
+    findFirstResult = memberWithAssignments({ exitDate: "2023-01-01" }, []);
+    const res = await memberRoutes.request("/m1/assignments", { method: "POST", body: formBody({ role: roleAktiv.id, from: "2024-01-01" }) });
+    expect(res.status).toBe(403);
   });
 });
 
 describe("role combobox tabs (Spec 47)", () => {
   it("renders one tab per type in type order, defaulting to the first", async () => {
-    const { RoleRow } = await import("../routes/members.js");
+    const { AssignmentModalForm } = await import("../routes/members.js");
     const roles: any[] = [
       { id: "a", title: "Brandmeister", typeId: "t1", typeName: "Dienstgrad", grantsActiveStatus: true },
       { id: "b", title: "Kassier", typeId: "t3", typeName: "Verein", grantsActiveStatus: false },
     ];
-    const html = String(RoleRow({ index: 0, roles }));
+    const html = String(AssignmentModalForm({ roles, action: "/x", title: "T" }));
     expect(html.indexOf("Dienstgrad")).toBeGreaterThan(-1);
     expect(html.indexOf("Dienstgrad")).toBeLessThan(html.indexOf("Verein"));
     expect(html).toMatch(/data-type="t1"[^>]*class="[^"]*tab-active/);
