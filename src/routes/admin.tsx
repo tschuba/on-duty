@@ -79,7 +79,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   "member-roles": t("admin.permissions.resource.member-roles"),
 };
 
-function AdminTabs({ active }: { active: "users" | "permissions" | "anniversaries" | "config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -87,9 +87,6 @@ function AdminTabs({ active }: { active: "users" | "permissions" | "anniversarie
       </a>
       <a href="/admin/permissions" role="tab" class={`tab${active === "permissions" ? " tab-active" : ""}`}>
         {t("admin.tabs.permissions")}
-      </a>
-      <a href="/admin/anniversaries" role="tab" class={`tab${active === "anniversaries" ? " tab-active" : ""}`}>
-        {t("admin.tabs.anniversaries")}
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         {t("admin.tabs.config")}
@@ -1775,9 +1772,9 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
   };
 
   return c.html(
-    <Layout title={t("admin.anniversaries.title")} user={user} activeNav="admin">
+    <Layout title={t("admin.anniversaries.title")} user={user} activeNav="members">
       <BackupWarnBanner {...warn} />
-      <AdminTabs active="anniversaries" />
+      <MemberTabs active="anniversaryYears" user={user} />
       <div class="max-w-4xl mx-auto">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
