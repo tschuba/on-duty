@@ -797,7 +797,7 @@ function StatusPreview({ saved }: { saved?: MemberStatus }) {
     <div
       hx-post="/members/status-preview"
       hx-include="closest form"
-      hx-trigger="load, input from:closest form delay:300ms, change from:closest form, assignment-modal from:body delay:100ms"
+      hx-trigger="load, input from:closest form delay:300ms, change from:closest form, assignment-modal from:body delay:100ms, htmx:afterSettle from:#role-rows delay:100ms"
       hx-target="#status-preview"
       hx-swap="innerHTML"
     >
@@ -1364,7 +1364,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
             var els = form.querySelectorAll('[name="' + kv[0] + '"]');
             els.forEach(function (el) { if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === kv[1]; else el.value = kv[1]; });
           });
-          if (rows['assignment_role[]']) htmx.ajax('POST', '/members/assignments/rows', { values: rows, target: '#assignments-box', swap: 'outerHTML' }).then(function () { form.dispatchEvent(new Event('change', { bubbles: true })); });
+          if (rows['assignment_role[]']) htmx.ajax('POST', '/members/assignments/rows', { values: rows, target: '#assignments-box', swap: 'outerHTML' });
           else form.dispatchEvent(new Event('change', { bubbles: true }));
           bar.remove();
         });
@@ -1407,7 +1407,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
             if (current() !== 'aktiv' || rows.children.length) return;
             var i = parseInt(rows.dataset.nextIndex || '0', 10);
             rows.dataset.nextIndex = String(i + 1);
-            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' });
+            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' }).then(function () { form.dispatchEvent(new Event('change', { bubbles: true })); });
           }
           var err = document.getElementById('startStatusError');
           form.querySelectorAll('input[name="startStatus"]').forEach(function (r) {
