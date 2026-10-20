@@ -1216,7 +1216,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
           <thead>
             <tr>
               <th>{t("admin.roles.table.name")}</th>
-              <th>{t("admin.roles.table.activeStatus")}</th>
+              {ty.allowsActiveStatus && <th>{t("admin.roles.table.activeStatus")}</th>}
               <th />
             </tr>
           </thead>
@@ -1243,23 +1243,25 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                       )}
                       {r.title}
                     </td>
+                    {ty.allowsActiveStatus && (
                     <td>
                       <form method="post" action={`/admin/roles/${r.id}/active`} onclick="event.stopPropagation()">
                         {activeFilter && <input type="hidden" name="active" value={activeFilter} />}
-                        <label class="flex items-center gap-3 cursor-pointer w-fit" title={!ty.allowsActiveStatus ? t("admin.roles.type.flagNotAllowed") : undefined}>
+                        <label class="flex items-center gap-3 cursor-pointer w-fit">
                           <input
                             type="checkbox"
                             name="grantsActiveStatus"
                             value="1"
                             class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40"
                             checked={r.grantsActiveStatus}
-                            disabled={r.isProtected || !ty.allowsActiveStatus}
+                            disabled={r.isProtected}
                             onchange="this.form.submit()"
                             aria-label={t("admin.roles.table.activeStatus")}
                           />
                         </label>
                       </form>
                     </td>
+                    )}
                     <td>
                       <div class="flex gap-2 justify-end items-center">
                         <MoveButtons action={`/admin/roles/${r.id}/move`} id={r.id} />
