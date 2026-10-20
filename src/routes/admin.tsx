@@ -403,11 +403,11 @@ function RoleCheckboxes({
           oninput="const q=this.value.toLowerCase();this.closest('.role-picker').querySelectorAll('[data-role-item]').forEach(function(el){el.hidden=!el.dataset.roleItem.includes(q)})"
         />
       </label>
-      <div class="flex flex-col gap-1 max-h-72 overflow-y-auto">
+      <div class="flex flex-col gap-1">
         {allRoles.map((r) => (
           <label
             key={r.id}
-            data-role-item={`${r.name} ${r.description ?? ""}`.toLowerCase()}
+            data-role-item={`${r.name} ${r.description ?? ""} ${permissionSearchText(permsByRole.get(r.id) ?? [])}`.toLowerCase()}
             class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-1.5 cursor-pointer has-[:checked]:border-primary"
           >
             <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm mt-1" checked={checkedIds.has(r.id)} />
@@ -432,7 +432,39 @@ function RoleCheckboxes({
   );
 }
 
-type UserFormState = { id?: string; name: string; email: string; checkedIds: Set<string>; error?: string };
+// Read-only union of the permissions of all checked roles; re-rendered client-side on every checkbox change.
+// shortcut: grouping logic is duplicated in the inline script (mirrors groupPermissionsForBadges), keep in sync.
+function EffectivePermissions({ permsByRole, checkedIds }: { permsByRole: Map<string, Permission[]>; checkedIds: Set<string> }) {
+  const union = [...new Set([...checkedIds].flatMap((id) => permsByRole.get(id) ?? []))];
+  const totals: Record<string, number> = {};
+  for (const p of PERMISSIONS) totals[p.split(":")[0]] = (totals[p.split(":")[0]] ?? 0) + 1;
+  const cfg = {
+    byRole: Object.fromEntries(permsByRole),
+    all: PERMISSIONS,
+    totals,
+    labels: PERMISSION_LABELS,
+    resources: RESOURCE_LABELS,
+    full: t("admin.permissions.badge.full"),
+    resourceFull: t("admin.permissions.badge.resourceFull", { resource: "{resource}" }),
+  };
+  const script = `(function(){var s=document.currentScript,c=JSON.parse(s.previousElementSibling.textContent),box=s.parentElement,f=box.closest('form');
+function mk(cls,txt){var e=document.createElement('span');e.className='badge badge-sm whitespace-nowrap '+cls;e.textContent=txt;return e}
+function render(){var set={};f.querySelectorAll('input[name=roles]:checked').forEach(function(i){(c.byRole[i.value]||[]).forEach(function(p){set[p]=1})});
+var out=box.querySelector('[data-effective]');out.replaceChildren();
+if(c.all.every(function(p){return set[p]})){out.append(mk('badge-primary',c.full));return}
+var by={};c.all.forEach(function(p){if(set[p]){var r=p.split(':')[0];(by[r]=by[r]||[]).push(p)}});
+Object.keys(by).forEach(function(r){if(by[r].length>1&&by[r].length===c.totals[r])out.append(mk('badge-outline badge-primary',c.resourceFull.replace('{resource}',c.resources[r]||r)));else by[r].forEach(function(p){out.append(mk('badge-outline',c.labels[p]))})})}
+f.addEventListener('change',function(e){if(e.target.name==='roles')render()});})()`;
+  return (
+    <div>
+      <script type="application/json" dangerouslySetInnerHTML={{ __html: JSON.stringify(cfg).replace(/</g, "\\u003c") }} />
+      <script dangerouslySetInnerHTML={{ __html: script }} />
+      <div data-effective><PermissionBadges permissions={union} /></div>
+    </div>
+  );
+}
+
+type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; error?: string };
 
 // Vollseite für Anlegen/Bearbeiten; bei Validierungsfehlern mit 422 und den eingegebenen Werten erneut gerendert.
 async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormState, status: 200 | 422 = 200) {
@@ -442,6 +474,10 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
   ]);
   const permsByRole = new Map<string, Permission[]>();
   for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
+  if (f.id && f.oidcLinked === undefined) {
+    const [link] = await db.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.userId, f.id), eq(accounts.providerId, "oidc")));
+    f.oidcLinked = !!link;
+  }
   const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
     <Layout title={title} user={c.get("user")} activeNav="admin">
@@ -456,13 +492,23 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
           <div class="flex flex-col gap-1">
-            <input type="email" name="email" value={f.email} class="input input-bordered w-full" required />
-            {f.id && <span class="label-text-alt text-sm opacity-60">{t("admin.users.modal.emailWarning")}</span>}
+            {f.oidcLinked ? (
+              <>
+                <span class="py-2">{f.email}</span>
+                <span class="label-text-alt text-sm opacity-60">{t("admin.users.modal.emailOidcLocked")}</span>
+              </>
+            ) : (
+              <input type="email" name="email" value={f.email} class="input input-bordered w-full" required />
+            )}
           </div>
         </div>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
+        </div>
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
+          <span class="label-text text-right pt-1">{t("admin.users.modal.effectivePermissions")}</span>
+          <EffectivePermissions permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </div>
       </form>
     </Layout>,
@@ -532,22 +578,20 @@ adminRoutes.post("/users/:id", guard, async (c) => {
 
   const body = await c.req.parseBody({ all: true });
   const name = String(body.name ?? "").trim();
-  const email = String(body.email ?? "").trim().toLowerCase();
+  const [oidcLink] = await db.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.userId, id), eq(accounts.providerId, "oidc")));
+  // OIDC-linked users: email is owned by the IdP, ignore any submitted value.
+  const email = oidcLink ? existing.email : String(body.email ?? "").trim().toLowerCase();
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
 
   if (!name || !email) {
-    return renderUserForm(c, { id,  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
+    return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
   }
 
   if (email !== existing.email) {
     const dupe = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (dupe.length > 0) {
-      return renderUserForm(c, { id,  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
+      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
     }
-    // Remove OIDC account link so Better Auth re-links on next login
-    await db
-      .delete(accounts)
-      .where(and(eq(accounts.userId, id), eq(accounts.providerId, "oidc")));
   }
 
   await db

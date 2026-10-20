@@ -80,6 +80,7 @@ const select = vi.fn(() => ({
     if (table === appRolePermissions) return chainOf(nextRows(appRolePermissions, appRolePermissionsFixture));
     if (table === userAppRoles) return chainOf(nextRows(userAppRoles, userAppRolesFixture));
     if (table === orgConfig) return chainOf(nextRows(orgConfig, orgConfigFixture));
+    if (table === accounts) return chainOf(nextRows(accounts, []));
     return chainOf([]);
   }),
 }));
@@ -368,12 +369,14 @@ describe("GET /users/new", () => {
 describe("role picker", () => {
   it("renders search field, per-role filter text and collapsed details", async () => {
     appRolesFixture = [makeAppRole({ id: "ar1", name: "Editor", description: "Darf Daten ändern" })];
+    appRolePermissionsFixture = [{ roleId: "ar1", permission: "members:read" }];
     const html = await (await adminRoutes.request("/users/new")).text();
     expect(html).toContain(t("admin.users.modal.roleSearchPlaceholder"));
-    expect(html).toContain('data-role-item="editor darf daten ändern"');
+    expect(html).toMatch(/data-role-item="editor darf daten ändern members:read /);
+    expect(html).toContain(t("admin.users.modal.effectivePermissions"));
     expect(html).toContain(t("admin.users.modal.roleDetails"));
     expect(html).toMatch(/aria-expanded="false"/);
-    expect(html).toContain("overflow-y-auto");
+    expect(html).not.toContain("overflow-y-auto");
   });
 });
 
@@ -394,6 +397,20 @@ describe("GET /users/:id/edit", () => {
     userAppRolesFixture = [{ roleId: "ar1" }];
     const html = await (await adminRoutes.request("/users/u2/edit")).text();
     expect(html).toMatch(/value="ar1"[^>]*checked/);
+  });
+
+  it("renders the email as plain text for OIDC-linked users", async () => {
+    usersFixture = [makeUser({ id: "u2", email: "oidc@b.de" })];
+    queue(accounts, [{ id: "a1" }]);
+    const html = await (await adminRoutes.request("/users/u2/edit")).text();
+    expect(html).toContain("oidc@b.de");
+    expect(html).not.toContain('name="email"');
+  });
+
+  it("keeps the email input for users without an OIDC link", async () => {
+    usersFixture = [makeUser({ id: "u2", email: "local@b.de" })];
+    const html = await (await adminRoutes.request("/users/u2/edit")).text();
+    expect(html).toContain('name="email"');
   });
 });
 
@@ -454,12 +471,20 @@ describe("POST /users/:id", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("unlinks the OIDC account and saves when the email changes without conflict", async () => {
+  it("changes the email of a non-OIDC user", async () => {
     queue(users, [makeUser({ email: "old@b.de" })], []);
     const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de" }) });
     expect(res.status).toBe(302);
-    expect(deleteCalls.some((c) => c.table === accounts)).toBe(true);
     expect(updateCalls.some((c) => c.table === users && c.set.email === "new@b.de")).toBe(true);
+  });
+
+  it("ignores a submitted email for OIDC-linked users and keeps the account link", async () => {
+    usersFixture = [makeUser({ email: "old@b.de" })];
+    queue(accounts, [{ id: "a1" }]);
+    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de" }) });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.some((c) => c.table === accounts)).toBe(false);
+    expect(updateCalls.some((c) => c.table === users && c.set.email === "old@b.de")).toBe(true);
   });
 
   it("saves without touching the OIDC link when the email is unchanged", async () => {
