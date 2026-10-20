@@ -1181,7 +1181,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
         {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
         {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
-        <StartStatusSelect value="aktiv" />
+        <StartStatusSelect value="" />
         <MemberFormFields m={prefill} />
         {canWriteBank && !linkMemberId && <BankDataSection m={prefill ?? {}} editable />}
         {applicationId && (
@@ -1219,7 +1219,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
 
 type StartStatus = "aktiv" | "passiv" | "foerdernd";
 
-function StartStatusSelect({ value }: { value: StartStatus }) {
+function StartStatusSelect({ value }: { value: StartStatus | "" }) {
   return (
     <fieldset class="space-y-2">
       <legend class="sr-only">{t("members.form.startStatus")}</legend>
@@ -1228,7 +1228,7 @@ function StartStatusSelect({ value }: { value: StartStatus }) {
           <label class="card bg-base-200 border-2 border-transparent cursor-pointer has-[:checked]:border-primary">
             <div class="card-body p-4 gap-1">
               <div class="flex items-center gap-2">
-                <input type="radio" name="startStatus" value={s} class="radio radio-primary radio-sm" checked={s === value} />
+                <input type="radio" name="startStatus" value={s} class="radio radio-primary radio-sm" checked={s === value} required />
                 <span class="font-semibold">{STATUS_LABELS[s]}</span>
               </div>
               <p class="text-xs opacity-70">{t(`members.form.startStatus.${s}`)}</p>
@@ -1240,7 +1240,7 @@ function StartStatusSelect({ value }: { value: StartStatus }) {
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function () {
           var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
-          function current() { return form.querySelector('input[name="startStatus"]:checked').value; }
+          function current() { var c = form.querySelector('input[name="startStatus"]:checked'); return c ? c.value : ''; }
           function prefill() {
             if (current() !== 'aktiv' || rows.children.length) return;
             var i = parseInt(rows.dataset.nextIndex || '0', 10);
@@ -1424,7 +1424,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               )}
             </div>
           )}
-          <StartStatusSelect value={startStatus || "aktiv"} />
+          <StartStatusSelect value={startStatus} />
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && !linkMemberId && <BankDataSection m={m} editable errors={errors} />}
           {applicationId && (
