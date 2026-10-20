@@ -670,6 +670,22 @@ describe("POST /new", () => {
     expect(html).toContain("text-warning");
   });
 
+  it("status preview puts the age-limit hint on the affected row only", async () => {
+    rolesFixture = [roleAktiv];
+    const birth = `${new Date().getFullYear() - 70}-01-01`;
+    const res = await memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: birth,
+        "assignment_idx[]": ["0", "1"], "assignment_role[]": [roleAktiv.id, roleAktiv.id],
+        "assignment_from[]": ["1990-01-01", "1990-01-01"], "assignment_to[]": ["2000-01-01", ""],
+      }),
+    });
+    const html = await res.text();
+    expect(html).toMatch(/id="role-hint-1"[^>]*text-warning/);
+    expect(html).not.toMatch(/id="role-hint-0"[^>]*text-warning/);
+  });
+
   it("status preview overlays the new badge only when the status changes", async () => {
     const post = (savedStatus: string) => memberRoutes.request("/status-preview", {
       method: "POST",

@@ -396,8 +396,10 @@ function RoleRow({
 }) {
   const selectedTitle = assignment ? (roles.find((r) => r.id === assignment.memberRoleId)?.title ?? "") : "";
   return (
+    <>
     <tr id={`role-row-${index}`} data-autofrom={auto ? "1" : undefined}>
       <td>
+        <input type="hidden" name="assignment_idx[]" value={String(index)} />
         <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
         <input type="hidden" name="assignment_role[]" class="role-combobox-value" value={assignment?.memberRoleId ?? ""} />
         <div class="relative">
@@ -476,7 +478,7 @@ function RoleRow({
         <button
           type="button"
           class="btn btn-ghost text-error"
-          onclick={`var f=this.closest('form');this.closest('tr').remove();f.dispatchEvent(new Event('change'))`}
+          onclick={`var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change'))`}
         >
           ✕
         </button>
@@ -626,6 +628,8 @@ function RoleRow({
         }
       ` }} />
     </tr>
+    <tr class="border-0"><td colSpan={5} class="p-0"><div id={`role-hint-${index}`} /></td></tr>
+    </>
   );
 }
 
@@ -698,13 +702,14 @@ function StatusPreview({ saved }: { saved?: MemberStatus }) {
   );
 }
 
-function parseFormAssignments(body: Record<string, any>, allRoles: Role[]): Assignment[] {
+function parseFormAssignments(body: Record<string, any>, allRoles: Role[]): (Assignment & { rowIdx?: string })[] {
   const roles = [body["assignment_role[]"]].flat() as string[];
   const froms = [body["assignment_from[]"]].flat() as string[];
   const tos = [body["assignment_to[]"]].flat() as string[];
+  const idxs = [body["assignment_idx[]"]].flat() as string[];
   return roles.flatMap((r, i) => {
     const role = allRoles.find((x) => x.id === r);
-    return role && froms[i] ? [{ from: froms[i], to: tos[i] || null, role } as Assignment] : [];
+    return role && froms[i] ? [{ from: froms[i], to: tos[i] || null, role, rowIdx: idxs[i] } as Assignment & { rowIdx?: string }] : [];
   });
 }
 
@@ -725,17 +730,20 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
   const saved = trimmed(body, "savedStatus") as MemberStatus;
   const cutoff = ageLimitDate(birthDate, env.ACTIVE_AGE_LIMIT);
   const limitReached = new Date().toISOString().slice(0, 10) >= cutoff;
-  const hints = limitReached
-    ? planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff))
-    : [];
+  const hinted = new Set(
+    limitReached ? planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff)).map((a) => a.rowIdx) : []
+  );
+  const datum = new Date(cutoff).toLocaleDateString("de-DE");
+  // Alle Zeilen schicken, damit nicht mehr zutreffende Hinweise wieder verschwinden.
+  const allIdx = [body["assignment_idx[]"]].flat().filter(Boolean) as string[];
   return c.html(
     <>
       {saved && <StatusBadgeSlot saved={saved} next={status} oob />}
       {conflict && <p class="text-warning">{conflict.message}</p>}
-      {hints.map((a) => (
-        <p class="text-warning">
-          {t("members.form.roleAgeLimitHint", { datum: new Date(cutoff).toLocaleDateString("de-DE"), title: a.role.title })}
-        </p>
+      {allIdx.map((i) => (
+        <div id={`role-hint-${i}`} hx-swap-oob="true" class={hinted.has(i) ? "text-warning text-sm px-4 pb-2" : ""}>
+          {hinted.has(i) && t("members.form.roleAgeLimitHint", { datum })}
+        </div>
       ))}
     </>
   );
