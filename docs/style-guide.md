@@ -56,7 +56,7 @@ Zwei Kategorien, bewusst unterschiedlich behandelt — nicht alles muss wie die 
 
 - `class="table table-zebra w-full"`
 - Sortierbare Spalten wo fachlich sinnvoll (Klick auf Spaltenkopf, `SortIcon`-Komponente als Indikator) — nicht zwingend auf jeder Spalte
-- Pagination bei potenziell langen Listen
+- Pagination bei potenziell langen Listen: `<Pager>` (`src/components/pager.tsx`), sticky am unteren Viewport-Rand (`sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers, damit die Version sichtbar bleibt), deckender Hintergrund). Sticky bezieht sich auf den nächsten Scroll-Container: Vorfahren dürfen kein `overflow` ≠ `visible` haben, der Pager steht daher **außerhalb** des `overflow-x-auto`-Tabellen-Wrappers.
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-8">{leerer-Text}</td></tr>`
 
 Die Kategorie richtet sich nur danach, ob die Tabelle die **primäre Datenliste ihres Tabs/ihrer Seite** ist — nicht danach, ob zusätzlich eine Breiten-Einschränkung (`max-w-*`) angewendet wird. `max-w-*` gehört auf den Wrapper/die Tabelle als zusätzlicher Modifier, entscheidet aber nicht die Kategorie (Haupt-Liste vs. Sub-Tabelle).

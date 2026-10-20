@@ -9,6 +9,7 @@ import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.
 import { Icon } from "../components/icon.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
+import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { parsePagination, buildListUrl } from "../lib/list-query.js";
@@ -376,16 +377,12 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
         </tbody>
       </table>
 
-      <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
-        <span class="text-sm opacity-70 mr-auto">{t("donors.table.count", { count: sorted.length })}</span>
-        <div class="join">
-          {page > 1 && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: page - 1 })} class="join-item btn">«</a>}
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <a key={p} href={donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: p })} class={`join-item btn${p === page ? " btn-active" : ""}`}>{p}</a>
-          ))}
-          {page < totalPages && <a href={donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: page + 1 })} class="join-item btn">»</a>}
-        </div>
-      </div>
+      <Pager
+        countLabel={t("donors.table.count", { count: sorted.length })}
+        page={page}
+        totalPages={totalPages}
+        pageUrl={(p) => donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: p })}
+      />
     </Layout>
   );
 });

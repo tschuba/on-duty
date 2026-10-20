@@ -42,6 +42,12 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 - [ ] Backup-History in `/admin/backup` sichtbar
 - [ ] Fehlendes Backup → Warn-Banner in Admin-Bereich sichtbar
 
+## Pager (Mitglieder, Spender)
+
+- [ ] Pager bleibt beim Scrollen sticky am unteren Viewport-Rand (deckender Hintergrund)
+- [ ] Seitengröße ändern (nur Mitglieder) → Liste springt auf Seite 1, Wert bleibt erhalten
+- [ ] Seitenwechsel über Zahlen und «/» funktioniert
+
 ## Admin
 
 - [ ] Benutzer anlegen / bearbeiten / deaktivieren (inkl. sofortige Session-Invalidierung)
