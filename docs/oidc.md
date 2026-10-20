@@ -117,7 +117,7 @@ Bei neuen Registrierungen ohne Auto-Freigabe erhalten Admins eine E-Mail, sofern
 
 ### Authentik
 
-Authentik liefert `email_verified` seit Release **2025.10** standardmäßig als `false` (davor immer `true`). **Vor dem Update bzw. vor dem Einschalten dieser Version von on-duty** ein eigenes Scope-Mapping anlegen (*Customization → Property Mappings → Scope Mapping*, Scope `email`) und im OAuth2-Provider statt des Standard-Mappings auswählen:
+Authentik liefert `email_verified` seit Release **2025.10** standardmäßig als `false` (davor immer `true`). **Vor dem Update bzw. vor dem Einschalten dieser Version von on-duty** ein eigenes Scope-Mapping anlegen (*Customization → Property Mappings → Scope Mapping*, Scope `email`) und im OAuth2-Provider (*Advanced protocol settings → Scopes*) das Standard-Mapping „OpenID 'email'“ entfernen und stattdessen dieses auswählen:
 
 ```python
 return {
@@ -127,3 +127,5 @@ return {
 ```
 
 Für die Selbstregistrierung einen Enrollment Flow bauen (Stages: Prompt → User Write → Email → User Login) und in der Login-Stage verlinken. Das Setzen des Attributs `email_verified` nach der Email-Stage (z. B. per Expression Policy) muss in der eigenen Instanz getestet werden. Sind alle Benutzer vertrauenswürdig, kann das Mapping stattdessen fest `True` liefern.
+
+Kontrolle: Im ID-Token bzw. Userinfo-Endpoint (z. B. mit jwt.io) muss `"email_verified": true` stehen.

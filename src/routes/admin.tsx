@@ -1,12 +1,10 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   users,
   sessions,
   accounts,
-  memberRoles,
-  memberRoleAssignments,
   anniversaryYears,
   backupHistory,
   appRoles,
@@ -17,7 +15,7 @@ import { Icon } from "../components/icon.js";
 import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
@@ -58,6 +56,15 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "org:tax-data:read": t("admin.permissions.key.orgTaxDataRead"),
   "org:tax-data:write": t("admin.permissions.key.orgTaxDataWrite"),
   "import:run": t("admin.permissions.key.importRun"),
+  "member-roles:read": t("admin.permissions.key.memberRolesRead"),
+  "member-roles:write": t("admin.permissions.key.memberRolesWrite"),
+  "member-roles:delete": t("admin.permissions.key.memberRolesDelete"),
+  "member-role-types:read": t("admin.permissions.key.memberRoleTypesRead"),
+  "member-role-types:write": t("admin.permissions.key.memberRoleTypesWrite"),
+  "member-role-types:delete": t("admin.permissions.key.memberRoleTypesDelete"),
+  "anniversary-years:read": t("admin.permissions.key.anniversaryYearsRead"),
+  "anniversary-years:write": t("admin.permissions.key.anniversaryYearsWrite"),
+  "anniversary-years:delete": t("admin.permissions.key.anniversaryYearsDelete"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -68,9 +75,12 @@ const RESOURCE_LABELS: Record<string, string> = {
   inventory: t("admin.permissions.resource.inventory"),
   lending: t("admin.permissions.resource.lending"),
   org: t("admin.permissions.resource.org"),
+  "anniversary-years": t("admin.permissions.resource.anniversary-years"),
+  "member-roles": t("admin.permissions.resource.member-roles"),
+  "member-role-types": t("admin.permissions.resource.member-role-types"),
 };
 
-function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "anniversaries" | "config" | "backup" }) {
+function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">
       <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
@@ -78,12 +88,6 @@ function AdminTabs({ active }: { active: "users" | "permissions" | "roles" | "an
       </a>
       <a href="/admin/permissions" role="tab" class={`tab${active === "permissions" ? " tab-active" : ""}`}>
         {t("admin.tabs.permissions")}
-      </a>
-      <a href="/admin/roles" role="tab" class={`tab${active === "roles" ? " tab-active" : ""}`}>
-        {t("admin.tabs.roles")}
-      </a>
-      <a href="/admin/anniversaries" role="tab" class={`tab${active === "anniversaries" ? " tab-active" : ""}`}>
-        {t("admin.tabs.anniversaries")}
       </a>
       <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
         {t("admin.tabs.config")}
@@ -132,7 +136,7 @@ export async function backupWarnProps() {
   return getBackupWarnProps(configured, last, schedule);
 }
 
-function ModalScaffold() {
+export function ModalScaffold() {
   return (
     <dialog id="admin-modal" class="modal">
       <div class="modal-box max-w-2xl" id="modal-content" />
@@ -1031,608 +1035,6 @@ adminRoutes.post("/permissions/:id/delete", guard, async (c) => {
   await db.delete(appRoles).where(eq(appRoles.id, id));
   setFlash(c, t("admin.permissions.flash.deleted", { name: role.name }), "success");
   return c.redirect("/admin/permissions");
-});
-
-// ── /admin/roles ──────────────────────────────────────────────────────────────
-adminRoutes.get("/roles", guard, async (c) => {
-  const user = c.get("user");
-  const activeFilter = c.req.query("active"); // "1" | "0" | undefined
-
-  const [rolesWithCount, warn] = await Promise.all([
-    db
-      .select({
-        id: memberRoles.id,
-        title: memberRoles.title,
-        grantsActiveStatus: memberRoles.grantsActiveStatus,
-        isProtected: memberRoles.isProtected,
-        assignmentCount: count(memberRoleAssignments.id),
-      })
-      .from(memberRoles)
-      .leftJoin(memberRoleAssignments, eq(memberRoleAssignments.memberRoleId, memberRoles.id))
-      .where(
-        activeFilter === "1" ? eq(memberRoles.grantsActiveStatus, true) :
-        activeFilter === "0" ? eq(memberRoles.grantsActiveStatus, false) :
-        undefined
-      )
-      .groupBy(memberRoles.id, memberRoles.title, memberRoles.grantsActiveStatus, memberRoles.isProtected)
-      .orderBy(asc(memberRoles.title)),
-    backupWarnProps(),
-  ]);
-
-  return c.html(
-    <Layout title={t("admin.roles.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
-      <AdminTabs active="roles" />
-
-      <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-4">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            {t("admin.roles.title")}
-          </h1>
-          <div class="join">
-            <a href="/admin/roles" class={`btn join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
-            <a href="/admin/roles?active=1" class={`btn join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
-            <a href="/admin/roles?active=0" class={`btn join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
-          </div>
-        </div>
-        <button
-          class="btn btn-primary"
-          hx-get="/admin/roles/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.roles.newRole")}
-        </button>
-      </div>
-
-      <ClickToEditHint />
-      <div class="overflow-x-auto mb-10">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th>{t("admin.roles.table.name")}</th>
-              <th>{t("admin.roles.table.activeStatus")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rolesWithCount.map((r) => {
-              const canDelete = !r.isProtected && r.assignmentCount === 0;
-              return (
-                <tr
-                  key={r.id}
-                  {...(!r.isProtected && {
-                    class: "cursor-pointer hover",
-                    "hx-get": `/admin/roles/${r.id}/edit`,
-                    "hx-target": "#modal-content",
-                    "hx-swap": "innerHTML",
-                  })}
-                >
-                  <td class="font-medium">
-                    {r.isProtected && (
-                      <span class="mr-1" title={t("admin.roles.systemRole")}>
-                        🔒
-                      </span>
-                    )}
-                    {r.title}
-                  </td>
-                  <td>
-                    {r.grantsActiveStatus ? (
-                      <span class="badge badge-success badge-sm">{t("admin.roles.filterActive")}</span>
-                    ) : (
-                      <span class="opacity-60">{t("admin.roles.filterPassive")}</span>
-                    )}
-                  </td>
-                  <td>
-                    <div class="flex gap-2 justify-end">
-                      {canDelete ? (
-                        <>
-                          <button
-                            class="btn btn-outline btn-error btn-xs"
-                            onclick={`event.stopPropagation(); document.getElementById('delete-role-${r.id}').showModal()`}
-                          >
-                            {t("common.delete")}
-                          </button>
-                          <dialog id={`delete-role-${r.id}`} class="modal" onclick="event.stopPropagation()">
-                            <div class="modal-box">
-                              <h3 class="font-bold text-lg">{t("admin.roles.confirmDelete.title")}</h3>
-                              <p class="py-2 opacity-70">
-                                {t("admin.roles.confirmDelete.body", { title: r.title })}
-                              </p>
-                              <div class="modal-action">
-                                <form method="dialog">
-                                  <button class="btn">{t("common.cancel")}</button>
-                                </form>
-                                <form method="post" action={`/admin/roles/${r.id}/delete`}>
-                                  <button type="submit" class="btn btn-error">
-                                    {t("common.delete")}
-                                  </button>
-                                </form>
-                              </div>
-                            </div>
-                            <form method="dialog" class="modal-backdrop">
-                              <button>{t("common.close")}</button>
-                            </form>
-                          </dialog>
-                        </>
-                      ) : (
-                        <button
-                          class="btn btn-ghost btn-xs text-base-content/30"
-                          disabled
-                          title={
-                            r.isProtected
-                              ? t("admin.roles.cannotDelete.protected")
-                              : r.assignmentCount === 1
-                                ? t("admin.roles.cannotDelete.usedBySingle", { count: r.assignmentCount })
-                                : t("admin.roles.cannotDelete.usedByMultiple", { count: r.assignmentCount })
-                          }
-                        >
-                          {t("common.delete")}
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      </div>
-
-      <ModalScaffold />
-    </Layout>
-  );
-});
-
-// HTMX fragment: new role modal
-adminRoutes.get("/roles/new", guard, (c) => {
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.create")}</h3>
-      <form method="post" action="/admin/roles" class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
-          <input type="text" name="title" class="input input-bordered w-full" required />
-        </div>
-        <label class="label cursor-pointer justify-start gap-3">
-          <input type="checkbox" name="grantsActiveStatus" value="1" class="checkbox" />
-          <span class="label-text">{t("admin.roles.modal.grantsActive")}</span>
-        </label>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.create")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
-});
-
-// HTMX fragment: edit role modal
-adminRoutes.get("/roles/:id/edit", guard, async (c) => {
-  const id = c.req.param("id");
-  const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
-
-  const [{ cnt }] = await db
-    .select({ cnt: count() })
-    .from(memberRoleAssignments)
-    .where(eq(memberRoleAssignments.memberRoleId, id));
-
-  const hasAssignments = cnt > 0;
-
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.edit")}</h3>
-      <form method="post" action={`/admin/roles/${id}`} class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
-          {hasAssignments ? (
-            <div class="flex flex-col gap-1">
-              <input type="text" value={role.title} class="input input-bordered w-full opacity-50" disabled />
-              <span class="label-text-alt text-sm opacity-60">
-                {t("admin.roles.modal.nameLocked")}
-              </span>
-              <input type="hidden" name="title" value={role.title} />
-            </div>
-          ) : (
-            <input type="text" name="title" value={role.title} class="input input-bordered w-full" required />
-          )}
-        </div>
-        <label class="label cursor-pointer justify-start gap-3">
-          <input
-            type="checkbox"
-            name="grantsActiveStatus"
-            value="1"
-            class="checkbox"
-            {...(role.grantsActiveStatus ? { checked: true } : {})}
-          />
-          <span class="label-text">{t("admin.roles.modal.grantsActive")}</span>
-        </label>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
-});
-
-// POST /admin/roles — create
-adminRoutes.post("/roles", guard, async (c) => {
-  const body = await c.req.parseBody();
-  const title = String(body.title ?? "").trim();
-  const grantsActiveStatus = body.grantsActiveStatus === "1";
-
-  if (!title) {
-    setFlash(c, t("admin.roles.flash.requiredTitle"), "error");
-    return c.redirect("/admin/roles");
-  }
-
-  await db.insert(memberRoles).values({
-    id: crypto.randomUUID(),
-    title,
-    grantsActiveStatus,
-    isProtected: false,
-  });
-
-  setFlash(c, t("admin.roles.flash.created", { title }), "success");
-  return c.redirect("/admin/roles");
-});
-
-// POST /admin/roles/:id — update
-adminRoutes.post("/roles/:id", guard, async (c) => {
-  const id = c.req.param("id");
-  const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
-
-  const body = await c.req.parseBody();
-  const grantsActiveStatus = body.grantsActiveStatus === "1";
-
-  const [{ cnt }] = await db
-    .select({ cnt: count() })
-    .from(memberRoleAssignments)
-    .where(eq(memberRoleAssignments.memberRoleId, id));
-
-  if (cnt === 0) {
-    const title = String(body.title ?? "").trim();
-    if (!title) {
-      setFlash(c, t("admin.roles.flash.requiredTitle"), "error");
-      return c.redirect("/admin/roles");
-    }
-    await db.update(memberRoles).set({ title, grantsActiveStatus }).where(eq(memberRoles.id, id));
-  } else {
-    await db.update(memberRoles).set({ grantsActiveStatus }).where(eq(memberRoles.id, id));
-  }
-
-  setFlash(c, t("admin.roles.flash.saved"), "success");
-  return c.redirect("/admin/roles");
-});
-
-// POST /admin/roles/:id/delete
-adminRoutes.post("/roles/:id/delete", guard, async (c) => {
-  const id = c.req.param("id");
-  const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role) return c.redirect("/admin/roles");
-
-  if (role.isProtected) {
-    setFlash(c, t("admin.roles.flash.protected"), "error");
-    return c.redirect("/admin/roles");
-  }
-
-  const [{ cnt }] = await db
-    .select({ cnt: count() })
-    .from(memberRoleAssignments)
-    .where(eq(memberRoleAssignments.memberRoleId, id));
-
-  if (cnt > 0) {
-    setFlash(c, t("admin.roles.flash.hasAssignments"), "error");
-    return c.redirect("/admin/roles");
-  }
-
-  await db.delete(memberRoles).where(eq(memberRoles.id, id));
-  setFlash(c, t("admin.roles.flash.deleted", { title: role.title }), "success");
-  return c.redirect("/admin/roles");
-});
-
-const ANNIVERSARY_KINDS = ["service", "membership"] as const;
-type AnniversaryKind = (typeof ANNIVERSARY_KINDS)[number];
-const isKind = (k: string): k is AnniversaryKind => (ANNIVERSARY_KINDS as readonly string[]).includes(k);
-
-// ── /admin/anniversaries ──────────────────────────────────────────────────────
-adminRoutes.get("/anniversaries", guard, async (c) => {
-  const user = c.get("user");
-  const kindParam = c.req.query("kind") ?? "";
-  const kindFilter = isKind(kindParam) ? kindParam : null;
-  const [allYears, warn] = await Promise.all([
-    db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.kind), asc(anniversaryYears.year)),
-    backupWarnProps(),
-  ]);
-
-  type YearSort = "kind" | "year" | "title";
-  const sortParam = c.req.query("sort");
-  const sort: YearSort = sortParam === "year" || sortParam === "title" ? sortParam : "kind";
-  const dir = c.req.query("dir") === "desc" ? "desc" : "asc";
-  const sign = dir === "desc" ? -1 : 1;
-  // Ties fall back to kind, year so the order stays stable.
-  const cmp = (a: (typeof allYears)[number], b: (typeof allYears)[number]) =>
-    (sort === "year" ? a.year - b.year
-      : sort === "title" ? (a.title ?? "").localeCompare(b.title ?? "", "de")
-      : a.kind.localeCompare(b.kind)) * sign
-    || a.kind.localeCompare(b.kind) || a.year - b.year;
-  const years = (kindFilter ? allYears.filter((y) => y.kind === kindFilter) : allYears).sort(cmp);
-  const sortUrl = (col: YearSort) => {
-    const q = new URLSearchParams();
-    if (kindFilter) q.set("kind", kindFilter);
-    q.set("sort", col);
-    q.set("dir", sort === col && dir === "asc" ? "desc" : "asc");
-    return `/admin/anniversaries?${q}`;
-  };
-
-  return c.html(
-    <Layout title={t("admin.anniversaries.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
-      <AdminTabs active="anniversaries" />
-      <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.anniversaries.title")}
-        </h1>
-        <button
-          class="btn btn-primary"
-          hx-get="/admin/anniversaries/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.anniversaries.newYear")}
-        </button>
-      </div>
-
-      <div class="join mb-4">
-        <a href={`/admin/anniversaries?sort=${sort}&dir=${dir}`} class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-        {ANNIVERSARY_KINDS.map((k) => (
-          <a href={`/admin/anniversaries?kind=${k}&sort=${sort}&dir=${dir}`} class={`join-item btn${kindFilter === k ? " btn-primary btn-outline" : " btn-ghost"}`}>{t(`admin.anniversaries.kind.${k}`)}</a>
-        ))}
-      </div>
-
-      <ClickToEditHint />
-      <div class="overflow-x-auto mb-6">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th><a href={sortUrl("kind")} class="link link-hover">{t("admin.anniversaries.table.kind")} <SortIcon col="kind" active={sort} dir={dir} /></a></th>
-              <th><a href={sortUrl("year")} class="link link-hover">{t("admin.anniversaries.table.years")} <SortIcon col="year" active={sort} dir={dir} /></a></th>
-              <th><a href={sortUrl("title")} class="link link-hover">{t("admin.anniversaries.table.title")} <SortIcon col="title" active={sort} dir={dir} /></a></th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {years.length === 0 ? (
-              <tr>
-                <td colspan={4} class="text-center opacity-50 py-4">
-                  {t("admin.anniversaries.empty")}
-                </td>
-              </tr>
-            ) : (
-              years.map((y) => (
-                <tr
-                  key={`${y.kind}-${y.year}`}
-                  class="cursor-pointer hover"
-                  hx-get={`/admin/anniversaries/${y.kind}/${y.year}/edit`}
-                  hx-target="#modal-content"
-                  hx-swap="innerHTML"
-                >
-                  <td>{t(`admin.anniversaries.kind.${y.kind}`)}</td>
-                  <td class="font-medium">{y.year}</td>
-                  <td class="opacity-70">{y.title ?? "–"}</td>
-                  <td>
-                    <div class="flex gap-2 justify-end">
-                      <button
-                        class="btn btn-outline btn-error btn-xs"
-                        onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.kind}-${y.year}').showModal()`}
-                      >
-                        {t("common.delete")}
-                      </button>
-                    </div>
-                    <dialog id={`delete-year-${y.kind}-${y.year}`} class="modal" onclick="event.stopPropagation()">
-                      <div class="modal-box">
-                        <p>
-                          {y.title
-                            ? t("admin.anniversaries.confirmDelete.bodyWithTitle", { kind: t(`admin.anniversaries.kind.${y.kind}`), year: String(y.year), title: y.title })
-                            : t("admin.anniversaries.confirmDelete.body", { kind: t(`admin.anniversaries.kind.${y.kind}`), year: String(y.year) })}
-                        </p>
-                        <div class="modal-action">
-                          <form method="dialog">
-                            <button class="btn">{t("common.cancel")}</button>
-                          </form>
-                          <form method="post" action={`/admin/anniversaries/${y.kind}/${y.year}/delete`}>
-                            <button type="submit" class="btn btn-error">
-                              {t("common.delete")}
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-                      <form method="dialog" class="modal-backdrop">
-                        <button>{t("common.close")}</button>
-                      </form>
-                    </dialog>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      </div>
-
-      <ModalScaffold />
-    </Layout>
-  );
-});
-
-// HTMX fragment: new anniversary year modal
-adminRoutes.get("/anniversaries/new", guard, (c) => {
-  const kind = "service";
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.create")}</h3>
-      <form method="post" action="/admin/anniversaries" class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.kindLabel")} <span class="text-error">*</span></span>
-          <select name="kind" class="select select-bordered w-full" required>
-            {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
-          </select>
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
-          <input type="number" name="year" min="1" max="200" class="input input-bordered w-full" required placeholder={t("admin.anniversaries.modal.yearPlaceholder")} />
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
-          <input type="text" name="title" class="input input-bordered w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
-        </div>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.add")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
-});
-
-// HTMX fragment: edit anniversary year modal
-adminRoutes.get("/anniversaries/:kind/:year/edit", guard, async (c) => {
-  const kind = c.req.param("kind");
-  const year = parseInt(c.req.param("year"), 10);
-  const [y] = await db.select().from(anniversaryYears).where(and(eq(anniversaryYears.kind, kind as AnniversaryKind), eq(anniversaryYears.year, year)));
-  if (!y) return c.html("", HTTP_STATUS.NOT_FOUND);
-
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.edit")}</h3>
-      <form method="post" action={`/admin/anniversaries/${kind}/${year}`} class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.kindLabel")} <span class="text-error">*</span></span>
-          <select name="kind" class="select select-bordered w-full" required>
-            {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
-          </select>
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
-          <input type="number" name="year" value={y.year} min="1" max="200" class="input input-bordered w-full" required />
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
-          <input type="text" name="title" value={y.title ?? ""} class="input input-bordered w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
-        </div>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
-});
-
-// POST /admin/anniversaries — create
-adminRoutes.post("/anniversaries", guard, async (c) => {
-  const body = await c.req.parseBody();
-  const year = parseInt(String(body.year ?? ""), 10);
-  const kind = String(body.kind ?? "");
-  const title = String(body.title ?? "").trim() || null;
-
-  if (!isKind(kind) || !year || year < 1 || year > 200) {
-    setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
-    return c.redirect("/admin/anniversaries");
-  }
-
-  await db.insert(anniversaryYears).values({ kind, year, title }).onConflictDoNothing();
-  setFlash(c, t("admin.anniversaries.flash.added", { year }), "success");
-  return c.redirect("/admin/anniversaries");
-});
-
-// POST /admin/anniversaries/:year — update
-adminRoutes.post("/anniversaries/:kind/:year", guard, async (c) => {
-  const oldKind = c.req.param("kind");
-  const oldYear = parseInt(c.req.param("year"), 10);
-  if (!isKind(oldKind)) return c.html("", HTTP_STATUS.NOT_FOUND);
-  const [existing] = await db.select().from(anniversaryYears).where(and(eq(anniversaryYears.kind, oldKind), eq(anniversaryYears.year, oldYear)));
-  if (!existing) return c.html("", HTTP_STATUS.NOT_FOUND);
-
-  const body = await c.req.parseBody();
-  const newYear = parseInt(String(body.year ?? ""), 10);
-  const newKind = String(body.kind ?? "");
-  const title = String(body.title ?? "").trim() || null;
-
-  if (!isKind(newKind) || !newYear || newYear < 1 || newYear > 200) {
-    setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
-    return c.redirect("/admin/anniversaries");
-  }
-
-  if (newYear !== oldYear || newKind !== oldKind) {
-    const [conflict] = await db
-      .select({ year: anniversaryYears.year })
-      .from(anniversaryYears)
-      .where(and(eq(anniversaryYears.kind, newKind), eq(anniversaryYears.year, newYear)));
-    if (conflict) {
-      setFlash(c, t("admin.anniversaries.flash.yearExists", { year: newYear }), "error");
-      return c.redirect("/admin/anniversaries");
-    }
-  }
-
-  await db
-    .update(anniversaryYears)
-    .set({ kind: newKind, year: newYear, title })
-    .where(and(eq(anniversaryYears.kind, oldKind), eq(anniversaryYears.year, oldYear)));
-  setFlash(c, t("admin.anniversaries.flash.saved"), "success");
-  return c.redirect("/admin/anniversaries");
-});
-
-// POST /admin/anniversaries/:year/delete
-adminRoutes.post("/anniversaries/:kind/:year/delete", guard, async (c) => {
-  const kind = c.req.param("kind");
-  if (!isKind(kind)) return c.html("", HTTP_STATUS.NOT_FOUND);
-  const year = parseInt(c.req.param("year"), 10);
-  await db.delete(anniversaryYears).where(and(eq(anniversaryYears.kind, kind), eq(anniversaryYears.year, year)));
-  setFlash(c, t("admin.anniversaries.flash.deleted", { year }), "success");
-  return c.redirect("/admin/anniversaries");
 });
 
 // ── /admin/config ─────────────────────────────────────────────────────────────

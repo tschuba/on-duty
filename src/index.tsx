@@ -13,6 +13,8 @@ import { applyRoutes } from "./routes/apply.js";
 import { memberRoutes } from "./routes/members.js";
 import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
+import { roleRoutes } from "./routes/roles.js";
+import { yearRoutes } from "./routes/anniversary-years.js";
 import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { donationRoutes } from "./routes/donations.js";
@@ -72,6 +74,9 @@ app.get("/", requireAuth(), (c) => {
     [["applications:read"], "/applications"],
     [["system:admin"], "/admin"],
     [["import:run"], "/import"],
+    [["member-roles:read"], "/roles"],
+    [["member-role-types:read"], "/role-types"],
+    [["anniversary-years:read"], "/anniversary-years"],
   ];
   return c.redirect(landing.find(([ps]) => ps.some((p) => perms.has(p as never)))?.[1] ?? "/account");
 });
@@ -99,6 +104,9 @@ app.route("/inventory", inventoryRoutes);
 
 // Admin routes
 app.route("/admin", adminRoutes);
+// Role and role-type configuration (own permissions, linked from the members tabs)
+app.route("/", roleRoutes);
+app.route("/anniversary-years", yearRoutes);
 app.route("/organisation", organisationRoutes);
 app.route("/import", importRoutes);
 

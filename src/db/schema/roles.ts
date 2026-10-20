@@ -2,9 +2,22 @@ import { boolean, date, integer, pgTable, primaryKey, text, uuid } from "drizzle
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
+export const memberRoleTypes = pgTable("member_role_types", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  allowsActiveStatus: boolean("allows_active_status").notNull().default(false),
+  sortOrder: integer("sort_order").notNull(),
+  isProtected: boolean("is_protected").notNull().default(false),
+});
+
 export const memberRoles = pgTable("member_roles", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
+  typeId: uuid("type_id")
+    .notNull()
+    .references(() => memberRoleTypes.id, { onDelete: "restrict" }),
+  sortOrder: integer("sort_order").notNull(),
   grantsActiveStatus: boolean("grants_active_status").notNull().default(false),
   isProtected: boolean("is_protected").notNull().default(false),
 });

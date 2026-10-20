@@ -4,6 +4,7 @@ import {
   sessions,
   accounts,
   memberRoles,
+  memberRoleTypes,
   memberRoleAssignments,
   anniversaryYears,
   backupHistory,
@@ -41,6 +42,7 @@ function chainOf(rows: unknown) {
 
 let usersFixture: any[] = [];
 let rolesFixture: any[] = [];
+let typesFixture: any[] = [makeType()];
 let assignmentCountFixture: any[] = [{ cnt: 0 }];
 let yearsFixture: any[] = [];
 let backupHistoryFixture: any[] = [];
@@ -70,6 +72,7 @@ const select = vi.fn(() => ({
   from: vi.fn((table: any) => {
     if (table === users) return chainOf(nextRows(users, usersFixture));
     if (table === memberRoles) return chainOf(nextRows(memberRoles, rolesFixture));
+    if (table === memberRoleTypes) return chainOf(nextRows(memberRoleTypes, typesFixture));
     if (table === memberRoleAssignments) return chainOf(nextRows(memberRoleAssignments, assignmentCountFixture));
     if (table === anniversaryYears) return chainOf(nextRows(anniversaryYears, yearsFixture));
     if (table === backupHistory) return chainOf(nextRows(backupHistory, backupHistoryFixture));
@@ -117,7 +120,7 @@ vi.mock("../db/index.js", () => ({
   db: { select, insert, update, delete: del },
 }));
 
-let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
+let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -151,6 +154,7 @@ beforeEach(() => {
   queues.clear();
   usersFixture = [];
   rolesFixture = [];
+  typesFixture = [makeType()];
   assignmentCountFixture = [{ cnt: 0 }];
   yearsFixture = [];
   backupHistoryFixture = [];
@@ -158,7 +162,7 @@ beforeEach(() => {
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
-  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin"]) };
+  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
   backupConfigured = false;
   lastBackupResult = null;
   scheduleResult = { prev: null, next: null };
@@ -180,8 +184,12 @@ function makeUser(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeType(overrides: Record<string, unknown> = {}) {
+  return { id: "t1", name: "Dienstgrad", allowsActiveStatus: true, sortOrder: 1, isProtected: false, ...overrides };
+}
+
 function makeRole(overrides: Record<string, unknown> = {}) {
-  return { id: "r1", title: "Vorstand", grantsActiveStatus: true, isProtected: false, ...overrides };
+  return { id: "r1", title: "Vorstand", typeId: "t1", sortOrder: 1, grantsActiveStatus: true, isProtected: false, ...overrides };
 }
 
 function makeRoleRow(overrides: Record<string, unknown> = {}) {
@@ -682,282 +690,6 @@ describe("POST /permissions/:id/delete", () => {
     const res = await adminRoutes.request("/permissions/ar1/delete", { method: "POST" });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === appRoles)).toBe(true);
-  });
-});
-
-describe("GET /roles", () => {
-  it("renders the unfiltered, active and passive views", async () => {
-    rolesFixture = [makeRoleRow()];
-    for (const qs of ["", "?active=1", "?active=0"]) {
-      expect((await adminRoutes.request(`/roles${qs}`)).status).toBe(200);
-    }
-  });
-
-  it("locks deletion for a protected role", async () => {
-    rolesFixture = [makeRoleRow({ isProtected: true })];
-    const html = await (await adminRoutes.request("/roles")).text();
-    expect(html).toContain(t("admin.roles.cannotDelete.protected"));
-  });
-
-  it("locks deletion with a singular usage message", async () => {
-    rolesFixture = [makeRoleRow({ assignmentCount: 1 })];
-    const html = await (await adminRoutes.request("/roles")).text();
-    expect(html).toContain(t("admin.roles.cannotDelete.usedBySingle", { count: 1 }));
-  });
-
-  it("locks deletion with a plural usage message", async () => {
-    rolesFixture = [makeRoleRow({ assignmentCount: 3 })];
-    const html = await (await adminRoutes.request("/roles")).text();
-    expect(html).toContain(t("admin.roles.cannotDelete.usedByMultiple", { count: 3 }));
-  });
-
-  it("allows deletion when unused and unprotected", async () => {
-    rolesFixture = [makeRoleRow({ assignmentCount: 0 })];
-    const html = await (await adminRoutes.request("/roles")).text();
-    expect(html).toContain(t("admin.roles.confirmDelete.title"));
-  });
-});
-
-describe("GET /roles/new", () => {
-  it("renders the create-role form", async () => {
-    expect((await adminRoutes.request("/roles/new")).status).toBe(200);
-  });
-});
-
-describe("GET /roles/:id/edit", () => {
-  it("404s for an unknown role", async () => {
-    rolesFixture = [];
-    expect((await adminRoutes.request("/roles/nope/edit")).status).toBe(404);
-  });
-
-  it("404s for a protected role", async () => {
-    rolesFixture = [makeRole({ isProtected: true })];
-    expect((await adminRoutes.request("/roles/r1/edit")).status).toBe(404);
-  });
-
-  it("locks the name field when assignments exist", async () => {
-    rolesFixture = [makeRole()];
-    assignmentCountFixture = [{ cnt: 2 }];
-    const html = await (await adminRoutes.request("/roles/r1/edit")).text();
-    expect(html).toContain(t("admin.roles.modal.nameLocked"));
-  });
-
-  it("keeps the name field editable with no assignments", async () => {
-    rolesFixture = [makeRole({ grantsActiveStatus: false })];
-    assignmentCountFixture = [{ cnt: 0 }];
-    const html = await (await adminRoutes.request("/roles/r1/edit")).text();
-    expect(html).not.toContain(t("admin.roles.modal.nameLocked"));
-  });
-});
-
-describe("POST /roles", () => {
-  it("requires a title", async () => {
-    const res = await adminRoutes.request("/roles", { method: "POST", body: formBody({ title: "" }) });
-    expect(res.status).toBe(302);
-    expect(insert).not.toHaveBeenCalled();
-  });
-
-  it("creates the role", async () => {
-    const res = await adminRoutes.request("/roles", { method: "POST", body: formBody({ title: "Kassier", grantsActiveStatus: "1" }) });
-    expect(res.status).toBe(302);
-    expect(insertCalls.some((c) => c.table === memberRoles && c.values.grantsActiveStatus === true)).toBe(true);
-  });
-});
-
-describe("POST /roles/:id", () => {
-  it("404s for an unknown role", async () => {
-    rolesFixture = [];
-    expect((await adminRoutes.request("/roles/nope", { method: "POST", body: formBody({}) })).status).toBe(404);
-  });
-
-  it("404s for a protected role", async () => {
-    rolesFixture = [makeRole({ isProtected: true })];
-    expect((await adminRoutes.request("/roles/r1", { method: "POST", body: formBody({}) })).status).toBe(404);
-  });
-
-  it("requires a title when there are no assignments yet", async () => {
-    rolesFixture = [makeRole()];
-    assignmentCountFixture = [{ cnt: 0 }];
-    const res = await adminRoutes.request("/roles/r1", { method: "POST", body: formBody({ title: "" }) });
-    expect(res.status).toBe(302);
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("updates title and status when unused", async () => {
-    rolesFixture = [makeRole()];
-    assignmentCountFixture = [{ cnt: 0 }];
-    const res = await adminRoutes.request("/roles/r1", { method: "POST", body: formBody({ title: "Neu", grantsActiveStatus: "1" }) });
-    expect(res.status).toBe(302);
-    expect(updateCalls.some((c) => c.table === memberRoles && c.set.title === "Neu")).toBe(true);
-  });
-
-  it("only updates the active-status flag when the role is in use", async () => {
-    rolesFixture = [makeRole()];
-    assignmentCountFixture = [{ cnt: 5 }];
-    const res = await adminRoutes.request("/roles/r1", { method: "POST", body: formBody({ grantsActiveStatus: "1" }) });
-    expect(res.status).toBe(302);
-    expect(updateCalls.some((c) => c.table === memberRoles && !("title" in c.set))).toBe(true);
-  });
-});
-
-describe("POST /roles/:id/delete", () => {
-  it("silently redirects for an unknown role", async () => {
-    rolesFixture = [];
-    const res = await adminRoutes.request("/roles/nope/delete", { method: "POST" });
-    expect(res.status).toBe(302);
-    expect(res.headers.get("set-cookie")).toBeNull();
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  it("refuses to delete a protected role", async () => {
-    rolesFixture = [makeRole({ isProtected: true })];
-    const res = await adminRoutes.request("/roles/r1/delete", { method: "POST" });
-    expect(res.headers.get("set-cookie")).toMatch(/flash=/);
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  it("refuses to delete a role with assignments", async () => {
-    rolesFixture = [makeRole()];
-    assignmentCountFixture = [{ cnt: 1 }];
-    const res = await adminRoutes.request("/roles/r1/delete", { method: "POST" });
-    expect(res.headers.get("set-cookie")).toMatch(/flash=/);
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  it("deletes an unused role", async () => {
-    rolesFixture = [makeRole()];
-    assignmentCountFixture = [{ cnt: 0 }];
-    const res = await adminRoutes.request("/roles/r1/delete", { method: "POST" });
-    expect(res.status).toBe(302);
-    expect(deleteCalls.some((c) => c.table === memberRoles)).toBe(true);
-  });
-});
-
-describe("GET /anniversaries", () => {
-  it("shows the empty state", async () => {
-    yearsFixture = [];
-    const html = await (await adminRoutes.request("/anniversaries")).text();
-    expect(html).toContain(t("admin.anniversaries.empty"));
-  });
-
-  it("renders a titled year with its delete confirmation", async () => {
-    yearsFixture = [makeYear({ year: 25, title: "Silber" })];
-    const html = await (await adminRoutes.request("/anniversaries")).text();
-    expect(html).toContain("Silber");
-    expect(html).toContain(t("admin.anniversaries.confirmDelete.bodyWithTitle", { kind: "Dienst", year: "25", title: "Silber" }));
-  });
-
-  it("falls back to an em-dash and untitled delete text when title is null", async () => {
-    yearsFixture = [makeYear({ year: 10, title: null })];
-    const html = await (await adminRoutes.request("/anniversaries")).text();
-    expect(html).toContain(t("admin.anniversaries.confirmDelete.body", { kind: "Dienst", year: "10" }));
-  });
-});
-
-describe("GET /anniversaries?kind=", () => {
-  it("filters rows by kind", async () => {
-    yearsFixture = [makeYear({ kind: "service", year: 25, title: "Dienst25" }), makeYear({ kind: "membership", year: 10, title: "Mitgl10" })];
-    const html = await (await adminRoutes.request("/anniversaries?kind=membership")).text();
-    expect(html).toContain("Mitgl10");
-    expect(html).not.toContain("Dienst25");
-    const all = await (await adminRoutes.request("/anniversaries?kind=bogus")).text();
-    expect(all).toContain("Dienst25");
-  });
-});
-
-describe("GET /anniversaries?sort=", () => {
-  it("sorts by year descending and ignores bogus sort values", async () => {
-    yearsFixture = [makeYear({ year: 10, title: "Aa" }), makeYear({ year: 50, title: "Zz" })];
-    const html = await (await adminRoutes.request("/anniversaries?sort=year&dir=desc")).text();
-    expect(html.indexOf("Zz")).toBeLessThan(html.indexOf("Aa"));
-    const bogus = await (await adminRoutes.request("/anniversaries?sort=x")).text();
-    expect(bogus.indexOf("Aa")).toBeLessThan(bogus.indexOf("Zz"));
-  });
-});
-
-describe("GET /anniversaries/new", () => {
-  it("renders the create form", async () => {
-    expect((await adminRoutes.request("/anniversaries/new")).status).toBe(200);
-  });
-});
-
-describe("GET /anniversaries/:kind/:year/edit", () => {
-  it("404s for an unknown year", async () => {
-    yearsFixture = [];
-    expect((await adminRoutes.request("/anniversaries/service/99/edit")).status).toBe(404);
-  });
-
-  it("renders the edit form with existing values", async () => {
-    yearsFixture = [makeYear({ year: 25, title: "Silber" })];
-    const html = await (await adminRoutes.request("/anniversaries/service/25/edit")).text();
-    expect(html).toContain("Silber");
-  });
-});
-
-describe("POST /anniversaries", () => {
-  it.each([0, -1, 300])("rejects an out-of-range year (%d)", async (year) => {
-    const res = await adminRoutes.request("/anniversaries", { method: "POST", body: formBody({ kind: "service", year: String(year) }) });
-    expect(res.status).toBe(302);
-    expect(insert).not.toHaveBeenCalled();
-  });
-
-  it("rejects an unknown kind", async () => {
-    const res = await adminRoutes.request("/anniversaries", { method: "POST", body: formBody({ kind: "x", year: "25" }) });
-    expect(res.status).toBe(302);
-    expect(insert).not.toHaveBeenCalled();
-  });
-
-  it("creates a year with a title", async () => {
-    await adminRoutes.request("/anniversaries", { method: "POST", body: formBody({ kind: "service", year: "25", title: "Silber" }) });
-    expect(insertCalls.some((c) => c.table === anniversaryYears && c.values.title === "Silber")).toBe(true);
-  });
-
-  it("defaults an empty title to null", async () => {
-    await adminRoutes.request("/anniversaries", { method: "POST", body: formBody({ kind: "service", year: "25", title: "" }) });
-    expect(insertCalls.some((c) => c.table === anniversaryYears && c.values.title === null)).toBe(true);
-  });
-});
-
-describe("POST /anniversaries/:kind/:year", () => {
-  it("404s for an unknown year", async () => {
-    yearsFixture = [];
-    expect((await adminRoutes.request("/anniversaries/service/10", { method: "POST", body: formBody({ kind: "service", year: "10" }) })).status).toBe(404);
-  });
-
-  it("rejects an out-of-range new year", async () => {
-    yearsFixture = [makeYear({ year: 10 })];
-    const res = await adminRoutes.request("/anniversaries/service/10", { method: "POST", body: formBody({ kind: "service", year: "0" }) });
-    expect(res.status).toBe(302);
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("updates in place when the year is unchanged", async () => {
-    yearsFixture = [makeYear({ year: 10 })];
-    const res = await adminRoutes.request("/anniversaries/service/10", { method: "POST", body: formBody({ kind: "service", year: "10", title: "Neu" }) });
-    expect(res.status).toBe(302);
-    expect(updateCalls.some((c) => c.table === anniversaryYears && c.set.title === "Neu")).toBe(true);
-  });
-
-  it("rejects renaming onto an already-used year", async () => {
-    queue(anniversaryYears, [makeYear({ year: 10 })], [makeYear({ year: 20 })]);
-    const res = await adminRoutes.request("/anniversaries/service/10", { method: "POST", body: formBody({ kind: "service", year: "20" }) });
-    expect(res.status).toBe(302);
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("moves the year when the target is free", async () => {
-    queue(anniversaryYears, [makeYear({ year: 10 })], []);
-    const res = await adminRoutes.request("/anniversaries/service/10", { method: "POST", body: formBody({ kind: "service", year: "20" }) });
-    expect(res.status).toBe(302);
-    expect(updateCalls.some((c) => c.table === anniversaryYears && c.set.year === 20)).toBe(true);
-  });
-});
-
-describe("POST /anniversaries/:kind/:year/delete", () => {
-  it("deletes the year and redirects", async () => {
-    const res = await adminRoutes.request("/anniversaries/service/10/delete", { method: "POST" });
-    expect(res.status).toBe(302);
-    expect(deleteCalls.some((c) => c.table === anniversaryYears)).toBe(true);
   });
 });
 

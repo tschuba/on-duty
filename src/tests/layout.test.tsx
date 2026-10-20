@@ -117,3 +117,40 @@ describe("user menu", () => {
   });
 });
 
+describe("role tabs (MemberTabs)", () => {
+  it("shows Funktionen and Funktionstypen only with member-roles:read", async () => {
+    const render = async (perm: string) => {
+      const app = new Hono();
+      app.get("/", (c) => c.html(<MemberTabs active="members" user={userWith(perm)} />));
+      return (await app.request("/")).text();
+    };
+    expect(await render("member-roles:read")).toContain("/roles");
+    expect(await render("members:write")).not.toContain("/roles");
+  });
+});
+
+describe("Mitglieder nav item for roles-only users", () => {
+  it("links to the role pages without members:read and hides member tabs", async () => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<MemberTabs active="roles" user={userWith("member-roles:read")} />));
+    const html = await (await app.request("/")).text();
+    expect(html).toContain("/roles");
+    expect(html).not.toContain('href="/members"');
+  });
+});
+
+describe("separate tabs for roles and role types", () => {
+  it("shows only the tab the user may read", async () => {
+    const render = async (perm: string) => {
+      const app = new Hono();
+      app.get("/", (c) => c.html(<MemberTabs active="roles" user={userWith(perm)} />));
+      return (await app.request("/")).text();
+    };
+    const roles = await render("member-roles:read");
+    expect(roles).toContain('href="/roles"');
+    expect(roles).not.toContain("/role-types");
+    const types = await render("member-role-types:read");
+    expect(types).toContain("/role-types");
+    expect(types).not.toContain('href="/roles"');
+  });
+});

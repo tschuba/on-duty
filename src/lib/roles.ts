@@ -25,6 +25,15 @@ export const PERMISSIONS = [
   "org:tax-data:read",
   "org:tax-data:write",
   "import:run",
+  "member-roles:read",
+  "member-roles:write",
+  "member-roles:delete",
+  "member-role-types:read",
+  "member-role-types:write",
+  "member-role-types:delete",
+  "anniversary-years:read",
+  "anniversary-years:write",
+  "anniversary-years:delete",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

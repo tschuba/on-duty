@@ -1,0 +1,42 @@
+export const ROLE_TYPES = [
+  { id: "5f75964a-8f5e-4d0f-8a6b-0255e823119f", description: "Dienstgrade der Feuerwehr, aufsteigend vom Anwärter bis zum Hauptbrandmeister.", key: "rank", name: "Dienstgrad", allowsActiveStatus: true, sortOrder: 1, isProtected: false },
+  { id: "48f95a02-4ad7-434b-bcc9-9da9cfa8b6b5", description: "Gewählte oder übertragene Aufgaben im Dienst, z. B. Kommandant, Gruppenführer oder Jugendwart.", key: "position", name: "Dienststellung", allowsActiveStatus: true, sortOrder: 2, isProtected: false },
+  { id: "91321c9b-5872-4ca6-a0fa-55010d95bc48", description: "Ämter und Ehrungen im Verein, z. B. Vorstand, Kassier oder Ehrenmitglied.", key: "club", name: "Verein", allowsActiveStatus: false, sortOrder: 3, isProtected: false },
+  { id: "e4333d64-2527-4f99-b5cc-547422f87d12", description: "Alle übrigen Funktionen, die zu keinem anderen Typ passen.", key: "other", name: "Sonstige", allowsActiveStatus: false, sortOrder: 4, isProtected: true },
+] as const;
+
+export const ROLE_SEED = [
+  { id: "f2dd276b-027b-4b82-8313-918bc4f9d5c5", title: "Feuerwehr-Anwärter", type: "rank", grantsActiveStatus: true, sortOrder: 1 },
+  { id: "e9db3bda-6f1e-4d88-be87-d98f316a0a9d", title: "Feuerwehrmann/-frau", type: "rank", grantsActiveStatus: true, sortOrder: 2 },
+  { id: "ec85fe13-8708-4884-866b-67f55969b088", title: "Oberfeuerwehrmann/-frau", type: "rank", grantsActiveStatus: true, sortOrder: 3 },
+  { id: "623b6a0d-6595-4ad6-b291-e451d8cfbdde", title: "Hauptfeuerwehrmann/-frau", type: "rank", grantsActiveStatus: true, sortOrder: 4 },
+  { id: "b21f4245-a9b9-4f32-bf18-8e08d7602ed3", title: "Löschmeister", type: "rank", grantsActiveStatus: true, sortOrder: 5 },
+  { id: "65726a2d-6368-4292-ad3c-287f37248211", title: "Oberlöschmeister", type: "rank", grantsActiveStatus: true, sortOrder: 6 },
+  { id: "9dc9d004-e9d8-4531-a5cd-9d242d6512df", title: "Hauptlöschmeister", type: "rank", grantsActiveStatus: true, sortOrder: 7 },
+  { id: "ac25ef28-6ad9-471c-bd36-3693f62b540c", title: "Brandmeister", type: "rank", grantsActiveStatus: true, sortOrder: 8 },
+  { id: "32f519b4-ac39-4717-89e7-2b4b93a857f9", title: "Oberbrandmeister", type: "rank", grantsActiveStatus: true, sortOrder: 9 },
+  { id: "4cb50b84-a9e8-435a-8d3e-d7e7c40203c4", title: "Hauptbrandmeister", type: "rank", grantsActiveStatus: true, sortOrder: 10 },
+  { id: "9540a309-6b49-48f8-b39b-2349018a6119", title: "Kommandant", type: "position", grantsActiveStatus: true, sortOrder: 1 },
+  { id: "f65456f1-377a-4c16-a3d4-a27e18c2ac66", title: "1. Kommandant", type: "position", grantsActiveStatus: true, sortOrder: 2 },
+  { id: "0ada20bb-74ed-4ded-a3da-ee1e17a26d11", title: "2. Kommandant", type: "position", grantsActiveStatus: true, sortOrder: 3 },
+  { id: "bc7a50c6-a0c9-4d1a-a212-6d39ba833fed", title: "Maschinist", type: "position", grantsActiveStatus: true, sortOrder: 4 },
+  { id: "77700bd9-6c64-43d6-af49-02d3c8e7d665", title: "Gruppenführer", type: "position", grantsActiveStatus: true, sortOrder: 5 },
+  { id: "fa924ea5-597a-479b-be5e-19fae309a0ad", title: "Gerätewart", type: "position", grantsActiveStatus: false, sortOrder: 6 },
+  { id: "aa7c8c81-344e-456b-872f-d2205afe3026", title: "Schriftführer", type: "position", grantsActiveStatus: false, sortOrder: 7 },
+  { id: "a01ba0da-a36d-47ff-9a39-036696cce73d", title: "Ausbilder", type: "position", grantsActiveStatus: false, sortOrder: 8 },
+  { id: "bda48bcc-d4f3-464f-9067-732d3f35675c", title: "Jugendwart", type: "position", grantsActiveStatus: false, sortOrder: 9 },
+  { id: "b2b821ce-30aa-4b14-a6aa-c63d09daf37c", title: "Stellv. Jugendwart", type: "position", grantsActiveStatus: false, sortOrder: 10 },
+  { id: "6976ff4a-7141-4ac4-962b-9b2540b13096", title: "Kinderfeuerwehr-Betreuer", type: "position", grantsActiveStatus: false, sortOrder: 11 },
+  { id: "3750d6fd-00a8-4423-bbc3-b1c8e7e5abcc", title: "Stellv. Kinderfeuerwehr-Betreuer", type: "position", grantsActiveStatus: false, sortOrder: 12 },
+  { id: "0e9fadad-c158-4590-adc7-633d180ddb17", title: "1. Vorstand", type: "club", grantsActiveStatus: false, sortOrder: 1 },
+  { id: "3060799d-5e93-4812-9426-b37baab73f58", title: "2. Vorstand", type: "club", grantsActiveStatus: false, sortOrder: 2 },
+  { id: "8bf6c0be-faa1-4149-b116-ef6bebf7cece", title: "Vorstand", type: "club", grantsActiveStatus: false, sortOrder: 3 },
+  { id: "b76895ab-577d-4fcf-a567-300fa1bfba91", title: "Schriftführer", type: "club", grantsActiveStatus: false, sortOrder: 4 },
+  { id: "5054f7c6-61fa-4692-93a6-2256f16de546", title: "Kassier", type: "club", grantsActiveStatus: false, sortOrder: 5 },
+  { id: "e10a3bb7-ed77-46a9-a7fe-f1d1f8326ed3", title: "Beisitzer", type: "club", grantsActiveStatus: false, sortOrder: 6 },
+  { id: "8a6372ef-4561-4f0d-aa2e-3ed80ac2b003", title: "Ehrenkommandant", type: "club", grantsActiveStatus: false, sortOrder: 7 },
+  { id: "4005b6b5-bbf3-4d52-98c1-3893bf7db574", title: "Ehrenvorstand", type: "club", grantsActiveStatus: false, sortOrder: 8 },
+  { id: "d4bda8ff-6d64-404e-a6c2-d7b500abb6a2", title: "Ehrenmitglied", type: "club", grantsActiveStatus: false, sortOrder: 9 },
+] as const;
+
+export const ROLE_TYPE_IDS = Object.fromEntries(ROLE_TYPES.map((t) => [t.key, t.id])) as Record<(typeof ROLE_TYPES)[number]["key"], string>;

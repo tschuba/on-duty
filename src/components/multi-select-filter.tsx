@@ -1,5 +1,5 @@
 import { Icon } from "./icon.js";
-export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string };
+export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string };
 
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
 // autoApply: Schließen navigiert (page=1). Sonst gehören die Checkboxen (name=param)
@@ -33,7 +33,11 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
         )}
         <ul class="space-y-0.5 max-h-64 overflow-y-auto">
           {options.length === 0 && emptyLabel && <li class="text-sm opacity-50 px-2 py-1">{emptyLabel}</li>}
-          {options.map((o) => (
+          {options.map((o, i) => (
+            <>
+            {o.group && o.group !== options[i - 1]?.group && (
+              <li class="text-xs font-semibold opacity-60 px-2 pt-2" data-msf-group>{o.group}</li>
+            )}
             <li key={o.value} data-title={o.label.toLowerCase()}>
               <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${o.dim ? " opacity-50" : ""}`}>
                 <input type="checkbox" class="checkbox checkbox-xs" name={param} value={o.value} checked={selected.includes(o.value)} />
@@ -41,6 +45,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
                 {o.hint && <span class="text-xs opacity-60">{o.hint}</span>}
               </label>
             </li>
+            </>
           ))}
         </ul>
         <div class="flex gap-1 mt-2">

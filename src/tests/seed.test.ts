@@ -43,15 +43,15 @@ describe("runSeed", () => {
     existingAccounts = [];
     await runSeed();
 
-    // memberRoles, anniversaryYears, appRoles, appRolePermissions, users, userAppRoles, accounts
-    expect(insert).toHaveBeenCalledTimes(7);
+    // memberRoleTypes, memberRoles, anniversaryYears, appRoles, appRolePermissions, users, userAppRoles, accounts
+    expect(insert).toHaveBeenCalledTimes(8);
   });
 
   it("skips creating the admin credential account when one already exists", async () => {
     existingAccounts = [{ id: "existing" }];
     await runSeed();
 
-    // memberRoles, anniversaryYears, appRoles, appRolePermissions, users, userAppRoles (no accounts insert)
-    expect(insert).toHaveBeenCalledTimes(6);
+    // memberRoleTypes, memberRoles, anniversaryYears, appRoles, appRolePermissions, users, userAppRoles (no accounts insert)
+    expect(insert).toHaveBeenCalledTimes(7);
   });
 });
