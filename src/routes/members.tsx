@@ -1271,6 +1271,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
           </label>
         ))}
       </div>
+      <p id="startStatusError" class="text-error text-sm" role="alert" hidden>{t("members.form.startStatusRequired")}</p>
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function () {
           var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
@@ -1281,8 +1282,12 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
             rows.dataset.nextIndex = String(i + 1);
             htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' });
           }
+          var err = document.getElementById('startStatusError');
           form.querySelectorAll('input[name="startStatus"]').forEach(function (r) {
+            // Eigene Meldung bei der Kartengruppe statt der Browser-Blase am einzelnen Radio.
+            r.addEventListener('invalid', function (e) { e.preventDefault(); err.hidden = false; err.scrollIntoView({ block: 'center' }); });
             r.addEventListener('change', function () {
+              err.hidden = true;
               document.getElementById('startStatusPassiveHint').hidden = current() !== 'passiv';
               prefill();
             });

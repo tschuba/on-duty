@@ -137,6 +137,7 @@ export const de = {
   "members.bank.accountHolderHint": "Leer = Name des Mitglieds.",
   "members.form.roleActive": "aktiv",
   "members.form.startStatus": "Status beim Anlegen",
+  "members.form.startStatusRequired": "Bitte wähle einen Status aus.",
   "members.form.statusBecomes": "wird",
   "members.form.startStatus.aktiv": "Leistet aktiven Dienst in der Feuerwehr, z. B. als Feuerwehr-Anwärter.",
   "members.form.startStatus.passiv": "Altersbedingt aus dem aktiven Dienst ausgeschieden, z. B. als Ehrenkommandant.",
