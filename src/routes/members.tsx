@@ -375,7 +375,7 @@ const toRowData = (a: Assignment): AssignmentRowData => ({ id: a.id, roleId: a.m
 // Offene (ohne „bis“) zuerst, danach „von“ absteigend.
 const sortRows = (rows: AssignmentRowData[]) => [...rows].sort((a, b) => (a.to ? 1 : 0) - (b.to ? 1 : 0) || b.from.localeCompare(a.from));
 
-const ADD_CLICK = "if(event.detail.successful)document.getElementById('assignment-modal').showModal()";
+const ADD_CLICK = "if(event.detail.successful){var d=document.getElementById('assignment-modal');d.showModal();setTimeout(function(){var f=d.querySelector('.role-picker-search');if(f)f.focus()},50)}";
 
 // Eine Zeile der read-only Tabelle. Neuanlage (kein memberId): Werte stecken als Hidden-Inputs im Hauptformular.
 function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRowData; memberId?: string; index?: string; auto?: boolean; readOnly?: boolean }) {
@@ -463,7 +463,7 @@ function AssignmentModalScaffold() {
           });
           document.body.addEventListener('assignment-modal', function (e) {
             if (e.detail.value === 'close') d.close();
-            else { var t = d.querySelector('.role-combobox-trigger'); if (t) t.focus(); }
+            else { var t = d.querySelector('.role-picker-search'); if (t) t.focus(); }
           });
         })();
       ` }} />
@@ -485,73 +485,27 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
       {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.form.role")}<span class="text-error ml-1">*</span></span></label>
-        <div class="relative">
-          <input type="hidden" name="role" class="role-combobox-value" value={selectedId ?? ""} />
-          <button
-            type="button"
-            role="combobox"
-            aria-haspopup="listbox"
-            aria-expanded="false"
-            aria-controls={`role-combobox-popover-m`}
-            class={`role-combobox-trigger btn btn-outline justify-start font-normal min-w-48${selectedTitle ? "" : " opacity-50"}`}
-            style={`anchor-name:--role-combobox-anchor-m`}
-            data-placeholder={t("members.form.roleSelect")}
-          >
-            {selectedTitle || t("members.form.roleSelect")}
-          </button>
-          <div
-            id={`role-combobox-popover-m`}
-            popover="auto"
-            class="role-combobox-popover dropdown-content bg-base-100 rounded-box shadow p-2"
-            style={`position-anchor:--role-combobox-anchor-m`}
-          >
-            <label class="input input-bordered input-sm flex items-center gap-2 w-full mb-1">
-              <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-              <input
-                type="text"
-                autocomplete="off"
-                role="searchbox"
-                aria-autocomplete="list"
-                aria-controls={`role-combobox-list-m`}
-                class="role-combobox-search grow min-w-0"
-                placeholder={t("common.searchPlaceholder")}
-              />
-            </label>
-            {types.length > 1 && (
-              <div role="tablist" class="role-combobox-tabs tabs tabs-border mb-1">
-                {types.map((ty) => (
-                  <button
-                    key={ty.id}
-                    type="button"
-                    role="tab"
-                    data-type={ty.id}
-                    class={`role-combobox-tab tab${ty.id === activeType ? " tab-active" : ""}`}
-                  >
-                    {ty.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <ul id={`role-combobox-list-m`} role="listbox" class="role-combobox-list menu p-0">
-              {roles.map((r) => (
-                <li
-                  key={r.id}
-                  id={`role-combobox-option-m-${r.id}`}
-                  role="option"
-                  data-id={r.id}
-                  data-title={r.title}
-                  data-type={r.typeId}
-                  aria-selected={r.id === selectedId ? "true" : "false"}
-                >
-                  <a class="min-h-11 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
-                </li>
+        <div class="role-picker" data-selected={selectedId ?? ""}>
+          <input type="hidden" name="role" class="role-picker-value" value={selectedId ?? ""} />
+          <label class="input input-bordered flex items-center gap-2 w-full mb-1">
+            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
+          </label>
+          {types.length > 1 && (
+            <div role="tablist" class="tabs tabs-border mb-1">
+              {types.map((ty) => (
+                <button key={ty.id} type="button" role="tab" data-type={ty.id} class={`role-picker-tab tab${ty.id === activeType ? " tab-active" : ""}`}>{ty.name}</button>
               ))}
-              <li class="role-combobox-no-match hidden"><a class="disabled pointer-events-none opacity-50 min-h-11 flex items-center">{t("members.form.roleNoMatch")}</a></li>
-            </ul>
-            <button type="button" class={`role-combobox-reset btn btn-sm btn-ghost w-full mt-1${selectedTitle ? "" : " hidden"}`}>
-              {t("common.reset")}
-            </button>
-          </div>
+            </div>
+          )}
+          <ul id="role-picker-list" role="listbox" class="role-picker-list menu menu-sm p-0 w-full flex-nowrap overflow-y-auto border border-base-300 rounded-box" style="max-height:min(16rem,32vh)">
+            {roles.map((r) => (
+              <li key={r.id} role="option" data-id={r.id} data-title={r.title} data-type={r.typeId} aria-selected={r.id === selectedId ? "true" : "false"}>
+                <a class="min-h-9 flex items-center gap-2">{r.title}{r.grantsActiveStatus && <span class="badge badge-sm badge-outline">{t("members.form.roleActive")}</span>}</a>
+              </li>
+            ))}
+            <li class="role-picker-no-match hidden"><a class="disabled pointer-events-none opacity-50">{t("members.form.roleNoMatch")}</a></li>
+          </ul>
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -574,157 +528,38 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         <button type="submit" class="btn btn-primary">{t("common.save")}</button>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__roleComboboxBound) {
-          window.__roleComboboxBound = true;
-
-          function rcWrap(trigger) { return trigger.closest('.relative'); }
-          function rcPopover(trigger) { return rcWrap(trigger).querySelector('.role-combobox-popover'); }
-          function rcSearch(trigger) { return rcPopover(trigger).querySelector('.role-combobox-search'); }
-          function rcList(trigger) { return rcPopover(trigger).querySelector('.role-combobox-list'); }
-          function rcHidden(trigger) { return rcWrap(trigger).querySelector('.role-combobox-value'); }
-          function rcResetBtn(trigger) { return rcPopover(trigger).querySelector('.role-combobox-reset'); }
-          function rcOptions(list) { return Array.from(list.querySelectorAll('li[role=option]')); }
-          function rcNoMatch(list) { return list.querySelector('.role-combobox-no-match'); }
-
-          function rcClearActive(list) {
-            rcOptions(list).forEach(function (li) { li.classList.remove('menu-active'); });
+        (function () {
+          var root = document.currentScript.parentNode.querySelector('.role-picker');
+          var value = root.querySelector('.role-picker-value'), search = root.querySelector('.role-picker-search');
+          var list = root.querySelector('.role-picker-list'), noMatch = root.querySelector('.role-picker-no-match');
+          var opts = Array.from(list.querySelectorAll('li[role=option]')), tabs = Array.from(root.querySelectorAll('.role-picker-tab'));
+          function activeType() { var t = root.querySelector('.role-picker-tab.tab-active'); return t ? t.dataset.type : null; }
+          function visible() { return opts.filter(function (o) { return !o.hidden; }); }
+          function mark(li) { opts.forEach(function (o) { o.classList.toggle('menu-active', o === li); }); if (li) li.scrollIntoView({ block: 'nearest' }); }
+          function filter() {
+            var q = search.value.trim().toLowerCase(), type = q ? null : activeType();
+            opts.forEach(function (o) { o.hidden = !(o.dataset.title.toLowerCase().includes(q) && (!type || o.dataset.type === type)); });
+            noMatch.classList.toggle('hidden', visible().length > 0);
+            mark(null);
           }
-
-          function rcSetActive(trigger, li) {
-            var list = rcList(trigger);
-            rcClearActive(list);
-            if (li) li.classList.add('menu-active');
+          function pick(li) {
+            value.value = li.dataset.id; value.dispatchEvent(new Event('change', { bubbles: true }));
+            opts.forEach(function (o) { o.setAttribute('aria-selected', o === li ? 'true' : 'false'); o.classList.toggle('menu-active', o === li); });
           }
-
-          function rcVisibleOptions(list) {
-            return rcOptions(list).filter(function (li) { return li.style.display !== 'none'; });
-          }
-
-          function rcFilter(trigger) {
-            var list = rcList(trigger);
-            var needle = rcSearch(trigger).value.trim().toLowerCase();
-            var tab = rcPopover(trigger).querySelector('.role-combobox-tab.tab-active');
-            var anyVisible = false;
-            rcOptions(list).forEach(function (li) {
-              // Search spans all types; without a search term only the active tab shows.
-              var match = needle ? li.dataset.title.toLowerCase().includes(needle) : (!tab || li.dataset.type === tab.dataset.type);
-              li.style.display = match ? '' : 'none';
-              if (match) anyVisible = true;
-            });
-            rcNoMatch(list).classList.toggle('hidden', anyVisible);
-            rcClearActive(list);
-          }
-
-          function rcIsOpen(trigger) { return rcPopover(trigger).matches(':popover-open'); }
-
-          function rcOpen(trigger) {
-            rcPopover(trigger).showPopover();
-            trigger.setAttribute('aria-expanded', 'true');
-            rcSearch(trigger).value = '';
-            var tabs = Array.from(rcPopover(trigger).querySelectorAll('.role-combobox-tab'));
-            if (tabs.length) {
-              var sel = rcOptions(rcList(trigger)).find(function (o) { return o.getAttribute('aria-selected') === 'true'; });
-              var want = sel ? sel.dataset.type : tabs[0].dataset.type;
-              tabs.forEach(function (tb) { tb.classList.toggle('tab-active', tb.dataset.type === want); });
-            }
-            rcFilter(trigger);
-            rcSearch(trigger).focus();
-          }
-
-          function rcClose(trigger) {
-            rcPopover(trigger).hidePopover();
-            trigger.setAttribute('aria-expanded', 'false');
-            rcClearActive(rcList(trigger));
-          }
-
-          function rcSetValue(trigger, id, title) {
-            rcHidden(trigger).value = id;
-            rcHidden(trigger).dispatchEvent(new Event('change', { bubbles: true }));
-            trigger.textContent = title || trigger.dataset.placeholder;
-            trigger.classList.toggle('opacity-50', !id);
-            trigger.classList.remove('btn-error');
-            trigger.removeAttribute('aria-invalid');
-            rcResetBtn(trigger).classList.toggle('hidden', !id);
-          }
-
-          function rcSelect(trigger, li) {
-            rcSetValue(trigger, li.dataset.id, li.dataset.title);
-            rcOptions(rcList(trigger)).forEach(function (o) { o.setAttribute('aria-selected', o === li ? 'true' : 'false'); });
-            rcClose(trigger);
-            trigger.focus();
-          }
-
-          document.body.addEventListener('click', function (e) {
-            var trigger = e.target.closest('.role-combobox-trigger');
-            if (trigger) {
-              if (rcIsOpen(trigger)) { rcClose(trigger); } else { rcOpen(trigger); }
-              return;
-            }
-            var tabBtn = e.target.closest('.role-combobox-tab');
-            if (tabBtn) {
-              var tabTrigger = rcWrap(tabBtn.closest('.role-combobox-popover')).querySelector('.role-combobox-trigger');
-              rcPopover(tabTrigger).querySelectorAll('.role-combobox-tab').forEach(function (tb) { tb.classList.toggle('tab-active', tb === tabBtn); });
-              rcSearch(tabTrigger).value = '';
-              rcFilter(tabTrigger);
-              rcSearch(tabTrigger).focus();
-              return;
-            }
-            var resetBtn = e.target.closest('.role-combobox-reset');
-            if (resetBtn) {
-              var t = rcWrap(resetBtn).querySelector('.role-combobox-trigger');
-              rcSetValue(t, '', '');
-              rcOptions(rcList(t)).forEach(function (o) { o.setAttribute('aria-selected', 'false'); });
-              rcClose(t);
-              t.focus();
-              return;
-            }
-            var li = e.target.closest('.role-combobox-list li[role=option]');
-            if (li) {
-              var trig = rcWrap(li.closest('.role-combobox-popover')).querySelector('.role-combobox-trigger');
-              rcSelect(trig, li);
-              return;
-            }
-            var openTrigger = document.querySelector('.role-combobox-trigger[aria-expanded=true]');
-            if (openTrigger && !rcPopover(openTrigger).contains(e.target)) rcClose(openTrigger);
+          function setTab(t) { tabs.forEach(function (x) { x.classList.toggle('tab-active', x === t); }); filter(); }
+          tabs.forEach(function (t) { t.addEventListener('click', function () { search.value = ''; setTab(t); search.focus(); }); });
+          list.addEventListener('click', function (e) { var li = e.target.closest('li[role=option]'); if (li) pick(li); });
+          search.addEventListener('input', filter);
+          search.addEventListener('keydown', function (e) {
+            var v = visible(), cur = v.findIndex(function (o) { return o.classList.contains('menu-active'); });
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mark(v[Math.max(0, Math.min(v.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1)))]); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (cur >= 0) pick(v[cur]); else if (v.length === 1) pick(v[0]); else root.closest('form').querySelector('[name=from]').focus(); }
           });
-
-          document.body.addEventListener('input', function (e) {
-            var trigger = e.target.closest('.role-combobox-search') && rcWrap(e.target).querySelector('.role-combobox-trigger');
-            if (!trigger) return;
-            rcFilter(trigger);
-          });
-
-          document.body.addEventListener('keydown', function (e) {
-            var trigger = e.target.closest('.role-combobox-trigger');
-            if (trigger && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown')) {
-              e.preventDefault();
-              if (!rcIsOpen(trigger)) rcOpen(trigger);
-              return;
-            }
-            var searchInput = e.target.closest('.role-combobox-search');
-            if (!searchInput) return;
-            var trig = rcWrap(searchInput).querySelector('.role-combobox-trigger');
-            var list = rcList(trig);
-            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-              e.preventDefault();
-              var visible = rcVisibleOptions(list);
-              if (!visible.length) return;
-              var current = visible.findIndex(function (li) { return li.classList.contains('menu-active'); });
-              var next = e.key === 'ArrowDown' ? current + 1 : current - 1;
-              if (next < 0) next = 0;
-              if (next > visible.length - 1) next = visible.length - 1;
-              rcSetActive(trig, visible[next]);
-            } else if (e.key === 'Enter') {
-              e.preventDefault();
-              var active = list.querySelector('li.menu-active');
-              if (active) rcSelect(trig, active);
-            } else if (e.key === 'Escape') {
-              e.preventDefault();
-              rcClose(trig);
-              trig.focus();
-            }
-          });
-        }
+          var sel = opts.find(function (o) { return o.getAttribute('aria-selected') === 'true'; });
+          if (sel) { var t = tabs.find(function (x) { return x.dataset.type === sel.dataset.type; }); if (t) setTab(t); sel.classList.add('menu-active'); sel.scrollIntoView({ block: 'nearest' }); }
+          else filter();
+          search.focus();
+        })();
       ` }} />
     </form>
   );
