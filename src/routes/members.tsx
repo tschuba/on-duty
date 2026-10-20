@@ -1221,7 +1221,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
 type StartStatus = "aktiv" | "passiv" | "foerdernd";
 
 function PassiveHint({ show }: { show: boolean }) {
-  return <p id="startStatusPassiveHint" class="text-sm opacity-70" hidden={!show}>{t("members.form.startStatusPassiveHint")}</p>;
+  return <p id="startStatusPassiveHint" class="text-sm opacity-70" hidden={!show}>{t("members.form.startStatusPassiveHint", { grenze: String(env.ACTIVE_AGE_LIMIT) })}</p>;
 }
 
 function StartStatusSelect({ value }: { value: StartStatus | "" }) {
