@@ -109,11 +109,42 @@ describe("GET /anniversaries filters", () => {
     expect(html).not.toContain("Dienst25");
   });
 
-  it("legacy alias anniversaries shows both", async () => {
+  it("multiple filters are OR-combined", async () => {
+    setup();
+    const html = await get("service&filter=membership");
+    expect(html).toContain("Dienst25");
+    expect(html).toContain("Mitglied15");
+  });
+
+  it("unknown filter value falls back to all", async () => {
     setup();
     const html = await get("anniversaries");
     expect(html).toContain("Dienst25");
     expect(html).toContain("Mitglied15");
+  });
+
+  const hrefOf = (html: string, label: string) =>
+    html.match(new RegExp(`<a href="([^"]*)"[^>]*>${label}</a>`))![1].replace(/&amp;/g, "&");
+
+  it("toggle link adds an inactive filter and removes an active one", async () => {
+    setup();
+    let html = await get("service");
+    expect(new URL(hrefOf(html, "Nur Mitgliedsjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service", "membership"]);
+    html = await get("service&filter=membership");
+    expect(new URL(hrefOf(html, "Nur Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["membership"]);
+  });
+
+  it("last active filter cannot be removed", async () => {
+    setup();
+    const html = await get("service");
+    expect(html).toContain("pointer-events-none");
+    expect(new URL(hrefOf(html, "Nur Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service"]);
+  });
+
+  it("All button activates every filter", async () => {
+    setup();
+    const html = await get("service");
+    expect(new URL(hrefOf(html, "Alle"), "http://x").searchParams.getAll("filter")).toEqual(["service", "membership", "birthdays"]);
   });
 
   it("merges identical service and membership rows", async () => {

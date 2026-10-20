@@ -8,7 +8,7 @@ import { Layout, MemberTabs } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
-import { buildListUrl } from "../lib/list-query.js";
+import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, rangePresets, todayStr } from "../lib/quick-range.js";
 import { formatDate } from "../lib/format.js";
@@ -57,12 +57,20 @@ const STATUS_LABEL: Partial<Record<MemberStatus, string>> = {
 
 // ── Components ────────────────────────────────────────────────────────────────
 
-// "anniversaries" is the legacy alias for service + membership.
-function filterEvents(events: AnniversaryEvent[], filter: string): AnniversaryEvent[] {
-  if (filter === "birthdays") return events.filter((e) => e.kind === "birthday");
-  if (filter === "anniversaries") return events.filter((e) => e.kind === "anniversary");
-  if (filter === "service" || filter === "membership") return events.filter((e) => e.types?.includes(filter));
-  return events;
+const KIND_FILTERS = ["service", "membership", "birthdays"] as const;
+const BIRTHDAYS_FILTER = "birthdays";
+
+// Empty/invalid selection means "all kinds active" (also covers legacy ?filter=all).
+function parseKindFilters(raw: string[] | undefined): string[] {
+  const parsed = parseMulti(raw, KIND_FILTERS);
+  return parsed.length ? parsed : [...KIND_FILTERS];
+}
+
+// OR across the active kinds.
+function filterEvents(events: AnniversaryEvent[], filters: string[]): AnniversaryEvent[] {
+  return events.filter((e) =>
+    e.kind === "birthday" ? filters.includes(BIRTHDAYS_FILTER) : e.types?.some((ty) => filters.includes(ty)),
+  );
 }
 
 function anniversaryLabel(e: AnniversaryEvent): string {
@@ -101,8 +109,8 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
   );
 }
 
-function EventList({ events, today, filter }: { events: AnniversaryEvent[]; today: string; filter: string }) {
-  const filtered = filterEvents(events, filter);
+function EventList({ events, today, filters }: { events: AnniversaryEvent[]; today: string; filters: string[] }) {
+  const filtered = filterEvents(events, filters);
 
   if (!filtered.length) {
     return <p class="text-base-content/60 py-8">{t("anniversaries.empty")}</p>;
@@ -178,8 +186,8 @@ function AnniversariesExportModal() {
             var p=new URLSearchParams({
               start:url.searchParams.get('start')||'',
               end:url.searchParams.get('end')||'',
-              filter:url.searchParams.get('filter')||'all',
             });
+            url.searchParams.getAll('filter').forEach(function(f){p.append('filter',f)});
             var gte=url.searchParams.get('gte');if(gte)p.set('gte',gte);
             url.searchParams.getAll('mod').forEach(function(m){p.append('mod',m)});
             if(document.getElementById('exp-ann-contact').checked)p.set('contact','1');
@@ -201,7 +209,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   const start = c.req.query("start") || today;
   const end = c.req.query("end") || addMonths(today, 12);
-  const filter = c.req.query("filter") || "all";
+  const filters = parseKindFilters(c.req.queries("filter"));
   const gteRaw = c.req.query("gte") || "";
   const gte = parseInt(gteRaw, 10) || 0;
   const mods = c.req.queries("mod") ?? [];
@@ -231,9 +239,20 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   }
 
   const qs = (extra: Record<string, string | string[]>) =>
-    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
+    buildListUrl("/anniversaries", { start, end, filter: filters, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
-  const filterLink = (f: string) => qs({ filter: f });
+  const allKindsActive = filters.length === KIND_FILTERS.length;
+  const filterAll = () => qs({ filter: [...KIND_FILTERS] });
+  // toggle a kind in/out; the last active kind cannot be removed
+  const filterToggle = (f: string) => {
+    if (!filters.includes(f)) return qs({ filter: [...filters, f] });
+    return filters.length === 1 ? qs({}) : qs({ filter: filters.filter((x) => x !== f) });
+  };
+  const kindBtn = (f: string, label: string) => {
+    const active = filters.includes(f);
+    const locked = active && filters.length === 1;
+    return <a href={filterToggle(f)} class={`join-item btn${active ? " btn-primary btn-outline" : " btn-ghost"}${locked ? " pointer-events-none" : ""}`}>{label}</a>;
+  };
   // toggle a mod value in/out of the active set
   const modToggle = (m: string) => {
     const next = mods.includes(m) ? mods.filter((x) => x !== m) : [...mods, m];
@@ -259,7 +278,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
             <input type="date" name="start" value={start} class="input input-bordered w-36" />
             <span class="text-base-content/50">–</span>
             <input type="date" name="end" value={end} class="input input-bordered w-36" />
-            <input type="hidden" name="filter" value={filter} />
+            {filters.map((f) => <input type="hidden" name="filter" value={f} />)}
             {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
             <button type="submit" class="btn">{t("common.show")}</button>
@@ -267,10 +286,10 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
           {/* Typ-Filter */}
           <div class="join">
-            <a href={filterLink("all")} class={`join-item btn${filter === "all" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-            <a href={filterLink("service")} class={`join-item btn${filter === "service" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.serviceOnly")}</a>
-            <a href={filterLink("membership")} class={`join-item btn${filter === "membership" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.membershipOnly")}</a>
-            <a href={filterLink("birthdays")} class={`join-item btn${filter === "birthdays" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.birthdaysOnly")}</a>
+            <a href={filterAll()} class={`join-item btn${allKindsActive ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
+            {kindBtn("service", t("anniversaries.filter.serviceOnly"))}
+            {kindBtn("membership", t("anniversaries.filter.membershipOnly"))}
+            {kindBtn("birthdays", t("anniversaries.filter.birthdaysOnly"))}
           </div>
 
           {/* Jahre + Mod */}
@@ -278,7 +297,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
             <form method="get" action="/anniversaries" id="gte-form" class="flex items-center gap-2">
               <input type="hidden" name="start" value={start} />
               <input type="hidden" name="end" value={end} />
-              <input type="hidden" name="filter" value={filter} />
+              {filters.map((f) => <input type="hidden" name="filter" value={f} />)}
               {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
               <label class="text-sm text-base-content/70" for="gte-input">{t("anniversaries.minYears.label")}</label>
               <input
@@ -300,7 +319,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
         </div>
       </div>
 
-      <EventList events={events} today={today} filter={filter} />
+      <EventList events={events} today={today} filters={filters} />
       <AnniversariesExportModal />
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
@@ -328,7 +347,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const today = todayStr();
   const start = q.start || today;
   const end = q.end || addMonths(today, 12);
-  const filter = q.filter || "all";
+  const filters = parseKindFilters(c.req.queries("filter"));
   const inclContact = q.contact === "1";
   const inclAddr = q.addr === "1";
   const gte = parseInt(q.gte || "", 10) || 0;
@@ -347,7 +366,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   }));
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
-  events = filterEvents(events, filter);
+  events = filterEvents(events, filters);
   if (gte > 0) events = events.filter((e) => e.years >= gte);
   if (mod === "10") events = events.filter((e) => e.years % 10 === 0);
   else if (mod === "5") events = events.filter((e) => e.years % 5 === 0 && e.years % 10 !== 0);
