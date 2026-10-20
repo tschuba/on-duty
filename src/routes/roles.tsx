@@ -4,7 +4,7 @@ import { db } from "../db/index.js";
 import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
-import { BackupWarnBanner, ModalScaffold, backupWarnProps } from "./admin.js";
+import { ModalScaffold } from "./admin.js";
 import { flagAllowed, isPermutation, moveId } from "../lib/role-types.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
@@ -127,7 +127,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   const user = c.get("user");
   const activeFilter = c.req.query("active"); // "1" | "0" | undefined
 
-  const [types, rolesWithCount, warn] = await Promise.all([
+  const [types, rolesWithCount] = await Promise.all([
     db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder)),
     db
       .select({
@@ -147,7 +147,6 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       )
       .groupBy(memberRoles.id, memberRoles.title, memberRoles.typeId, memberRoles.grantsActiveStatus, memberRoles.isProtected, memberRoles.sortOrder)
       .orderBy(asc(memberRoles.sortOrder)),
-    backupWarnProps(),
   ]);
   const typeCounts = new Map<string, number>();
   const allRoleRows = await db.select({ typeId: memberRoles.typeId }).from(memberRoles);
@@ -160,7 +159,6 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
 
   return c.html(
     <Layout title={t("admin.roles.title")} user={user} activeNav="members">
-      <BackupWarnBanner {...warn} />
       <MemberTabs active={tab === "types" ? "roleTypes" : "roles"} user={user} />
 
       <div class="max-w-4xl mx-auto">
