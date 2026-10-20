@@ -1314,7 +1314,7 @@ function checkStartStatus(
   }
   if (choice === "foerdernd" && derived !== "foerdernd") {
     const titel = (runningActive ?? anyActive)?.role.title ?? "";
-    const status = STATUS_LABELS[derived];
+    const status = STATUS_LABELS[derived].toLowerCase();
     return { message: t("members.error.status.supportingHasRole", { titel, name, status }), suggest };
   }
   return undefined;
@@ -1440,7 +1440,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span>{statusConflict.message}</span>
               {statusConflict.suggest && (
                 <button type="submit" name="switchStatus" value={statusConflict.suggest} class="btn btn-sm">
-                  {t("members.form.createAs", { status: STATUS_LABELS[statusConflict.suggest] })}
+                  {t("members.form.createAs", { status: STATUS_LABELS[statusConflict.suggest].toLowerCase() })}
                 </button>
               )}
             </div>
