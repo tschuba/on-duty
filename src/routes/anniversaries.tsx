@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout, MemberTabs } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl } from "../lib/list-query.js";
@@ -247,14 +248,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
       <div class="max-w-4xl mx-auto">
       <MemberTabs active="anniversaries" user={user} />
       <div class="mb-6">
-        <div class="flex justify-between items-center mb-4">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            {t("anniversaries.title")}
-          </h1>
-          <button class="btn btn-neutral" onclick="document.getElementById('ann-export-modal').showModal()">
-            {t("common.export")}
-          </button>
-        </div>
+        <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" />} />
 
         {/* Controls */}
         <div class="flex flex-wrap gap-3 items-end">

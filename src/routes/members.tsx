@@ -9,6 +9,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { RolePopover } from "../components/role-popover.js";
 import { ACTIVE_ROLE_ID } from "../lib/import.js";
 import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
@@ -950,23 +951,20 @@ function DeleteMemberButton({
   if (blockedBy) {
     return (
       <button
-        class="btn btn-ghost text-base-content/30 ml-auto"
+        class="btn btn-ghost text-base-content/30"
         disabled
+        aria-label={t("common.delete")}
         title={t(`members.delete.blocked${blockedBy === "donor" ? "Donor" : blockedBy === "loan" ? "Loan" : "Application"}`)}
       >
-        {t("common.delete")}
+        <Icon name="trash" class="h-5 w-5" />
+        <span class="@max-xl:hidden">{t("common.delete")}</span>
       </button>
     );
   }
 
   return (
     <>
-      <button
-        class="btn btn-ghost text-error ml-auto"
-        onclick="document.getElementById('delete-member-modal').showModal()"
-      >
-        {t("common.delete")}
-      </button>
+      <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-member-modal').showModal()" />
       <dialog id="delete-member-modal" class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{t("members.delete.confirmTitle")}</h3>
@@ -1156,17 +1154,10 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   return c.html(
     <Layout title={t("members.title")} user={user} activeNav="members">
       <MemberTabs active="members" user={user} />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("members.title")}</h1>
-        <div class="flex items-center gap-2">
-          <button class="btn btn-neutral" onclick="document.getElementById('members-export-modal').showModal()">
-            {t("common.export")}
-          </button>
-          {isEditor && (
-            <a href="/members/new" class="btn btn-primary">{t("members.addMember")}</a>
-          )}
-        </div>
-      </div>
+      <PageHeader title={t("members.title")} actions={<>
+        <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" />
+        {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
+      </>} />
 
       <StatsCards all={all} />
 
@@ -1267,12 +1258,8 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
 
   return c.html(
     <Layout title={t("members.newMember")} user={user} activeNav="members">
-      <div class="mb-4">
-        <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("members.newMember")}</h1>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
-      <form method="post" action="/members/new" class="space-y-4 max-w-4xl">
+      <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" cancelHref="/members" saveAndNew />} />
+      <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1306,11 +1293,6 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <RoleRowsAddButton initialCount={0} />
         <input type="hidden" id="roles-json" value={JSON.stringify(roles)} />
         </Section>
-        <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
-          <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </form>
     </Layout>
   );
@@ -1507,15 +1489,11 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     };
     return c.html(
       <Layout title={t("members.newMember")} user={user} activeNav="members">
-        <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("members.newMember")}</h1>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
+        <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" cancelHref="/members" saveAndNew />} />
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
-        <form method="post" action="/members/new" class="space-y-4 max-w-4xl">
+        <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
           {personId && <input type="hidden" name="personId" value={personId} />}
           {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
@@ -1564,11 +1542,6 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
           </Section>
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <button type="submit" name="_action" value="save_and_new" class="btn btn-outline btn-primary">{t("common.saveAndNew")}</button>
-            <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
       </Layout>,
       422
@@ -1780,16 +1753,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
     const openRoles = m.assignments.filter((a) => !a.to);
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
-        <div class="mb-4">
-          <a href={backHref(c)} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <div class="flex items-center gap-3 mt-1">
-            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-              {m.firstName} {m.lastName}
-            </h1>
-            <StatusBadge status={m.status} />
-            {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}
-          </div>
-        </div>
+        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}</>} />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
           <ViewField label={t("members.form.firstName")} value={m.firstName} />
@@ -1830,18 +1794,8 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
-      <div class="mb-4">
-        <a href={backHref(c)} class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <div class="flex items-center gap-3 mt-1">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            {m.firstName} {m.lastName}
-          </h1>
-          <StatusBadgeSlot saved={m.status} />
-          {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}
-        </div>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
-      <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<FormActions formId="member-form" cancelHref={backHref(c)} /></>} />
+      <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <Section title={t("members.form.assignments")} open>
@@ -1858,10 +1812,6 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         </div>
         <RoleRowsAddButton initialCount={m.assignments.length} />
         </Section>
-        <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <a href="/members" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </form>
     </Layout>
   );
@@ -1944,16 +1894,9 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
-        <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <div class="flex items-center gap-3 mt-1">
-            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
-            <StatusBadgeSlot saved={existing.status} />
-          </div>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
+        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${id}`} /></>} />
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
-        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
+        <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <Section title={t("members.form.assignments")} open>
@@ -1979,10 +1922,6 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
           </Section>
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
       </Layout>,
       422
@@ -2019,15 +1958,8 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
 
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
-        <div class="mb-4">
-          <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <div class="flex items-center gap-3 mt-1">
-            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
-            <StatusBadgeSlot saved={existing.status} />
-          </div>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
-        <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
+        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${id}`} /></>} />
+        <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
@@ -2055,10 +1987,6 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           </div>
           <RoleRowsAddButton initialCount={assignmentRoles.length} />
           </Section>
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <a href={`/members/${id}`} class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
         <ReactivationModal memberId={id} formData={formData} />
       </Layout>

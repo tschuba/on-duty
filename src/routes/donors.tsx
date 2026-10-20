@@ -7,6 +7,7 @@ import { countOpenReceipts, recipientName } from "../lib/donations.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
 import { Icon } from "../components/icon.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -324,10 +325,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
   return c.html(
     <Layout title={t("donors.title")} user={user} activeNav="donations">
       <DonationTabs active="donors" openReceiptsCount={openReceipts} />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donors.title")}</h1>
-        {canRecord && <a href="/donors/new" class="btn btn-primary">{t("donors.addDonor")}</a>}
-      </div>
+      <PageHeader title={t("donors.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />} />
 
       <div class="flex flex-wrap gap-3 mb-4 items-center">
         <form method="get" class="flex gap-2">
@@ -397,17 +395,9 @@ donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
-      <div class="mb-4">
-        <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.newDonor")}</h1>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
-      <form method="post" action="/donors/new" class="space-y-4 max-w-xl">
+      <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+      <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
         <DonorPickerFields />
-        <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <a href="/donors" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </form>
     </Layout>
   );
@@ -425,17 +415,9 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
-        <div class="mb-4">
-          <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donors.newDonor")}</h1>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
-        <form method="post" action="/donors/new" class="space-y-4 max-w-xl">
+        <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+        <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={values} errors={errors} />
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <a href="/donors" class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
       </Layout>,
       422
@@ -467,17 +449,9 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   return c.html(
     <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
-      <div class="mb-4">
-        <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
-      <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
+      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+      <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
         <DonorPersonFields values={donor.person} />
-        <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <a href="/donors" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </form>
     </Layout>
   );
@@ -497,17 +471,9 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
-        <div class="mb-4">
-          <a href="/donors" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
-        <form method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
+        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+        <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
           <DonorPersonFields values={values} errors={errors} />
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <a href="/donors" class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
       </Layout>,
       422

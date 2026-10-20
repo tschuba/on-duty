@@ -27,17 +27,7 @@ Zwei Font-Families, als CSS-Variablen definiert:
 - `--font-heading`: **Oswald** (700) — für `<h1>`
 - `--font-body`: **Inter** (400/500) — Standard-Body-Font (kein expliziter Klassenaufruf nötig, ist Browser-Default über `app.css`)
 
-**Regel für Seitentitel:**
-
-```html
-<h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">…</h1>
-```
-
-Detail-Seiten (z.B. Mitglieder-/Spender-Detailansicht), die unter einem Breadcrumb/Kontext-Element sitzen, bekommen zusätzlich `mt-1`:
-
-```html
-<h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">…</h1>
-```
+**Regel für Seitentitel:** Der `<h1>` entsteht ausschließlich in `PageHeader` (`src/components/page-header.tsx`), nie freistehend (Ausnahme: Fehlerseiten 403/404/500 und Login-Karten ohne `Layout`-Nav).
 
 Keine weiteren Heading-Ebenen (`h2`/`h3`) mit eigener Konvention etabliert — bei Bedarf hier ergänzen, bevor neue Varianten frei erfunden werden.
 
@@ -45,21 +35,17 @@ Keine weiteren Heading-Ebenen (`h2`/`h3`) mit eigener Konvention etabliert — b
 
 Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main class="container mx-auto px-4 py-6">` als äußerer Wrapper, direkt darin der Seiteninhalt.
 
-**Header-Zeile** (Titel + primäre Aktionen), durchgängiges Muster:
+**Seitenkopf:** `PageHeader` (`title`, `backHref?`/`backLabel?`, `subtitle?`, `actions?`) — Titel links, Aktionen rechtsbündig (Primär zuletzt). Aktionen sind `HeaderAction` (`variant`, `icon`, `label`; setzt `aria-label` + `title`) bzw. `FormActions` (Abbrechen / Speichern & Neu / Speichern).
 
-```html
-<div class="flex items-center justify-between mb-4">
-  <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{title}</h1>
-  <div class="flex items-center gap-2">
-    <!-- Sekundäre Aktion(en) -->
-    <!-- Primäre Aktion zuletzt -->
-  </div>
-</div>
-```
+**Formulare:** Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes Formular bekommt eine feste `id`; der Kopf-Button verweist per `form="<id>"` darauf (kein JS, Enter im Feld funktioniert weiter). Löschen = eigenes kleines `<form>` im Inhalt, Button im Kopf zeigt per `form=` darauf. Bei mehreren Formularen zeigt der Kopf nur auf das Hauptformular.
 
-Bei nur einer Aktion kann die innere `<div class="flex items-center gap-2">` entfallen, das `<a>`/`<button>` steht dann direkt als zweites Kind (siehe `donors.tsx`).
+**Icon-only (Container-Queries):** Stufe 1 (Kopf < `@xl`): Labels der sekundären Aktionen entfallen; Stufe 2 (< `@md`): auch das Label der primären Aktion. Icon bleibt, `aria-label`/`title` tragen den Namen.
 
-Kein Breadcrumb/"Zurück"-Link-Pattern im Code vorhanden — Navigation läuft über die Navbar bzw. Browser-Back. Nicht neu einführen, ohne das hier festzuhalten.
+**Untermenü:** `SubNav` (`src/components/sub-nav.tsx`) ersetzt alle `tabs-lifted`: `tabs-sm` (~32 px), `bg-base-300`, 1 px Rahmen unten, aktiver Tab mit `primary`-Unterstrich.
+
+**Sticky:** Hauptnav ist immer sticky; ab `md` zusätzlich Untermenü und Seitenkopf (Offsets über `--nav-h`/`--subnav-h` in `app.css`), darunter nur Hauptnav + Seitenkopf (Untermenü scrollt mit). Vorfahren dürfen kein `overflow` ≠ `visible` setzen, sonst bricht Sticky.
+
+**Zurück-Link:** Detail- und Formularseiten setzen `backHref` auf die Liste.
 
 ## Tabellen
 

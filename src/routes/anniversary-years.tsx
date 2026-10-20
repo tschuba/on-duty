@@ -4,6 +4,7 @@ import { db } from "../db/index.js";
 import { anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { ModalScaffold } from "./admin.js";
 import { SortIcon } from "./members.js";
 import { setFlash } from "../lib/flash.js";
@@ -52,19 +53,7 @@ yearRoutes.get("/", yearsRead, async (c) => {
     <Layout title={t("admin.anniversaries.title")} user={user} activeNav="members">
       <MemberTabs active="anniversaryYears" user={user} />
       <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.anniversaries.title")}
-        </h1>
-        {canWrite && <button
-          class="btn btn-primary"
-          hx-get="/anniversary-years/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.anniversaries.newYear")}
-        </button>}
-      </div>
+      <PageHeader title={t("admin.anniversaries.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
 
       <div class="join mb-4">
         <a href={`/anniversary-years?sort=${sort}&dir=${dir}`} class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>

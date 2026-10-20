@@ -3,8 +3,10 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
+import { SubNav } from "../components/sub-nav.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
@@ -74,21 +76,13 @@ export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLend
   showLending?: boolean;
 }) {
   return (
-    <div role="tablist" class="tabs tabs-lifted mb-6">
-      <a href="/inventory" role="tab" class={`tab${active === "stock" ? " tab-active" : ""}`}>
-        {t("inventory.tabs.stock")}
-      </a>
-      <a href="/inventory/inspections" role="tab" class={`tab${active === "inspections" ? " tab-active" : ""}`}>
-        {t("inventory.tabs.inspections")}
-        {overdueCount > 0 && <span class="badge badge-sm badge-primary ml-1">{overdueCount}</span>}
-      </a>
-      {showLending && (
-        <a href="/inventory/lending" role="tab" class={`tab${active === "lending" ? " tab-active" : ""}`}>
-          {t("inventory.tabs.lending")}
-          {(overdueLoanCount ?? 0) > 0 && <span class="badge badge-sm badge-primary ml-1">{overdueLoanCount}</span>}
-        </a>
-      )}
-    </div>
+    <SubNav items={[
+      { href: "/inventory", active: active === "stock", label: t("inventory.tabs.stock") },
+      { href: "/inventory/inspections", active: active === "inspections", label: t("inventory.tabs.inspections"),
+        badge: overdueCount > 0 ? <span class="badge badge-sm badge-primary ml-1">{overdueCount}</span> : null },
+      ...(showLending ? [{ href: "/inventory/lending", active: active === "lending", label: t("inventory.tabs.lending"),
+        badge: (overdueLoanCount ?? 0) > 0 ? <span class="badge badge-sm badge-primary ml-1">{overdueLoanCount}</span> : null }] : []),
+    ]} />
   );
 }
 
@@ -710,10 +704,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
         showLending={user.permissions.has("lending:read")}
       />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("inventory.title")}</h1>
-        {user.permissions.has("inventory:manage") && <a href="/inventory/new" class="btn btn-primary">{t("inventory.newItem")}</a>}
-      </div>
+      <PageHeader title={t("inventory.title")} actions={user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />} />
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <form method="get" action="/inventory" class="contents">
@@ -872,11 +863,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
 }) {
   return (
     <>
-      <div class="mb-4">
-        <a href="/inventory" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{title}</h1>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
+      <PageHeader title={title} backHref="/inventory" subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} cancelHref="/inventory" /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
@@ -900,11 +887,6 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
           </div>
         )}
       </form>
-      <div class="flex gap-2 pt-4 max-w-2xl">
-        <button type="submit" form={formId} class="btn btn-primary">{t("common.save")}</button>
-        {extraActions}
-        <a href="/inventory" class="btn btn-ghost">{t("common.cancel")}</a>
-      </div>
     </>
   );
 }
@@ -1012,14 +994,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
     return c.html(
       <Layout title={item.name} user={user} activeNav="inventory">
-        <div class="mb-4">
-          <a href="/inventory" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <div class="flex items-center gap-3 mt-1">
-            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{item.name}</h1>
-            <CategoryBadge category={cat} />
-            <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span>
-          </div>
-        </div>
+        <PageHeader title={<>{item.name} <CategoryBadge category={cat} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" />
         {item.retiredAt && (
           <div class="alert alert-warning max-w-2xl mb-4">
             {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
@@ -1097,11 +1072,11 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
 
   const retireAction = item.retiredAt ? (
     <form method="post" action={`/inventory/${item.id}/reactivate`} onsubmit={`return confirm('${t("inventory.reactivate.confirm")}')`}>
-      <button type="submit" class="btn btn-outline">{t("inventory.reactivate.button")}</button>
+      <HeaderAction type="submit" icon="check" label={t("inventory.reactivate.button")} class="btn-outline" />
     </form>
   ) : (
     <>
-      <button type="button" class="btn btn-outline btn-warning" onclick="document.getElementById('retire-modal').showModal()">{t("inventory.retire.button")}</button>
+      <HeaderAction icon="no-symbol" label={t("inventory.retire.button")} class="btn-outline btn-warning" onclick="document.getElementById('retire-modal').showModal()" />
       <dialog id="retire-modal" class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{t("inventory.retire.confirmTitle")}</h3>
@@ -1320,7 +1295,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
         overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
         showLending={user.permissions.has("lending:read")}
       />
-      <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{t("inventory.inspections.title")}</h1>
+      <PageHeader title={t("inventory.inspections.title")} />
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <form method="get" class="flex items-end gap-2">

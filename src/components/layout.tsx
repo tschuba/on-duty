@@ -8,6 +8,7 @@ import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
 import { Icon } from "./icon.js";
+import { SubNav } from "./sub-nav.js";
 
 // package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
 const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).version;
@@ -70,7 +71,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       {/* Toast container — filled by HX-Trigger: showToast */}
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
-      <nav class="navbar bg-base-200 shadow-sm px-4 border-b-[3px] border-gold">
+      <nav class="navbar bg-base-200 shadow-sm px-4 sticky top-0 z-40 border-b-[3px] border-gold">
         <div class="navbar-start flex-1 items-baseline">
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
             on-<span class="text-error">duty</span>
@@ -230,14 +231,7 @@ export function DonationTabs({ active, openReceiptsCount }: { active: "donations
     { key: "donors", href: "/donors", count: DONORS_TAB_COUNT },
   ] as const;
   return (
-    <div role="tablist" class="tabs tabs-lifted mb-6">
-      {tabs.map((tab) => (
-        <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
-          {t(`donations.tabs.${tab.key}`)}
-          <CountBadge count={tab.count} />
-        </a>
-      ))}
-    </div>
+    <SubNav items={tabs.map((tab) => ({ href: tab.href, active: active === tab.key, label: t(`donations.tabs.${tab.key}`), badge: <CountBadge count={tab.count} /> }))} />
   );
 }
 
@@ -256,13 +250,6 @@ export async function MemberTabs({ active, user }: { active: "members" | "annive
     ...(user.permissions.has("anniversary-years:read") ? [{ key: "anniversaryYears", href: "/anniversary-years", count: 0 }] : []),
   ] as const;
   return (
-    <div role="tablist" class="tabs tabs-lifted mb-6">
-      {tabs.map((tab) => (
-        <a href={tab.href} role="tab" class={`tab${active === tab.key ? " tab-active" : ""}`}>
-          {t(`common.nav.${tab.key}` as "common.nav.members")}
-          <CountBadge count={tab.count} />
-        </a>
-      ))}
-    </div>
+    <SubNav items={tabs.map((tab) => ({ href: tab.href, active: active === tab.key, label: t(`common.nav.${tab.key}` as "common.nav.members"), badge: <CountBadge count={tab.count} /> }))} />
   );
 }

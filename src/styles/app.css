@@ -139,3 +139,25 @@
   box-shadow: inset 0 0 0 1px var(--color-primary);
   font-weight: 600;
 }
+
+/* Sticky-Offsets: Hauptnav (daisyUI navbar = 4rem) + Untermenü (tabs-sm, 2rem). Untermenü klebt erst ab md. */
+:root {
+  --nav-h: 4rem;
+  --subnav-h: 2rem;
+}
+.subnav {
+  top: var(--nav-h);
+}
+.page-header {
+  top: var(--nav-h);
+}
+@media (min-width: 48rem) {
+  body:has([data-subnav]) .page-header {
+    top: calc(var(--nav-h) + var(--subnav-h));
+  }
+}
+@media (max-width: 47.99rem) {
+  .subnav {
+    position: static;
+  }
+}

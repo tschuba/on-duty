@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { db } from "../db/index.js";
 import { persons, applications, applicationGuardians } from "../db/schema/index.js";
 import { Layout } from "../components/layout.js";
+import { PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
@@ -175,8 +176,7 @@ function MembershipPage({ values, errors }: { values: ApplicantValues; errors: R
   return (
     <Layout title={t("apply.title")}>
       <div class="max-w-xl mx-auto">
-        <h1 class="text-2xl font-bold mb-1" style="font-family: var(--font-heading)">{t("apply.title")}</h1>
-        <p class="text-sm opacity-60 mb-4">{t("common.requiredLegend")}</p>
+        <PageHeader title={t("apply.title")} subtitle={t("common.requiredLegend")} />
         <form method="post" action="/apply" class="space-y-4">
           <Honeypot />
           <ApplicantFormFields values={values} errors={errors} />
@@ -201,8 +201,7 @@ function YouthPage({
   return (
     <Layout title={t("apply.youth.title")}>
       <div class="max-w-xl mx-auto">
-        <h1 class="text-2xl font-bold mb-1" style="font-family: var(--font-heading)">{t("apply.youth.title")}</h1>
-        <p class="text-sm opacity-60 mb-4">{t("common.requiredLegend")}</p>
+        <PageHeader title={t("apply.youth.title")} subtitle={t("common.requiredLegend")} />
         <form method="post" action="/apply/youth" class="space-y-4">
           <Honeypot />
           <ApplicantFormFields values={values} errors={errors} />
@@ -245,7 +244,7 @@ function InactivePage() {
   return (
     <Layout title={t("apply.inactive.title")}>
       <div class="max-w-xl mx-auto text-center py-12">
-        <h1 class="text-2xl font-bold mb-2" style="font-family: var(--font-heading)">{t("apply.inactive.title")}</h1>
+        <PageHeader title={t("apply.inactive.title")} />
         <p class="opacity-70">{t("apply.inactive.body")}</p>
       </div>
     </Layout>
@@ -256,7 +255,7 @@ function SuccessPage() {
   return (
     <Layout title={t("apply.success.title")}>
       <div class="max-w-xl mx-auto text-center py-12">
-        <h1 class="text-2xl font-bold mb-2" style="font-family: var(--font-heading)">{t("apply.success.title")}</h1>
+        <PageHeader title={t("apply.success.title")} />
         <p class="opacity-70">{t("apply.success.body")}</p>
       </div>
     </Layout>

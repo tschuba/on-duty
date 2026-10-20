@@ -16,6 +16,8 @@ import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { SubNav } from "../components/sub-nav.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
@@ -82,20 +84,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
   return (
-    <div role="tablist" class="tabs tabs-lifted mb-6">
-      <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
-        {t("admin.tabs.users")}
-      </a>
-      <a href="/admin/permissions" role="tab" class={`tab${active === "permissions" ? " tab-active" : ""}`}>
-        {t("admin.tabs.permissions")}
-      </a>
-      <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
-        {t("admin.tabs.config")}
-      </a>
-      <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
-        {t("admin.tabs.backup")}
-      </a>
-    </div>
+    <SubNav items={(["users", "permissions", "config", "backup"] as const).map((k) => ({ href: `/admin/${k}`, active: active === k, label: t(`admin.tabs.${k}`) }))} />
   );
 }
 
@@ -212,19 +201,7 @@ adminRoutes.get("/users", guard, async (c) => {
     <Layout title={t("admin.users.title")} user={user} activeNav="admin">
       <BackupWarnBanner {...warn} />
       <AdminTabs active="users" />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.users.title")}
-        </h1>
-        <button
-          class="btn btn-primary"
-          hx-get="/admin/users/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.users.newUser")}
-        </button>
-      </div>
+      <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
       <div class="tabs tabs-boxed mb-2 w-fit">
         <a href="/admin/users" class={`tab${onlyPending ? "" : " tab-active"}`}>{t("admin.users.filter.all")}</a>
@@ -253,9 +230,7 @@ adminRoutes.get("/users", guard, async (c) => {
                   key={u.id}
                   {...(!isLocal && {
                     class: "cursor-pointer hover",
-                    "hx-get": `/admin/users/${u.id}/edit`,
-                    "hx-target": "#modal-content",
-                    "hx-swap": "innerHTML",
+                    onclick: `location.href='/admin/users/${u.id}/edit'`,
                   })}
                 >
                   <td class="font-medium">
@@ -395,7 +370,6 @@ adminRoutes.get("/users", guard, async (c) => {
           </tbody>
         </table>
       </div>
-      <ModalScaffold />
     </Layout>
   );
 });
@@ -460,9 +434,10 @@ adminRoutes.get("/users/new", guard, async (c) => {
   for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
 
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.create")}</h3>
-      <form method="post" action="/admin/users" class="flex flex-col gap-3">
+    <Layout title={t("admin.users.modal.create")} user={c.get("user")} activeNav="admin">
+      <AdminTabs active="users" />
+      <PageHeader title={t("admin.users.modal.create")} backHref="/admin/users" actions={<FormActions formId="admin-users-form" cancelHref="/admin/users" />} />
+      <form id="admin-users-form" method="post" action="/admin/users" class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
           <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" class="input input-bordered w-full" required />
@@ -475,21 +450,8 @@ adminRoutes.get("/users/new", guard, async (c) => {
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={new Set()} />
         </div>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.create")}
-          </button>
-        </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
+    </Layout>
   );
 });
 
@@ -509,9 +471,10 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const checkedIds = new Set(assigned.map((a) => a.roleId));
 
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.edit")}</h3>
-      <form method="post" action={`/admin/users/${id}`} class="flex flex-col gap-3">
+    <Layout title={t("admin.users.modal.edit")} user={c.get("user")} activeNav="admin">
+      <AdminTabs active="users" />
+      <PageHeader title={t("admin.users.modal.edit")} backHref="/admin/users" actions={<FormActions formId="admin-users-form" cancelHref="/admin/users" />} />
+      <form id="admin-users-form" method="post" action={`/admin/users/${id}`} class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
           <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" value={u.name} class="input input-bordered w-full" required />
@@ -529,21 +492,8 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={checkedIds} />
         </div>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
+    </Layout>
   );
 });
 
@@ -712,19 +662,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <AdminTabs active="permissions" />
 
       <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.permissions.title")}
-        </h1>
-        <button
-          class="btn btn-primary"
-          hx-get="/admin/permissions/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.permissions.newRole")}
-        </button>
-      </div>
+      <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
       <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
@@ -745,9 +683,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   key={r.id}
                   {...(!r.isProtected && {
                     class: "cursor-pointer hover",
-                    "hx-get": `/admin/permissions/${r.id}/edit`,
-                    "hx-target": "#modal-content",
-                    "hx-swap": "innerHTML",
+                    onclick: `location.href='/admin/permissions/${r.id}/edit'`,
                   })}
                 >
                   <td class="font-medium">
@@ -821,7 +757,6 @@ adminRoutes.get("/permissions", guard, async (c) => {
       </div>
       </div>
 
-      <ModalScaffold />
     </Layout>
   );
 });
@@ -866,9 +801,10 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
 // HTMX fragment: new permission-role modal
 adminRoutes.get("/permissions/new", guard, (c) => {
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.permissions.modal.create")}</h3>
-      <form method="post" action="/admin/permissions" class="flex flex-col gap-3">
+    <Layout title={t("admin.permissions.modal.create")} user={c.get("user")} activeNav="admin">
+      <AdminTabs active="permissions" />
+      <PageHeader title={t("admin.permissions.modal.create")} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" cancelHref="/admin/permissions" />} />
+      <form id="admin-permissions-form" method="post" action="/admin/permissions" class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
           <span class="label-text text-right">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
           <input type="text" name="name" class="input input-bordered w-full" required />
@@ -881,17 +817,8 @@ adminRoutes.get("/permissions/new", guard, (c) => {
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
           <PermissionCheckboxes checked={new Set()} />
         </div>
-        <div class="modal-action mt-2">
-          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.create")}
-          </button>
-        </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
+    </Layout>
   );
 });
 
@@ -908,9 +835,10 @@ adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const checked = new Set(perms.map((p) => p.permission));
 
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.permissions.modal.edit")}</h3>
-      <form method="post" action={`/admin/permissions/${id}`} class="flex flex-col gap-3">
+    <Layout title={t("admin.permissions.modal.edit")} user={c.get("user")} activeNav="admin">
+      <AdminTabs active="permissions" />
+      <PageHeader title={t("admin.permissions.modal.edit")} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" cancelHref="/admin/permissions" />} />
+      <form id="admin-permissions-form" method="post" action={`/admin/permissions/${id}`} class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
           {hasAssignments ? (
@@ -933,17 +861,8 @@ adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
           <PermissionCheckboxes checked={checked} />
         </div>
-        <div class="modal-action mt-2">
-          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
+    </Layout>
   );
 });
 
@@ -1069,15 +988,7 @@ adminRoutes.get("/config", guard, async (c) => {
       <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
       <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.config.title")}
-        </h1>
-        {/* Outside the form element, tied to it via the form attribute. */}
-        <button type="submit" form="config-form" id="config-save" class="btn btn-primary" disabled>
-          {t("admin.config.save")}
-        </button>
-      </div>
+      <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
         <div class="flex flex-wrap items-center gap-2 mb-4">
           <label class="input input-bordered input-sm flex items-center gap-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
@@ -1211,20 +1122,8 @@ adminRoutes.get("/backup", guard, async (c) => {
           </div>
         </div>
       )}
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.backup.title")}
-        </h1>
-        <form method="post" action="/admin/backup/run">
-          <button
-            type="submit"
-            class="btn btn-outline"
-            onclick={`return confirm('${t("admin.backup.confirmStart")}')`}
-          >
-            {t("admin.backup.startNow")}
-          </button>
-        </form>
-      </div>
+      <PageHeader title={t("admin.backup.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("admin.backup.startNow")} form="backup-form" class="btn-outline" onclick={`return confirm('${t("admin.backup.confirmStart")}')`} />} />
+      <form id="backup-form" method="post" action="/admin/backup/run" />
 
       {entries.length === 0 ? (
         <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>

@@ -3,6 +3,7 @@ import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
@@ -190,10 +191,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         overdueLoanCount={await countOverdueLoans()}
         showLending
       />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("lending.title")}</h1>
-        {user.permissions.has("lending:manage") && <a href="/inventory/lending/loans/new" class="btn btn-primary">{t("lending.newLoan")}</a>}
-      </div>
+      <PageHeader title={t("lending.title")} actions={user.permissions.has("lending:manage") && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />} />
 
       <form method="get" action="/inventory/lending" class="flex gap-2 items-center flex-wrap mb-4">
         <label class="input input-bordered flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
@@ -283,14 +281,11 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
   const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
   return (
     <>
+      <PageHeader title={item.inventoryItem.name} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={<>
+        <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-loan-modal').showModal()" />
+        <HeaderAction variant="primary" icon="check" label={t("common.save")} form="loan-form" class="btn-primary" />
+      </>} />
       <div class="mb-4">
-        <a href="/inventory/lending" class="link link-hover text-sm opacity-70">{t("lending.loans.backToList")}</a>
-        <div class="flex items-center justify-between gap-2 mt-1">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{item.inventoryItem.name}</h1>
-          <button type="button" class="btn btn-outline btn-error" onclick="document.getElementById('delete-loan-modal').showModal()">
-            {t("common.delete")}
-          </button>
-        </div>
         <dl class="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
           <dt class="opacity-60">{t("lending.loans.table.borrower")}</dt>
           <dd>{borrowerLabel(loan)}</dd>
@@ -306,7 +301,7 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
       </div>
 
       <div class="space-y-4 max-w-xl">
-        <form method="post" action={base} class="space-y-4 border border-base-300 rounded-box p-4">
+        <form id="loan-form" method="post" action={base} class="space-y-4 border border-base-300 rounded-box p-4">
           {!item.individualTracking && (
             <div class="form-control max-w-32">
               <label class="label"><span class="label-text">{t("lending.loans.form.quantity")}</span></label>
@@ -322,7 +317,6 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
             ))}
           </div>
           <div class="flex gap-2 pt-2">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
             <button type="reset" class="btn btn-ghost">{t("common.reset")}</button>
           </div>
         </form>
@@ -661,10 +655,7 @@ lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) =>
 
 function NewLoanHeader() {
   return (
-    <div class="mb-4">
-      <a href="/inventory/lending" class="link link-hover text-sm opacity-70">{t("lending.loans.backToList")}</a>
-      <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("lending.newLoan.title")}</h1>
-    </div>
+    <PageHeader title={t("lending.newLoan.title")} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} />
   );
 }
 

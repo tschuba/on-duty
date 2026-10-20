@@ -7,6 +7,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Section } from "../components/section.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import {
@@ -29,7 +30,7 @@ const CATEGORY_LABEL: Record<InventoryCategory, string> = {
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PageTitle = ({ children }: { children: string }) => (
-  <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{children}</h1>
+  <PageHeader title={children} />
 );
 
 // Zwischenstand im Browser: nur Formularwerte (nie die Datei), Schlüssel = Datei-Fingerprint, 24 h gültig.

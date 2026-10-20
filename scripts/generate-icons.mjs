@@ -21,6 +21,14 @@ const ICONS = {
   sun: "24/outline/sun.svg",
   moon: "24/outline/moon.svg",
   clock: "24/outline/clock.svg",
+  "check": "24/outline/check.svg",
+  "x-mark": "24/outline/x-mark.svg",
+  "trash": "24/outline/trash.svg",
+  "plus": "24/outline/plus.svg",
+  "arrow-down-tray": "24/outline/arrow-down-tray.svg",
+  "arrow-left": "24/outline/arrow-left.svg",
+  "pencil": "24/outline/pencil.svg",
+  "no-symbol": "24/outline/no-symbol.svg",
   "arrow-right-start-on-rectangle": "24/outline/arrow-right-start-on-rectangle.svg",
 };
 
