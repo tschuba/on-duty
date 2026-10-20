@@ -1122,4 +1122,14 @@ describe("role types (Spec 47)", () => {
     queue(memberRoles, [makeRole()], [makeRole(), makeRole({ id: "r2" })]);
     expect((await adminRoutes.request("/roles/reorder", { method: "POST", body: formBody({ id: "r1" }) })).status).toBe(400);
   });
+
+  it("shows roles or types depending on the tab", async () => {
+    rolesFixture = [makeRoleRow()];
+    const roles = await (await adminRoutes.request("/roles")).text();
+    expect(roles).toContain(t("admin.roles.newRole"));
+    expect(roles).not.toContain(t("admin.roleTypes.new"));
+    const types = await (await adminRoutes.request("/roles?tab=types")).text();
+    expect(types).toContain(t("admin.roleTypes.new"));
+    expect(types).not.toContain(t("admin.roles.newRole"));
+  });
 });

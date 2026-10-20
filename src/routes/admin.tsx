@@ -1162,6 +1162,7 @@ adminRoutes.get("/roles", guard, async (c) => {
   const allRoleRows = await db.select({ typeId: memberRoles.typeId }).from(memberRoles);
   for (const r of allRoleRows) typeCounts.set(r.typeId, (typeCounts.get(r.typeId) ?? 0) + 1);
   const canReorder = !activeFilter;
+  const tab = c.req.query("tab") === "types" ? "types" : "roles";
 
   return c.html(
     <Layout title={t("admin.roles.title")} user={user} activeNav="admin">
@@ -1169,6 +1170,11 @@ adminRoutes.get("/roles", guard, async (c) => {
       <AdminTabs active="roles" />
 
       <div class="max-w-4xl mx-auto">
+      <div role="tablist" class="tabs tabs-border mb-4">
+        <a href="/admin/roles" role="tab" class={`tab${tab === "roles" ? " tab-active" : ""}`}>{t("admin.roles.title")}</a>
+        <a href="/admin/roles?tab=types" role="tab" class={`tab${tab === "types" ? " tab-active" : ""}`}>{t("admin.roleTypes.title")}</a>
+      </div>
+      {tab === "roles" && (<>
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-4">
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
@@ -1269,8 +1275,11 @@ adminRoutes.get("/roles", guard, async (c) => {
         </table>
       </div>
 
+      </>)}
+
+      {tab === "types" && (<>
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-bold" style="font-family: var(--font-heading)">{t("admin.roleTypes.title")}</h2>
+        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("admin.roleTypes.title")}</h1>
         <button class="btn btn-primary" hx-get="/admin/role-types/new" hx-target="#modal-content" hx-swap="innerHTML">
           {t("admin.roleTypes.new")}
         </button>
@@ -1326,6 +1335,7 @@ adminRoutes.get("/roles", guard, async (c) => {
           </tbody>
         </table>
       </div>
+      </>)}
       </div>
 
       <ModalScaffold />
@@ -1606,7 +1616,7 @@ adminRoutes.post("/role-types", guard, async (c) => {
   const name = String(body.name ?? "").trim();
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/admin/roles");
+    return c.redirect("/admin/roles?tab=types");
   }
   const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${memberRoleTypes.sortOrder}), 0)` }).from(memberRoleTypes);
   await db.insert(memberRoleTypes).values({
@@ -1617,7 +1627,7 @@ adminRoutes.post("/role-types", guard, async (c) => {
     isProtected: false,
   });
   setFlash(c, t("admin.roleTypes.flash.created", { name }), "success");
-  return c.redirect("/admin/roles");
+  return c.redirect("/admin/roles?tab=types");
 });
 
 adminRoutes.post("/role-types/reorder", guard, async (c) => {
@@ -1634,7 +1644,7 @@ adminRoutes.post("/role-types/:id/move", guard, async (c) => {
   const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
   const current = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   await writeOrder(memberRoleTypes, moveId(current.map((r) => r.id), id, dir));
-  return c.redirect("/admin/roles");
+  return c.redirect("/admin/roles?tab=types");
 });
 
 adminRoutes.post("/role-types/:id", guard, async (c) => {
@@ -1646,7 +1656,7 @@ adminRoutes.post("/role-types/:id", guard, async (c) => {
   const allowsActiveStatus = body.allowsActiveStatus === "1";
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/admin/roles");
+    return c.redirect("/admin/roles?tab=types");
   }
   if (type.allowsActiveStatus && !allowsActiveStatus) {
     const flagged = await db
@@ -1659,19 +1669,19 @@ adminRoutes.post("/role-types/:id", guard, async (c) => {
   }
   await db.update(memberRoleTypes).set({ name, allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roles.flash.saved"), "success");
-  return c.redirect("/admin/roles");
+  return c.redirect("/admin/roles?tab=types");
 });
 
 adminRoutes.post("/role-types/:id/delete", guard, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
-  if (!type) return c.redirect("/admin/roles");
+  if (!type) return c.redirect("/admin/roles?tab=types");
   if (type.isProtected) return badRequest(c, t("admin.roleTypes.cannotDelete.protected"));
   const assigned = await db.select({ title: memberRoles.title }).from(memberRoles).where(eq(memberRoles.typeId, id));
   if (assigned.length > 0) return badRequest(c, t("admin.roleTypes.flash.notEmpty"), assigned.map((r) => r.title));
   await db.delete(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roleTypes.flash.deleted", { name: type.name }), "success");
-  return c.redirect("/admin/roles");
+  return c.redirect("/admin/roles?tab=types");
 });
 
 const ANNIVERSARY_KINDS = ["service", "membership"] as const;
