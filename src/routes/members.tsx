@@ -1203,7 +1203,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
             els.forEach(function (el) { if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.value === kv[1]; else el.value = kv[1]; });
           });
           if (rows['assignment_role[]']) htmx.ajax('POST', '/members/assignments/rows', { values: rows, target: '#assignments-box', swap: 'outerHTML' });
-          else form.dispatchEvent(new Event('change', { bubbles: true }));
+          else { var sr = form.querySelector('input[name="startStatus"]:checked'); if (sr) sr.dispatchEvent(new Event('change', { bubbles: true })); }
           bar.remove();
         });
         btn(TX.discard, function () { localStorage.removeItem(KEY); bar.remove(); });

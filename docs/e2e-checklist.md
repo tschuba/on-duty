@@ -13,7 +13,7 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 
 ## Mitglieder
 
-- [ ] Mitglied anlegen (alle Pflichtfelder + mindestens eine Funktionszuweisung)
+- [ ] Mitglied anlegen (alle Pflichtfelder + mindestens eine Funktion)
 - [ ] Inline-Validierung: Speichern ohne Pflichtfeld → Fehlermeldung
 - [ ] Statusableitung: aktive Rolle → `aktiv`; kein Eintragsalter unter Jugendgrenze → `jugend`
 - [ ] Mitglied bearbeiten (Stammdaten + Zuweisung hinzufügen/entfernen)
