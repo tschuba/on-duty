@@ -139,3 +139,47 @@
   box-shadow: inset 0 0 0 1px var(--color-primary);
   font-weight: 600;
 }
+
+/* Sticky-Offsets: Hauptnav (daisyUI navbar = 4rem) + Untermenü (tabs-sm, 2.5rem). Untermenü klebt erst ab md. */
+:root {
+  --nav-h: 4rem;
+  --subnav-h: 2.5rem;
+}
+.subnav {
+  top: var(--nav-h);
+  /* Randlos über die volle Fensterbreite; Tabs bleiben an der Inhaltskante ausgerichtet. */
+  margin-inline: calc(50% - 50vw);
+  padding-inline: calc(50vw - 50% + 1rem);
+  /* Zu schmal: horizontal scrollen statt Einträge abzuschneiden. */
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  --fade-l: 0rem;
+  --fade-r: 0rem;
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+}
+.subnav::-webkit-scrollbar {
+  display: none;
+}
+.subnav > .tab {
+  flex: none;
+}
+.subnav[data-more-l] {
+  --fade-l: 2.5rem;
+}
+.subnav[data-more-r] {
+  --fade-r: 2.5rem;
+}
+.page-header {
+  top: var(--nav-h);
+}
+@media (min-width: 48rem) {
+  body:has([data-subnav]) .page-header {
+    top: calc(var(--nav-h) + var(--subnav-h));
+  }
+}
+@media (max-width: 47.99rem) {
+  .subnav {
+    position: static;
+  }
+}

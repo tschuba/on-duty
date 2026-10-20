@@ -5,6 +5,7 @@ import { persons, members, applications, applicationGuardians } from "../db/sche
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
+import { PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -173,8 +174,7 @@ applicationRoutes.get("/", guard, async (c) => {
   return c.html(
     <Layout title={t("applications.title")} user={user} activeNav="members">
       <MemberTabs active="applications" user={user} />
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("applications.title")}</h1>
+      <PageHeader title={t("applications.title")} actions={
         <div class="dropdown dropdown-end">
           <div
             tabindex={0}
@@ -231,7 +231,7 @@ applicationRoutes.get("/", guard, async (c) => {
             })}
           </ul>
         </div>
-      </div>
+      } />
       {canManageForms && (["membership", "youth"] as const).map((type) => {
         const form = forms[type];
         return (
@@ -402,14 +402,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
   return c.html(
     <Layout title={`${app.person.firstName} ${app.person.lastName}`} user={user} activeNav="members">
       <MemberTabs active="applications" user={user} />
-      <div class="mb-4">
-        <a href="/applications" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <div class="flex items-center gap-3 mt-1">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{app.person.firstName} {app.person.lastName}</h1>
-          <span class={STATUS_BADGE_CLASS[app.status]}>{STATUS_LABELS[app.status]}</span>
-        </div>
-        <p class="text-sm opacity-60 mt-1">{t("applications.detail.submittedAt", { date: formatDateTime(app.submittedAt) })} · {TYPE_LABELS[app.type]}</p>
-      </div>
+      <PageHeader title={<>{app.person.firstName} {app.person.lastName} <span class={STATUS_BADGE_CLASS[app.status]}>{STATUS_LABELS[app.status]}</span></>} backHref="/applications" subtitle={<>{t("applications.detail.submittedAt", { date: formatDateTime(app.submittedAt) })} · {TYPE_LABELS[app.type]}</>} />
 
       {hasDuplicates && (
         <div class="alert alert-warning mb-4 max-w-2xl">

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { deleteOwnAccount } from "../lib/account.js";
@@ -47,9 +48,7 @@ pendingRoutes.get("/", guard, (c) => {
   return c.html(
     <Layout title={t("pending.title")}>
       <div class="max-w-md mx-auto text-center mt-16">
-        <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">
-          {t(unverified ? "pending.unverified.title" : "pending.title")}
-        </h1>
+        <PageHeader title={t(unverified ? "pending.unverified.title" : "pending.title")} />
         <p class="opacity-70 mb-6">{t(unverified ? "pending.unverified.body" : "pending.body")}</p>
         <div class="flex gap-2 justify-center">
           <form method="post" action="/logout">
@@ -73,7 +72,7 @@ accountRoutes.get("/", guard, async (c) => {
   return c.html(
     <Layout title={t("account.title")} user={user}>
       <div class="max-w-xl mx-auto">
-        <h1 class="text-2xl font-bold mb-4" style="font-family: var(--font-heading)">{t("account.title")}</h1>
+        <PageHeader title={t("account.title")} />
         {/* Name and email come from the OIDC provider and are not editable here. */}
         <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 mb-6">
           <dt class="opacity-60">{t("account.profile.name")}</dt>

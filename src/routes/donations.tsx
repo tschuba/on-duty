@@ -4,6 +4,7 @@ import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -271,10 +272,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
       <DonationTabs active="donations" openReceiptsCount={openReceipts} />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("donations.title")}</h1>
-        {canRecord && <a href="/donations/new" class="btn btn-primary">{t("donations.newDonation")}</a>}
-      </div>
+      <PageHeader title={t("donations.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />} />
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
       <form method="get" class="flex flex-wrap gap-3 mb-4 items-end">
@@ -345,19 +343,11 @@ donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
-      <div class="mb-4">
-        <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.newDonation")}</h1>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
-      <form method="post" action="/donations" class="space-y-4 max-w-xl">
+      <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" />} />
+      <form id="donation-form" method="post" action="/donations" class="space-y-4 max-w-xl">
         <DonorPickerFields />
         <div class="divider" />
         <DonationFormFields showTodayButton />
-        <div class="flex gap-2 pt-4">
-          <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </form>
     </Layout>
   );
@@ -376,19 +366,11 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
-        <div class="mb-4">
-          <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.newDonation")}</h1>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
-        <form method="post" action="/donations" class="space-y-4 max-w-xl">
+        <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" />} />
+        <form id="donation-form" method="post" action="/donations" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={donorFields.values} errors={errors} />
           <div class="divider" />
           <DonationFormFields values={donationFields.values} errors={errors} showTodayButton />
-          <div class="flex gap-2 pt-4">
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-            <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
-          </div>
         </form>
       </Layout>,
       422
@@ -429,22 +411,13 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
-      <div class="mb-4">
-        <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
-        <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-      </div>
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
       </form>
       {canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}></form>}
-      <div class="flex gap-2 pt-4 max-w-xl">
-        <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
-        {canDelete(user, d) && <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>}
-        <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
-      </div>
     </Layout>
   );
 });
@@ -462,20 +435,11 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donations.title")} user={user} activeNav="donations">
-        <div class="mb-4">
-          <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></h1>
-          <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
-        </div>
+        <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
           <DonationFormFields values={values} errors={errors} />
         </form>
         {canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}></form>}
-        <div class="flex gap-2 pt-4 max-w-xl">
-          <button type="submit" form="donation-edit-form" class="btn btn-primary">{t("common.save")}</button>
-          {canDelete(user, d) && <button type="submit" form="donation-delete-form" class="btn btn-error btn-outline">{t("common.delete")}</button>}
-          <a href="/donations" class="btn btn-ghost">{t("common.cancel")}</a>
-        </div>
       </Layout>,
       422
     );
@@ -528,10 +492,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
 
   return c.html(
     <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
-      <div class="mb-4">
-        <a href="/donations" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-        <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{t("donations.receipt.title")}</h1>
-      </div>
+      <PageHeader title={t("donations.receipt.title")} backHref="/donations" />
 
       {!orgComplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 

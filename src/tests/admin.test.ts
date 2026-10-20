@@ -400,7 +400,7 @@ describe("GET /users/:id/edit", () => {
 describe("POST /users", () => {
   it("rejects missing required fields", async () => {
     const res = await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "", email: "" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(insert).not.toHaveBeenCalled();
   });
 
@@ -442,14 +442,14 @@ describe("POST /users/:id", () => {
   it("rejects missing required fields", async () => {
     usersFixture = [makeUser()];
     const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "", email: "" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(update).not.toHaveBeenCalled();
   });
 
   it("rejects a duplicate email on change", async () => {
     queue(users, [makeUser({ email: "old@b.de" })], [makeUser({ id: "other", email: "new@b.de" })]);
     const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "new@b.de" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(deleteCalls.some((c) => c.table === accounts)).toBe(false);
     expect(update).not.toHaveBeenCalled();
   });
@@ -605,13 +605,13 @@ describe("GET /permissions/:id/edit", () => {
 describe("POST /permissions", () => {
   it("requires a name", async () => {
     const res = await adminRoutes.request("/permissions", { method: "POST", body: formBody({ name: "" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(insert).not.toHaveBeenCalled();
   });
 
   it("rejects a role without any permission", async () => {
     const res = await adminRoutes.request("/permissions", { method: "POST", body: formBody({ name: "Leer" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(insertCalls.some((c) => c.table === appRoles)).toBe(false);
   });
 
@@ -644,7 +644,7 @@ describe("POST /permissions/:id", () => {
     appRolesFixture = [makeAppRole()];
     userAppRolesFixture = [{ cnt: 0 }];
     const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(update).not.toHaveBeenCalled();
   });
 
@@ -652,7 +652,7 @@ describe("POST /permissions/:id", () => {
     appRolesFixture = [makeAppRole()];
     userAppRolesFixture = [{ cnt: 0 }];
     const res = await adminRoutes.request("/permissions/ar1", { method: "POST", body: formBody({ name: "Neu" }) });
-    expect(res.status).toBe(302);
+    expect(res.status).toBe(422);
     expect(update).not.toHaveBeenCalled();
   });
 

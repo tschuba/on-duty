@@ -4,6 +4,7 @@ import { db } from "../db/index.js";
 import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { ModalScaffold } from "./admin.js";
 import { flagAllowed, isPermutation, moveId } from "../lib/role-types.js";
 import { setFlash } from "../lib/flash.js";
@@ -163,26 +164,12 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
 
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-4">
-          <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-            {t("admin.roles.title")}
-          </h1>
-          <div class="join">
+      <PageHeader title={t("admin.roles.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <div class="mb-4"><div class="join">
             <a href="/roles" class={`btn join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
             <a href="/roles?active=1" class={`btn join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
             <a href="/roles?active=0" class={`btn join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
-          </div>
-        </div>
-        {canWrite && <button
-          class="btn btn-primary"
-          hx-get="/roles/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.roles.newRole")}
-        </button>}
-      </div>
+          </div></div>
 
       {canWrite && <ClickToEditHint />}
       {types.map((ty) => {
@@ -286,12 +273,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       </>)}
 
       {tab === "types" && (<>
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{t("admin.roleTypes.title")}</h1>
-        {canWriteTypes && <button class="btn btn-primary" hx-get="/role-types/new" hx-target="#modal-content" hx-swap="innerHTML">
-          {t("admin.roleTypes.new")}
-        </button>}
-      </div>
+      <PageHeader title={t("admin.roleTypes.title")} actions={canWriteTypes && <HeaderAction variant="primary" icon="plus" label={t("admin.roleTypes.new")} class="btn-primary" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
           <thead>

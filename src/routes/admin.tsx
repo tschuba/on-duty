@@ -16,6 +16,8 @@ import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { SubNav } from "../components/sub-nav.js";
 import { env, ENV_META } from "../env.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
@@ -82,20 +84,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
   return (
-    <div role="tablist" class="tabs tabs-lifted mb-6">
-      <a href="/admin/users" role="tab" class={`tab${active === "users" ? " tab-active" : ""}`}>
-        {t("admin.tabs.users")}
-      </a>
-      <a href="/admin/permissions" role="tab" class={`tab${active === "permissions" ? " tab-active" : ""}`}>
-        {t("admin.tabs.permissions")}
-      </a>
-      <a href="/admin/config" role="tab" class={`tab${active === "config" ? " tab-active" : ""}`}>
-        {t("admin.tabs.config")}
-      </a>
-      <a href="/admin/backup" role="tab" class={`tab${active === "backup" ? " tab-active" : ""}`}>
-        {t("admin.tabs.backup")}
-      </a>
-    </div>
+    <SubNav items={(["users", "permissions", "config", "backup"] as const).map((k) => ({ href: `/admin/${k}`, active: active === k, label: t(`admin.tabs.${k}`) }))} />
   );
 }
 
@@ -210,21 +199,9 @@ adminRoutes.get("/users", guard, async (c) => {
 
   return c.html(
     <Layout title={t("admin.users.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="users" />
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.users.title")}
-        </h1>
-        <button
-          class="btn btn-primary"
-          hx-get="/admin/users/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.users.newUser")}
-        </button>
-      </div>
+      <BackupWarnBanner {...warn} />
+      <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
       <div class="tabs tabs-boxed mb-2 w-fit">
         <a href="/admin/users" class={`tab${onlyPending ? "" : " tab-active"}`}>{t("admin.users.filter.all")}</a>
@@ -253,9 +230,7 @@ adminRoutes.get("/users", guard, async (c) => {
                   key={u.id}
                   {...(!isLocal && {
                     class: "cursor-pointer hover",
-                    "hx-get": `/admin/users/${u.id}/edit`,
-                    "hx-target": "#modal-content",
-                    "hx-swap": "innerHTML",
+                    onclick: `location.href='/admin/users/${u.id}/edit'`,
                   })}
                 >
                   <td class="font-medium">
@@ -395,7 +370,6 @@ adminRoutes.get("/users", guard, async (c) => {
           </tbody>
         </table>
       </div>
-      <ModalScaffold />
     </Layout>
   );
 });
@@ -450,101 +424,52 @@ function RoleCheckboxes({
   );
 }
 
-// HTMX fragment: create user modal
-adminRoutes.get("/users/new", guard, async (c) => {
+type UserFormState = { id?: string; name: string; email: string; checkedIds: Set<string>; error?: string };
+
+// Vollseite für Anlegen/Bearbeiten; bei Validierungsfehlern mit 422 und den eingegebenen Werten erneut gerendert.
+async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormState, status: 200 | 422 = 200) {
   const [allRoles, permRows] = await Promise.all([
     db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
     db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
   ]);
   const permsByRole = new Map<string, Permission[]>();
   for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
-
+  const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.create")}</h3>
-      <form method="post" action="/admin/users" class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
+    <Layout title={title} user={c.get("user")} activeNav="admin">
+      <AdminTabs active="users" />
+      <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" />} />
+      {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
+      <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-x-3">
           <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
-          <input type="text" name="name" class="input input-bordered w-full" required />
+          <input type="text" name="name" value={f.name} class="input input-bordered w-full" required />
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
-          <input type="email" name="email" class="input input-bordered w-full" required />
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
+          <div class="flex flex-col gap-1">
+            <input type="email" name="email" value={f.email} class="input input-bordered w-full" required />
+            {f.id && <span class="label-text-alt text-sm opacity-60">{t("admin.users.modal.emailWarning")}</span>}
+          </div>
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
-          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={new Set()} />
-        </div>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.create")}
-          </button>
+          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
+    </Layout>,
+    status
   );
-});
+}
 
-// HTMX fragment: edit user modal
+adminRoutes.get("/users/new", guard, (c) => renderUserForm(c, { name: "", email: "", checkedIds: new Set() }));
+
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [u] = await db.select().from(users).where(eq(users.id, id));
   if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
-
-  const [allRoles, permRows, assigned] = await Promise.all([
-    db.select({ id: appRoles.id, name: appRoles.name, description: appRoles.description }).from(appRoles).orderBy(asc(appRoles.name)),
-    db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
-    db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id)),
-  ]);
-  const permsByRole = new Map<string, Permission[]>();
-  for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
-  const checkedIds = new Set(assigned.map((a) => a.roleId));
-
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.users.modal.edit")}</h3>
-      <form method="post" action={`/admin/users/${id}`} class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
-          <input type="text" name="name" value={u.name} class="input input-bordered w-full" required />
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
-          <div class="flex flex-col gap-1">
-            <input type="email" name="email" value={u.email} class="input input-bordered w-full" required />
-            <span class="label-text-alt text-sm opacity-60">
-              {t("admin.users.modal.emailWarning")}
-            </span>
-          </div>
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-          <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
-          <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={checkedIds} />
-        </div>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
+  const assigned = await db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id));
+  return renderUserForm(c, { id, name: u.name, email: u.email, checkedIds: new Set(assigned.map((a) => a.roleId)) });
 });
 
 async function validRoleIds(requested: string[]): Promise<string[]> {
@@ -561,8 +486,7 @@ adminRoutes.post("/users", guard, async (c) => {
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
 
   if (!name || !email) {
-    setFlash(c, t("admin.users.flash.missingFields"), "error");
-    return c.redirect("/admin/users");
+    return renderUserForm(c, {  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
   }
 
   const existing = await db
@@ -570,8 +494,7 @@ adminRoutes.post("/users", guard, async (c) => {
     .from(users)
     .where(eq(users.email, email));
   if (existing.length > 0) {
-    setFlash(c, t("admin.users.flash.emailExists"), "error");
-    return c.redirect("/admin/users");
+    return renderUserForm(c, {  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
   }
 
   const now = new Date();
@@ -605,15 +528,13 @@ adminRoutes.post("/users/:id", guard, async (c) => {
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
 
   if (!name || !email) {
-    setFlash(c, t("admin.users.flash.missingFields"), "error");
-    return c.redirect("/admin/users");
+    return renderUserForm(c, { id,  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
   }
 
   if (email !== existing.email) {
     const dupe = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (dupe.length > 0) {
-      setFlash(c, t("admin.users.flash.emailExists"), "error");
-      return c.redirect("/admin/users");
+      return renderUserForm(c, { id,  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
     }
     // Remove OIDC account link so Better Auth re-links on next login
     await db
@@ -708,23 +629,11 @@ adminRoutes.get("/permissions", guard, async (c) => {
 
   return c.html(
     <Layout title={t("admin.permissions.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="permissions" />
+      <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-4">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.permissions.title")}
-        </h1>
-        <button
-          class="btn btn-primary"
-          hx-get="/admin/permissions/new"
-          hx-target="#modal-content"
-          hx-swap="innerHTML"
-        >
-          {t("admin.permissions.newRole")}
-        </button>
-      </div>
+      <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
       <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
@@ -745,9 +654,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   key={r.id}
                   {...(!r.isProtected && {
                     class: "cursor-pointer hover",
-                    "hx-get": `/admin/permissions/${r.id}/edit`,
-                    "hx-target": "#modal-content",
-                    "hx-swap": "innerHTML",
+                    onclick: `location.href='/admin/permissions/${r.id}/edit'`,
                   })}
                 >
                   <td class="font-medium">
@@ -821,7 +728,6 @@ adminRoutes.get("/permissions", guard, async (c) => {
       </div>
       </div>
 
-      <ModalScaffold />
     </Layout>
   );
 });
@@ -863,88 +769,51 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
   );
 }
 
-// HTMX fragment: new permission-role modal
-adminRoutes.get("/permissions/new", guard, (c) => {
+type PermFormState = { id?: string; name: string; nameLocked?: boolean; description: string; checked: Set<Permission>; error?: string };
+
+async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: PermFormState, status: 200 | 422 = 200) {
+  const title = t(f.id ? "admin.permissions.modal.edit" : "admin.permissions.modal.create");
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.permissions.modal.create")}</h3>
-      <form method="post" action="/admin/permissions" class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
-          <input type="text" name="name" class="input input-bordered w-full" required />
+    <Layout title={title} user={c.get("user")} activeNav="admin">
+      <AdminTabs active="permissions" />
+      <PageHeader title={title} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" />} />
+      {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
+      <form id="admin-permissions-form" method="post" action={f.id ? `/admin/permissions/${f.id}` : "/admin/permissions"} class="flex flex-col gap-3 max-w-2xl">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
+          <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
+          {f.nameLocked ? (
+            <div class="flex flex-col gap-1">
+              <input type="text" value={f.name} class="input input-bordered w-full opacity-50" disabled />
+              <span class="label-text-alt text-sm opacity-60">{t("admin.permissions.modal.nameLocked")}</span>
+              <input type="hidden" name="name" value={f.name} />
+            </div>
+          ) : (
+            <input type="text" name="name" value={f.name} class="input input-bordered w-full" required />
+          )}
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
-          <textarea name="description" rows={2} class="textarea textarea-bordered w-full" />
+          <textarea name="description" rows={2} class="textarea textarea-bordered w-full">{f.description}</textarea>
         </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
-          <PermissionCheckboxes checked={new Set()} />
-        </div>
-        <div class="modal-action mt-2">
-          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.create")}
-          </button>
+          <PermissionCheckboxes checked={f.checked} />
         </div>
       </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
+    </Layout>,
+    status
   );
-});
+}
 
-// HTMX fragment: edit permission-role modal
+adminRoutes.get("/permissions/new", guard, (c) => renderPermissionForm(c, { name: "", description: "", checked: new Set() }));
+
 adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
   if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
-
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
-  const hasAssignments = cnt > 0;
-
   const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
-  const checked = new Set(perms.map((p) => p.permission));
-
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.permissions.modal.edit")}</h3>
-      <form method="post" action={`/admin/permissions/${id}`} class="flex flex-col gap-3">
-        <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
-          {hasAssignments ? (
-            <div class="flex flex-col gap-1">
-              <input type="text" value={role.name} class="input input-bordered w-full opacity-50" disabled />
-              <span class="label-text-alt text-sm opacity-60">
-                {t("admin.permissions.modal.nameLocked")}
-              </span>
-              <input type="hidden" name="name" value={role.name} />
-            </div>
-          ) : (
-            <input type="text" name="name" value={role.name} class="input input-bordered w-full" required />
-          )}
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
-          <textarea name="description" rows={2} class="textarea textarea-bordered w-full">{role.description ?? ""}</textarea>
-        </div>
-        <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-          <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
-          <PermissionCheckboxes checked={checked} />
-        </div>
-        <div class="modal-action mt-2">
-          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
+  return renderPermissionForm(c, { id, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
 });
 
 function parsePermissions(body: Record<string, unknown>): Permission[] {
@@ -959,14 +828,9 @@ adminRoutes.post("/permissions", guard, async (c) => {
   const description = String(body.description ?? "").trim() || null;
   const permissions = parsePermissions(body);
 
-  if (!name) {
-    setFlash(c, t("admin.permissions.flash.requiredName"), "error");
-    return c.redirect("/admin/permissions");
-  }
-  if (permissions.length === 0) {
-    setFlash(c, t("admin.permissions.flash.requiredPermission"), "error");
-    return c.redirect("/admin/permissions");
-  }
+  const form = { name, description: String(body.description ?? "").trim(), checked: new Set(permissions) };
+  if (!name) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredName") }, 422);
+  if (permissions.length === 0) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredPermission") }, 422);
 
   const id = crypto.randomUUID();
   await db.insert(appRoles).values({ id, name, description, isProtected: false });
@@ -987,22 +851,14 @@ adminRoutes.post("/permissions/:id", guard, async (c) => {
   const body = await c.req.parseBody({ all: true });
   const permissions = parsePermissions(body);
   const description = String(body.description ?? "").trim() || null;
-  if (permissions.length === 0) {
-    setFlash(c, t("admin.permissions.flash.requiredPermission"), "error");
-    return c.redirect("/admin/permissions");
-  }
-
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
 
+  const name = cnt === 0 ? String(body.name ?? "").trim() : role.name;
+  const form = { id, name, nameLocked: cnt > 0, description: description ?? "", checked: new Set(permissions) };
+  if (!name) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredName") }, 422);
+  if (permissions.length === 0) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredPermission") }, 422);
   const updates: { name?: string; description: string | null } = { description };
-  if (cnt === 0) {
-    const name = String(body.name ?? "").trim();
-    if (!name) {
-      setFlash(c, t("admin.permissions.flash.requiredName"), "error");
-      return c.redirect("/admin/permissions");
-    }
-    updates.name = name;
-  }
+  if (cnt === 0) updates.name = name;
   await db.update(appRoles).set(updates).where(eq(appRoles.id, id));
 
   await db.delete(appRolePermissions).where(eq(appRolePermissions.roleId, id));
@@ -1066,18 +922,10 @@ adminRoutes.get("/config", guard, async (c) => {
   ];
   return c.html(
     <Layout title={t("admin.config.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
+      <BackupWarnBanner {...warn} />
       <div class="max-w-4xl mx-auto">
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.config.title")}
-        </h1>
-        {/* Outside the form element, tied to it via the form attribute. */}
-        <button type="submit" form="config-form" id="config-save" class="btn btn-primary" disabled>
-          {t("admin.config.save")}
-        </button>
-      </div>
+      <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
         <div class="flex flex-wrap items-center gap-2 mb-4">
           <label class="input input-bordered input-sm flex items-center gap-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
@@ -1180,8 +1028,8 @@ adminRoutes.get("/backup", guard, async (c) => {
 
   return c.html(
     <Layout title="Backup" user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="backup" />
+      <BackupWarnBanner {...warn} />
       {schedule && (
         <div class="grid grid-cols-2 gap-4 text-sm mb-6">
           <div class={`p-4 rounded-box border ${lastBackupAfterSchedule === "success" ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>
@@ -1211,20 +1059,8 @@ adminRoutes.get("/backup", guard, async (c) => {
           </div>
         </div>
       )}
-      <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
-          {t("admin.backup.title")}
-        </h1>
-        <form method="post" action="/admin/backup/run">
-          <button
-            type="submit"
-            class="btn btn-outline"
-            onclick={`return confirm('${t("admin.backup.confirmStart")}')`}
-          >
-            {t("admin.backup.startNow")}
-          </button>
-        </form>
-      </div>
+      <PageHeader title={t("admin.backup.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("admin.backup.startNow")} form="backup-form" class="btn-outline" onclick={`return confirm('${t("admin.backup.confirmStart")}')`} />} />
+      <form id="backup-form" method="post" action="/admin/backup/run" />
 
       {entries.length === 0 ? (
         <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>
