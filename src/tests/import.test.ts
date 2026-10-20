@@ -75,7 +75,10 @@ describe("members", () => {
     expect(suggestRole("1. Kommandant", roles)).toEqual({ choice: { kind: "role", roleId: "r-k" }, note: "1." });
     expect(suggestRole("vorstand", roles).choice).toEqual({ kind: "role", roleId: "r-v" });
     expect(suggestRole("Löschmeister", roles).choice).toEqual({ kind: "new" });
+    const ranks = [{ id: "r-f", title: "Feuerwehrmann/-frau", grantsActiveStatus: true }, { id: "r-o", title: "Oberfeuerwehrmann/-frau", grantsActiveStatus: true }];
+    for (const [t, id] of [["Feuerwehrfrau", "r-f"], ["Feuerwehrmann", "r-f"], ["Oberfeuerwehrfrau", "r-o"]]) expect(suggestRole(t, ranks).choice).toEqual({ kind: "role", roleId: id });
     expect(suggestRole("Schriftführerin", [roles[0]]).choice).toEqual({ kind: "new" });
+    expect(suggestRole("Schriftführerin", [{ id: "r-s", title: "Schriftführer/-in", grantsActiveStatus: false }]).choice).toEqual({ kind: "role", roleId: "r-s" });
   });
 
   it("blocks rows with missing required values until supplied", () => {

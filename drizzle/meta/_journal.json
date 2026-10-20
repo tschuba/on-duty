@@ -358,6 +358,13 @@
       "when": 1793300000000,
       "tag": "0050_member_role_types_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793400000000,
+      "tag": "0051_single_schriftfuehrer",
+      "breakpoints": true
     }
   ]
 }

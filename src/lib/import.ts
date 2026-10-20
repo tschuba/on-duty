@@ -92,6 +92,8 @@ export function cleanPhones(v: unknown): string | null {
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+// Geschlechtsneutral vergleichen: "Feuerwehrfrau" und "Feuerwehrmann/-frau" → "feuerwehrmann".
+const normRole = (s: string) => norm(s).replace(/\/-(frau|in)$/, "").replace(/frau/g, "mann");
 
 // ── Mitglieder ──────────────────────────────────────────────────────────────
 
@@ -168,7 +170,7 @@ export const ROLE_SYNONYMS: Record<string, Synonym> = {
   "stellvertretender kommandant": { role: "2. Kommandant", note: null, fallback: { role: "Kommandant", note: "2. (Stellvertreter)" } },
   "1. vorsitzender": { role: "1. Vorstand", note: null, fallback: { role: "Vorstand", note: "1. Vorsitzender" } },
   "stellvertretende vorsitzende": { role: "2. Vorstand", note: null, fallback: { role: "Vorstand", note: "2. Vorsitzende" } },
-  "schriftführerin": { role: "Schriftführer", note: null },
+  "schriftführerin": { role: "Schriftführer/-in", note: null },
 };
 
 export type RoleOption = { id: string; title: string; grantsActiveStatus: boolean };
@@ -176,12 +178,12 @@ export type RoleChoice = { kind: "role"; roleId: string } | { kind: "new" };
 
 export function suggestRole(title: string, roles: RoleOption[]): { choice: RoleChoice; note: string | null } {
   const syn = ROLE_SYNONYMS[title.toLowerCase().trim()];
-  const find = (name: string) => roles.find((r) => norm(r.title) === norm(name));
+  const find = (name: string) => roles.find((r) => normRole(r.title) === normRole(name));
   const bySyn = syn && find(syn.role);
   if (bySyn) return { choice: { kind: "role", roleId: bySyn.id }, note: syn.note };
   const byFallback = syn?.fallback && find(syn.fallback.role);
   if (byFallback) return { choice: { kind: "role", roleId: byFallback.id }, note: syn.fallback!.note };
-  const same = roles.find((r) => norm(r.title) === norm(title));
+  const same = roles.find((r) => normRole(r.title) === normRole(title));
   return { choice: same ? { kind: "role", roleId: same.id } : { kind: "new" }, note: null };
 }
 
