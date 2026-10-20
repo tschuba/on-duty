@@ -1244,11 +1244,23 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                       {r.title}
                     </td>
                     <td>
-                      {r.grantsActiveStatus ? (
-                        <span class="badge badge-success badge-sm">{t("admin.roles.filterActive")}</span>
-                      ) : (
-                        <span class="opacity-60">{t("admin.roles.filterPassive")}</span>
-                      )}
+                      <form method="post" action={`/admin/roles/${r.id}/active`} onclick="event.stopPropagation()">
+                        {activeFilter && <input type="hidden" name="active" value={activeFilter} />}
+                        <label class="flex items-center gap-2 cursor-pointer" title={!ty.allowsActiveStatus ? t("admin.roles.type.flagNotAllowed") : undefined}>
+                          <input
+                            type="checkbox"
+                            name="grantsActiveStatus"
+                            value="1"
+                            class="toggle toggle-success toggle-sm"
+                            checked={r.grantsActiveStatus}
+                            disabled={r.isProtected || !ty.allowsActiveStatus}
+                            onchange="this.form.submit()"
+                          />
+                          <span class={r.grantsActiveStatus ? "" : "opacity-60"}>
+                            {r.grantsActiveStatus ? t("admin.roles.filterActive") : t("admin.roles.filterPassive")}
+                          </span>
+                        </label>
+                      </form>
                     </td>
                     <td>
                       <div class="flex gap-2 justify-end items-center">
@@ -1515,6 +1527,22 @@ adminRoutes.post("/roles/:id/move", guard, async (c) => {
   const current = await db.select().from(memberRoles).where(eq(memberRoles.typeId, role.typeId)).orderBy(asc(memberRoles.sortOrder));
   await writeOrder(memberRoles, moveId(current.map((r) => r.id), id, dir));
   return c.redirect("/admin/roles");
+});
+
+// POST /admin/roles/:id/active — toggle the active-status flag from the list
+adminRoutes.post("/roles/:id/active", guard, async (c) => {
+  const id = c.req.param("id");
+  const body = await c.req.parseBody();
+  const back = body.active === "1" || body.active === "0" ? `/admin/roles?active=${body.active}` : "/admin/roles";
+  const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
+  if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
+  const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, role.typeId));
+  const grantsActiveStatus = body.grantsActiveStatus === "1";
+  if (!type || !flagAllowed(grantsActiveStatus, type)) {
+    return badRequest(c, t("admin.roles.flash.flagNotAllowed", { type: type?.name ?? "" }));
+  }
+  await db.update(memberRoles).set({ grantsActiveStatus }).where(eq(memberRoles.id, id));
+  return c.redirect(back);
 });
 
 // POST /admin/roles/:id — update

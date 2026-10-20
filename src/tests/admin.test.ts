@@ -1139,4 +1139,15 @@ describe("role types (Spec 47)", () => {
     const html = await (await adminRoutes.request("/roles")).text();
     expect(html.match(/<details[^>]*data-section=/g)?.length).toBe(2);
   });
+
+  it("toggles the active flag from the list, but not on types that forbid it", async () => {
+    rolesFixture = [makeRole({ grantsActiveStatus: false })];
+    const ok = await post("/roles/r1/active", { grantsActiveStatus: "1" });
+    expect(ok.status).toBe(302);
+    expect(updateCalls.some((c) => c.table === memberRoles && c.set.grantsActiveStatus === true)).toBe(true);
+    updateCalls.length = 0;
+    typesFixture = [makeType({ allowsActiveStatus: false })];
+    expect((await post("/roles/r1/active", { grantsActiveStatus: "1" })).status).toBe(400);
+    expect(updateCalls.length).toBe(0);
+  });
 });
