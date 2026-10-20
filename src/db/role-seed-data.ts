@@ -1,8 +1,8 @@
 export const ROLE_TYPES = [
-  { id: "5f75964a-8f5e-4d0f-8a6b-0255e823119f", key: "rank", name: "Dienstgrad", allowsActiveStatus: true, sortOrder: 1, isProtected: false },
-  { id: "48f95a02-4ad7-434b-bcc9-9da9cfa8b6b5", key: "position", name: "Dienststellung", allowsActiveStatus: true, sortOrder: 2, isProtected: false },
-  { id: "91321c9b-5872-4ca6-a0fa-55010d95bc48", key: "club", name: "Verein", allowsActiveStatus: false, sortOrder: 3, isProtected: false },
-  { id: "e4333d64-2527-4f99-b5cc-547422f87d12", key: "other", name: "Sonstige", allowsActiveStatus: false, sortOrder: 4, isProtected: true },
+  { id: "5f75964a-8f5e-4d0f-8a6b-0255e823119f", description: "Dienstgrade der Feuerwehr, aufsteigend vom Anwärter bis zum Hauptbrandmeister.", key: "rank", name: "Dienstgrad", allowsActiveStatus: true, sortOrder: 1, isProtected: false },
+  { id: "48f95a02-4ad7-434b-bcc9-9da9cfa8b6b5", description: "Gewählte oder übertragene Aufgaben im Dienst, z. B. Kommandant, Gruppenführer oder Jugendwart.", key: "position", name: "Dienststellung", allowsActiveStatus: true, sortOrder: 2, isProtected: false },
+  { id: "91321c9b-5872-4ca6-a0fa-55010d95bc48", description: "Ämter und Ehrungen im Verein, z. B. Vorstand, Kassier oder Ehrenmitglied.", key: "club", name: "Verein", allowsActiveStatus: false, sortOrder: 3, isProtected: false },
+  { id: "e4333d64-2527-4f99-b5cc-547422f87d12", description: "Alle übrigen Funktionen, die zu keinem anderen Typ passen.", key: "other", name: "Sonstige", allowsActiveStatus: false, sortOrder: 4, isProtected: true },
 ] as const;
 
 export const ROLE_SEED = [
