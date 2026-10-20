@@ -1221,27 +1221,38 @@ type StartStatus = "aktiv" | "passiv" | "foerdernd";
 
 function StartStatusSelect({ value }: { value: StartStatus }) {
   return (
-    <div class="form-control max-w-xs">
-      <label class="label" for="startStatus"><span class="label-text">{t("members.form.startStatus")}</span></label>
-      <select id="startStatus" name="startStatus" class="select select-bordered">
+    <fieldset class="space-y-2">
+      <legend class="label-text font-medium">{t("members.form.startStatus")}</legend>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {(["aktiv", "passiv", "foerdernd"] as const).map((s) => (
-          <option value={s} selected={s === value}>{STATUS_LABELS[s]}</option>
+          <label class="card bg-base-200 border-2 border-transparent cursor-pointer has-[:checked]:border-primary">
+            <div class="card-body p-4 gap-1">
+              <div class="flex items-center gap-2">
+                <input type="radio" name="startStatus" value={s} class="radio radio-primary radio-sm" checked={s === value} />
+                <span class="font-semibold">{STATUS_LABELS[s]}</span>
+              </div>
+              <p class="text-xs opacity-70">{t(`members.form.startStatus.${s}`)}</p>
+            </div>
+          </label>
         ))}
-      </select>
-      <p class="text-xs opacity-60 mt-1">{t("members.form.startStatusHint")}</p>
+      </div>
+      <p class="text-xs opacity-60">{t("members.form.startStatusHint")}</p>
       <p id="startStatusPassiveHint" class="text-xs opacity-60" hidden={value !== "passiv"}>{t("members.form.startStatusPassiveHint")}</p>
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function () {
-          var sel = document.getElementById('startStatus'), form = sel.closest('form'), rows = document.getElementById('role-rows');
+          var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
+          function current() { return form.querySelector('input[name="startStatus"]:checked').value; }
           function prefill() {
-            if (sel.value !== 'aktiv' || rows.children.length) return;
+            if (current() !== 'aktiv' || rows.children.length) return;
             var i = parseInt(rows.dataset.nextIndex || '0', 10);
             rows.dataset.nextIndex = String(i + 1);
             htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' });
           }
-          sel.addEventListener('change', function () {
-            document.getElementById('startStatusPassiveHint').hidden = sel.value !== 'passiv';
-            prefill();
+          form.querySelectorAll('input[name="startStatus"]').forEach(function (r) {
+            r.addEventListener('change', function () {
+              document.getElementById('startStatusPassiveHint').hidden = current() !== 'passiv';
+              prefill();
+            });
           });
           form.elements.entryDate.addEventListener('input', function (e) {
             rows.querySelectorAll('tr[data-autofrom] input[name="assignment_from[]"]').forEach(function (el) { el.value = e.target.value; });
@@ -1252,7 +1263,7 @@ function StartStatusSelect({ value }: { value: StartStatus }) {
           prefill();
         });
       ` }} />
-    </div>
+    </fieldset>
   );
 }
 
