@@ -137,7 +137,7 @@ export const de = {
   "members.bank.accountHolderHint": "Leer = Name des Mitglieds.",
   "members.form.roleActive": "aktiv",
   "members.form.startStatus": "Status beim Anlegen",
-  "members.form.startStatus.aktiv": "Im aktiven Dienst, mit laufender Funktion (z. B. Feuerwehr-Anwärter).",
+  "members.form.startStatus.aktiv": "Leistet aktiven Dienst in der Feuerwehr, z. B. als Feuerwehr-Anwärter.",
   "members.form.startStatus.passiv": "Aus Altersgründen aus dem aktiven Dienst ausgeschieden, z. B. Ehrenkommandant.",
   "members.form.startStatus.foerdernd": "Unterstützt die Feuerwehr über Mitgliedsbeitrag. Kein aktiver Dienst.",
   "members.form.startStatusPassiveHint": "Passiv ist, wer bis zum {grenze}. Geburtstag im aktiven Dienst war. Dafür braucht es eine Funktion im aktiven Dienst, die offen bleibt oder frühestens an diesem Geburtstag endet.",
