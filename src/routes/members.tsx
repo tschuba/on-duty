@@ -20,6 +20,7 @@ import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { SEARCH_DEBOUNCE_MS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import { env } from "../env.js";
+import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
@@ -320,42 +321,15 @@ export function MembersTable({
         </table>
       </div>
 
-      {/* Pagination + page size */}
-      <div class="flex flex-wrap items-center justify-end gap-4 mt-4">
-        <span class="text-sm opacity-70 mr-auto">{t("members.table.count", { count: totalCount })}</span>
-        <div class="flex items-center gap-2 text-sm opacity-70">
-          <span class="whitespace-nowrap">{t("members.table.pageSize")}</span>
-          <select
-            class="select select-bordered"
-            onchange={`
-              const v = this.value;
-              localStorage.setItem('members_pageSize', v);
-              const url = new URL(window.location.href);
-              url.searchParams.set('pageSize', v);
-              url.searchParams.set('page', '1');
-              window.location = url.toString();
-            `}
-          >
-            {PAGE_SIZE_OPTIONS.map((n) => (
-              <option key={n} value={n} selected={n === pageSize}>{n}</option>
-            ))}
-          </select>
-        </div>
-
-        <div class="join">
-          {page > 1 && <a href={pageUrl(page - 1)} class="join-item btn">«</a>}
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <a
-              key={p}
-              href={pageUrl(p)}
-              class={`join-item btn${p === page ? " btn-active" : ""}`}
-            >
-              {p}
-            </a>
-          ))}
-          {page < totalPages && <a href={pageUrl(page + 1)} class="join-item btn">»</a>}
-        </div>
-      </div>
+      <Pager
+        countLabel={t("members.table.count", { count: totalCount })}
+        page={page}
+        totalPages={totalPages}
+        pageUrl={pageUrl}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        pageSizeStorageKey="members_pageSize"
+      />
     </div>
   );
 }
