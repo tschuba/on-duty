@@ -199,12 +199,10 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     key={r.id}
                     data-id={r.id}
                     draggable={canReorder}
-                    {...((canWrite || r.isProtected) && {
-                      class: "cursor-pointer hover",
-                      "hx-get": `/roles/${r.id}/edit`,
-                      "hx-target": "#modal-content",
-                      "hx-swap": "innerHTML",
-                    })}
+                    class="cursor-pointer hover"
+                    hx-get={`/roles/${r.id}/edit`}
+                    hx-target="#modal-content"
+                    hx-swap="innerHTML"
                   >
                     <td class="font-medium">
                       {r.isProtected && (
@@ -424,12 +422,12 @@ roleRoutes.get("/roles/new", rolesWrite, async (c) => {
 });
 
 // HTMX fragment: edit role modal
-// Protected (system) roles are viewable read-only by anyone with read access.
+// Read access shows the form; it is editable only with write permission on an unprotected role.
 roleRoutes.get("/roles/:id/edit", rolesRead, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role) return c.html("", HTTP_STATUS.NOT_FOUND);
-  if (!role.isProtected && !c.get("user").permissions.has("member-roles:write")) return c.html("", HTTP_STATUS.FORBIDDEN);
+  const readOnly = role.isProtected || !c.get("user").permissions.has("member-roles:write");
 
   const types = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   const [{ cnt }] = await db
@@ -447,10 +445,10 @@ roleRoutes.get("/roles/:id/edit", rolesRead, async (c) => {
       <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.edit")}</h3>
       {role.isProtected && <div class="alert alert-info mb-3">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
       <form method="post" action={`/roles/${id}`} class="flex flex-col gap-3">
-        <fieldset disabled={role.isProtected} class="contents">
+        <fieldset disabled={readOnly} class="contents">
           <RoleForm types={types} role={role} hasAssignments={cnt > 0} affected={Number(affected)} />
         </fieldset>
-        {role.isProtected ? (
+        {readOnly ? (
           <div class="modal-action mt-2">
             <button type="button" class="btn" onclick="document.getElementById('admin-modal').close()">{t("common.close")}</button>
           </div>
