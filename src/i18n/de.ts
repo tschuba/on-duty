@@ -161,6 +161,7 @@ export const de = {
   "admin.permissions.key.membersBankDataWrite": "Bankdaten bearbeiten",
   "members.error.assignmentRange": "„Bis“ darf nicht vor „Von“ liegen.",
   "members.assignment.empty": "Keine Funktionszuweisungen.",
+  "members.assignment.noteCount": "von {max} Zeichen",
   "members.assignment.titleNew": "Funktionszuweisung hinzufügen",
   "members.assignment.titleEdit": "Funktionszuweisung bearbeiten",
   "members.assignment.confirmDelete": "Zuweisung wirklich löschen?",

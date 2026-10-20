@@ -1076,6 +1076,16 @@ describe("POST /:id", () => {
     expect(bad.status).toBe(422);
   });
 
+  it("normalizes CRLF in notes to LF and caps them at 200 characters", async () => {
+    rolesFixture = [roleAktiv];
+    findFirstResult = memberWithAssignments({}, []);
+    await memberRoutes.request("/m1/assignments", { method: "POST", body: formBody({ role: roleAktiv.id, from: "2024-01-01", note: "Eins\r\nZwei" }) });
+    expect(insertCalls.find((c) => c.table === memberRoleAssignments)?.values.note).toBe("Eins\nZwei");
+    insertCalls.length = 0;
+    await memberRoutes.request("/m1/assignments", { method: "POST", body: formBody({ role: roleAktiv.id, from: "2024-01-01", note: "x".repeat(250) }) });
+    expect(insertCalls.find((c) => c.table === memberRoleAssignments)?.values.note).toHaveLength(200);
+  });
+
   it("blocks assignment changes for archived members", async () => {
     findFirstResult = memberWithAssignments({ exitDate: "2023-01-01" }, []);
     const res = await memberRoutes.request("/m1/assignments", { method: "POST", body: formBody({ role: roleAktiv.id, from: "2024-01-01" }) });

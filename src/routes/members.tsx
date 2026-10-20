@@ -18,7 +18,7 @@ import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
+import { SEARCH_DEBOUNCE_MS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
@@ -366,8 +366,11 @@ function roleTypeTabs(roles: Role[]) {
   return [...seen.values()];
 }
 
-const normalizeNote = (v?: string) => v?.trim().slice(0, 200) || null;
-const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${note})` : title);
+// Umbrüche werden als \n gespeichert (\r\n → \n), damit der Zähler im Browser und das Limit hier gleich zählen.
+const normalizeNote = (v?: string) => v?.replace(/\r\n?/g, "\n").trim().slice(0, ASSIGNMENT_NOTE_MAX_LENGTH) || null;
+// Einzeilige Darstellung (Badge, Klammer-Label, Export): Umbrüche werden zu Leerzeichen.
+const singleLine = (v: string) => v.replace(/\s*\n\s*/g, " ");
+const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${singleLine(note)})` : title);
 
 type AssignmentRowData = { id: string; roleId: string; roleTitle: string; from: string; to: string | null; note: string | null; idx?: string };
 
@@ -397,7 +400,7 @@ function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRo
         </td>
         <td class="assignment-from">{formatDate(r.from)}</td>
         <td>{r.to ? formatDate(r.to) : ""}</td>
-        <td>{r.note}</td>
+        <td class="whitespace-pre-line">{r.note}</td>
         <td class="text-right whitespace-nowrap">
           {!readOnly && memberId && (
             <>
@@ -525,7 +528,8 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
       </div>
       <div class="form-control">
         <label class="label"><span class="label-text">{t("members.form.note")}</span></label>
-        <input type="text" name="note" class="input input-bordered w-full" maxlength={200} value={values.note ?? ""} />
+        <textarea name="note" rows={3} class="note-input textarea textarea-bordered w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH}>{values.note ?? ""}</textarea>
+        <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
       </div>
       <div class="modal-action flex-wrap">
         <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
@@ -572,6 +576,16 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
           if (sel) { var t = tabs.find(function (x) { return x.dataset.type === sel.dataset.type; }); if (t) setTab(t); sel.classList.add('menu-active'); sel.scrollIntoView({ block: 'nearest' }); }
           else filter();
           search.focus();
+          var note = root.closest('form').querySelector('.note-input'), counter = root.closest('form').querySelector('.note-counter');
+          function count() {
+            // Browser und Server zählen einen Umbruch gleich als 1 Zeichen.
+            var n = note.value.length, max = note.maxLength;
+            counter.querySelector('.note-count').textContent = n;
+            counter.classList.toggle('text-error', n >= max);
+            counter.classList.toggle('text-warning', n >= max * 0.9 && n < max);
+            counter.classList.toggle('opacity-60', n < max * 0.9);
+          }
+          note.addEventListener('input', count); count();
         })();
       ` }} />
     </form>
@@ -1632,7 +1646,7 @@ export function buildExportSheets(
     const asgHeader = [t("members.table.lastName"), t("members.table.firstName"), t("members.form.role"), t("members.form.from"), t("members.form.to"), t("members.form.note")];
     const asgRows = asgns.map((a) => {
       const m = nameMap.get(a.memberId);
-      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to), a.note ?? ""];
+      return [m?.lastName ?? "", m?.firstName ?? "", a.roleTitle, toDate(a.from), toDate(a.to), singleLine(a.note ?? "")];
     });
     sheets.push({ name: t("members.export.sheetAssignments"), header: asgHeader, rows: asgRows });
   }
