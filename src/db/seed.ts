@@ -44,7 +44,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Vorstand",
     description: "Kann Spenden erfassen, Zuwendungsbestätigungen ausstellen und Anträge prüfen",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read"],
+    permissions: ["members:read", "members:write", "members:delete", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "member-roles:read", "member-role-types:read"],
   },
   {
     id: "5d3e7f90-1b2c-4d5e-8f60-7a8b9c0d1e2f",
@@ -58,7 +58,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Führung",
     description: "Kann das Inventar vollständig verwalten",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "inventory:read", "inventory:manage", "lending:read", "org:read", "org:write"],
+    permissions: ["members:read", "members:write", "members:delete", "inventory:read", "inventory:manage", "lending:read", "org:read", "org:write", "member-roles:read", "member-role-types:read"],
   },
 ];
 
