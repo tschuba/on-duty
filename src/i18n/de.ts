@@ -139,7 +139,7 @@ export const de = {
   "members.form.startStatus": "Status beim Anlegen",
   "members.form.startStatus.aktiv": "Im aktiven Dienst, mit laufender Funktion (z. B. Feuerwehr-Anwärter).",
   "members.form.startStatus.passiv": "Aus Altersgründen aus dem aktiven Dienst ausgeschieden, z. B. Ehrenkommandant.",
-  "members.form.startStatus.foerdernd": "Unterstützt die Feuerwehr, zahlt nur Beitrag, kein aktiver Dienst.",
+  "members.form.startStatus.foerdernd": "Unterstützt die Feuerwehr über Mitgliedsbeitrag. Kein aktiver Dienst.",
   "members.form.startStatusPassiveHint": "Passiv wird aus einer aktiv machenden Funktion abgeleitet, die bei Erreichen der Altersgrenze noch galt. Bitte diese Funktion mit ihrem Zeitraum eintragen.",
   "members.form.thisMember": "das Mitglied",
   "members.form.createAs": "Als {status} anlegen",
