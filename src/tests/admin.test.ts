@@ -1150,4 +1150,14 @@ describe("role types (Spec 47)", () => {
     expect((await post("/roles/r1/active", { grantsActiveStatus: "1" })).status).toBe(400);
     expect(updateCalls.length).toBe(0);
   });
+
+  it("toggles allows_active_status on a type, blocked while flagged roles exist", async () => {
+    queue(memberRoles, []);
+    expect((await post("/role-types/t1/allows-active", {})).status).toBe(302);
+    expect(updateCalls.some((c) => c.table === memberRoleTypes && c.set.allowsActiveStatus === false)).toBe(true);
+    updateCalls.length = 0;
+    queue(memberRoles, [makeRole()]);
+    expect((await post("/role-types/t1/allows-active", {})).status).toBe(400);
+    expect(updateCalls.length).toBe(0);
+  });
 });

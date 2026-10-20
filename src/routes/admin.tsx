@@ -1330,7 +1330,14 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                   hx-swap="innerHTML"
                 >
                   <td class="font-medium">{ty.isProtected && <span class="mr-1" title={t("admin.roles.systemRole")}>🔒</span>}{ty.name}</td>
-                  <td>{ty.allowsActiveStatus ? t("common.yes") : t("common.no")}</td>
+                  <td>
+                    <form method="post" action={`/admin/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-success toggle-sm" checked={ty.allowsActiveStatus} onchange="this.form.submit()" />
+                        <span class={ty.allowsActiveStatus ? "" : "opacity-60"}>{ty.allowsActiveStatus ? t("common.yes") : t("common.no")}</span>
+                      </label>
+                    </form>
+                  </td>
                   <td>
                     <div class="flex gap-2 justify-end items-center">
                       {!ty.isProtected && n === 0 ? (
@@ -1670,6 +1677,27 @@ adminRoutes.post("/role-types", guard, async (c) => {
   return c.redirect("/admin/role-types");
 });
 
+// Titles of flagged roles that forbid removing allows_active_status (empty = allowed).
+async function flaggedRolesBlocking(type: typeof memberRoleTypes.$inferSelect, next: boolean): Promise<string[]> {
+  if (!type.allowsActiveStatus || next) return [];
+  const flagged = await db
+    .select({ title: memberRoles.title })
+    .from(memberRoles)
+    .where(and(eq(memberRoles.typeId, type.id), eq(memberRoles.grantsActiveStatus, true)));
+  return flagged.map((r) => r.title);
+}
+
+adminRoutes.post("/role-types/:id/allows-active", guard, async (c) => {
+  const id = c.req.param("id");
+  const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
+  if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
+  const allowsActiveStatus = (await c.req.parseBody()).allowsActiveStatus === "1";
+  const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
+  if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
+  await db.update(memberRoleTypes).set({ allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
+  return c.redirect("/admin/role-types");
+});
+
 adminRoutes.post("/role-types/:id", guard, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
@@ -1681,15 +1709,8 @@ adminRoutes.post("/role-types/:id", guard, async (c) => {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
     return c.redirect("/admin/role-types");
   }
-  if (type.allowsActiveStatus && !allowsActiveStatus) {
-    const flagged = await db
-      .select({ title: memberRoles.title })
-      .from(memberRoles)
-      .where(and(eq(memberRoles.typeId, id), eq(memberRoles.grantsActiveStatus, true)));
-    if (flagged.length > 0) {
-      return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), flagged.map((r) => r.title));
-    }
-  }
+  const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
+  if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
   await db.update(memberRoleTypes).set({ name, allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roles.flash.saved"), "success");
   return c.redirect("/admin/role-types");
