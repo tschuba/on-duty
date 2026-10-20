@@ -344,6 +344,13 @@
       "when": 1793000000000,
       "tag": "0048_member_roles_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793200000000,
+      "tag": "0049_anniversary_years_permission",
+      "breakpoints": true
     }
   ]
 }

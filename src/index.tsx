@@ -73,6 +73,7 @@ app.get("/", requireAuth(), (c) => {
     [["system:admin"], "/admin"],
     [["import:run"], "/import"],
     [["member-roles:read"], "/admin/roles"],
+    [["anniversary-years:read"], "/admin/anniversaries"],
   ];
   return c.redirect(landing.find(([ps]) => ps.some((p) => perms.has(p as never)))?.[1] ?? "/account");
 });

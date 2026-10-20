@@ -34,6 +34,9 @@ const guard = requireAuth("system:admin");
 const rolesRead = requireAuth("member-roles:read");
 const rolesWrite = requireAuth("member-roles:write");
 const rolesDelete = requireAuth("member-roles:delete");
+const yearsRead = requireAuth("anniversary-years:read");
+const yearsWrite = requireAuth("anniversary-years:write");
+const yearsDelete = requireAuth("anniversary-years:delete");
 
 // system:admin is reserved for the built-in protected `admin` role — never offered
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
@@ -66,6 +69,9 @@ const PERMISSION_LABELS: Record<Permission, string> = {
   "member-roles:read": t("admin.permissions.key.memberRolesRead"),
   "member-roles:write": t("admin.permissions.key.memberRolesWrite"),
   "member-roles:delete": t("admin.permissions.key.memberRolesDelete"),
+  "anniversary-years:read": t("admin.permissions.key.anniversaryYearsRead"),
+  "anniversary-years:write": t("admin.permissions.key.anniversaryYearsWrite"),
+  "anniversary-years:delete": t("admin.permissions.key.anniversaryYearsDelete"),
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -76,6 +82,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   inventory: t("admin.permissions.resource.inventory"),
   lending: t("admin.permissions.resource.lending"),
   org: t("admin.permissions.resource.org"),
+  "anniversary-years": t("admin.permissions.resource.anniversary-years"),
   "member-roles": t("admin.permissions.resource.member-roles"),
 };
 
@@ -1742,8 +1749,10 @@ type AnniversaryKind = (typeof ANNIVERSARY_KINDS)[number];
 const isKind = (k: string): k is AnniversaryKind => (ANNIVERSARY_KINDS as readonly string[]).includes(k);
 
 // ── /admin/anniversaries ──────────────────────────────────────────────────────
-adminRoutes.get("/anniversaries", guard, async (c) => {
+adminRoutes.get("/anniversaries", yearsRead, async (c) => {
   const user = c.get("user");
+  const canWrite = user.permissions.has("anniversary-years:write");
+  const canDelete = user.permissions.has("anniversary-years:delete");
   const kindParam = c.req.query("kind") ?? "";
   const kindFilter = isKind(kindParam) ? kindParam : null;
   const [allYears, warn] = await Promise.all([
@@ -1780,14 +1789,14 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
           {t("admin.anniversaries.title")}
         </h1>
-        <button
+        {canWrite && <button
           class="btn btn-primary"
           hx-get="/admin/anniversaries/new"
           hx-target="#modal-content"
           hx-swap="innerHTML"
         >
           {t("admin.anniversaries.newYear")}
-        </button>
+        </button>}
       </div>
 
       <div class="join mb-4">
@@ -1797,7 +1806,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
         ))}
       </div>
 
-      <ClickToEditHint />
+      {canWrite && <ClickToEditHint />}
       <div class="overflow-x-auto mb-6">
         <table class="table table-zebra w-full">
           <thead>
@@ -1805,13 +1814,13 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
               <th><a href={sortUrl("kind")} class="link link-hover">{t("admin.anniversaries.table.kind")} <SortIcon col="kind" active={sort} dir={dir} /></a></th>
               <th><a href={sortUrl("year")} class="link link-hover">{t("admin.anniversaries.table.years")} <SortIcon col="year" active={sort} dir={dir} /></a></th>
               <th><a href={sortUrl("title")} class="link link-hover">{t("admin.anniversaries.table.title")} <SortIcon col="title" active={sort} dir={dir} /></a></th>
-              <th />
+              {canDelete && <th />}
             </tr>
           </thead>
           <tbody>
             {years.length === 0 ? (
               <tr>
-                <td colspan={4} class="text-center opacity-50 py-4">
+                <td colspan={canDelete ? 4 : 3} class="text-center opacity-50 py-4">
                   {t("admin.anniversaries.empty")}
                 </td>
               </tr>
@@ -1819,14 +1828,17 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
               years.map((y) => (
                 <tr
                   key={`${y.kind}-${y.year}`}
-                  class="cursor-pointer hover"
-                  hx-get={`/admin/anniversaries/${y.kind}/${y.year}/edit`}
-                  hx-target="#modal-content"
-                  hx-swap="innerHTML"
+                  {...(canWrite && {
+                    class: "cursor-pointer hover",
+                    "hx-get": `/admin/anniversaries/${y.kind}/${y.year}/edit`,
+                    "hx-target": "#modal-content",
+                    "hx-swap": "innerHTML",
+                  })}
                 >
                   <td>{t(`admin.anniversaries.kind.${y.kind}`)}</td>
                   <td class="font-medium">{y.year}</td>
                   <td class="opacity-70">{y.title ?? "–"}</td>
+                  {canDelete && (
                   <td>
                     <div class="flex gap-2 justify-end">
                       <button
@@ -1859,6 +1871,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
                       </form>
                     </dialog>
                   </td>
+                  )}
                 </tr>
               ))
             )}
@@ -1873,7 +1886,7 @@ adminRoutes.get("/anniversaries", guard, async (c) => {
 });
 
 // HTMX fragment: new anniversary year modal
-adminRoutes.get("/anniversaries/new", guard, (c) => {
+adminRoutes.get("/anniversaries/new", yearsWrite, (c) => {
   const kind = "service";
   return c.html(
     <>
@@ -1912,7 +1925,7 @@ adminRoutes.get("/anniversaries/new", guard, (c) => {
 });
 
 // HTMX fragment: edit anniversary year modal
-adminRoutes.get("/anniversaries/:kind/:year/edit", guard, async (c) => {
+adminRoutes.get("/anniversaries/:kind/:year/edit", yearsWrite, async (c) => {
   const kind = c.req.param("kind");
   const year = parseInt(c.req.param("year"), 10);
   const [y] = await db.select().from(anniversaryYears).where(and(eq(anniversaryYears.kind, kind as AnniversaryKind), eq(anniversaryYears.year, year)));
@@ -1955,7 +1968,7 @@ adminRoutes.get("/anniversaries/:kind/:year/edit", guard, async (c) => {
 });
 
 // POST /admin/anniversaries — create
-adminRoutes.post("/anniversaries", guard, async (c) => {
+adminRoutes.post("/anniversaries", yearsWrite, async (c) => {
   const body = await c.req.parseBody();
   const year = parseInt(String(body.year ?? ""), 10);
   const kind = String(body.kind ?? "");
@@ -1972,7 +1985,7 @@ adminRoutes.post("/anniversaries", guard, async (c) => {
 });
 
 // POST /admin/anniversaries/:year — update
-adminRoutes.post("/anniversaries/:kind/:year", guard, async (c) => {
+adminRoutes.post("/anniversaries/:kind/:year", yearsWrite, async (c) => {
   const oldKind = c.req.param("kind");
   const oldYear = parseInt(c.req.param("year"), 10);
   if (!isKind(oldKind)) return c.html("", HTTP_STATUS.NOT_FOUND);
@@ -2009,7 +2022,7 @@ adminRoutes.post("/anniversaries/:kind/:year", guard, async (c) => {
 });
 
 // POST /admin/anniversaries/:year/delete
-adminRoutes.post("/anniversaries/:kind/:year/delete", guard, async (c) => {
+adminRoutes.post("/anniversaries/:kind/:year/delete", yearsDelete, async (c) => {
   const kind = c.req.param("kind");
   if (!isKind(kind)) return c.html("", HTTP_STATUS.NOT_FOUND);
   const year = parseInt(c.req.param("year"), 10);

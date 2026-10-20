@@ -28,6 +28,9 @@ export const PERMISSIONS = [
   "member-roles:read",
   "member-roles:write",
   "member-roles:delete",
+  "anniversary-years:read",
+  "anniversary-years:write",
+  "anniversary-years:delete",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

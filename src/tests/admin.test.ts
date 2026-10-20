@@ -120,7 +120,7 @@ vi.mock("../db/index.js", () => ({
   db: { select, insert, update, delete: del },
 }));
 
-let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete"]) };
+let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -162,7 +162,7 @@ beforeEach(() => {
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
-  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete"]) };
+  currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
   backupConfigured = false;
   lastBackupResult = null;
   scheduleResult = { prev: null, next: null };
@@ -1184,5 +1184,18 @@ describe("role types (Spec 47)", () => {
     const writer = await (await adminRoutes.request("/roles")).text();
     expect(writer).toContain(t("admin.roles.newRole"));
     expect(writer).not.toContain("/admin/roles/r1/delete");
+  });
+
+  it("hides anniversary-year write and delete controls without those permissions", async () => {
+    yearsFixture = [{ kind: "service", year: 25, title: null }];
+    currentUser = { id: "u1", disabled: false, permissions: new Set(["anniversary-years:read"]) };
+    const ro = await (await adminRoutes.request("/anniversaries")).text();
+    expect(ro).not.toContain(t("admin.anniversaries.newYear"));
+    expect(ro).not.toContain("/edit");
+    expect(ro).not.toContain("delete-year-");
+    currentUser = { id: "u1", disabled: false, permissions: new Set(["anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
+    const rw = await (await adminRoutes.request("/anniversaries")).text();
+    expect(rw).toContain(t("admin.anniversaries.newYear"));
+    expect(rw).toContain("delete-year-");
   });
 });

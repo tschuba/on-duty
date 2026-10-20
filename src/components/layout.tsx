@@ -51,7 +51,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
     orgMissingCount = (["master", "tax"] as OrgTab[]).filter((tab) => canReadOrgTab(user.permissions, tab)).reduce((n, tab) => n + missing[tab].length, 0);
   }
   // "Mitglieder" also serves roles-only users (e.g. the local Administrator): they land on the role pages.
-  const membersNavHref = user?.permissions.has("members:read") ? "/members" : user?.permissions.has("member-roles:read") ? "/admin/roles" : user?.permissions.has("system:admin") ? "/admin/anniversaries" : null;
+  const membersNavHref = user?.permissions.has("members:read") ? "/members" : user?.permissions.has("member-roles:read") ? "/admin/roles" : user?.permissions.has("anniversary-years:read") ? "/admin/anniversaries" : null;
   const pendingUsersCount = user?.permissions.has("system:admin") ? await countPendingUsers() : 0;
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
   const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
@@ -253,8 +253,8 @@ export async function MemberTabs({ active, user }: { active: "members" | "annive
     ...(user.permissions.has("member-roles:read")
       ? [{ key: "roles", href: "/admin/roles", count: 0 }, { key: "roleTypes", href: "/admin/role-types", count: 0 }]
       : []),
-    // Anniversary-year configuration still needs system:admin (the /admin/anniversaries routes enforce it).
-    ...(user.permissions.has("system:admin") ? [{ key: "anniversaryYears", href: "/admin/anniversaries", count: 0 }] : []),
+    // Anniversary-year configuration has its own permission (the /admin/anniversaries routes enforce it).
+    ...(user.permissions.has("anniversary-years:read") ? [{ key: "anniversaryYears", href: "/admin/anniversaries", count: 0 }] : []),
   ] as const;
   return (
     <div role="tablist" class="tabs tabs-lifted mb-6">

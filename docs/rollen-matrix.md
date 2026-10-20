@@ -31,6 +31,9 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `member-roles:read`        | ✔ | ✔ |   |   |   |   |
 | `member-roles:write`       | ✔ | ✔ |   |   |   |   |
 | `member-roles:delete`      | ✔ |   |   |   |   |   |
+| `anniversary-years:read`   | ✔ |   |   |   |   |   |
+| `anniversary-years:write`  | ✔ |   |   |   |   |   |
+| `anniversary-years:delete` | ✔ |   |   |   |   |   |
 
 ## Hinweis
 
