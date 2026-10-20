@@ -3,6 +3,15 @@ import { Icon } from "./icon.js";
 import type { IconName } from "./icons.generated.js";
 import { t } from "../i18n/index.js";
 
+// Icon + Label einer Aktion; das Label verschwindet per Container-Query (der nächste @container-Vorfahr zählt).
+export function ActionContent({ icon, label, variant = "secondary" }: { icon: IconName; label: string; variant?: "primary" | "secondary" }) {
+  const hide = variant === "primary" ? "@max-md:hidden" : "@max-xl:hidden";
+  return (<>
+    <Icon name={icon} class="h-5 w-5 shrink-0" />
+    <span class={hide}>{label}</span>
+  </>);
+}
+
 // Aktions-Button für den Seitenkopf. Label wird per Container-Query ausgeblendet:
 // Stufe 1 (schmal) Sekundär, Stufe 2 (sehr schmal) auch Primär. aria-label/title bleiben immer.
 export function HeaderAction({ variant = "secondary", icon, label, href, form, type, onclick, class: cls = "btn-neutral", name, value, attrs }: {
@@ -18,11 +27,7 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
   value?: string;
   attrs?: Record<string, string>; // z. B. hx-get für Modal-Auslöser
 }) {
-  const hide = variant === "primary" ? "@max-md:hidden" : "@max-xl:hidden";
-  const inner = (<>
-    <Icon name={icon} class="h-5 w-5 shrink-0" />
-    <span class={hide}>{label}</span>
-  </>);
+  const inner = <ActionContent icon={icon} label={label} variant={variant} />;
   const cls2 = `btn ${cls}`;
   return href ? (
     <a href={href} class={cls2} aria-label={label} title={label}>{inner}</a>

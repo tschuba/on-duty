@@ -27,7 +27,7 @@ export function Section({ id, title, badge, tone, open, collapsible = true, clas
   }
   return (
     <details id={id} class={`collapse collapse-arrow ${box}`} open={open} {...attrs}>
-      <summary class={`collapse-title ${titleClass}`} style="font-family: var(--font-heading)">{heading}</summary>
+      <summary class={`collapse-title @container ${titleClass}`} style="font-family: var(--font-heading)">{heading}</summary>
       <div class="collapse-content overflow-x-auto pt-4">{children as never}</div>
     </details>
   );

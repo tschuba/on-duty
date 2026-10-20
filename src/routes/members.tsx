@@ -9,7 +9,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { RolePopover } from "../components/role-popover.js";
 import { ACTIVE_ROLE_ID } from "../lib/import.js";
 import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
@@ -427,8 +427,8 @@ function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRo
 // „Hinzufügen“ im Bereichstitel (nur bei offenem Bereich sichtbar, siehe .section-actions in app.css).
 function AssignmentAddButton({ memberId }: { memberId?: string }) {
   return (
-    <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="event.preventDefault();event.stopPropagation()" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
-      <Icon name="plus" class="w-4 h-4" />{t("members.form.addAssignment")}
+    <button type="button" class="btn btn-outline btn-primary" aria-label={t("members.form.addAssignment")} title={t("members.form.addAssignment")} onclick="event.preventDefault();event.stopPropagation()" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
+      <ActionContent icon="plus" label={t("members.form.addAssignment")} />
     </button>
   );
 }
@@ -531,10 +531,12 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         <textarea name="note" rows={3} class="note-input textarea textarea-bordered w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH}>{values.note ?? ""}</textarea>
         <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
       </div>
-      <div class="modal-action flex-wrap">
-        <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
-        <button type="submit" name="more" value="1" class="btn btn-outline btn-primary"><Icon name="plus" class="w-4 h-4" />{t("common.saveAndNew")}</button>
-        <button type="submit" class="btn btn-primary"><Icon name="check" class="w-4 h-4" />{t("common.save")}</button>
+      <div class="modal-action @container">
+        <div class="flex w-full justify-end gap-2">
+          <button type="button" class="btn" aria-label={t("common.cancel")} title={t("common.cancel")} onclick="this.closest('dialog').close()"><ActionContent icon="x-mark" label={t("common.cancel")} variant="primary" /></button>
+          <button type="submit" name="more" value="1" class="btn btn-outline btn-primary" aria-label={t("common.saveAndNew")} title={t("common.saveAndNew")}><ActionContent icon="plus" label={t("common.saveAndNew")} variant="primary" /></button>
+          <button type="submit" class="btn btn-primary" aria-label={t("common.save")} title={t("common.save")}><ActionContent icon="check" label={t("common.save")} variant="primary" /></button>
+        </div>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
         (function () {
