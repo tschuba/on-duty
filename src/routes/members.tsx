@@ -736,7 +736,7 @@ function BankDataSection({
   // Zustand pro Tab in sessionStorage, damit er Ansicht ↔ Bearbeiten überdauert.
   return (
     <>
-      <Section title={t("members.bank.title")} open={!!errors?.iban} class="mt-6 max-w-2xl" attrs={{ "data-bank-key": key }}>
+      <Section title={t("members.bank.title")} open={!!errors?.iban} class="mt-6" attrs={{ "data-bank-key": key }}>
         <div class="space-y-4">{body}</div>
       </Section>
       <script dangerouslySetInnerHTML={{ __html: `(function(){var d=document.currentScript.previousElementSibling,k=d.dataset.bankKey;
@@ -1800,7 +1800,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
           {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
         </div>
-        <Section title={t("members.contact.title")} open class="mt-6 max-w-2xl">
+        <Section title={t("members.contact.title")} open class="mt-6">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
             <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
@@ -1810,7 +1810,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           </div>
         </Section>
         {openRoles.length > 0 && (
-          <Section title={t("members.view.activeFunctions")} open class="max-w-2xl">
+          <Section title={t("members.view.activeFunctions")} open>
             <div class="flex flex-wrap gap-2">
               {openRoles.map((a) => (
                 <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
@@ -1819,7 +1819,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           </Section>
         )}
         {canWriteBank ? (
-          <form method="post" action={`/members/${m.id}`} class="space-y-4 max-w-2xl">
+          <form method="post" action={`/members/${m.id}`} class="space-y-4">
             <BankDataSection m={m} editable />
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           </form>
@@ -1887,7 +1887,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     if (errors.iban) {
       return c.html(
         <Layout title={`${existing.firstName} ${existing.lastName}`} user={user} activeNav="members">
-          <form method="post" action={`/members/${id}`} class="space-y-4 max-w-2xl">
+          <form method="post" action={`/members/${id}`} class="space-y-4">
             <BankDataSection m={{ ...existing, ...bank, iban: trimmed(body, "iban") }} editable errors={errors} />
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
           </form>
