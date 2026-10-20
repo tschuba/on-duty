@@ -1236,7 +1236,6 @@ function StartStatusSelect({ value }: { value: StartStatus }) {
           </label>
         ))}
       </div>
-      <p class="text-xs opacity-60">{t("members.form.startStatusHint")}</p>
       <p id="startStatusPassiveHint" class="text-xs opacity-60" hidden={value !== "passiv"}>{t("members.form.startStatusPassiveHint")}</p>
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function () {
