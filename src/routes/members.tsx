@@ -730,8 +730,12 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
   const saved = trimmed(body, "savedStatus") as MemberStatus;
   const cutoff = ageLimitDate(birthDate, env.ACTIVE_AGE_LIMIT);
   const hintKey = new Date().toISOString().slice(0, 10) >= cutoff ? "members.form.roleAgeLimitHint.past" : "members.form.roleAgeLimitHint.future";
+  // Nur anzeigen, wenn die Altersgrenze erreicht ist oder innerhalb des nächsten Jahres erreicht wird.
+  const horizon = new Date();
+  horizon.setFullYear(horizon.getFullYear() + 1);
+  const nearLimit = cutoff <= horizon.toISOString().slice(0, 10);
   const hinted = new Set(
-    planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff)).map((a) => a.rowIdx)
+    !nearLimit ? [] : planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff)).map((a) => a.rowIdx)
   );
   const datum = new Date(cutoff).toLocaleDateString("de-DE");
   // Alle Zeilen schicken, damit nicht mehr zutreffende Hinweise wieder verschwinden.
