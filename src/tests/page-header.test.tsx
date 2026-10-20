@@ -27,7 +27,7 @@ describe("SubNav", () => {
   it("marks the active tab", async () => {
     const html = await render(<SubNav items={[{ href: "/a", label: "A", active: true }, { href: "/b", label: "B", active: false }]} />);
     expect(html).toContain("tab-active");
-    expect(html.match(/tab-active/g)).toHaveLength(1);
+    expect(html.match(/class="[^"]*tab-active/g)).toHaveLength(1);
   });
 });
 
