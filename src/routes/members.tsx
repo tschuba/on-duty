@@ -1192,6 +1192,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         )}
         <div class="divider">{t("members.form.assignments")}</div>
         <StatusPreview />
+        <PassiveHint show={false} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
@@ -1219,6 +1220,10 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
 
 type StartStatus = "aktiv" | "passiv" | "foerdernd";
 
+function PassiveHint({ show }: { show: boolean }) {
+  return <p id="startStatusPassiveHint" class="text-sm opacity-70" hidden={!show}>{t("members.form.startStatusPassiveHint")}</p>;
+}
+
 function StartStatusSelect({ value }: { value: StartStatus | "" }) {
   return (
     <fieldset class="space-y-2">
@@ -1236,7 +1241,6 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
           </label>
         ))}
       </div>
-      <p id="startStatusPassiveHint" class="text-xs opacity-60" hidden={value !== "passiv"}>{t("members.form.startStatusPassiveHint")}</p>
       <script dangerouslySetInnerHTML={{ __html: `
         document.addEventListener('DOMContentLoaded', function () {
           var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
@@ -1435,6 +1439,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           )}
           <div class="divider">{t("members.form.assignments")}</div>
           <StatusPreview />
+          <PassiveHint show={startStatus === "passiv"} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
