@@ -144,7 +144,7 @@ export const de = {
   "members.form.thisMember": "das Mitglied",
   "members.form.createAs": "Als {status} anlegen",
   "members.error.status.activeAgeLimit": "Mit {grenze} Jahren (erreicht am {datum}) ist {name} nicht mehr im aktiven Dienst, sondern passiv.",
-  "members.error.status.activeNoRole": "Für „aktiv“ fehlt eine laufende Funktion im aktiven Dienst. Trag eine Funktion ohne Enddatum ein, oder lege {name} als fördernd an.",
+  "members.error.status.activeNoRole": "„Aktiv“ braucht eine laufende Funktion im aktiven Dienst, also ohne Enddatum. Trag sie ein, oder lege {name} als fördernd an.",
   "members.error.status.passiveNoRole": "Für „passiv“ braucht es eine Funktion im aktiven Dienst, die am {datum} (Altersgrenze {grenze} Jahre) noch galt. Trag sie mit Zeitraum ein, oder lege {name} als fördernd an.",
   "members.error.status.passiveRunning": "{name} erreicht die Altersgrenze von {grenze} Jahren erst am {datum}, die Funktion „{titel}“ läuft noch. Damit ist {name} aktiv.",
   "members.error.status.supportingHasRole": "Die Funktion „{titel}“ macht {name} zu {status}. Entferne die Funktion, oder lege {name} als {status} an.",
