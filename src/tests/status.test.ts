@@ -78,19 +78,28 @@ describe("deriveMemberStatus", () => {
     expect(deriveMemberStatus(member({ birthDate: age(CHILDREN_LIMIT, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("jugend");
   });
 
-  it("passiv when no active-role assignment", () => {
-    expect(deriveMemberStatus(member(), [], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("passiv");
+  it("foerdernd when no active-role assignment", () => {
+    expect(deriveMemberStatus(member(), [], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("foerdernd");
   });
 
-  it("passiv when only closed active-role assignment", () => {
-    expect(deriveMemberStatus(member(), [assignment(activeRole, "2023-01-01")], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("passiv");
+  it("foerdernd when active role ended before the age limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(70) }), [assignment(activeRole, "2020-06-01")], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("foerdernd");
   });
 
-  it("passiv when only passive-role assignment (no grants_active_status)", () => {
-    expect(deriveMemberStatus(member(), [assignment(passiveRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("passiv");
+  it("foerdernd under limit with only non-granting role", () => {
+    expect(deriveMemberStatus(member(), [assignment(passiveRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("foerdernd");
   });
 
-  it("aktiv ignores passive-role assignment, counts open active-role", () => {
-    expect(deriveMemberStatus(member(), [assignment(passiveRole), assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("aktiv");
+  it("passiv when open active role and age limit reached", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(66) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passiv");
+  });
+
+  it("passiv when active role ended after the age limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(70) }), [assignment(activeRole, "2030-01-01".replace("2030", String(new Date().getFullYear() - 1)))], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passiv");
+  });
+
+  it("aktiv on day before age limit, passiv on the limit day", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(65, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("aktiv");
+    expect(deriveMemberStatus(member({ birthDate: age(65, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passiv");
   });
 });

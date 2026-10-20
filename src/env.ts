@@ -50,6 +50,7 @@ export const env = {
   SESSION_LIFETIME: process.env.SESSION_LIFETIME ?? "7d",
   CHILDREN_AGE_LIMIT: Number(process.env.CHILDREN_AGE_LIMIT ?? "12"),
   YOUTH_AGE_LIMIT: Number(process.env.YOUTH_AGE_LIMIT ?? "18"),
+  ACTIVE_AGE_LIMIT: Number(process.env.ACTIVE_AGE_LIMIT ?? "65"),
   // Ehrungstermin (MM-DD): Datum, an dem Jubiläen geehrt werden
   ANNIVERSARY_CUTOFF: process.env.ANNIVERSARY_CUTOFF ?? "01-06",
   BACKUP_SCHEDULE: process.env.BACKUP_SCHEDULE ?? "0 2 * * 0",
@@ -73,6 +74,7 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "ORG_NAME",                  value: env.ORG_NAME },
   { key: "CHILDREN_AGE_LIMIT",        value: env.CHILDREN_AGE_LIMIT },
   { key: "YOUTH_AGE_LIMIT",           value: env.YOUTH_AGE_LIMIT },
+  { key: "ACTIVE_AGE_LIMIT",          value: env.ACTIVE_AGE_LIMIT },
   { key: "ANNIVERSARY_CUTOFF",        value: env.ANNIVERSARY_CUTOFF },
   { key: "SESSION_LIFETIME",          value: env.SESSION_LIFETIME },
   { key: "ADMIN_PASSWORD_MIN_LENGTH", value: env.ADMIN_PASSWORD_MIN_LENGTH },

@@ -10,8 +10,7 @@ INSERT INTO member_roles (id, title, grants_active_status) VALUES
   ('bc7a50c6-a0c9-4d1a-a212-6d39ba833fed', 'Maschinist',                  true),
   ('bda48bcc-d4f3-464f-9067-732d3f35675c', 'Jugendfeuerwehrwart',         false),
   ('b2b821ce-30aa-4b14-a6aa-c63d09daf37c', 'Stellv. Jugendfeuerwehrwart', false),
-  ('f2dd276b-027b-4b82-8313-918bc4f9d5c5', 'Aktives Mitglied',            true),
-  ('1e2e2581-a5f5-4780-905a-0535ebf93ead', 'Passives Mitglied',           false),
+  ('f2dd276b-027b-4b82-8313-918bc4f9d5c5', 'Feuerwehr-Anwärter',          true),
   ('8a6372ef-4561-4f0d-aa2e-3ed80ac2b003', 'Ehrenkommandant',             false),
   ('4005b6b5-bbf3-4d52-98c1-3893bf7db574', 'Ehrenvorstand',               false),
   ('d4bda8ff-6d64-404e-a6c2-d7b500abb6a2', 'Ehrenmitglied',               false)

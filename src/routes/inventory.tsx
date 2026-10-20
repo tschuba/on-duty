@@ -1404,7 +1404,7 @@ inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending
       id: m.id,
       firstName: m.person.firstName,
       lastName: m.person.lastName,
-      status: deriveMemberStatus(m, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+      status: deriveMemberStatus(m, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
     }))
     .filter((m) => scope === "all" || ASSIGNABLE_MEMBER_STATUSES.has(m.status))
     .sort((a, b) => a.lastName.localeCompare(b.lastName, "de"))

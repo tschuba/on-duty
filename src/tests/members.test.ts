@@ -232,7 +232,7 @@ describe("parseListQuery", () => {
       search: "",
       sort: "lastName",
       dir: "asc",
-      statusFilter: ["aktiv", "passiv", "kinder", "jugend"],
+      statusFilter: ["aktiv", "passiv", "foerdernd", "kinder", "jugend"],
       roleFilter: [],
       page: 1,
       pageSize: 25,

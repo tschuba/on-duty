@@ -9,7 +9,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { RolePopover } from "../components/role-popover.js";
-import { deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
+import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
@@ -49,7 +49,7 @@ async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus
     return {
       ...member,
       assignments: m.assignments as Assignment[],
-      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
     };
   });
 
@@ -69,7 +69,7 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
   return {
     ...member,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
   };
 }
 
@@ -124,6 +124,7 @@ export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" 
 const STATUS_LABELS: Record<MemberStatus, string> = {
   aktiv: t("status.aktiv"),
   passiv: t("status.passiv"),
+  foerdernd: t("status.foerdernd"),
   kinder: t("status.kinder"),
   jugend: t("status.jugend"),
   ausgetreten: t("status.ausgetreten"),
@@ -133,6 +134,7 @@ const STATUS_LABELS: Record<MemberStatus, string> = {
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   aktiv: "badge badge-sm badge-success",
   passiv: "badge badge-sm badge-neutral",
+  foerdernd: "badge badge-sm badge-secondary",
   kinder: "badge badge-sm badge-warning",
   jugend: "badge badge-sm badge-info",
   ausgetreten: "badge badge-sm badge-ghost opacity-60",
@@ -157,7 +159,7 @@ export function SortIcon<T extends string>({ col, active, dir }: { col: T; activ
 }
 
 export function StatsCards({ all }: { all: MemberWithStatus[] }) {
-  const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
+  const counts = { aktiv: 0, passiv: 0, foerdernd: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
     const subset = all.filter((m) => m.status === status);
     return {
@@ -173,7 +175,7 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const kinder = genderCount("kinder");
 
   return (
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
@@ -184,6 +186,10 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.passive")}</div>
         <div class="stat-value">{counts.passiv}</div>
+      </div>
+      <div class="stat bg-base-200 rounded-box p-4">
+        <div class="stat-title">{t("members.stats.supporting")}</div>
+        <div class="stat-value">{counts.foerdernd}</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.youth")}</div>
@@ -662,6 +668,7 @@ function StatusPreview({ roles }: { roles: Role[] }) {
     active: roles.filter((r) => r.grantsActiveStatus).map((r) => r.id),
     children: env.CHILDREN_AGE_LIMIT,
     youth: env.YOUTH_AGE_LIMIT,
+    limit: env.ACTIVE_AGE_LIMIT,
     labels: STATUS_LABELS,
   };
   return (
@@ -674,20 +681,26 @@ function StatusPreview({ roles }: { roles: Role[] }) {
           var form = box.closest('form');
           function val(n) { var el = form.querySelector('[name="' + n + '"]'); return el ? el.value : ''; }
           function update() {
-            var status = 'passiv';
+            var status = 'foerdernd';
             if (val('deathDate')) status = 'verstorben';
             else if (val('exitDate')) status = 'ausgetreten';
             else {
               var roles = form.querySelectorAll('[name="assignment_role[]"]');
               var tos = form.querySelectorAll('[name="assignment_to[]"]');
-              var hasActive = Array.prototype.some.call(roles, function (r, i) {
-                return r.value && !tos[i].value && cfg.active.indexOf(r.value) !== -1;
-              });
-              if (hasActive) {
-                var b = new Date(val('birthDate')), now = new Date();
-                var age = now.getFullYear() - b.getFullYear();
-                if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+              var froms = form.querySelectorAll('[name="assignment_from[]"]');
+              var b = new Date(val('birthDate')), now = new Date();
+              var age = now.getFullYear() - b.getFullYear();
+              if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
+              var isActive = function (r) { return r.value && cfg.active.indexOf(r.value) !== -1; };
+              var hasActive = Array.prototype.some.call(roles, function (r, i) { return isActive(r) && !tos[i].value; });
+              if (hasActive && (isNaN(age) || age < cfg.limit)) {
                 status = isNaN(age) ? 'aktiv' : age < cfg.children ? 'kinder' : age < cfg.youth ? 'jugend' : 'aktiv';
+              } else if (val('birthDate')) {
+                var cutoff = (b.getFullYear() + cfg.limit) + val('birthDate').slice(4);
+                var atCutoff = Array.prototype.some.call(roles, function (r, i) {
+                  return isActive(r) && froms[i].value <= cutoff && (!tos[i].value || tos[i].value >= cutoff);
+                });
+                if (atCutoff) status = 'passiv';
               }
             }
             var out = box.querySelector('.status-preview-value');
@@ -978,7 +991,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const statusParsed = statusRaw.filter((s) => STATUS_LABELS[s as MemberStatus]); // unbekannte (z. B. altes "archiviert") ignorieren
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
-    : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
+    : ["aktiv", "passiv", "foerdernd", "kinder", "jugend"]) as MemberStatus[];
   const roleFilter = roleFilterRaw.filter(Boolean);
   const { page, pageSize } = parsePagination(q);
 
@@ -1072,7 +1085,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           />
         </label>
         <div class="join">
-          {(["aktiv", "passiv", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
+          {(["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
             <a
               key={s}
               href={filterToggleUrl(s)}
@@ -1162,6 +1175,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
         {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
         {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
+        <StartStatusSelect value="aktiv" />
         <MemberFormFields m={prefill} />
         {canWriteBank && !linkMemberId && <BankDataSection m={prefill ?? {}} editable />}
         {applicationId && (
@@ -1196,6 +1210,56 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     </Layout>
   );
 });
+
+type StartStatus = "aktiv" | "passiv" | "foerdernd";
+
+function StartStatusSelect({ value }: { value: StartStatus }) {
+  return (
+    <div class="form-control max-w-xs">
+      <label class="label" for="startStatus"><span class="label-text">{t("members.form.startStatus")}</span></label>
+      <select id="startStatus" name="startStatus" class="select select-bordered">
+        {(["aktiv", "passiv", "foerdernd"] as const).map((s) => (
+          <option value={s} selected={s === value}>{STATUS_LABELS[s]}</option>
+        ))}
+      </select>
+      <p class="text-xs opacity-60 mt-1">{t("members.form.startStatusHint")}</p>
+      {value === "passiv" && <p class="text-xs opacity-60">{t("members.form.startStatusPassiveHint")}</p>}
+    </div>
+  );
+}
+
+// Vergleicht die gewählte Anlage-Auswahl mit dem abgeleiteten Status. Kinder/Jugend zählen als aktiv.
+function checkStartStatus(
+  choice: StartStatus,
+  member: { exitDate: string | null; deathDate: string | null; birthDate: string },
+  planned: Assignment[],
+  name: string
+): { message: string; suggest?: StartStatus } | undefined {
+  const derived = deriveMemberStatus(member, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
+  if (isFormer(derived)) return undefined;
+  const grenze = String(env.ACTIVE_AGE_LIMIT);
+  const datum = new Date(ageLimitDate(member.birthDate, env.ACTIVE_AGE_LIMIT)).toLocaleDateString("de-DE");
+  const runningActive = planned.find((a) => a.role.grantsActiveStatus && !a.to);
+  const anyActive = planned.find((a) => a.role.grantsActiveStatus);
+  const isActiveFamily = derived === "aktiv" || derived === "kinder" || derived === "jugend";
+  const suggest = isActiveFamily ? (derived === "aktiv" ? "aktiv" : undefined) : (derived as StartStatus);
+  if (choice === "aktiv" && !isActiveFamily) {
+    return derived === "passiv"
+      ? { message: t("members.error.status.activeAgeLimit", { grenze, datum, name }), suggest }
+      : { message: t("members.error.status.activeNoRole", { name }), suggest };
+  }
+  if (choice === "passiv" && derived !== "passiv") {
+    return derived === "foerdernd"
+      ? { message: t("members.error.status.passiveNoRole", { grenze, datum, name }), suggest }
+      : { message: t("members.error.status.passiveRunning", { grenze, datum, name }), suggest };
+  }
+  if (choice === "foerdernd" && derived !== "foerdernd") {
+    const titel = (runningActive ?? anyActive)?.role.title ?? "";
+    const status = STATUS_LABELS[derived];
+    return { message: t("members.error.status.supportingHasRole", { titel, name, status }), suggest };
+  }
+  return undefined;
+}
 
 // GET /members/role-row — HTMX fragment: one assignment row
 memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
@@ -1258,6 +1322,21 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
   }
 
+  // Auswahl aktiv/passiv/fördernd gegen den abgeleiteten Status prüfen (nur Anlegen, Server entscheidet).
+  const startStatus = (trimmed(body, "switchStatus") || trimmed(body, "startStatus")) as StartStatus;
+  let statusConflict: { message: string; suggest?: "aktiv" | "passiv" | "foerdernd" } | undefined;
+  if (Object.keys(errors).length === 0 && ["aktiv", "passiv", "foerdernd"].includes(startStatus)) {
+    const allRoles = await db.select().from(memberRoles);
+    const planned = assignmentRoles.flatMap((r, i) => {
+      const role = allRoles.find((x) => x.id === r);
+      return role && assignmentFroms[i] ? [{ from: assignmentFroms[i], to: assignmentTos[i] || null, role } as Assignment] : [];
+    });
+    const exitDate = (body.exitDate as string) || null;
+    const deathDate = (body.deathDate as string) || null;
+    statusConflict = checkStartStatus(startStatus, { exitDate, deathDate, birthDate }, planned, `${firstName} ${lastName}`);
+    if (statusConflict) errors._status = statusConflict.message;
+  }
+
   if (Object.keys(errors).length > 0) {
     const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
     const m: Partial<Member> = {
@@ -1292,6 +1371,17 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
           {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
           {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
+          {statusConflict && (
+            <div class="alert alert-error text-sm flex-wrap">
+              <span>{statusConflict.message}</span>
+              {statusConflict.suggest && (
+                <button type="submit" name="switchStatus" value={statusConflict.suggest} class="btn btn-sm">
+                  {t("members.form.createAs", { status: STATUS_LABELS[statusConflict.suggest] })}
+                </button>
+              )}
+            </div>
+          )}
+          <StartStatusSelect value={startStatus || "aktiv"} />
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && !linkMemberId && <BankDataSection m={m} editable errors={errors} />}
           {applicationId && (

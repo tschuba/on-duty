@@ -49,7 +49,7 @@ describe("getCeremonyYear", () => {
 describe("generateEvents scope filtering", () => {
   const ay = [{ kind: "service" as const, year: 25, title: null }, { kind: "membership" as const, year: 25, title: null }];
 
-  const mkMember = (status: "aktiv" | "jugend" | "kinder" | "passiv" | "ausgetreten" | "verstorben") => ({
+  const mkMember = (status: "aktiv" | "jugend" | "kinder" | "passiv" | "foerdernd" | "ausgetreten" | "verstorben") => ({
     id: status,
     firstName: "Max",
     lastName: "Muster",

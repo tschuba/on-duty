@@ -302,6 +302,13 @@
       "when": 1792419374078,
       "tag": "0042_import_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792500000000,
+      "tag": "0043_member_status_foerdernd",
+      "breakpoints": true
     }
   ]
 }

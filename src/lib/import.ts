@@ -1,5 +1,7 @@
 import * as XLSX from "xlsx";
+import { env } from "../env.js";
 import { t } from "../i18n/index.js";
+import { ageInYears } from "./status.js";
 import { isValidIban, normalizeIban } from "./iban.js";
 import type { InventoryCategory } from "./inventory.js";
 
@@ -239,7 +241,7 @@ export function planMembers(
     const assignments: PlannedAssignment[] = [];
     if (!m.deathDate && m.entryDate) {
       if (m.active) {
-        assignments.push({ key: "a", title: "Aktives Mitglied", kind: "function", roleChoice: { kind: "role", roleId: ACTIVE_ROLE_ID }, grants: true, from: m.entryDate, note: null, assumed: false, skipped: false });
+        assignments.push({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice: { kind: "role", roleId: ACTIVE_ROLE_ID }, grants: true, from: m.entryDate, note: null, assumed: false, skipped: false });
       }
       const wanted = [...m.functions.map((title) => ({ title, kind: "function" as const })), ...(m.rank ? [{ title: m.rank, kind: "rank" as const }] : [])];
       wanted.forEach(({ title, kind }, k) => {
@@ -255,7 +257,7 @@ export function planMembers(
         const roleChoice: RoleChoice = !rolePick ? d.choice : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
         const skipped = str(body, `askip_${m.mid}_${k}`) === "1";
         const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : d.grants;
-        if (!skipped && !m.active && grants) warnings.push(t("import.row.activeWarning", { title: title }));
+        if (!skipped && !m.active && grants && !(m.birthDate && ageInYears(m.birthDate) >= env.ACTIVE_AGE_LIMIT)) warnings.push(t("import.row.activeWarning", { title: title }));
         // Angenommen: Funktionsbeginn (fwportal liefert keins), fehlendes Beförderungsdatum.
         assignments.push({ key: String(k), title, kind, roleChoice, grants, from, note, assumed: !skipped && (kind === "function" || !rankDate), skipped });
       });
