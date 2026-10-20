@@ -105,7 +105,7 @@ export const de = {
   "members.form.mobile": "Mobil",
   "members.form.email": "E-Mail",
   "members.form.assignments": "Funktionszuweisungen",
-  "members.form.addAssignment": "+ Zuweisung hinzufügen",
+  "members.form.addAssignment": "Zuweisung hinzufügen",
   "members.form.roleSelect": "— Funktion wählen —",
   "members.form.roleNoMatch": "Keine Treffer",
   "members.form.from": "Von",

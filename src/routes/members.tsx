@@ -421,7 +421,16 @@ function AssignmentRow({ r, memberId, index, auto, readOnly }: { r: AssignmentRo
   );
 }
 
-// Read-only Tabelle + „Hinzufügen“; Änderungen laufen über das Modal (#assignment-modal).
+// „Hinzufügen“ im Bereichstitel (nur bei offenem Bereich sichtbar, siehe .section-actions in app.css).
+function AssignmentAddButton({ memberId }: { memberId?: string }) {
+  return (
+    <button type="button" class="btn btn-outline btn-primary btn-sm" onclick="event.preventDefault();event.stopPropagation()" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
+      <Icon name="plus" class="w-4 h-4" />{t("members.form.addAssignment")}
+    </button>
+  );
+}
+
+// Read-only Tabelle; Änderungen laufen über das Modal (#assignment-modal).
 function AssignmentsBox({ rows, memberId, readOnly }: { rows: AssignmentRowData[]; memberId?: string; readOnly?: boolean }) {
   return (
     <div id="assignments-box">
@@ -434,11 +443,6 @@ function AssignmentsBox({ rows, memberId, readOnly }: { rows: AssignmentRowData[
           </tbody>
         </table>
       </div>
-      {!readOnly && (
-        <button type="button" class="btn btn-ghost" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
-          {t("members.form.addAssignment")}
-        </button>
-      )}
     </div>
   );
 }
@@ -1163,7 +1167,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
             <span class="label-text">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
-        <Section title={t("members.form.assignments")} open>
+        <Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
         <StatusPreview />
         <PassiveHint show={false} />
         <AssignmentsBox rows={[]} />
@@ -1487,7 +1491,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span class="label-text">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
-          <Section title={t("members.form.assignments")} open>
+          <Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
           <StatusPreview />
           <PassiveHint show={startStatus === "passiv"} />
         <AssignmentsBox rows={rowsFromBody(body, await db.select().from(memberRoles))} />
@@ -1751,7 +1755,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
-        <Section title={t("members.form.assignments")} open>
+        <Section title={t("members.form.assignments")} open actions={!(m.exitDate || m.deathDate) && <AssignmentAddButton memberId={m.id} />}>
         <AssignmentsBox rows={m.assignments.map(toRowData)} memberId={m.id} readOnly={!!(m.exitDate || m.deathDate)} />
         </Section>
       </form>
@@ -1822,7 +1826,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
-          <Section title={t("members.form.assignments")} open>
+          <Section title={t("members.form.assignments")} open actions={!(existing.exitDate || existing.deathDate) && <AssignmentAddButton memberId={id} />}>
         <AssignmentsBox rows={existing.assignments.map(toRowData)} memberId={id} readOnly={!!(existing.exitDate || existing.deathDate)} />
           </Section>
         </form>
@@ -1864,7 +1868,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             street: body.street as string, houseNumber: body.houseNumber as string,
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
-          <Section title={t("members.form.assignments")} open>
+          <Section title={t("members.form.assignments")} open actions={!(existing.exitDate || existing.deathDate) && <AssignmentAddButton memberId={id} />}>
         <AssignmentsBox rows={existing.assignments.map(toRowData)} memberId={id} readOnly={!!(existing.exitDate || existing.deathDate)} />
           </Section>
         </form>
