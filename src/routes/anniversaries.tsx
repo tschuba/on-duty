@@ -79,8 +79,10 @@ function EventRow({ event: e, past, divider, showJub }: { event: AnniversaryEven
 
   return (
     <tr class={past ? "opacity-40" : ""}>
-      <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(e.refDate ?? e.date)}</td>
-      {showJub && <td class={`whitespace-nowrap text-sm${border}`}>{e.jubDate ? formatDate(e.jubDate) : ""}</td>}
+      <td class={`whitespace-nowrap text-sm pl-6${border}`}>
+        {formatDate(e.refDate ?? e.date)}
+        {showJub && e.jubDate && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.jubDate) })}</div>}
+      </td>
       <td class={border}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">
           {e.lastName}, {e.firstName}
@@ -120,7 +122,7 @@ function EventList({ events, today, filter, showJub }: { events: AnniversaryEven
           {[...groups.entries()].map(([month, evs], i) => (
             <>
               <tr>
-                <td colspan={showJub ? 6 : 5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
+                <td colspan={5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
                   {formatMonth(month)}
                 </td>
               </tr>
