@@ -287,9 +287,9 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
           {/* Typ-Filter */}
           <div class="join">
             <a href={filterAll()} class={`join-item btn${allKindsActive ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-            {kindBtn("service", t("anniversaries.filter.serviceOnly"))}
-            {kindBtn("membership", t("anniversaries.filter.membershipOnly"))}
-            {kindBtn("birthdays", t("anniversaries.filter.birthdaysOnly"))}
+            {kindBtn("service", t("anniversaries.filter.service"))}
+            {kindBtn("membership", t("anniversaries.filter.membership"))}
+            {kindBtn("birthdays", t("anniversaries.filter.birthdays"))}
           </div>
 
           {/* Jahre + Mod */}

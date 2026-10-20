@@ -129,16 +129,16 @@ describe("GET /anniversaries filters", () => {
   it("toggle link adds an inactive filter and removes an active one", async () => {
     setup();
     let html = await get("service");
-    expect(new URL(hrefOf(html, "Nur Mitgliedsjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service", "membership"]);
+    expect(new URL(hrefOf(html, "Mitgliedsjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service", "membership"]);
     html = await get("service&filter=membership");
-    expect(new URL(hrefOf(html, "Nur Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["membership"]);
+    expect(new URL(hrefOf(html, "Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["membership"]);
   });
 
   it("last active filter cannot be removed", async () => {
     setup();
     const html = await get("service");
     expect(html).toContain("pointer-events-none");
-    expect(new URL(hrefOf(html, "Nur Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service"]);
+    expect(new URL(hrefOf(html, "Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service"]);
   });
 
   it("All button activates every filter", async () => {
