@@ -81,13 +81,13 @@ describe("generateEvents scope filtering", () => {
   it("firstEntryDate shifts service, separate rows", () => {
     const m = { ...mkMember("aktiv"), firstEntryDate: "1990-06-15" };
     const a = generateEvents([m], ay, CUTOFF, "1990-01-01", "2027-12-31").filter(e => e.kind === "anniversary");
-    expect(a.map(e => [e.date, e.types])).toEqual([["2016-06-15", ["service"]], ["2026-06-15", ["membership"]]]);
+    expect(a.map(e => [e.date, e.types])).toEqual([["2016-01-06", ["service"]], ["2026-01-06", ["membership"]]]);
   });
 
   it("cutoff applies per base date", () => {
     const m = { ...mkMember("aktiv"), firstEntryDate: "1990-01-05" }; // on/before cutoff → no +1
     const a = generateEvents([m], ay, CUTOFF, "2000-01-01", "2027-12-31").filter(e => e.types?.[0] === "service");
-    expect(a[0].date).toBe("2015-01-05");
+    expect(a[0].date).toBe("2015-01-06");
   });
 
   it("same date but different years or titles", () => {
@@ -132,5 +132,23 @@ describe("generateEvents scope filtering", () => {
     const birthdays = evs.filter(e => e.kind === "birthday");
     expect(birthdays[0].lastName).toBe("Amann");
     expect(birthdays[1].lastName).toBe("Ziegler");
+  });
+});
+
+describe("generateEvents ceremony date", () => {
+  const ay = [{ kind: "service" as const, year: 25, title: null }];
+  const mk = (entryDate: string) => ({ id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate, status: "aktiv" as const });
+  it.each([["2000-07-01", "2026-01-06"], ["1977-01-01", "2002-01-06"]])("entry %s → %s", (entry, expected) => {
+    const a = generateEvents([mk(entry)], ay, CUTOFF, "1990-01-01", "2060-12-31").filter(e => e.kind === "anniversary");
+    expect(a.map(e => e.date)).toEqual([expected]);
+  });
+});
+
+describe("generateEvents refDate", () => {
+  it("keeps entry day/month for display, date is ceremony", () => {
+    const m = { id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate: "2000-07-01", status: "aktiv" as const };
+    const [e] = generateEvents([m], [{ kind: "service", year: 25, title: null }], CUTOFF, "2026-01-01", "2026-12-31").filter(e => e.kind === "anniversary");
+    expect([e.date, e.refDate]).toEqual(["2026-01-06", "2026-07-01"]);
+    expect(e.date).toBe("2026-01-06");
   });
 });
