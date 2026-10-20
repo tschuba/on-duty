@@ -29,7 +29,7 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 - [ ] Manuelle Datumseingabe wird respektiert
 - [ ] Filter `Alle / Nur Jubiläen / Nur Geburtstage` funktioniert
 - [ ] Vergangene Ereignisse erscheinen gedimmt
-- [ ] Jubiläumsberechnung: Eintritt vor/auf/nach Stichtag korrekt
+- [ ] Jubiläumsberechnung: Eintritt vor/auf/nach Stichtag korrekt (siehe docs/jubilaeen.md)
 
 ## Export
 
