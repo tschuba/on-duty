@@ -364,7 +364,7 @@ export const de = {
   "admin.permissions.key.anniversaryYearsRead": "Jubiläumsjahre ansehen",
   "admin.permissions.key.anniversaryYearsWrite": "Jubiläumsjahre anlegen und bearbeiten",
   "admin.permissions.key.anniversaryYearsDelete": "Jubiläumsjahre löschen",
-  "admin.permissions.key.memberRolesRead": "Funktionen ansehen",
+  "admin.permissions.key.memberRolesRead": "Funktionen und Funktionstypen ansehen",
   "admin.permissions.key.memberRolesWrite": "Funktionen und Funktionstypen anlegen und bearbeiten",
   "admin.permissions.key.memberRolesDelete": "Funktionen und Funktionstypen löschen",
 
