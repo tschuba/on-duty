@@ -162,6 +162,7 @@ function StatusBadgeSlot({ saved, next, oob }: { saved: MemberStatus; next?: Mem
       <span class={changed ? "opacity-40" : ""}><StatusBadge status={saved} /></span>
       {changed && (
         <span class="absolute left-3 top-2 shadow-md rounded-full ring-2 ring-base-100" aria-live="polite">
+          <span class="sr-only">{t("members.form.statusBecomes")} </span>
           <StatusBadge status={next} />
         </span>
       )}
