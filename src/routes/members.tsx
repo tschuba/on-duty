@@ -793,25 +793,23 @@ function MemberFormFields({
         {field("lastName", t("members.form.lastName"), "text", true)}
         {field("firstName", t("members.form.firstName"), "text", true)}
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {field("street", t("members.form.street"))}
-        {field("houseNumber", t("members.form.houseNumber"))}
-        {field("zip", t("members.form.zip"))}
-      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("city", t("members.form.city"))}
         <div class="form-control">
           <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
-          <select name="gender" class={`select select-bordered w-full${genderErr ? " select-error" : ""}`}>
-            <option value="" selected={!m?.gender}>{t("members.form.genderNone")}</option>
-            <option value="male" selected={m?.gender === "male"}>{t("members.form.genderMale")}</option>
-            <option value="female" selected={m?.gender === "female"}>{t("members.form.genderFemale")}</option>
-          </select>
+          <div class="flex flex-wrap gap-x-6 gap-y-2 min-h-12 items-center">
+            {([["", "genderNone"], ["male", "genderMale"], ["female", "genderFemale"]] as const).map(([v, k]) => (
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="radio" name="gender" value={v} class="radio radio-sm" checked={(m?.gender ?? "") === v} />
+                <span>{t(`members.form.${k}`)}</span>
+              </label>
+            ))}
+          </div>
           {genderErr && <span class="text-error text-sm mt-1">{genderErr}</span>}
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("birthDate", t("members.form.birthDate"), "date", true)}
+        {field("deathDate", t("members.form.deathDate"), "date")}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("firstEntryDate", t("members.form.firstEntryDate"), "date")}
@@ -819,7 +817,15 @@ function MemberFormFields({
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("exitDate", t("members.form.exitDate"), "date")}
-        {field("deathDate", t("members.form.deathDate"), "date")}
+      </div>
+      <div class="divider">{t("members.contact.title")}</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {field("street", t("members.form.street"))}
+        {field("houseNumber", t("members.form.houseNumber"))}
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {field("zip", t("members.form.zip"))}
+        {field("city", t("members.form.city"))}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("phone", t("members.form.phone"))}
@@ -1728,13 +1734,18 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           {m.firstEntryDate && <ViewField label={t("members.form.firstEntryDate")} value={formatDate(m.firstEntryDate)} />}
           <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
           <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
-          <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
-          <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
-          <ViewField label={t("members.form.phone")} value={m.phone} />
-          <ViewField label={t("members.form.mobile")} value={m.mobile} />
-          <ViewField label={t("members.form.email")} value={m.email} />
           {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
           {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
+        </div>
+        <div class="mt-6 max-w-2xl">
+          <h2 class="font-semibold mb-2">{t("members.contact.title")}</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
+            <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
+            <ViewField label={t("members.form.phone")} value={m.phone} />
+            <ViewField label={t("members.form.mobile")} value={m.mobile} />
+            <ViewField label={t("members.form.email")} value={m.email} />
+          </div>
         </div>
         {openRoles.length > 0 && (
           <div class="mt-6">
