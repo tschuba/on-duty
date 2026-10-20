@@ -154,6 +154,21 @@ function StatusBadge({ status, compact = false }: { status: MemberStatus; compac
   }
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;
 }
+// Badge mit Platzhalter: ändert die Bearbeitung den Status, liegt das neue Badge leicht versetzt über dem gespeicherten.
+function StatusBadgeSlot({ saved, next, oob }: { saved: MemberStatus; next?: MemberStatus; oob?: boolean }) {
+  const changed = !!next && next !== saved;
+  return (
+    <span id="status-badge-slot" class="relative inline-block" hx-swap-oob={oob ? "true" : undefined}>
+      <span class={changed ? "opacity-40" : ""}><StatusBadge status={saved} /></span>
+      {changed && (
+        <span class="absolute left-3 top-2 shadow-md rounded-full ring-2 ring-base-100" aria-live="polite">
+          <StatusBadge status={next} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
@@ -668,7 +683,7 @@ function BankDataSection({
 
 // Live preview of the derived status: HTMX posts the whole form to /members/status-preview,
 // which uses the same deriveMemberStatus as saving.
-function StatusPreview() {
+function StatusPreview({ saved }: { saved?: MemberStatus }) {
   return (
     <div
       hx-post="/members/status-preview"
@@ -677,6 +692,7 @@ function StatusPreview() {
       hx-target="#status-preview"
       hx-swap="innerHTML"
     >
+      {saved && <input type="hidden" name="savedStatus" value={saved} />}
       <div id="status-preview" class="text-sm opacity-80 space-y-1" />
     </div>
   );
@@ -699,13 +715,14 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
   const allRoles = await db.select().from(memberRoles);
   const planned = parseFormAssignments(body, allRoles);
   const member = { exitDate: trimmed(body, "exitDate") || null, deathDate: trimmed(body, "deathDate") || null, birthDate };
-  if (!birthDate) return c.html(<p>{t("members.form.activeHint")}</p>);
+  if (!birthDate) return c.html(<></>);
   const status = deriveMemberStatus(member, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
   const choice = trimmed(body, "startStatus");
   const name = `${trimmed(body, "firstName")} ${trimmed(body, "lastName")}`.trim() || t("members.form.thisMember");
   const conflict = ["aktiv", "passiv", "foerdernd"].includes(choice)
     ? checkStartStatus(choice as StartStatus, member, planned, name)
     : undefined;
+  const saved = trimmed(body, "savedStatus") as MemberStatus;
   const cutoff = ageLimitDate(birthDate, env.ACTIVE_AGE_LIMIT);
   const limitReached = new Date().toISOString().slice(0, 10) >= cutoff;
   const hints = limitReached
@@ -713,7 +730,7 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
     : [];
   return c.html(
     <>
-      <p>{t("members.form.activeHint")} {t("members.form.statusPreview")} <strong>{STATUS_LABELS[status]}</strong></p>
+      {saved && <StatusBadgeSlot saved={saved} next={status} oob />}
       {conflict && <p class="text-warning">{conflict.message}</p>}
       {hints.map((a) => (
         <p class="text-warning">
@@ -1729,7 +1746,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {m.firstName} {m.lastName}
           </h1>
-          <StatusBadge status={m.status} />
+          <StatusBadgeSlot saved={m.status} />
           {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
@@ -1738,7 +1755,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
-        <StatusPreview />
+        <StatusPreview saved={m.status} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1838,7 +1855,10 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
           <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+          <div class="flex items-center gap-3 mt-1">
+            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+            <StatusBadgeSlot saved={existing.status} />
+          </div>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
@@ -1846,7 +1866,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview />
+          <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1909,7 +1929,10 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
           <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+          <div class="flex items-center gap-3 mt-1">
+            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+            <StatusBadgeSlot saved={existing.status} />
+          </div>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
@@ -1918,7 +1941,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview />
+          <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>

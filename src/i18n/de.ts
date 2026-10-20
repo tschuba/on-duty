@@ -149,8 +149,6 @@ export const de = {
   "members.error.status.passiveRunning": "{name} erreicht die Altersgrenze von {grenze} Jahren erst am {datum}, die Funktion „{titel}“ läuft noch. Damit ist {name} aktiv.",
   "members.error.status.supportingHasRole": "Die Funktion „{titel}“ macht {name} zu {status}. Entferne die Funktion, oder lege {name} als {status} an.",
   "members.form.roleAgeLimitHint": "Altersgrenze ab {datum} erreicht: Funktion „{title}“ zählt nicht mehr als aktiver Dienst.",
-  "members.form.statusPreview": "Status nach dem Speichern:",
-  "members.form.activeHint": "Aktiv ist, wer vor der Altersgrenze eine laufende aktive Funktion hat.",
   "admin.permissions.key.membersBankDataRead": "Bankdaten ansehen",
   "admin.permissions.key.membersBankDataWrite": "Bankdaten bearbeiten",
   "members.error.assignmentIncomplete": "Funktion und Feld „Von“ sind Pflichtfelder.",

@@ -667,8 +667,18 @@ describe("POST /new", () => {
     });
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("Fördernd");
     expect(html).toContain("text-warning");
+  });
+
+  it("status preview overlays the new badge only when the status changes", async () => {
+    const post = (savedStatus: string) => memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", savedStatus }),
+    });
+    const changed = await (await post("aktiv")).text();
+    expect(changed).toContain('hx-swap-oob="true"');
+    expect(changed).toContain("absolute");
+    expect(await (await post("foerdernd")).text()).not.toContain("absolute");
   });
 
   it("redirects back to the new-member form for save_and_new", async () => {
