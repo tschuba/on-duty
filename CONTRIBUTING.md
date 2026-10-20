@@ -4,27 +4,29 @@ Beiträge sind willkommen. Bitte halte dich an folgende Konventionen.
 
 ## Branch-Benennung
 
+Branch-Namen sind immer auf **Englisch**.
+
 ```
-feature/<beschreibung>
-fix/<beschreibung>
-chore/<beschreibung>
+feature/<description>
+fix/<description>
+chore/<description>
 ```
 
 ## Commit-Nachrichten
 
-Dieses Projekt verwendet [Conventional Commits](https://www.conventionalcommits.org/):
+Dieses Projekt verwendet [Conventional Commits](https://www.conventionalcommits.org/). Commit-Titel und -Text sind immer auf **Englisch**.
 
 ```
-<typ>[optionaler scope]: <beschreibung>
+<type>[optional scope]: <description>
 ```
 
 Erlaubte Typen: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`, `revert`
 
 Beispiele:
 ```
-feat: Mitglied-Exportfunktion hinzufügen
-fix(auth): Session-Ablauf bei OIDC-Redirect korrigieren
-chore: Abhängigkeiten aktualisieren
+feat: add member export
+fix(auth): fix session expiry on OIDC redirect
+chore: update dependencies
 ```
 
 Ein Git-Hook prüft das Format automatisch. Einmalig einrichten:
@@ -32,6 +34,11 @@ Ein Git-Hook prüft das Format automatisch. Einmalig einrichten:
 ```bash
 pnpm install  # richtet den Hook automatisch ein
 ```
+
+## Pull Requests
+
+- PR-Titel und -Beschreibung sind immer auf **Englisch**.
+- Der PR-Titel muss dem Conventional-Commits-Format (`<type>[optional scope]: <description>`, erlaubte Typen siehe oben) entsprechen und den Check **PR Title** bestehen (`.github/workflows/pr-version-bump.yml`).
 
 ## Sprache
 
