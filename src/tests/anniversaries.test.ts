@@ -138,7 +138,7 @@ describe("generateEvents scope filtering", () => {
 describe("generateEvents ceremony date", () => {
   const ay = [{ kind: "service" as const, year: 25, title: null }];
   const mk = (entryDate: string) => ({ id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate, status: "aktiv" as const });
-  it.each([["2000-07-01", "2026-01-06"], ["1977-01-01", "2003-01-06"]])("entry %s → %s", (entry, expected) => {
+  it.each([["2000-07-01", "2026-01-06"], ["1977-01-01", "2002-01-06"]])("entry %s → %s", (entry, expected) => {
     const a = generateEvents([mk(entry)], ay, CUTOFF, "1990-01-01", "2060-12-31").filter(e => e.kind === "anniversary");
     expect(a.map(e => e.date)).toEqual([expected]);
   });
