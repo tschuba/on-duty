@@ -261,6 +261,7 @@ export const de = {
   "admin.tabs.users": "Benutzer",
   "admin.tabs.permissions": "Berechtigungen",
   "admin.tabs.roles": "Funktionen",
+  "admin.tabs.roleTypes": "Funktionstypen",
   "admin.tabs.anniversaries": "Jubiläen",
   "admin.tabs.config": "Konfiguration",
   "admin.tabs.backup": "Backup",

@@ -1128,7 +1128,7 @@ describe("role types (Spec 47)", () => {
     const roles = await (await adminRoutes.request("/roles")).text();
     expect(roles).toContain(t("admin.roles.newRole"));
     expect(roles).not.toContain(t("admin.roleTypes.new"));
-    const types = await (await adminRoutes.request("/roles?tab=types")).text();
+    const types = await (await adminRoutes.request("/role-types")).text();
     expect(types).toContain(t("admin.roleTypes.new"));
     expect(types).not.toContain(t("admin.roles.newRole"));
   });
