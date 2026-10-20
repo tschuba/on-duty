@@ -589,7 +589,7 @@ describe("GET /permissions/:id/edit", () => {
     const html = await res.text();
     expect(html).toContain("<fieldset disabled");
     expect(html).toContain(t("admin.permissions.readOnlyHint"));
-    expect(html).not.toContain('data-discard');
+    expect(html).not.toContain('form="admin-permissions-form"');
   });
 
   it("locks the name field when assignments exist", async () => {
