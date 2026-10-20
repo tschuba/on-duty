@@ -216,6 +216,11 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
             showToast(message, type);
           } catch(e) {}
         }
+        // Verwerfen-Button nur bei ungespeicherten Änderungen zeigen
+        const toggleDiscard = (f, show) => f && f.id && document.querySelectorAll('[data-discard="' + f.id + '"]').forEach(b => b.classList.toggle("hidden", !show));
+        document.addEventListener("input", (e) => toggleDiscard(e.target.form, true));
+        document.addEventListener("change", (e) => toggleDiscard(e.target.form, true));
+        document.addEventListener("reset", (e) => toggleDiscard(e.target, false));
         // HTMX spinner: add loading class to triggering element
         document.body.addEventListener("htmx:beforeRequest", (e) => e.detail.elt.classList.add("loading", "loading-spinner"));
         document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));

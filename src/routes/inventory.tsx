@@ -863,7 +863,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
 }) {
   return (
     <>
-      <PageHeader title={title} backHref="/inventory" subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} cancelHref="/inventory" /></>} />
+      <PageHeader title={title} backHref="/inventory" subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (

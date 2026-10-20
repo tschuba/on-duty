@@ -7,7 +7,7 @@ const render = async (n: unknown) => String(await (n as { toString(): Promise<st
 
 describe("PageHeader", () => {
   it("renders h1, back link and actions", async () => {
-    const html = await render(<PageHeader title="Titel" backHref="/liste" actions={<FormActions formId="f1" cancelHref="/liste" saveAndNew />} />);
+    const html = await render(<PageHeader title="Titel" backHref="/liste" actions={<FormActions formId="f1" saveAndNew />} />);
     expect(html).toContain("<h1");
     expect(html).toContain('href="/liste"');
     expect(html).toContain('form="f1"');

@@ -343,7 +343,7 @@ donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
-      <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" cancelHref="/donations" />} />
+      <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" />} />
       <form id="donation-form" method="post" action="/donations" class="space-y-4 max-w-xl">
         <DonorPickerFields />
         <div class="divider" />
@@ -366,7 +366,7 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
-        <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" cancelHref="/donations" />} />
+        <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" />} />
         <form id="donation-form" method="post" action="/donations" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={donorFields.values} errors={errors} />
           <div class="divider" />
@@ -411,7 +411,7 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   return c.html(
     <Layout title={t("donations.title")} user={user} activeNav="donations">
-      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" />}<FormActions formId="donation-edit-form" cancelHref="/donations" /></>} />
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
@@ -435,7 +435,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donations.title")} user={user} activeNav="donations">
-        <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" />}<FormActions formId="donation-edit-form" cancelHref="/donations" /></>} />
+        <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
           <DonationFormFields values={values} errors={errors} />
         </form>

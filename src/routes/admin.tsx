@@ -199,8 +199,8 @@ adminRoutes.get("/users", guard, async (c) => {
 
   return c.html(
     <Layout title={t("admin.users.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="users" />
+      <BackupWarnBanner {...warn} />
       <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
       <div class="tabs tabs-boxed mb-2 w-fit">
@@ -438,7 +438,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
   return c.html(
     <Layout title={title} user={c.get("user")} activeNav="admin">
       <AdminTabs active="users" />
-      <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" cancelHref="/admin/users" />} />
+      <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" />} />
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-x-3">
@@ -629,8 +629,8 @@ adminRoutes.get("/permissions", guard, async (c) => {
 
   return c.html(
     <Layout title={t("admin.permissions.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="permissions" />
+      <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
@@ -776,7 +776,7 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
   return c.html(
     <Layout title={title} user={c.get("user")} activeNav="admin">
       <AdminTabs active="permissions" />
-      <PageHeader title={title} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" cancelHref="/admin/permissions" />} />
+      <PageHeader title={title} backHref="/admin/permissions" actions={<FormActions formId="admin-permissions-form" />} />
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-permissions-form" method="post" action={f.id ? `/admin/permissions/${f.id}` : "/admin/permissions"} class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
@@ -922,8 +922,8 @@ adminRoutes.get("/config", guard, async (c) => {
   ];
   return c.html(
     <Layout title={t("admin.config.title")} user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="config" />
+      <BackupWarnBanner {...warn} />
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
@@ -1028,8 +1028,8 @@ adminRoutes.get("/backup", guard, async (c) => {
 
   return c.html(
     <Layout title="Backup" user={user} activeNav="admin">
-      <BackupWarnBanner {...warn} />
       <AdminTabs active="backup" />
+      <BackupWarnBanner {...warn} />
       {schedule && (
         <div class="grid grid-cols-2 gap-4 text-sm mb-6">
           <div class={`p-4 rounded-box border ${lastBackupAfterSchedule === "success" ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>

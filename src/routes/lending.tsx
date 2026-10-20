@@ -282,7 +282,7 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
   return (
     <>
       <PageHeader title={item.inventoryItem.name} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={<>
-        <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-loan-modal').showModal()" />
+        <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-loan-modal').showModal()" />
         <HeaderAction variant="primary" icon="check" label={t("common.save")} form="loan-form" class="btn-primary" />
       </>} />
       <div class="mb-4">

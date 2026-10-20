@@ -964,7 +964,7 @@ function DeleteMemberButton({
 
   return (
     <>
-      <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-member-modal').showModal()" />
+      <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-member-modal').showModal()" />
       <dialog id="delete-member-modal" class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{t("members.delete.confirmTitle")}</h3>
@@ -1258,7 +1258,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
 
   return c.html(
     <Layout title={t("members.newMember")} user={user} activeNav="members">
-      <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" cancelHref="/members" saveAndNew />} />
+      <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
       <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
         {personId && <input type="hidden" name="personId" value={personId} />}
         {linkMemberId && <input type="hidden" name="linkMemberId" value={linkMemberId} />}
@@ -1489,7 +1489,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     };
     return c.html(
       <Layout title={t("members.newMember")} user={user} activeNav="members">
-        <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" cancelHref="/members" saveAndNew />} />
+        <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
@@ -1794,7 +1794,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<FormActions formId="member-form" cancelHref={backHref(c)} /></>} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<FormActions formId="member-form" /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
@@ -1894,7 +1894,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
-        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${id}`} /></>} />
+        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
@@ -1958,7 +1958,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
 
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
-        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${id}`} /></>} />
+        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,

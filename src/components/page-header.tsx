@@ -11,7 +11,7 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
   label: string;
   href?: string;
   form?: string; // id des Formulars im Inhalt (kein JS nötig)
-  type?: "submit" | "button";
+  type?: "submit" | "button" | "reset";
   onclick?: string;
   class?: string; // daisyUI-Farbklasse, z. B. "btn-primary", "btn-outline btn-error"
   name?: string;
@@ -51,10 +51,10 @@ export function PageHeader({ title, backHref, backLabel, subtitle, actions }: {
   );
 }
 
-// Standard-Aktionen für Formularseiten: Abbrechen (sekundär), optional Speichern & Neu, Speichern (primär, zuletzt).
-export function FormActions({ formId, cancelHref, saveAndNew }: { formId: string; cancelHref: string; saveAndNew?: boolean }) {
+// Standard-Aktionen für Formularseiten: Verwerfen (sekundär, nur bei ungespeicherten Änderungen), optional Speichern & Neu, Speichern (primär, zuletzt).
+export function FormActions({ formId, saveAndNew }: { formId: string; saveAndNew?: boolean }) {
   return (<>
-    <HeaderAction icon="x-mark" label={t("common.cancel")} href={cancelHref} class="btn-ghost" />
+    <HeaderAction icon="x-mark" label={t("common.discard")} type="reset" form={formId} class="btn-outline hidden" attrs={{ "data-discard": formId }} />
     {saveAndNew && <HeaderAction icon="plus" label={t("common.saveAndNew")} form={formId} name="_action" value="save_and_new" class="btn-outline btn-primary" />}
     <HeaderAction variant="primary" icon="check" label={t("common.save")} form={formId} class="btn-primary" />
   </>);

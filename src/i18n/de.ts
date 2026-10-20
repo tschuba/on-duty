@@ -3,6 +3,7 @@ export const de = {
   "common.yes": "Ja",
   "common.no": "Nein",
   "common.cancel": "Abbrechen",
+  "common.discard": "Verwerfen",
   "common.close": "Schließen",
   "common.save": "Speichern",
   "common.edit": "Bearbeiten",
@@ -65,7 +66,7 @@ export const de = {
   // ── Members ──────────────────────────────────────────────────────────────────
   "members.title": "Mitglieder",
   "members.newMember": "Neues Mitglied",
-  "members.addMember": "+ Neues Mitglied",
+  "members.addMember": "Neues Mitglied",
   "members.table.lastName": "Nachname",
   "members.table.firstName": "Vorname",
   "members.table.birthDate": "Geburtsdatum",
@@ -169,7 +170,7 @@ export const de = {
 
   // ── Donations ────────────────────────────────────────────────────────────────
   "donations.title": "Spenden",
-  "donations.newDonation": "+ Neue Spende",
+  "donations.newDonation": "Neue Spende",
   "donations.table.date": "Datum",
   "donations.table.donor": "Spender",
   "donations.table.amount": "Betrag",
@@ -240,7 +241,7 @@ export const de = {
 
   // ── Donors ───────────────────────────────────────────────────────────────────
   "donors.title": "Spender",
-  "donors.addDonor": "+ Neuer Spender",
+  "donors.addDonor": "Neuer Spender",
   "donors.table.lastName": "Nachname",
   "donors.table.firstName": "Vorname",
   "donors.table.address": "Adresse",
@@ -273,7 +274,7 @@ export const de = {
 
   // ── Admin – Users ────────────────────────────────────────────────────────────
   "admin.users.title": "Benutzer",
-  "admin.users.newUser": "+ Neuer Benutzer",
+  "admin.users.newUser": "Neuer Benutzer",
   "admin.users.table.name": "Name",
   "admin.users.table.email": "E-Mail",
   "admin.users.table.role": "Benutzerrolle",
@@ -308,7 +309,7 @@ export const de = {
 
   // ── Admin – Permissions (Berechtigungen / app roles) ────────────────────────
   "admin.permissions.title": "Berechtigungen",
-  "admin.permissions.newRole": "+ Neue Rolle",
+  "admin.permissions.newRole": "Neue Rolle",
   "admin.permissions.table.name": "Anzeigename",
   "admin.permissions.table.permissions": "Berechtigungen",
   "admin.permissions.confirmDelete.title": "Rolle löschen?",
@@ -374,7 +375,7 @@ export const de = {
 
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",
-  "admin.roles.newRole": "+ Neue Funktion",
+  "admin.roles.newRole": "Neue Funktion",
   "admin.roles.filterAll": "Alle",
   "admin.roles.filterActive": "Aktiv",
   "admin.roles.filterPassive": "Passiv",
@@ -404,7 +405,7 @@ export const de = {
   "admin.roles.moveUp": "Nach oben",
   "admin.roles.moveDown": "Nach unten",
   "admin.roleTypes.title": "Funktionstypen",
-  "admin.roleTypes.new": "+ Neuer Typ",
+  "admin.roleTypes.new": "Neuer Typ",
   "admin.roleTypes.edit": "Funktionstyp bearbeiten",
   "admin.roleTypes.table.name": "Name",
   "admin.roleTypes.table.description": "Beschreibung",
@@ -422,7 +423,7 @@ export const de = {
 
   // ── Admin – Anniversaries ────────────────────────────────────────────────────
   "admin.anniversaries.title": "Jubiläen",
-  "admin.anniversaries.newYear": "+ Neues Jubiläumsjahr",
+  "admin.anniversaries.newYear": "Neues Jubiläumsjahr",
   "admin.anniversaries.table.kind": "Art",
   "admin.anniversaries.kind.service": "Dienst",
   "admin.anniversaries.kind.membership": "Mitgliedschaft",
@@ -683,7 +684,7 @@ export const de = {
   "inventory.title": "Inventar",
   "inventory.tabs.stock": "Bestand",
   "inventory.tabs.inspections": "Prüffristen",
-  "inventory.newItem": "+ Neuer Gegenstand",
+  "inventory.newItem": "Neuer Gegenstand",
   "inventory.table.name": "Name",
   "inventory.table.category": "Kategorie",
   "inventory.table.dueDate": "Nächste Prüfung",
@@ -794,7 +795,7 @@ export const de = {
   "lending.filter.statusCount": "{count} Status",
   "lending.filter.allStatus": "Alle Status",
   "lending.filter.searchPlaceholder": "Gegenstand oder Entleiher…",
-  "lending.newLoan": "+ Neuer Verleihvorgang",
+  "lending.newLoan": "Neuer Verleihvorgang",
   "lending.newLoan.title": "Neuer Verleihvorgang",
   "lending.loans.form.item": "Gegenstand",
   "lending.loans.form.itemPlaceholder": "Gegenstand wählen…",

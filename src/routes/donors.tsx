@@ -395,7 +395,7 @@ donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
-      <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+      <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
       <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
         <DonorPickerFields />
       </form>
@@ -415,7 +415,7 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
-        <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+        <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
         <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={values} errors={errors} />
         </form>
@@ -449,7 +449,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   return c.html(
     <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
-      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
       <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
         <DonorPersonFields values={donor.person} />
       </form>
@@ -471,7 +471,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
-        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref="/donors" />} />
+        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
         <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
           <DonorPersonFields values={values} errors={errors} />
         </form>
