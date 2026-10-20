@@ -471,7 +471,7 @@ export const de = {
   "anniversaries.event.serviceAndMembership": "Dienst + Mitgliedschaft",
   "anniversaries.filter.birthdaysOnly": "Nur Geburtstage",
   "anniversaries.filter.showJubDate": "Jubiläumsdatum",
-  "anniversaries.event.jubDate": "Jubiläum {date}",
+  "anniversaries.event.jubDate": "{date}",
   "anniversaries.filter.roundYears": "Runde",
   "anniversaries.filter.halfRoundYears": "Halbrunde",
   "filter.quick.label": "Zeitraum",
