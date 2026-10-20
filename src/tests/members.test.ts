@@ -232,7 +232,7 @@ describe("parseListQuery", () => {
       search: "",
       sort: "lastName",
       dir: "asc",
-      statusFilter: ["aktiv", "passiv", "kinder", "jugend"],
+      statusFilter: ["aktiv", "passiv", "foerdernd", "kinder", "jugend"],
       roleFilter: [],
       page: 1,
       pageSize: 25,
@@ -626,6 +626,90 @@ describe("POST /new", () => {
     expect(insertCalls.some((c) => c.table === persons)).toBe(true);
     expect(insertCalls.some((c) => c.table === members)).toBe(true);
     expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
+  });
+
+  it("rejects start status 'aktiv' without a running function (422, offers fördernd)", async () => {
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "aktiv" }),
+    });
+    expect(res.status).toBe(422);
+    const html = await res.text();
+    expect(html).toContain('name="switchStatus" value="foerdernd"');
+    expect(insertCalls.some((c) => c.table === members)).toBe(false);
+  });
+
+  it("accepts start status 'foerdernd' without functions, and switchStatus overrides the choice", async () => {
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "aktiv", switchStatus: "foerdernd" }),
+    });
+    expect(res.status).toBe(302);
+  });
+
+  it("rejects start status 'foerdernd' when a running function makes the member aktiv", async () => {
+    rolesFixture = [roleAktiv];
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "foerdernd",
+        "assignment_role[]": roleAktiv.id, "assignment_from[]": "2020-01-01", "assignment_to[]": "",
+      }),
+    });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain('name="switchStatus" value="aktiv"');
+  });
+
+  it("status preview shows derived status and the conflict", async () => {
+    const res = await memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", startStatus: "passiv" }),
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("text-warning");
+  });
+
+  it("status preview puts the age-limit hint on the affected row only", async () => {
+    rolesFixture = [roleAktiv];
+    const birth = `${new Date().getFullYear() - 70}-01-01`;
+    const res = await memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate: birth,
+        "assignment_idx[]": ["0", "1"], "assignment_role[]": [roleAktiv.id, roleAktiv.id],
+        "assignment_from[]": ["1990-01-01", "1990-01-01"], "assignment_to[]": ["2000-01-01", ""],
+      }),
+    });
+    const html = await res.text();
+    expect(html).toMatch(/id="role-hint-1"[^>]*text-warning[^>]*>Seit dem/);
+    expect(html).not.toMatch(/id="role-hint-0"[^>]*text-warning/);
+  });
+
+  it("status preview uses 'Ab dem' within a year before the limit, and no hint further away", async () => {
+    rolesFixture = [roleAktiv];
+    const post = (birthDate: string) => memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({
+        lastName: "Bauer", firstName: "Anna", birthDate,
+        "assignment_idx[]": "0", "assignment_role[]": roleAktiv.id, "assignment_from[]": "2020-01-01", "assignment_to[]": "",
+      }),
+    });
+    const d = new Date(); d.setMonth(d.getMonth() + 6);
+    const near = `${d.getFullYear() - 65}-${String(d.getMonth() + 1).padStart(2, "0")}-15`;
+    expect(await (await post(near)).text()).toMatch(/id="role-hint-0"[^>]*>Ab dem/);
+    expect(await (await post(`${new Date().getFullYear() - 30}-01-01`)).text()).not.toContain("text-warning");
+  });
+
+  it("status preview overlays the new badge only when the status changes", async () => {
+    const post = (savedStatus: string) => memberRoutes.request("/status-preview", {
+      method: "POST",
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", savedStatus }),
+    });
+    const changed = await (await post("aktiv")).text();
+    expect(changed).toContain('hx-swap-oob="true"');
+    expect(changed).toContain("absolute");
+    expect(await (await post("foerdernd")).text()).not.toContain("absolute");
   });
 
   it("redirects back to the new-member form for save_and_new", async () => {

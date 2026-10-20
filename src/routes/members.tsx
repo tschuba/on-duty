@@ -9,7 +9,8 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { RolePopover } from "../components/role-popover.js";
-import { deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
+import { ACTIVE_ROLE_ID } from "../lib/import.js";
+import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
@@ -49,7 +50,7 @@ async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus
     return {
       ...member,
       assignments: m.assignments as Assignment[],
-      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+      status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
     };
   });
 
@@ -69,7 +70,7 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
   return {
     ...member,
     assignments: m.assignments as Assignment[],
-    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
   };
 }
 
@@ -124,6 +125,7 @@ export function sortMembers(list: MemberWithStatus[], sort: SortKey, dir: "asc" 
 const STATUS_LABELS: Record<MemberStatus, string> = {
   aktiv: t("status.aktiv"),
   passiv: t("status.passiv"),
+  foerdernd: t("status.foerdernd"),
   kinder: t("status.kinder"),
   jugend: t("status.jugend"),
   ausgetreten: t("status.ausgetreten"),
@@ -133,6 +135,7 @@ const STATUS_LABELS: Record<MemberStatus, string> = {
 const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   aktiv: "badge badge-sm badge-success",
   passiv: "badge badge-sm badge-neutral",
+  foerdernd: "badge badge-sm badge-secondary",
   kinder: "badge badge-sm badge-warning",
   jugend: "badge badge-sm badge-info",
   ausgetreten: "badge badge-sm badge-ghost opacity-60",
@@ -151,13 +154,29 @@ function StatusBadge({ status, compact = false }: { status: MemberStatus; compac
   }
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;
 }
+// Badge mit Platzhalter: ändert die Bearbeitung den Status, liegt das neue Badge leicht versetzt über dem gespeicherten.
+function StatusBadgeSlot({ saved, next, oob }: { saved: MemberStatus; next?: MemberStatus; oob?: boolean }) {
+  const changed = !!next && next !== saved;
+  return (
+    <span id="status-badge-slot" class="relative inline-block" hx-swap-oob={oob ? "true" : undefined}>
+      <span class={changed ? "opacity-40" : ""}><StatusBadge status={saved} /></span>
+      {changed && (
+        <span class="absolute left-1/2 top-3/4 inline-flex rounded-full ring-2 ring-warning shadow-[0_0_8px_var(--color-warning)]" aria-live="polite">
+          <span class="sr-only">{t("members.form.statusBecomes")} </span>
+          <StatusBadge status={next} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function SortIcon<T extends string>({ col, active, dir }: { col: T; active: T; dir: "asc" | "desc" }) {
   if (col !== active) return <span class="opacity-30 ml-1">↕</span>;
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
 
 export function StatsCards({ all }: { all: MemberWithStatus[] }) {
-  const counts = { aktiv: 0, passiv: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
+  const counts = { aktiv: 0, passiv: 0, foerdernd: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
     const subset = all.filter((m) => m.status === status);
     return {
@@ -173,7 +192,7 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const kinder = genderCount("kinder");
 
   return (
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
@@ -184,6 +203,10 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.passive")}</div>
         <div class="stat-value">{counts.passiv}</div>
+      </div>
+      <div class="stat bg-base-200 rounded-box p-4">
+        <div class="stat-title">{t("members.stats.supporting")}</div>
+        <div class="stat-value">{counts.foerdernd}</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.youth")}</div>
@@ -365,15 +388,19 @@ function RoleRow({
   index,
   roles,
   assignment,
+  auto,
 }: {
   index: number;
   roles: Role[];
   assignment?: Assignment;
+  auto?: boolean;
 }) {
   const selectedTitle = assignment ? (roles.find((r) => r.id === assignment.memberRoleId)?.title ?? "") : "";
   return (
-    <tr id={`role-row-${index}`}>
+    <>
+    <tr id={`role-row-${index}`} data-autofrom={auto ? "1" : undefined}>
       <td>
+        <input type="hidden" name="assignment_idx[]" value={String(index)} />
         <input type="hidden" name="assignment_id[]" value={assignment?.id ?? ""} />
         <input type="hidden" name="assignment_role[]" class="role-combobox-value" value={assignment?.memberRoleId ?? ""} />
         <div class="relative">
@@ -452,7 +479,7 @@ function RoleRow({
         <button
           type="button"
           class="btn btn-ghost text-error"
-          onclick={`this.closest('tr').remove()`}
+          onclick={`var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change'))`}
         >
           ✕
         </button>
@@ -515,6 +542,7 @@ function RoleRow({
 
           function rcSetValue(trigger, id, title) {
             rcHidden(trigger).value = id;
+            rcHidden(trigger).dispatchEvent(new Event('change', { bubbles: true }));
             trigger.textContent = title || trigger.dataset.placeholder;
             trigger.classList.toggle('opacity-50', !id);
             trigger.classList.remove('btn-error');
@@ -601,6 +629,8 @@ function RoleRow({
         }
       ` }} />
     </tr>
+    <tr class="border-0"><td colSpan={5} class="p-0"><div id={`role-hint-${index}`} /></td></tr>
+    </>
   );
 }
 
@@ -656,54 +686,73 @@ function BankDataSection({
   );
 }
 
-// Live preview of the derived status; mirrors deriveMemberStatus (src/lib/status.ts) client-side.
-function StatusPreview({ roles }: { roles: Role[] }) {
-  const cfg = {
-    active: roles.filter((r) => r.grantsActiveStatus).map((r) => r.id),
-    children: env.CHILDREN_AGE_LIMIT,
-    youth: env.YOUTH_AGE_LIMIT,
-    labels: STATUS_LABELS,
-  };
+// Live preview of the derived status: HTMX posts the whole form to /members/status-preview,
+// which uses the same deriveMemberStatus as saving.
+function StatusPreview({ saved }: { saved?: MemberStatus }) {
   return (
-    <p class="text-sm opacity-60" id="status-preview" data-cfg={JSON.stringify(cfg)}>
-      {t("members.form.activeHint")} {t("members.form.statusPreview")} <strong class="status-preview-value"></strong>
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function () {
-          var box = document.getElementById('status-preview');
-          var cfg = JSON.parse(box.dataset.cfg);
-          var form = box.closest('form');
-          function val(n) { var el = form.querySelector('[name="' + n + '"]'); return el ? el.value : ''; }
-          function update() {
-            var status = 'passiv';
-            if (val('deathDate')) status = 'verstorben';
-            else if (val('exitDate')) status = 'ausgetreten';
-            else {
-              var roles = form.querySelectorAll('[name="assignment_role[]"]');
-              var tos = form.querySelectorAll('[name="assignment_to[]"]');
-              var hasActive = Array.prototype.some.call(roles, function (r, i) {
-                return r.value && !tos[i].value && cfg.active.indexOf(r.value) !== -1;
-              });
-              if (hasActive) {
-                var b = new Date(val('birthDate')), now = new Date();
-                var age = now.getFullYear() - b.getFullYear();
-                if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) age--;
-                status = isNaN(age) ? 'aktiv' : age < cfg.children ? 'kinder' : age < cfg.youth ? 'jugend' : 'aktiv';
-              }
-            }
-            var out = box.querySelector('.status-preview-value');
-            // write only on change: this node sits inside the observed form, an unconditional write would retrigger the observer forever
-            if (out.textContent !== cfg.labels[status]) out.textContent = cfg.labels[status];
-          }
-          form.addEventListener('input', update);
-          form.addEventListener('change', update);
-          // role combobox sets a hidden input programmatically, which fires no event
-          new MutationObserver(update).observe(form, { subtree: true, attributes: true, childList: true, attributeFilter: ['value', 'aria-selected'] });
-          update();
-        })();
-      ` }} />
-    </p>
+    <div
+      hx-post="/members/status-preview"
+      hx-include="closest form"
+      hx-trigger="load, input from:closest form delay:300ms, change from:closest form"
+      hx-target="#status-preview"
+      hx-swap="innerHTML"
+    >
+      {saved && <input type="hidden" name="savedStatus" value={saved} />}
+      <div id="status-preview" class="text-sm opacity-80 space-y-1" />
+    </div>
   );
 }
+
+function parseFormAssignments(body: Record<string, any>, allRoles: Role[]): (Assignment & { rowIdx?: string })[] {
+  const roles = [body["assignment_role[]"]].flat() as string[];
+  const froms = [body["assignment_from[]"]].flat() as string[];
+  const tos = [body["assignment_to[]"]].flat() as string[];
+  const idxs = [body["assignment_idx[]"]].flat() as string[];
+  return roles.flatMap((r, i) => {
+    const role = allRoles.find((x) => x.id === r);
+    return role && froms[i] ? [{ from: froms[i], to: tos[i] || null, role, rowIdx: idxs[i] } as Assignment & { rowIdx?: string }] : [];
+  });
+}
+
+// POST /members/status-preview — HTMX fragment: derived status, conflict with the start choice, age-limit hints
+memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => {
+  const body = await c.req.parseBody({ all: true });
+  const birthDate = trimmed(body, "birthDate");
+  const allRoles = await db.select().from(memberRoles);
+  const planned = parseFormAssignments(body, allRoles);
+  const member = { exitDate: trimmed(body, "exitDate") || null, deathDate: trimmed(body, "deathDate") || null, birthDate };
+  if (!birthDate) return c.html(<></>);
+  const status = deriveMemberStatus(member, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
+  const choice = trimmed(body, "startStatus");
+  const name = `${trimmed(body, "firstName")} ${trimmed(body, "lastName")}`.trim() || t("members.form.thisMember");
+  const conflict = ["aktiv", "passiv", "foerdernd"].includes(choice)
+    ? checkStartStatus(choice as StartStatus, member, planned, name)
+    : undefined;
+  const saved = trimmed(body, "savedStatus") as MemberStatus;
+  const cutoff = ageLimitDate(birthDate, env.ACTIVE_AGE_LIMIT);
+  const hintKey = new Date().toISOString().slice(0, 10) >= cutoff ? "members.form.roleAgeLimitHint.past" : "members.form.roleAgeLimitHint.future";
+  // Nur anzeigen, wenn die Altersgrenze erreicht ist oder innerhalb des nächsten Jahres erreicht wird.
+  const horizon = new Date();
+  horizon.setFullYear(horizon.getFullYear() + 1);
+  const nearLimit = cutoff <= horizon.toISOString().slice(0, 10);
+  const hinted = new Set(
+    !nearLimit ? [] : planned.filter((a) => a.role.grantsActiveStatus && (!a.to || a.to >= cutoff)).map((a) => a.rowIdx)
+  );
+  const datum = new Date(cutoff).toLocaleDateString("de-DE");
+  // Alle Zeilen schicken, damit nicht mehr zutreffende Hinweise wieder verschwinden.
+  const allIdx = [body["assignment_idx[]"]].flat().filter(Boolean) as string[];
+  return c.html(
+    <>
+      {saved && <StatusBadgeSlot saved={saved} next={status} oob />}
+      {conflict && <p class="text-warning">{conflict.message}</p>}
+      {allIdx.map((i) => (
+        <div id={`role-hint-${i}`} hx-swap-oob="true" class={hinted.has(i) ? "text-warning text-sm px-4 pb-2" : ""}>
+          {hinted.has(i) && t(hintKey, { datum })}
+        </div>
+      ))}
+    </>
+  );
+});
 
 function MemberFormFields({
   m,
@@ -978,7 +1027,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const statusParsed = statusRaw.filter((s) => STATUS_LABELS[s as MemberStatus]); // unbekannte (z. B. altes "archiviert") ignorieren
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
-    : ["aktiv", "passiv", "kinder", "jugend"]) as MemberStatus[];
+    : ["aktiv", "passiv", "foerdernd", "kinder", "jugend"]) as MemberStatus[];
   const roleFilter = roleFilterRaw.filter(Boolean);
   const { page, pageSize } = parsePagination(q);
 
@@ -1072,7 +1121,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           />
         </label>
         <div class="join">
-          {(["aktiv", "passiv", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
+          {(["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
             <a
               key={s}
               href={filterToggleUrl(s)}
@@ -1162,6 +1211,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
         {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
         {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
+        <StartStatusSelect value="" />
         <MemberFormFields m={prefill} />
         {canWriteBank && !linkMemberId && <BankDataSection m={prefill ?? {}} editable />}
         {applicationId && (
@@ -1171,7 +1221,8 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
           </label>
         )}
         <div class="divider">{t("members.form.assignments")}</div>
-        <StatusPreview roles={roles} />
+        <StatusPreview />
+        <PassiveHint show={false} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead>
@@ -1197,11 +1248,106 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   );
 });
 
+type StartStatus = "aktiv" | "passiv" | "foerdernd";
+
+function PassiveHint({ show }: { show: boolean }) {
+  return <p id="startStatusPassiveHint" class="text-sm opacity-70" hidden={!show}>{t("members.form.startStatusPassiveHint", { grenze: String(env.ACTIVE_AGE_LIMIT) })}</p>;
+}
+
+function StartStatusSelect({ value }: { value: StartStatus | "" }) {
+  return (
+    <fieldset class="space-y-2">
+      <legend class="sr-only">{t("members.form.startStatus")}</legend>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {(["aktiv", "passiv", "foerdernd"] as const).map((s) => (
+          <label class="card bg-base-200 border-2 border-transparent cursor-pointer has-[:checked]:border-primary">
+            <div class="card-body p-4 gap-1">
+              <div class="flex items-center gap-2">
+                <input type="radio" name="startStatus" value={s} class="radio radio-primary radio-sm" checked={s === value} required />
+                <span class="font-semibold">{STATUS_LABELS[s]}</span>
+              </div>
+              <p class="text-xs opacity-70">{t(`members.form.startStatus.${s}`)}</p>
+            </div>
+          </label>
+        ))}
+      </div>
+      <p id="startStatusError" class="text-error text-sm" role="alert" hidden>{t("members.form.startStatusRequired")}</p>
+      <script dangerouslySetInnerHTML={{ __html: `
+        document.addEventListener('DOMContentLoaded', function () {
+          var form = document.querySelector('input[name="startStatus"]').closest('form'), rows = document.getElementById('role-rows');
+          function current() { var c = form.querySelector('input[name="startStatus"]:checked'); return c ? c.value : ''; }
+          function prefill() {
+            if (current() !== 'aktiv' || rows.children.length) return;
+            var i = parseInt(rows.dataset.nextIndex || '0', 10);
+            rows.dataset.nextIndex = String(i + 1);
+            htmx.ajax('GET', '/members/role-row?' + new URLSearchParams({ index: i, roleId: '${ACTIVE_ROLE_ID}', from: form.elements.entryDate.value, auto: '1' }), { target: '#role-rows', swap: 'beforeend' });
+          }
+          var err = document.getElementById('startStatusError');
+          form.querySelectorAll('input[name="startStatus"]').forEach(function (r) {
+            // Eigene Meldung bei der Kartengruppe statt der Browser-Blase am einzelnen Radio.
+            r.addEventListener('invalid', function (e) { e.preventDefault(); err.hidden = false; err.scrollIntoView({ block: 'center' }); });
+            r.addEventListener('change', function () {
+              err.hidden = true;
+              document.getElementById('startStatusPassiveHint').hidden = current() !== 'passiv';
+              prefill();
+            });
+          });
+          form.elements.entryDate.addEventListener('input', function (e) {
+            rows.querySelectorAll('tr[data-autofrom] input[name="assignment_from[]"]').forEach(function (el) { el.value = e.target.value; });
+          });
+          rows.addEventListener('input', function (e) {
+            if (e.target.name === 'assignment_from[]') e.target.closest('tr').removeAttribute('data-autofrom');
+          });
+          prefill();
+        });
+      ` }} />
+    </fieldset>
+  );
+}
+
+// Vergleicht die gewählte Anlage-Auswahl mit dem abgeleiteten Status. Kinder/Jugend zählen als aktiv.
+function checkStartStatus(
+  choice: StartStatus,
+  member: { exitDate: string | null; deathDate: string | null; birthDate: string },
+  planned: Assignment[],
+  name: string
+): { message: string; suggest?: StartStatus } | undefined {
+  const derived = deriveMemberStatus(member, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
+  if (isFormer(derived)) return undefined;
+  const grenze = String(env.ACTIVE_AGE_LIMIT);
+  const datum = new Date(ageLimitDate(member.birthDate, env.ACTIVE_AGE_LIMIT)).toLocaleDateString("de-DE");
+  const runningActive = planned.find((a) => a.role.grantsActiveStatus && !a.to);
+  const anyActive = planned.find((a) => a.role.grantsActiveStatus);
+  const isActiveFamily = derived === "aktiv" || derived === "kinder" || derived === "jugend";
+  const suggest = isActiveFamily ? (derived === "aktiv" ? "aktiv" : undefined) : (derived as StartStatus);
+  if (choice === "aktiv" && !isActiveFamily) {
+    return derived === "passiv"
+      ? { message: t("members.error.status.activeAgeLimit", { grenze, datum, name }), suggest }
+      : { message: t("members.error.status.activeNoRole", { name }), suggest };
+  }
+  if (choice === "passiv" && derived !== "passiv") {
+    return derived === "foerdernd"
+      ? { message: t("members.error.status.passiveNoRole", { grenze, datum, name }), suggest }
+      : { message: t("members.error.status.passiveRunning", { grenze, datum, name }), suggest };
+  }
+  if (choice === "foerdernd" && derived !== "foerdernd") {
+    const titel = (runningActive ?? anyActive)?.role.title ?? "";
+    const status = STATUS_LABELS[derived].toLowerCase();
+    return { message: t("members.error.status.supportingHasRole", { titel, name, status }), suggest };
+  }
+  return undefined;
+}
+
 // GET /members/role-row — HTMX fragment: one assignment row
 memberRoutes.get("/role-row", requireAuth("members:write"), async (c) => {
   const index = Number(c.req.query("index") ?? 0);
   const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
-  return c.html(<RoleRow index={index} roles={roles} />);
+  // Optional prefill (used for the "aktiv" start choice): ?roleId=&from=&auto=1
+  const roleId = c.req.query("roleId");
+  const assignment = roleId
+    ? ({ id: "", memberRoleId: roleId, from: c.req.query("from") ?? "", to: null, note: null } as Assignment)
+    : undefined;
+  return c.html(<RoleRow index={index} roles={roles} assignment={assignment} auto={c.req.query("auto") === "1"} />);
 });
 
 // POST /members/new — create member (or link an existing person, see GET /new)
@@ -1258,6 +1404,21 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     errors._assignments = t("members.error.duplicateRole", { role: role?.title ?? dupRole });
   }
 
+  // Auswahl aktiv/passiv/fördernd gegen den abgeleiteten Status prüfen (nur Anlegen, Server entscheidet).
+  const startStatus = (trimmed(body, "switchStatus") || trimmed(body, "startStatus")) as StartStatus;
+  let statusConflict: { message: string; suggest?: "aktiv" | "passiv" | "foerdernd" } | undefined;
+  if (Object.keys(errors).length === 0 && ["aktiv", "passiv", "foerdernd"].includes(startStatus)) {
+    const allRoles = await db.select().from(memberRoles);
+    const planned = assignmentRoles.flatMap((r, i) => {
+      const role = allRoles.find((x) => x.id === r);
+      return role && assignmentFroms[i] ? [{ from: assignmentFroms[i], to: assignmentTos[i] || null, role } as Assignment] : [];
+    });
+    const exitDate = (body.exitDate as string) || null;
+    const deathDate = (body.deathDate as string) || null;
+    statusConflict = checkStartStatus(startStatus, { exitDate, deathDate, birthDate }, planned, `${firstName} ${lastName}`);
+    if (statusConflict) errors._status = statusConflict.message;
+  }
+
   if (Object.keys(errors).length > 0) {
     const roles = await db.select().from(memberRoles).orderBy(memberRoles.title);
     const m: Partial<Member> = {
@@ -1292,6 +1453,17 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           {applicationId && <input type="hidden" name="applicationId" value={applicationId} />}
           {applicationId && !linkMemberId && <p class="alert alert-info text-sm">{t("members.applicant.notice")}</p>}
           {linkMemberId && <p class="alert alert-info text-sm">{t(linkedWasArchived ? "members.relink.notice" : "members.relink.noticeActive")}</p>}
+          {statusConflict && (
+            <div class="alert alert-error text-sm flex-wrap">
+              <span>{statusConflict.message}</span>
+              {statusConflict.suggest && (
+                <button type="submit" name="switchStatus" value={statusConflict.suggest} class="btn btn-sm">
+                  {t("members.form.createAs", { status: STATUS_LABELS[statusConflict.suggest].toLowerCase() })}
+                </button>
+              )}
+            </div>
+          )}
+          <StartStatusSelect value={startStatus} />
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && !linkMemberId && <BankDataSection m={m} editable errors={errors} />}
           {applicationId && (
@@ -1301,7 +1473,8 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
             </label>
           )}
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview roles={roles} />
+          <StatusPreview />
+          <PassiveHint show={startStatus === "passiv"} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1591,7 +1764,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">
             {m.firstName} {m.lastName}
           </h1>
-          <StatusBadge status={m.status} />
+          <StatusBadgeSlot saved={m.status} />
           {canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}
         </div>
         <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
@@ -1600,7 +1773,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <div class="divider">{t("members.form.assignments")}</div>
-        <StatusPreview roles={roles} />
+        <StatusPreview saved={m.status} />
         <div class="overflow-x-auto">
           <table class="table w-full">
             <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1700,7 +1873,10 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
           <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+          <div class="flex items-center gap-3 mt-1">
+            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+            <StatusBadgeSlot saved={existing.status} />
+          </div>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         {errors._assignments && <div class="alert alert-error mb-4">{errors._assignments}</div>}
@@ -1708,7 +1884,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview roles={roles} />
+          <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
@@ -1771,7 +1947,10 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
         <div class="mb-4">
           <a href="/members" class="link link-hover text-sm opacity-70">{t("common.backToList")}</a>
-          <h1 class="text-2xl font-bold mt-1" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+          <div class="flex items-center gap-3 mt-1">
+            <h1 class="text-2xl font-bold" style="font-family: var(--font-heading)">{firstName} {lastName}</h1>
+            <StatusBadgeSlot saved={existing.status} />
+          </div>
           <p class="text-sm opacity-60 mt-1">{t("common.requiredLegend")}</p>
         </div>
         <form method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
@@ -1780,7 +1959,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
             zip: body.zip as string, city: body.city as string, gender: (body.gender as any) || null,
             phone: body.phone as string, mobile: body.mobile as string, email: body.email as string }} />
           <div class="divider">{t("members.form.assignments")}</div>
-          <StatusPreview roles={roles} />
+          <StatusPreview saved={existing.status} />
           <div class="overflow-x-auto">
             <table class="table w-full">
               <thead><tr><th>{t("members.form.role")} <span class="text-error">*</span></th><th>{t("members.form.from")} <span class="text-error">*</span></th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>

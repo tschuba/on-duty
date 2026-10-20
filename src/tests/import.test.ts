@@ -52,7 +52,7 @@ describe("readWorkbook", () => {
 const roles = [
   { id: "r-k", title: "Kommandant", grantsActiveStatus: true },
   { id: "r-v", title: "Vorstand", grantsActiveStatus: false },
-  { id: ACTIVE_ROLE_ID, title: "Aktives Mitglied", grantsActiveStatus: true },
+  { id: ACTIVE_ROLE_ID, title: "Feuerwehr-Anwärter", grantsActiveStatus: true },
 ];
 
 describe("members", () => {
@@ -95,7 +95,7 @@ describe("members", () => {
     expect(p.rows[0].included).toBe(false);
     const plan = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
     const a = plan.rows[0].assignments;
-    expect(a.map((x) => x.title)).toEqual(["Aktives Mitglied", "1. Kommandant", "Löschmeister"]);
+    expect(a.map((x) => x.title)).toEqual(["Feuerwehr-Anwärter", "1. Kommandant", "Löschmeister"]);
     expect(a[1]).toMatchObject({ note: "1.", from: "2026-01-01", assumed: true });
     expect(a[2].assumed).toBe(true); // no Datum Beförderung → from = Eintritt, flagged
     expect(plan.rows[1].assignments).toEqual([]); // passive: no role

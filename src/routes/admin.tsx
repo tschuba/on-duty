@@ -1640,6 +1640,7 @@ const CONFIG_DESCRIPTIONS: Record<string, string> = {
   ORG_NAME: t("admin.config.desc.ORG_NAME"),
   CHILDREN_AGE_LIMIT: t("admin.config.desc.CHILDREN_AGE_LIMIT"),
   YOUTH_AGE_LIMIT: t("admin.config.desc.YOUTH_AGE_LIMIT"),
+  ACTIVE_AGE_LIMIT: t("admin.config.desc.ACTIVE_AGE_LIMIT"),
   ANNIVERSARY_CUTOFF: t("admin.config.desc.ANNIVERSARY_CUTOFF"),
   SESSION_LIFETIME: t("admin.config.desc.SESSION_LIFETIME"),
   ADMIN_PASSWORD_MIN_LENGTH: t("admin.config.desc.ADMIN_PASSWORD_MIN_LENGTH"),

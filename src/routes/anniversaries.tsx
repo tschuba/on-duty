@@ -214,7 +214,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
     const m = flattenMember(row as any);
     return {
       ...m,
-      status: deriveMemberStatus(m, row.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+      status: deriveMemberStatus(m, row.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
     };
   });
 
@@ -349,7 +349,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
 
   const membersWithStatus = flatMembers.map((m, i) => ({
     ...m,
-    status: deriveMemberStatus(m, memberRows[i].assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT),
+    status: deriveMemberStatus(m, memberRows[i].assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
   }));
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
