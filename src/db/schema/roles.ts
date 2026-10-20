@@ -5,6 +5,7 @@ import { members } from "./members";
 export const memberRoleTypes = pgTable("member_role_types", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  description: text("description"),
   allowsActiveStatus: boolean("allows_active_status").notNull().default(false),
   sortOrder: integer("sort_order").notNull(),
   isProtected: boolean("is_protected").notNull().default(false),

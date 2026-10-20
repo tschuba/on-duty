@@ -1208,8 +1208,11 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
         const typeRoles = rolesWithCount.filter((r) => r.typeId === ty.id);
         return (
           <details key={ty.id} data-section={ty.id} open class="collapse collapse-arrow border border-base-300 bg-base-100 mb-3">
-            <summary class="collapse-title bg-base-300 text-lg font-bold flex items-center gap-2" style="font-family: var(--font-heading)">
-              {ty.name} <span class="badge badge-ghost badge-sm ml-2">{typeRoles.length}</span>
+            <summary class="collapse-title bg-base-300">
+              <div class="text-lg font-bold flex items-center gap-2" style="font-family: var(--font-heading)">
+                {ty.name} <span class="badge badge-ghost badge-sm">{typeRoles.length}</span>
+              </div>
+              {ty.description && <div class="text-sm font-normal opacity-70">{ty.description}</div>}
             </summary>
             <div class="collapse-content overflow-x-auto pt-4">
               <table class="table table-zebra w-full">
@@ -1621,6 +1624,10 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
         <span class="label-text text-right">{t("admin.roleTypes.table.name")} <span class="text-error">*</span></span>
         <input type="text" name="name" value={type?.name ?? ""} class="input input-bordered w-full" required />
       </div>
+      <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
+        <span class="label-text text-right pt-2">{t("admin.roleTypes.table.description")}</span>
+        <textarea name="description" rows={2} maxlength={300} class="textarea textarea-bordered w-full">{type?.description ?? ""}</textarea>
+      </div>
       <label class="label cursor-pointer justify-start gap-3">
         <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(type?.allowsActiveStatus ? { checked: true } : {})} />
         <span class="label-text">{t("admin.roleTypes.table.allowsActive")}</span>
@@ -1668,6 +1675,7 @@ adminRoutes.post("/role-types", guard, async (c) => {
   await db.insert(memberRoleTypes).values({
     id: crypto.randomUUID(),
     name,
+    description: String(body.description ?? "").trim().slice(0, 300) || null,
     allowsActiveStatus: body.allowsActiveStatus === "1",
     sortOrder: Number(max) + 1,
     isProtected: false,
@@ -1710,7 +1718,7 @@ adminRoutes.post("/role-types/:id", guard, async (c) => {
   }
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
   if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
-  await db.update(memberRoleTypes).set({ name, allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
+  await db.update(memberRoleTypes).set({ name, allowsActiveStatus, description: String(body.description ?? "").trim().slice(0, 300) || null }).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roles.flash.saved"), "success");
   return c.redirect("/admin/role-types");
 });

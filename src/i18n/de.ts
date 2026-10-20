@@ -393,6 +393,7 @@ export const de = {
   "admin.roleTypes.new": "+ Neuer Typ",
   "admin.roleTypes.edit": "Funktionstyp bearbeiten",
   "admin.roleTypes.table.name": "Name",
+  "admin.roleTypes.table.description": "Beschreibung",
   "admin.roleTypes.table.allowsActive": "Erlaubt aktiven Status",
   "admin.roleTypes.confirmDelete.title": "Funktionstyp löschen?",
   "admin.roleTypes.confirmDelete.body": "{name} wird dauerhaft gelöscht.",

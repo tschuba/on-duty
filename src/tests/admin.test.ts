@@ -1160,4 +1160,14 @@ describe("role types (Spec 47)", () => {
     expect((await post("/role-types/t1/allows-active", {})).status).toBe(400);
     expect(updateCalls.length).toBe(0);
   });
+
+  it("shows the type description as section subheading and saves it trimmed", async () => {
+    typesFixture = [makeType({ description: "Rang in der Wehr" })];
+    rolesFixture = [makeRoleRow()];
+    expect(await (await adminRoutes.request("/roles")).text()).toContain("Rang in der Wehr");
+    await post("/role-types/t1", { name: "Dienstgrad", allowsActiveStatus: "1", description: "  Neu  " });
+    expect(updateCalls.some((c) => c.table === memberRoleTypes && c.set.description === "Neu")).toBe(true);
+    await post("/role-types", { name: "X", description: "  " });
+    expect(insertCalls.some((c) => c.table === memberRoleTypes && c.values.description === null)).toBe(true);
+  });
 });
