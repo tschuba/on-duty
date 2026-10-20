@@ -149,5 +149,6 @@ describe("generateEvents refDate", () => {
     const m = { id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate: "2000-07-01", status: "aktiv" as const };
     const [e] = generateEvents([m], [{ kind: "service", year: 25, title: null }], CUTOFF, "2026-01-01", "2026-12-31").filter(e => e.kind === "anniversary");
     expect([e.date, e.refDate]).toEqual(["2026-01-06", "2026-07-01"]);
+    expect(e.jubDate).toBe("2025-07-01");
   });
 });

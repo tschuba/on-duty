@@ -69,7 +69,7 @@ function anniversaryLabel(e: AnniversaryEvent): string {
   return t(e.types?.[0] === "membership" ? "anniversaries.event.membership" : "anniversaries.event.service");
 }
 
-function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: boolean; divider: boolean }) {
+function EventRow({ event: e, past, divider, showJub }: { event: AnniversaryEvent; past: boolean; divider: boolean; showJub: boolean }) {
   const yearsCol = e.kind === "birthday"
     ? t("anniversaries.event.yearsDisplay", { years: e.years })
     : e.title
@@ -80,6 +80,7 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
   return (
     <tr class={past ? "opacity-40" : ""}>
       <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(e.refDate ?? e.date)}</td>
+      {showJub && <td class={`whitespace-nowrap text-sm${border}`}>{e.jubDate ? formatDate(e.jubDate) : ""}</td>}
       <td class={border}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">
           {e.lastName}, {e.firstName}
@@ -97,7 +98,7 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
   );
 }
 
-function EventList({ events, today, filter }: { events: AnniversaryEvent[]; today: string; filter: string }) {
+function EventList({ events, today, filter, showJub }: { events: AnniversaryEvent[]; today: string; filter: string; showJub: boolean }) {
   const filtered = filterEvents(events, filter);
 
   if (!filtered.length) {
@@ -119,12 +120,12 @@ function EventList({ events, today, filter }: { events: AnniversaryEvent[]; toda
           {[...groups.entries()].map(([month, evs], i) => (
             <>
               <tr>
-                <td colspan={5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
+                <td colspan={showJub ? 6 : 5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
                   {formatMonth(month)}
                 </td>
               </tr>
               {evs.map((e, i) => (
-                <EventRow event={e} past={e.date < today} divider={i > 0} />
+                <EventRow event={e} past={e.date < today} divider={i > 0} showJub={showJub} />
               ))}
             </>
           ))}
@@ -201,6 +202,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const gteRaw = c.req.query("gte") || "";
   const gte = parseInt(gteRaw, 10) || 0;
   const mods = c.req.queries("mod") ?? [];
+  const showJub = c.req.query("jub") === "1";
 
   const [memberRows, ayRows] = await Promise.all([
     db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } }),
@@ -227,7 +229,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   }
 
   const qs = (extra: Record<string, string | string[]>) =>
-    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
+    buildListUrl("/anniversaries", { start, end, filter, gte: gte > 0 ? gte : undefined, mod: mods, jub: showJub ? "1" : undefined }, extra);
 
   const filterLink = (f: string) => qs({ filter: f });
   // toggle a mod value in/out of the active set
@@ -283,6 +285,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
               <input type="hidden" name="end" value={end} />
               <input type="hidden" name="filter" value={filter} />
               {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
+              {showJub && <input type="hidden" name="jub" value="1" />}
               <label class="text-sm text-base-content/70" for="gte-input">{t("anniversaries.minYears.label")}</label>
               <input
                 id="gte-input"
@@ -299,11 +302,12 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
               <a href={modToggle("5")} class={`join-item btn${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
               <a href={modToggle("10")} class={`join-item btn${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>
             </div>
+            <a href={qs({ jub: showJub ? "" : "1" })} class={`btn${showJub ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.showJubDate")}</a>
           </div>
         </div>
       </div>
 
-      <EventList events={events} today={today} filter={filter} />
+      <EventList events={events} today={today} filter={filter} showJub={showJub} />
       <AnniversariesExportModal />
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
