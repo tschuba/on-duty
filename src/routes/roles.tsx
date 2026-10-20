@@ -199,10 +199,12 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     key={r.id}
                     data-id={r.id}
                     draggable={canReorder}
-                    class="cursor-pointer hover"
-                    hx-get={`/roles/${r.id}/edit`}
-                    hx-target="#modal-content"
-                    hx-swap="innerHTML"
+                    {...((canWrite || r.isProtected) && {
+                      class: "cursor-pointer hover",
+                      "hx-get": `/roles/${r.id}/edit`,
+                      "hx-target": "#modal-content",
+                      "hx-swap": "innerHTML",
+                    })}
                   >
                     <td class="font-medium">
                       {r.isProtected && (
