@@ -131,25 +131,6 @@ if (PHASE === "oidc") {
     if (!app.clientId || !app.clientSecret) throw new Error("Zitadel lieferte keine Client-ID/Secret");
     writeFileSync(OUT, `OIDC_CLIENT_ID='${app.clientId}'\nOIDC_CLIENT_SECRET='${app.clientSecret}'\n`, { mode: 0o600 });
     console.log(`[zitadel-init] Application angelegt (Client-ID ${app.clientId}).`);
-
-    // Optional convenience: register the same SMTP_* values in Zitadel (confirmation mails). First setup only.
-    if (SMTP_HOST && SMTP_FROM) {
-      try {
-        const host = `${SMTP_HOST}:${SMTP_PORT || "587"}`;
-        const created = await api("POST", "/admin/v1/email/smtp", {
-          senderAddress: SMTP_FROM.replace(/^.*<(.+)>$/, "$1"),
-          senderName: SMTP_FROM.includes("<") ? SMTP_FROM.replace(/\s*<.*$/, "").replace(/"/g, "") : "on-duty",
-          host,
-          user: SMTP_USER || "",
-          password: SMTP_PASS || "",
-          tls: (SMTP_PORT || "587") !== "25",
-        });
-        await api("POST", `/admin/v1/email/${created.id}/_activate`, {});
-        console.log("[zitadel-init] SMTP in Zitadel eingetragen.");
-      } catch (e) {
-        console.warn("[zitadel-init] SMTP konnte nicht eingetragen werden (optional):", e.message);
-      }
-    }
   } else {
     // Re-sync the domain-dependent parts. The update replaces the whole OIDC config, so resend the current one.
     const { app } = await api("GET", `/management/v1/projects/${projectId}/apps/${existing.id}`);
@@ -169,6 +150,37 @@ if (PHASE === "oidc") {
       const sec = await api("POST", `/management/v1/projects/${projectId}/apps/${existing.id}/oidc_config/_generate_client_secret`, {});
       writeFileSync(OUT, `OIDC_CLIENT_ID='${app.oidcConfig.clientId}'\nOIDC_CLIENT_SECRET='${sec.clientSecret}'\n`, { mode: 0o600 });
       console.log("[zitadel-init] oidc.env fehlte — Client-Secret neu erzeugt.");
+    }
+  }
+
+  // Optional convenience: keep Zitadel's SMTP (confirmation mails) in sync with SMTP_* on every run.
+  // The password is not readable, so config + password are always rewritten (idempotent).
+  if (SMTP_HOST && SMTP_FROM) {
+    try {
+      const body = {
+        senderAddress: SMTP_FROM.replace(/^.*<(.+)>$/, "$1"),
+        senderName: SMTP_FROM.includes("<") ? SMTP_FROM.replace(/\s*<.*$/, "").replace(/"/g, "") : "on-duty",
+        host: `${SMTP_HOST}:${SMTP_PORT || "587"}`,
+        user: SMTP_USER || "",
+        tls: (SMTP_PORT || "587") !== "25",
+      };
+      let cfg;
+      try {
+        cfg = (await api("GET", "/admin/v1/email")).config; // the active provider
+      } catch (e) {
+        if (!e.message.includes("-> 404")) throw e; // 404: none active yet; anything else must not create a duplicate
+      }
+      let id = cfg?.smtp ? cfg.id : undefined; // no active SMTP provider: add one and activate it
+      if (id) {
+        await api("PUT", `/admin/v1/email/smtp/${id}`, body);
+        if (SMTP_PASS) await api("PUT", `/admin/v1/email/smtp/${id}/password`, { password: SMTP_PASS });
+      } else {
+        id = (await api("POST", "/admin/v1/email/smtp", { ...body, password: SMTP_PASS || "" })).id;
+        await api("POST", `/admin/v1/email/${id}/_activate`, {});
+      }
+      console.log("[zitadel-init] SMTP in Zitadel synchronisiert.");
+    } catch (e) {
+      console.warn("[zitadel-init] SMTP konnte nicht synchronisiert werden (optional):", e.message);
     }
   }
 

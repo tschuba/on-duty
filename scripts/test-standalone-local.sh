@@ -59,6 +59,17 @@ ORG_NAME=on-duty Standalone Local Test
 EOF
 fi
 
+# Dummy-SMTP: zitadel-init trägt die Werte nur als Konfiguration in Zitadel ein, ein Mailserver ist nicht nötig.
+if ! grep -q '^SMTP_HOST=' "$ENV_FILE"; then
+  cat >> "$ENV_FILE" <<EOF
+SMTP_HOST=smtp.localhost
+SMTP_PORT=587
+SMTP_USER=first-user
+SMTP_PASS=dummy-pass
+SMTP_FROM=on-duty <noreply@app.localhost>
+EOF
+fi
+
 # Zitadel appends the org domain to the bootstrap username automatically
 # (default, see cmd/setup/steps.yaml) unless the username is an email address —
 # so the real login name is NOT the username alone. Read it from the running
@@ -88,6 +99,38 @@ until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/ro
 done
 # app only reads NODE_EXTRA_CA_CERTS at start — restart it once the CA certificate exists.
 "${COMPOSE[@]}" restart app >/dev/null
+
+# Fragt den aktiven SMTP-Provider per Zitadel-API ab (PAT liegt im zitadel-admin-Volume, nur im Init-Container gemountet).
+zitadel_smtp_user() {
+  "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint node zitadel-init -e '
+    const { readFileSync } = require("node:fs");
+    const pat = readFileSync("/zitadel/admin/admin.pat", "utf8").trim();
+    // node:http statt fetch: fetch ignoriert den Host-Header, Zitadel löst die Instanz darüber auf.
+    require("node:http").get(
+      { host: "zitadel", port: 8080, path: "/admin/v1/email", headers: { host: process.env.ZITADEL_DOMAIN, "x-forwarded-proto": "https", authorization: `Bearer ${pat}` } },
+      (res) => {
+        let b = "";
+        res.on("data", (c) => (b += c));
+        res.on("end", () => console.log(JSON.parse(b).config?.smtp?.user ?? "NONE"));
+      },
+    );
+  ' | tail -n1 | tr -d '[:space:]'
+}
+assert_smtp_user() {
+  local got
+  got=$(zitadel_smtp_user)
+  if [[ "$got" != "$1" ]]; then
+    echo "FEHLER: Zitadel-SMTP-User ist '$got', erwartet '$1'" >&2
+    exit 1
+  fi
+  echo "OK: Zitadel-SMTP-User = $1"
+}
+
+echo "Prüfe SMTP-Sync (erster Lauf)..."
+assert_smtp_user "$(grep '^SMTP_USER=' "$ENV_FILE" | cut -d= -f2)"
+echo "Prüfe SMTP-Sync (erneuter Lauf mit geändertem SMTP_USER, muss idempotent aktualisieren)..."
+SMTP_USER=second-user "${COMPOSE[@]}" run --rm --no-deps -T zitadel-init
+assert_smtp_user second-user
 
 APP_DOMAIN=$(grep '^SERVICE_FQDN_APP=' "$ENV_FILE" | cut -d= -f2)
 ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ADMIN=' "$ENV_FILE" | cut -d= -f2)
