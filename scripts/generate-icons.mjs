@@ -26,6 +26,7 @@ const ICONS = {
   "trash": "24/outline/trash.svg",
   "plus": "24/outline/plus.svg",
   "document-duplicate": "24/outline/document-duplicate.svg",
+  "chart-bar": "24/outline/chart-bar.svg",
   "arrow-down-tray": "24/outline/arrow-down-tray.svg",
   "arrow-left": "24/outline/arrow-left.svg",
   "pencil": "24/outline/pencil.svg",

@@ -186,6 +186,10 @@ export function SortIcon<T extends string>({ col, active, dir }: { col: T; activ
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
 
+function genderBreakdown(c: { m: number; w: number; o: number }) {
+  return <>{c.m > 0 && <span>{c.m} ♂</span>}{c.w > 0 && <span>{c.w} ♀</span>}{c.o > 0 && <span>{c.o} o.A.</span>}</>;
+}
+
 export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const counts = { aktiv: 0, passiv: 0, foerdernd: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
@@ -203,12 +207,12 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const kinder = genderCount("kinder");
 
   return (
-    <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
+    <div id="members-stats" class="hidden sm:grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-success">{counts.aktiv}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(aktiv)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
@@ -223,14 +227,14 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-info">{counts.jugend}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(jugend)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-warning">{counts.kinder}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(kinder)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
@@ -1051,6 +1055,11 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
     <Layout title={t("members.title")} user={user} activeNav="members">
       <MemberTabs active="members" user={user} />
       <PageHeader title={t("members.title")} actions={<>
+        <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
+          <Icon name="chart-bar" class="w-5 h-5" />
+          <span class="@max-xl:hidden">{t("members.stats.toggle")}</span>
+          <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
+        </label>
         <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" />
         {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />
@@ -1085,6 +1094,14 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       {/* Restore pageSize from localStorage on first load */}
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
+          const stats = document.getElementById('members-stats');
+          const savedStats = localStorage.getItem('members_statsVisible');
+          if (stats && savedStats) stats.style.display = savedStats === '1' ? 'grid' : 'none';
+          document.getElementById('members-stats-toggle').checked = getComputedStyle(stats).display !== 'none';
+          window.toggleMembersStats = function(show) {
+            stats.style.display = show ? 'grid' : 'none';
+            localStorage.setItem('members_statsVisible', show ? '1' : '0');
+          };
           const saved = localStorage.getItem('members_pageSize');
           const url = new URL(window.location.href);
           if (saved && !url.searchParams.has('pageSize')) {
