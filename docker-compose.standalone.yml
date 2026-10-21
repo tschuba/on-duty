@@ -156,6 +156,10 @@ services:
       NEXT_PUBLIC_BASE_PATH: /ui/v2/login
       ZITADEL_SERVICE_USER_TOKEN_FILE: /zitadel/bootstrap/login-client.pat
       ZITADEL_SESSION_COOKIE_SECRET: ${SERVICE_PASSWORD_ZITADELCOOKIE}
+      # Without this, Login V2 creates the user on registration but never sends the
+      # verification code (apps/login/src/lib/verify-helper.ts checkEmailVerification),
+      # leaving the user stuck until they hit "Resend code" manually.
+      EMAIL_VERIFICATION: "true"
       CUSTOM_REQUEST_HEADERS: Host:${SERVICE_FQDN_ZITADEL},x-zitadel-instance-host:${SERVICE_FQDN_ZITADEL},x-zitadel-public-host:${SERVICE_FQDN_ZITADEL},X-Forwarded-Proto:https
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
