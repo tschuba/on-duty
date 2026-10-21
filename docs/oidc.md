@@ -141,6 +141,7 @@ Kontrolle: Im ID-Token bzw. Userinfo-Endpoint (z. B. mit jwt.io) muss `"email_ve
 
 - Schrift: `branding/inter-500.ttf` (Zitadel empfiehlt TTF; Inter, OFL-Lizenz). Grenze: nur eine Schrift möglich, Oswald für Überschriften geht nicht.
 - Logo: `branding/logo.svg` und `logo-dark.svg`, Wortmarke „onduty“ zweifarbig (Primär-/Fehlerfarbe wie im App-Header, Schrift Oswald), als SVG-Pfade vorgerendert.
+- Texte: Der Login-UI v2 wird über die Settings-V2-API (`PUT /v2/settings/hosted_login_translation`) umgetextet (`de`, `en`, Anrede „du“): `common.title`, `accounts.description`, `accounts.addAnother`, `loginname.title`, `loginname.description`, `register.description`, `logout.title`, `logout.description`. `ORG_NAME` ersetzt „Zitadel“ im Text. Alle übrigen Texte bleiben Zitadel-Standard.
 
 ## Registrierung absichern (Zitadel-seitig)
 

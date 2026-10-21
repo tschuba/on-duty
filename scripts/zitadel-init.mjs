@@ -157,6 +157,25 @@ if (PHASE === "oidc") {
     await upload("logo", "logo.svg", "logo.svg", "image/svg+xml");
     await upload("logo/dark", "logo-dark.svg", "logo-dark.svg", "image/svg+xml");
     await api("POST", "/admin/v1/policies/label/_activate", {});
+    // Login UI v2 texts: name the organisation instead of "Zitadel" (only the keys listed here are overridden).
+    const org = process.env.ORG_NAME;
+    const texts = {
+      de: {
+        common: { title: `Anmelden bei ${org}` },
+        accounts: { description: "Wähle das Konto, mit dem du dich anmelden möchtest.", addAnother: "Mit einem anderen Konto anmelden" },
+        loginname: { title: "Willkommen zurück", description: "Melde dich mit deinen Zugangsdaten an." },
+        register: { description: `Erstelle dein Konto bei ${org}.` },
+        logout: { title: "Abmelden", description: "Wähle das Konto, das du abmelden möchtest." },
+      },
+      en: {
+        common: { title: `Sign in to ${org}` },
+        accounts: { description: "Select the account you want to sign in with.", addAnother: "Sign in with another account" },
+        loginname: { title: "Welcome back", description: "Sign in with your credentials." },
+        register: { description: `Create your account for ${org}.` },
+        logout: { title: "Sign out", description: "Select the account you want to sign out." },
+      },
+    };
+    if (org) for (const [locale, translations] of Object.entries(texts)) await api("PUT", "/v2/settings/hosted_login_translation", { instance: true, locale, translations });
     console.log("[zitadel-init] Login page branding applied.");
   } catch (e) {
     console.warn("[zitadel-init] Branding konnte nicht gesetzt werden (optional):", e.message);
