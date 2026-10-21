@@ -9,6 +9,7 @@ export const de = {
   "common.edit": "Bearbeiten",
   "common.delete": "Löschen",
   "common.create": "Anlegen",
+  "common.copy": "Kopieren",
   "common.add": "Hinzufügen",
   "common.download": "Herunterladen",
   "common.logout": "Abmelden",

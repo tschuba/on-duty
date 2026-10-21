@@ -1107,8 +1107,10 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   const personId = c.req.query("personId");
   const linkMemberId = c.req.query("linkMemberId");
   const applicationId = c.req.query("applicationId");
+  const copyFrom = c.req.query("copyFrom");
 
   let prefill: Partial<Member> | undefined;
+  let copyRows: AssignmentRowData[] = [];
   let linkedWasArchived = false;
   if (personId) {
     const [alreadyMember] = await db.select({ id: members.id }).from(members).where(eq(members.personId, personId));
@@ -1118,6 +1120,11 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     }
     const [person] = await db.select().from(persons).where(eq(persons.id, personId));
     if (person) prefill = { ...person, birthDate: person.birthDate ?? "" };
+  } else if (copyFrom) {
+    const src = await fetchMember(copyFrom);
+    if (!src) return c.notFound();
+    prefill = { street: src.street, houseNumber: src.houseNumber, zip: src.zip, city: src.city, companyName: src.companyName };
+    copyRows = src.assignments.map((a, i) => ({ ...toRowData(a), id: "", idx: String(i) }));
   } else if (linkMemberId) {
     const target = await fetchMember(linkMemberId);
     if (!target) return c.notFound();
@@ -1159,7 +1166,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <div id="assignments-wrap"><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
         <StatusPreview />
         <PassiveHint show={false} />
-        <AssignmentsBox rows={[]} />
+        <AssignmentsBox rows={copyRows} />
         </Section></div>
       </form>
         <AssignmentModalScaffold />
@@ -1733,7 +1740,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<FormActions formId="member-form" /></>} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<HeaderAction icon="document-duplicate" class="btn-outline btn-primary" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} /><FormActions formId="member-form" /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}

@@ -733,6 +733,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end">
+                      <a href={`/admin/permissions/new?copyFrom=${r.id}`} class="btn btn-outline btn-primary btn-xs" onclick="event.stopPropagation()">{t("common.copy")}</a>
                       {canDelete ? (
                         <>
                           <button
@@ -868,7 +869,16 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
   );
 }
 
-adminRoutes.get("/permissions/new", guard, (c) => renderPermissionForm(c, { name: "", description: "", checked: new Set() }));
+adminRoutes.get("/permissions/new", guard, async (c) => {
+  const copyFrom = c.req.query("copyFrom");
+  if (copyFrom) {
+    const [src] = await db.select().from(appRoles).where(eq(appRoles.id, copyFrom));
+    if (!src) return c.notFound();
+    const perms = await db.select().from(appRolePermissions).where(eq(appRolePermissions.roleId, copyFrom));
+    return renderPermissionForm(c, { name: "", description: src.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
+  }
+  return renderPermissionForm(c, { name: "", description: "", checked: new Set() });
+});
 
 adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
