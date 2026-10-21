@@ -84,6 +84,7 @@ export const de = {
   "members.stats.supporting": "Fördernd",
   "members.stats.youth": "Jugend",
   "members.stats.children": "Kinderfeuerwehr",
+  "members.stats.toggle": "Statistik",
   "members.stats.former": "Ausgeschieden",
   "members.filter.allRoles": "Alle Funktionen",
   "members.filter.allStatus": "Alle Status",

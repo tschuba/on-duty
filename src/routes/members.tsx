@@ -203,7 +203,7 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const kinder = genderCount("kinder");
 
   return (
-    <div class="grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
+    <div id="members-stats" class="hidden sm:grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
@@ -1051,6 +1051,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
     <Layout title={t("members.title")} user={user} activeNav="members">
       <MemberTabs active="members" user={user} />
       <PageHeader title={t("members.title")} actions={<>
+        <HeaderAction icon="chart-bar" label={t("members.stats.toggle")} onclick="toggleMembersStats()" />
         <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" />
         {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />
@@ -1085,6 +1086,14 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       {/* Restore pageSize from localStorage on first load */}
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
+          const stats = document.getElementById('members-stats');
+          const savedStats = localStorage.getItem('members_statsVisible');
+          if (stats && savedStats) stats.style.display = savedStats === '1' ? 'grid' : 'none';
+          window.toggleMembersStats = function() {
+            const show = getComputedStyle(stats).display === 'none';
+            stats.style.display = show ? 'grid' : 'none';
+            localStorage.setItem('members_statsVisible', show ? '1' : '0');
+          };
           const saved = localStorage.getItem('members_pageSize');
           const url = new URL(window.location.href);
           if (saved && !url.searchParams.has('pageSize')) {
