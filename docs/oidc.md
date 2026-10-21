@@ -137,7 +137,10 @@ Kontrolle: Im ID-Token bzw. Userinfo-Endpoint (z. B. mit jwt.io) muss `"email_ve
 
 ## Anmeldeseite gestalten (Zitadel)
 
-`scripts/zitadel-init.mjs` (Phase `oidc`) setzt idempotent die Label Policy der Instanz (Primär-, Warn-, Hintergrundfarbe hell/dunkel aus `src/styles/app.css`), lädt `scripts/fonts/inter-500.ttf` hoch (Zitadel empfiehlt TTF; Inter, OFL-Lizenz) und aktiviert die Policy. Fehler dabei sind nur Warnungen. Grenzen: nur eine Schrift (Oswald für Überschriften nicht möglich), Logo fehlt noch.
+`scripts/zitadel-init.mjs` (Phase `oidc`) setzt idempotent die Label Policy der Instanz (Primär-, Warn-, Hintergrundfarbe hell/dunkel aus `src/styles/app.css`), lädt Schrift und Logo aus `branding/` hoch und aktiviert die Policy. Fehler dabei sind nur Warnungen.
+
+- Schrift: `branding/inter-500.ttf` (Zitadel empfiehlt TTF; Inter, OFL-Lizenz). Grenze: nur eine Schrift möglich, Oswald für Überschriften geht nicht.
+- Logo: `branding/logo.svg` und `logo-dark.svg`, Wortmarke „onduty“ zweifarbig (Primär-/Fehlerfarbe wie im App-Header, Schrift Oswald), als SVG-Pfade vorgerendert.
 
 ## Registrierung absichern (Zitadel-seitig)
 

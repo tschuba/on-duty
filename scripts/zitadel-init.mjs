@@ -121,37 +121,41 @@ if (PHASE === "oidc") {
     }).catch((e) => {
       if (!String(e.message).includes("-> 400")) throw e; // 400 = "no changes", i.e. already applied
     });
-    const boundary = "----zitadelinit";
-    const font = readFileSync(new URL("./fonts/inter-500.ttf", import.meta.url));
-    const body = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="inter-500.ttf"\r\nContent-Type: font/ttf\r\n\r\n`),
-      font,
-      Buffer.from(`\r\n--${boundary}--\r\n`),
-    ]);
-    await new Promise((resolve, reject) => {
-      const req = http.request(
-        {
-          host: "zitadel",
-          port: 8080,
-          method: "POST",
-          path: "/assets/v1/instance/policy/label/font",
-          headers: {
-            host: ZITADEL_DOMAIN,
-            "x-forwarded-proto": "https",
-            authorization: `Bearer ${pat}`,
-            "content-type": `multipart/form-data; boundary=${boundary}`,
-            "content-length": body.length,
+    // Multipart upload to the Assets API (font and logos).
+    const upload = (path, file, name, type) =>
+      new Promise((resolve, reject) => {
+        const boundary = "----zitadelinit";
+        const body = Buffer.concat([
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: ${type}\r\n\r\n`),
+          readFileSync(new URL(`../branding/${file}`, import.meta.url)),
+          Buffer.from(`\r\n--${boundary}--\r\n`),
+        ]);
+        const req = http.request(
+          {
+            host: "zitadel",
+            port: 8080,
+            method: "POST",
+            path: `/assets/v1/instance/policy/label/${path}`,
+            headers: {
+              host: ZITADEL_DOMAIN,
+              "x-forwarded-proto": "https",
+              authorization: `Bearer ${pat}`,
+              "content-type": `multipart/form-data; boundary=${boundary}`,
+              "content-length": body.length,
+            },
           },
-        },
-        (res) => {
-          let buf = "";
-          res.on("data", (c) => (buf += c));
-          res.on("end", () => (res.statusCode >= 300 ? reject(new Error(`font upload -> ${res.statusCode}: ${buf}`)) : resolve()));
-        },
-      );
-      req.on("error", reject);
-      req.end(body);
-    });
+          (res) => {
+            let buf = "";
+            res.on("data", (c) => (buf += c));
+            res.on("end", () => (res.statusCode >= 300 ? reject(new Error(`${path} upload -> ${res.statusCode}: ${buf}`)) : resolve()));
+          },
+        );
+        req.on("error", reject);
+        req.end(body);
+      });
+    await upload("font", "inter-500.ttf", "inter-500.ttf", "font/ttf");
+    await upload("logo", "logo.svg", "logo.svg", "image/svg+xml");
+    await upload("logo/dark", "logo-dark.svg", "logo-dark.svg", "image/svg+xml");
     await api("POST", "/admin/v1/policies/label/_activate", {});
     console.log("[zitadel-init] Login page branding applied.");
   } catch (e) {
