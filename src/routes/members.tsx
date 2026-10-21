@@ -1740,7 +1740,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<><HeaderAction icon="plus" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} />{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<FormActions formId="member-form" /></>} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<HeaderAction icon="document-duplicate" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} /><FormActions formId="member-form" /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
