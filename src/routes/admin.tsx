@@ -733,7 +733,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end">
-                      <a href={`/admin/permissions/new?copyFrom=${r.id}`} class="btn btn-outline btn-xs" onclick="event.stopPropagation()">{t("common.copy")}</a>
+                      <a href={`/admin/permissions/new?copyFrom=${r.id}`} class="btn btn-outline btn-primary btn-xs" onclick="event.stopPropagation()">{t("common.copy")}</a>
                       {canDelete ? (
                         <>
                           <button
