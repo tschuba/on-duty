@@ -186,6 +186,10 @@ export function SortIcon<T extends string>({ col, active, dir }: { col: T; activ
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
 
+function genderBreakdown(c: { m: number; w: number; o: number }) {
+  return <>{c.m > 0 && <span>{c.m} ♂</span>}{c.w > 0 && <span>{c.w} ♀</span>}{c.o > 0 && <span>{c.o} o.A.</span>}</>;
+}
+
 export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const counts = { aktiv: 0, passiv: 0, foerdernd: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
   const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
@@ -208,7 +212,7 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-success">{counts.aktiv}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{aktiv.m} ♂</span><span>{aktiv.w} ♀</span><span>{aktiv.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(aktiv)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
@@ -223,14 +227,14 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
         <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-info">{counts.jugend}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{jugend.m} ♂</span><span>{jugend.w} ♀</span><span>{jugend.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(jugend)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
           <div class="stat-value text-warning">{counts.kinder}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28"><span>{kinder.m} ♂</span><span>{kinder.w} ♀</span><span>{kinder.o} o.A.</span></div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(kinder)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
