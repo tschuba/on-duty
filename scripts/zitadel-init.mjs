@@ -164,7 +164,7 @@ if (PHASE === "oidc") {
         common: { title: `Anmelden bei ${org}` },
         accounts: { description: "Wähle das Konto, mit dem du dich anmelden möchtest.", addAnother: "Mit einem anderen Konto anmelden" },
         loginname: { title: "Willkommen zurück", description: "Melde dich mit deinen Zugangsdaten an." },
-        register: { description: `Erstelle dein Konto bei ${org}.` },
+        register: { description: `Leg dein Konto bei ${org} an.` },
         logout: { title: "Abmelden", description: "Wähle das Konto, das du abmelden möchtest." },
       },
       en: {
