@@ -163,6 +163,10 @@ if (PHASE === "oidc") {
         host: `${SMTP_HOST}:${SMTP_PORT || "587"}`,
         user: SMTP_USER || "",
         tls: (SMTP_PORT || "587") !== "25",
+        description: "on-duty (managed by zitadel-init)",
+        // Password must go via the Auth oneof; the legacy top-level `password` creates a provider the console can't edit
+        // and whose SMTP AUTH fails (EMAIL-s9kfs).
+        ...(SMTP_PASS ? { plain: { password: SMTP_PASS } } : { none: {} }),
       };
       let cfg;
       try {
@@ -173,9 +177,8 @@ if (PHASE === "oidc") {
       let id = cfg?.smtp ? cfg.id : undefined; // no active SMTP provider: add one and activate it
       if (id) {
         await api("PUT", `/admin/v1/email/smtp/${id}`, body);
-        if (SMTP_PASS) await api("PUT", `/admin/v1/email/smtp/${id}/password`, { password: SMTP_PASS });
       } else {
-        id = (await api("POST", "/admin/v1/email/smtp", { ...body, password: SMTP_PASS || "" })).id;
+        id = (await api("POST", "/admin/v1/email/smtp", body)).id;
         await api("POST", `/admin/v1/email/${id}/_activate`, {});
       }
       console.log("[zitadel-init] SMTP in Zitadel synchronisiert.");
