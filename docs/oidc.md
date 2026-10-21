@@ -31,6 +31,7 @@ Beispiel: `https://on-duty.example.com/auth/callback/oidc`
 | `OIDC_CLIENT_ID` | OAuth2-Client-ID der registrierten Anwendung |
 | `OIDC_CLIENT_SECRET` | OAuth2-Client-Secret |
 | `OIDC_APP_URL` | Öffentliche URL der App (HTTPS). Wird zur Ableitung der Callback-URI verwendet. |
+| `OIDC_ACCOUNT_URL` | Optional. Link zur Kontoverwaltung beim Anmeldedienst (erscheint auf `/account` als „Anmeldedaten verwalten“). Zitadel: `<issuer>/ui/console/users/me` (gegen die Instanz prüfen). |
 
 Benötigte Scopes: `openid email profile`. Der Provider muss die E-Mail-Adresse des Benutzers im ID-Token liefern — sie ist das einzige Matching-Kriterium.
 
@@ -105,7 +106,7 @@ Standardmäßig ist die Selbstregistrierung **aus**. Der Admin schaltet sie unte
 | `registrationAutoApprove` | Neue Benutzer erhalten sofort die Standardrolle. Ohne diese Option sehen sie die Seite „Freischaltung ausstehend“, bis ein Admin ihnen unter **Admin → Benutzer** eine Rolle zuweist („Ablehnen“ löscht den Benutzer). |
 | `registrationDefaultRoleId` | Rolle für automatisch freigegebene Benutzer; muss mindestens ein Recht haben. **Achtung:** Jeder, der sich beim Provider registrieren kann, bekommt diese Rechte. |
 
-Bei neuen Registrierungen ohne Auto-Freigabe erhalten Admins eine E-Mail, sofern SMTP konfiguriert ist.
+Bei neuen Registrierungen ohne Auto-Freigabe erhalten alle Benutzer mit `system:admin` eine E-Mail an ihre `users.email` (SMTP nötig). Adressen auf `.invalid` (z. B. lokaler Admin) werden übersprungen; es gibt keine eigene Empfängerliste und keine Drosselung. Bei Auto-Freigabe wird keine Mail verschickt.
 
 **Zwei Schalter:** Die Registrierung beim Provider (Zitadel: *Register allowed*, Authentik: Enrollment Flow) bleibt dauerhaft aktiv; im Alltag steuert der Admin nur `registrationEnabled` in on-duty. Bei einem dedizierten Provider ist der on-duty-Schalter optional, bei einem **geteilten** Provider nötig, sonst würde jeder dort Registrierte einen on-duty-Benutzer erhalten. Provider-Konten ohne on-duty-Benutzer können entstehen, wenn die Registrierung in on-duty aus ist.
 
@@ -129,3 +130,20 @@ return {
 Für die Selbstregistrierung einen Enrollment Flow bauen (Stages: Prompt → User Write → Email → User Login) und in der Login-Stage verlinken. Das Setzen des Attributs `email_verified` nach der Email-Stage (z. B. per Expression Policy) muss in der eigenen Instanz getestet werden. Sind alle Benutzer vertrauenswürdig, kann das Mapping stattdessen fest `True` liefern.
 
 Kontrolle: Im ID-Token bzw. Userinfo-Endpoint (z. B. mit jwt.io) muss `"email_verified": true` stehen.
+
+## Kontowechsel
+
+`/login` leitet automatisch zum Provider weiter, mit `prompt=select_account`. Dort kann ein anderes Konto gewählt werden. „Abmelden“ ist rein lokal (kein Single Sign-Out). Bei `/login?error=…` erfolgt keine Weiterleitung. `/admin/login` bleibt unverändert.
+
+## Anmeldeseite gestalten (Zitadel)
+
+`scripts/zitadel-init.mjs` (Phase `oidc`) setzt idempotent die Label Policy der Instanz (Primär-, Warn-, Hintergrundfarbe hell/dunkel aus `src/styles/app.css`), lädt `scripts/fonts/inter-500.ttf` hoch (Zitadel empfiehlt TTF; Inter, OFL-Lizenz) und aktiviert die Policy. Fehler dabei sind nur Warnungen. Grenzen: nur eine Schrift (Oswald für Überschriften nicht möglich), Logo fehlt noch.
+
+## Registrierung absichern (Zitadel-seitig)
+
+on-duty enthält keinen Bot-Schutz. Optionen beim Provider (Konkretes gegen die verwendete Zitadel-Version prüfen):
+
+- Registrierung abschalten bzw. nur per Einladung / Admin-Anlage.
+- Domain-Einschränkung und Captcha per Action oder vorgeschaltetem Dienst (nichts Eingebautes).
+- E-Mail-Verifizierung ist Pflicht (`email_verified=true`).
+- In on-duty `registrationEnabled` und Auto-Freigabe ausgeschaltet lassen.

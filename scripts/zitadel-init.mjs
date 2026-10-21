@@ -106,6 +106,58 @@ async function retry(fn, tries = 30) {
 await retry(() => api("GET", "/auth/v1/users/me"));
 
 if (PHASE === "oidc") {
+  // Branding of the Zitadel login page (instance label policy). Brand colors from src/styles/app.css, background/font = daisyUI theme defaults (light.css/dark.css); one font only, no logo.
+  try {
+    await api("PUT", "/admin/v1/policies/label", {
+      primaryColor: "#2a5280",
+      backgroundColor: "#ffffff",
+      warnColor: "#cc0000",
+      fontColor: "#18181b",
+      primaryColorDark: "#5b8fd0",
+      backgroundColorDark: "#27313e",
+      warnColorDark: "#ff6b6b",
+      fontColorDark: "#ecf9ff",
+      themeMode: "THEME_MODE_AUTO",
+    }).catch((e) => {
+      if (!String(e.message).includes("-> 400")) throw e; // 400 = "no changes", i.e. already applied
+    });
+    const boundary = "----zitadelinit";
+    const font = readFileSync(new URL("./fonts/inter-500.ttf", import.meta.url));
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="inter-500.ttf"\r\nContent-Type: font/ttf\r\n\r\n`),
+      font,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    await new Promise((resolve, reject) => {
+      const req = http.request(
+        {
+          host: "zitadel",
+          port: 8080,
+          method: "POST",
+          path: "/assets/v1/instance/policy/label/font",
+          headers: {
+            host: ZITADEL_DOMAIN,
+            "x-forwarded-proto": "https",
+            authorization: `Bearer ${pat}`,
+            "content-type": `multipart/form-data; boundary=${boundary}`,
+            "content-length": body.length,
+          },
+        },
+        (res) => {
+          let buf = "";
+          res.on("data", (c) => (buf += c));
+          res.on("end", () => (res.statusCode >= 300 ? reject(new Error(`font upload -> ${res.statusCode}: ${buf}`)) : resolve()));
+        },
+      );
+      req.on("error", reject);
+      req.end(body);
+    });
+    await api("POST", "/admin/v1/policies/label/_activate", {});
+    console.log("[zitadel-init] Login page branding applied.");
+  } catch (e) {
+    console.warn("[zitadel-init] Branding konnte nicht gesetzt werden (optional):", e.message);
+  }
+
   const found = await api("POST", "/management/v1/projects/_search", {
     queries: [{ nameQuery: { name: "on-duty", method: "TEXT_QUERY_METHOD_EQUALS" } }],
   });
