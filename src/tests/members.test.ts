@@ -380,6 +380,18 @@ describe("MembersTable", () => {
     expect(html).toContain(roleVorstand.title);
   });
 
+  it("hides secondary columns on narrow viewports (th and td)", async () => {
+    const item = memberWithAssignments({}, [makeAssignment({ role: roleAktiv })]);
+    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
+    const html = await res.text();
+    const count = (c: string) => html.split(`class="${c}"`).length - 1;
+    expect(count("hidden md:table-cell")).toBe(2);
+    expect(count("hidden lg:table-cell")).toBe(2);
+    expect(count("hidden xl:table-cell")).toBe(2);
+    // genau 6 hidden-Vorkommen: nur die drei Sekundärspalten (th + td)
+    expect(html.split("hidden").length - 1).toBe(6);
+  });
+
   it("hides closed assignments from the open-roles display", async () => {
     const item = memberWithAssignments({}, [makeAssignment({ to: "2020-01-01" })]);
     const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));

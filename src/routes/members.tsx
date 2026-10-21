@@ -280,9 +280,9 @@ export function MembersTable({
             <tr>
               <th><a href={sortUrl("lastName")} class="link link-hover">{t("members.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
               <th>{t("members.table.firstName")}</th>
-              <th><a href={sortUrl("birthDate")} class="link link-hover">{t("members.table.birthDate")} <SortIcon col="birthDate" active={sort} dir={dir} /></a></th>
-              <th><a href={sortUrl("entryDate")} class="link link-hover">{t("members.table.entryDate")} <SortIcon col="entryDate" active={sort} dir={dir} /></a></th>
-              <th>{t("members.table.roles")}</th>
+              <th class="hidden xl:table-cell"><a href={sortUrl("birthDate")} class="link link-hover">{t("members.table.birthDate")} <SortIcon col="birthDate" active={sort} dir={dir} /></a></th>
+              <th class="hidden lg:table-cell"><a href={sortUrl("entryDate")} class="link link-hover">{t("members.table.entryDate")} <SortIcon col="entryDate" active={sort} dir={dir} /></a></th>
+              <th class="hidden md:table-cell">{t("members.table.roles")}</th>
               <th>{t("members.table.status")}</th>
             </tr>
           </thead>
@@ -297,9 +297,9 @@ export function MembersTable({
               >
                 <td class="font-medium">{m.lastName}</td>
                 <td>{m.firstName}</td>
-                <td>{formatDate(m.birthDate)}</td>
-                <td>{formatDate(m.entryDate)}</td>
-                <td>
+                <td class="hidden xl:table-cell">{formatDate(m.birthDate)}</td>
+                <td class="hidden lg:table-cell">{formatDate(m.entryDate)}</td>
+                <td class="hidden md:table-cell">
                   {(() => {
                     const roles = openRoles(m);
                     return (
