@@ -459,6 +459,20 @@ describe("GET /", () => {
     expect(html).not.toContain("Adler");
   });
 
+  it("renders the status filter as multi-select dropdown", async () => {
+    findManyResult = [];
+    const html = await (await memberRoutes.request("/")).text();
+    expect(html).toContain('data-msf-param="status"');
+    for (const v of ["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"]) expect(html).toContain(`name="status" value="${v}"`);
+    expect(html).toContain(t("members.filter.currentStatus"));
+  });
+
+  it("labels the status filter by selection", async () => {
+    findManyResult = [];
+    expect(await (await memberRoutes.request("/?status=aktiv&status=jugend")).text()).toContain("2 Status");
+    expect(await (await memberRoutes.request("/?status=jugend")).text()).toContain(`${t("status.jugend")} ▾`);
+  });
+
   it("hides the add-member button for a read-only user", async () => {
     currentUser = { id: "u1", permissions: new Set(), disabled: false };
     findManyResult = [];

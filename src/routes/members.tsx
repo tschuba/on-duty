@@ -954,6 +954,28 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
   );
 }
 
+const STATUS_ORDER: MemberStatus[] = ["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"];
+const DEFAULT_STATUS: MemberStatus[] = ["aktiv", "passiv", "foerdernd", "kinder", "jugend"];
+
+function StatusFilterDropdown({ statusFilter }: { statusFilter: MemberStatus[] }) {
+  const isDefault = statusFilter.length === DEFAULT_STATUS.length && DEFAULT_STATUS.every((s) => statusFilter.includes(s));
+  return (
+    <MultiSelectFilter
+      param="status"
+      autoApply
+      searchable
+      options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "verstorben" ? "cross" : undefined }))}
+      selected={statusFilter}
+      labelOverride={isDefault ? t("members.filter.currentStatus") : undefined}
+      allLabel={t("members.filter.allStatus")}
+      countLabel={(count) => t("members.table.statusCount", { count })}
+      applyLabel={t("common.apply")}
+      resetLabel={t("common.reset")}
+      searchPlaceholder={t("common.searchPlaceholder")}
+    />
+  );
+}
+
 // ── List query parsing ──────────────────────────────────────────────────────
 
 export type ListQuery = {
@@ -1025,13 +1047,6 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   if (isHtmx) return c.html(tableEl);
 
-  function filterToggleUrl(s: MemberStatus) {
-    const next = statusFilter.includes(s)
-      ? statusFilter.filter((x) => x !== s)
-      : [...statusFilter, s];
-    return buildListUrl("/members", { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize }, { status: next, page: 1 });
-  }
-
   return c.html(
     <Layout title={t("members.title")} user={user} activeNav="members">
       <MemberTabs active="members" user={user} />
@@ -1059,17 +1074,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
             hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
           />
         </label>
-        <div class="join">
-          {(["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"] as MemberStatus[]).map((s) => (
-            <a
-              key={s}
-              href={filterToggleUrl(s)}
-              class={`btn join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
-            >
-              {s === "verstorben" && <Icon name="cross" class="w-4 h-4 inline-block align-middle mr-1" />}{STATUS_LABELS[s]}
-            </a>
-          ))}
-        </div>
+        <StatusFilterDropdown statusFilter={statusFilter} />
         <RoleFilterDropdown roles={allRoles} roleFilter={roleFilter} activeRoleIds={activeRoleIds} />
       </div>
 
