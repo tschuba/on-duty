@@ -1,10 +1,10 @@
-import { Icon } from "./icon.js";
-export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string };
+import { Icon, type IconName } from "./icon.js";
+export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string; icon?: IconName };
 
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
 // autoApply: Schließen navigiert (page=1). Sonst gehören die Checkboxen (name=param)
 // zu einem umgebenden <form method="get">, das beim Schließen mit geänderter Auswahl abgeschickt wird. UND/ODER entscheidet die Route.
-export function MultiSelectFilter({ param, options, selected, allLabel, countLabel, applyLabel, resetLabel, searchPlaceholder, emptyLabel, searchable = false, autoApply = false }: {
+export function MultiSelectFilter({ param, options, selected, allLabel, countLabel, applyLabel, resetLabel, searchPlaceholder, emptyLabel, searchable = false, autoApply = false, labelOverride }: {
   param: string;
   options: FilterOption[];
   selected: string[];
@@ -16,13 +16,14 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
   emptyLabel?: string;
   searchable?: boolean;
   autoApply?: boolean;
+  labelOverride?: string;
 }) {
   const id = `msf-${param}`;
-  const label = selected.length === 0
+  const label = labelOverride ?? (selected.length === 0
     ? allLabel
     : selected.length === 1
     ? (options.find((o) => o.value === selected[0])?.label ?? countLabel(1))
-    : countLabel(selected.length);
+    : countLabel(selected.length));
 
   return (
     <div class="msf inline-block" data-msf-param={param} data-msf-auto={autoApply ? "1" : undefined}>
@@ -41,6 +42,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             <li key={o.value} data-title={o.label.toLowerCase()}>
               <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${o.dim ? " opacity-50" : ""}`}>
                 <input type="checkbox" class="checkbox checkbox-xs" name={param} value={o.value} checked={selected.includes(o.value)} />
+                {o.icon && <Icon name={o.icon} class="w-4 h-4" />}
                 <span class="text-sm flex-1">{o.label}</span>
                 {o.hint && <span class="text-xs opacity-60">{o.hint}</span>}
               </label>
