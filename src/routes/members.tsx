@@ -1051,7 +1051,11 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
     <Layout title={t("members.title")} user={user} activeNav="members">
       <MemberTabs active="members" user={user} />
       <PageHeader title={t("members.title")} actions={<>
-        <HeaderAction icon="chart-bar" label={t("members.stats.toggle")} onclick="toggleMembersStats()" />
+        <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
+          <Icon name="chart-bar" class="w-5 h-5" />
+          <span class="@max-xl:hidden">{t("members.stats.toggle")}</span>
+          <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
+        </label>
         <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" />
         {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />
@@ -1089,8 +1093,8 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           const stats = document.getElementById('members-stats');
           const savedStats = localStorage.getItem('members_statsVisible');
           if (stats && savedStats) stats.style.display = savedStats === '1' ? 'grid' : 'none';
-          window.toggleMembersStats = function() {
-            const show = getComputedStyle(stats).display === 'none';
+          document.getElementById('members-stats-toggle').checked = getComputedStyle(stats).display !== 'none';
+          window.toggleMembersStats = function(show) {
             stats.style.display = show ? 'grid' : 'none';
             localStorage.setItem('members_statsVisible', show ? '1' : '0');
           };
