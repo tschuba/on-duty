@@ -235,7 +235,6 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     )}
                     <td>
                       <div class="flex gap-2 justify-end items-center">
-                        {canWrite && <button type="button" class="btn btn-outline btn-primary btn-xs" onclick="event.stopPropagation()" hx-get={`/roles/new?copyFrom=${r.id}`} hx-target="#modal-content" hx-swap="innerHTML">{t("common.copy")}</button>}
                         {canWrite && <MoveButtons action={`/roles/${r.id}/move`} id={r.id} />}
                         {canDelete ? (
                           <DeleteDialog
