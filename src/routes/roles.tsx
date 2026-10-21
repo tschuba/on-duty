@@ -235,6 +235,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     )}
                     <td>
                       <div class="flex gap-2 justify-end items-center">
+                        {canWrite && <button type="button" class="btn btn-outline btn-xs" onclick="event.stopPropagation()" hx-get={`/roles/new?copyFrom=${r.id}`} hx-target="#modal-content" hx-swap="innerHTML">{t("common.copy")}</button>}
                         {canWrite && <MoveButtons action={`/roles/${r.id}/move`} id={r.id} />}
                         {canDelete ? (
                           <DeleteDialog
@@ -411,11 +412,17 @@ const SHOW_MODAL = <script dangerouslySetInnerHTML={{ __html: "document.getEleme
 // HTMX fragment: new role modal
 roleRoutes.get("/roles/new", rolesWrite, async (c) => {
   const types = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
+  const copyFrom = c.req.query("copyFrom");
+  let source: typeof memberRoles.$inferSelect | undefined;
+  if (copyFrom) {
+    [source] = await db.select().from(memberRoles).where(eq(memberRoles.id, copyFrom));
+    if (!source) return c.html("", HTTP_STATUS.NOT_FOUND);
+  }
   return c.html(
     <>
       <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.create")}</h3>
       <form method="post" action="/roles" class="flex flex-col gap-3">
-        <RoleForm types={types} />
+        <RoleForm types={types} role={source && { ...source, title: "", isProtected: false }} />
         <ModalActions submit={t("common.create")} />
       </form>
       {SHOW_MODAL}
