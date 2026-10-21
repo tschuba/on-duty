@@ -13,8 +13,8 @@ function age(years: number, daysOffset = 0): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-const activeRole = { id: "aktives_mitglied", title: "Aktives Mitglied", grantsActiveStatus: true, isProtected: false };
-const passiveRole = { id: "passives_mitglied", title: "Passives Mitglied", grantsActiveStatus: false, isProtected: false };
+const activeRole = { id: "aktives_mitglied", title: "Aktives Mitglied", grantsActiveStatus: true, isProtected: false, sortOrder: 0, typeId: "t1" };
+const passiveRole = { id: "passives_mitglied", title: "Passives Mitglied", grantsActiveStatus: false, isProtected: false, sortOrder: 0, typeId: "t1" };
 
 function assignment(role: typeof activeRole, to: string | null = null) {
   return {
@@ -24,6 +24,7 @@ function assignment(role: typeof activeRole, to: string | null = null) {
     from: "2020-01-01",
     to,
     autoClosed: false,
+    note: null,
     role,
   };
 }

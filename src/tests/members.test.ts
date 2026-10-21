@@ -148,8 +148,8 @@ beforeEach(() => {
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-const roleAktiv = { id: "role-aktiv", title: "Aktives Mitglied", grantsActiveStatus: true, isProtected: false };
-const roleVorstand = { id: "role-vorstand", title: "Vorstand", grantsActiveStatus: true, isProtected: true };
+const roleAktiv = { id: "role-aktiv", title: "Aktives Mitglied", grantsActiveStatus: true, isProtected: false, sortOrder: 0, typeId: "t1" };
+const roleVorstand = { id: "role-vorstand", title: "Vorstand", grantsActiveStatus: true, isProtected: true, sortOrder: 0, typeId: "t1" };
 
 function makeMember(overrides: Record<string, unknown> = {}) {
   return {
@@ -161,9 +161,11 @@ function makeMember(overrides: Record<string, unknown> = {}) {
     houseNumber: null,
     zip: null,
     city: null,
+    companyName: null,
     gender: null,
     birthDate: "1985-05-01",
     entryDate: "2010-01-01",
+    firstEntryDate: "2010-01-01",
     exitDate: null,
     deathDate: null,
     iban: null,
@@ -184,6 +186,7 @@ function makeAssignment(overrides: Record<string, unknown> = {}) {
     from: "2010-01-01",
     to: null,
     autoClosed: false,
+    note: null,
     role: roleAktiv,
     ...overrides,
   };
