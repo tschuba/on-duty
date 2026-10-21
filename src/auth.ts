@@ -77,6 +77,7 @@ export const auth = betterAuth({
           discoveryUrl: `${env.OIDC_PROVIDER}/.well-known/openid-configuration`,
           scopes: ["openid", "email", "profile"],
           pkce: true,
+          prompt: "select_account", // account chooser: switching accounts needs no provider knowledge
           // sign-up is gated at runtime by the user.create.before hook (registrationEnabled)
         },
       ],

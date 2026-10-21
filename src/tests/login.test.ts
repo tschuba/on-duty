@@ -31,7 +31,7 @@ const { loginRoutes } = await import("../routes/login.js");
 
 describe("GET /login", () => {
   it("shows ORG_NAME in the heading", async () => {
-    const html = await (await loginRoutes.request("/login")).text();
+    const html = await (await loginRoutes.request("/login?error=oidc_failed")).text();
     expect(html).toMatch(/<h1[^>]*>Test Feuerwehr<\/h1>/);
     expect(html).not.toContain("OIDC");
   });

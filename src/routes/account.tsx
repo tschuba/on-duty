@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { deleteOwnAccount } from "../lib/account.js";
 import { auth } from "../auth.js";
+import { env } from "../env.js";
 import { db } from "../db/index.js";
 import { appRoles, userAppRoles } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
@@ -49,7 +50,8 @@ pendingRoutes.get("/", guard, (c) => {
     <Layout title={t("pending.title")}>
       <div class="max-w-md mx-auto text-center mt-16">
         <PageHeader title={t(unverified ? "pending.unverified.title" : "pending.title")} />
-        <p class="opacity-70 mb-6">{t(unverified ? "pending.unverified.body" : "pending.body")}</p>
+        <p class="opacity-70 mb-2">{t(unverified ? "pending.unverified.body" : "pending.body")}</p>
+        <p class="text-sm opacity-70 mb-6">{t("pending.signedInAs")} <strong>{user.email}</strong></p>
         <div class="flex gap-2 justify-center">
           <form method="post" action="/logout">
             <button type="submit" class="btn">{t("pending.logout")}</button>
@@ -84,6 +86,11 @@ accountRoutes.get("/", guard, async (c) => {
             {roles.length === 0 ? <span class="opacity-40">—</span> : roles.map((r) => <span class="badge badge-outline badge-sm">{r.name}</span>)}
           </dd>
         </dl>
+        {env.OIDC_ACCOUNT_URL && (
+          <p class="mb-4">
+            <a class="link" href={env.OIDC_ACCOUNT_URL} target="_blank" rel="noopener noreferrer">{t("account.manageLogin")}</a>
+          </p>
+        )}
         <p class="opacity-70 mb-4">{t("account.delete.body")}</p>
         <DeleteAccount />
       </div>

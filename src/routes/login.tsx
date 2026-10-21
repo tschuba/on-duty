@@ -28,7 +28,12 @@ loginRoutes.get("/login", async (c) => {
           ? t("login.error.registrationDisabled")
           : error === "email_unverified"
             ? t("login.error.emailUnverified")
-            : null;
+            : error
+              ? t("login.error.generic")
+              : null;
+
+  // Without an error go straight to the provider; with one, stay (redirecting again would loop).
+  if (!error) return c.redirect("/auth/oidc-start");
 
   const heading = env.ORG_NAME;
 

@@ -177,6 +177,7 @@ services:
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       APP_DOMAIN: ${SERVICE_FQDN_APP}
       LOGIN_DOMAIN: ${SERVICE_FQDN_ZITADELLOGIN}
+      ORG_NAME: ${ORG_NAME:?}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       # Same SMTP values as for on-duty — kept in sync in Zitadel on every run.
       SMTP_HOST: ${SMTP_HOST:-}

@@ -94,7 +94,7 @@ jobs:
           FILTER=(src/ drizzle/ public/
             package.json pnpm-lock.yaml pnpm-workspace.yaml
             Dockerfile tsup.config.ts drizzle.config.ts
-            scripts/zitadel-init.mjs scripts/copy-fonts.mjs scripts/copy-htmx.mjs)
+            scripts/zitadel-init.mjs scripts/copy-fonts.mjs scripts/copy-htmx.mjs branding/)
 
           # Ignore our own bump commit's package.json change by diffing without it only if nothing else matches
           changed=$(git diff --name-only origin/master...HEAD -- "${FILTER[@]}")

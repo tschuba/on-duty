@@ -46,6 +46,7 @@ export const env = {
   OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID!,
   OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET!,
   OIDC_APP_URL: process.env.OIDC_APP_URL!,
+  OIDC_ACCOUNT_URL: process.env.OIDC_ACCOUNT_URL,
   ADMIN_PASSWORD_MIN_LENGTH: Number(process.env.ADMIN_PASSWORD_MIN_LENGTH ?? "12"),
   SESSION_LIFETIME: process.env.SESSION_LIFETIME ?? "7d",
   CHILDREN_AGE_LIMIT: Number(process.env.CHILDREN_AGE_LIMIT ?? "12"),

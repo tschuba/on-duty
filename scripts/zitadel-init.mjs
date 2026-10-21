@@ -106,6 +106,81 @@ async function retry(fn, tries = 30) {
 await retry(() => api("GET", "/auth/v1/users/me"));
 
 if (PHASE === "oidc") {
+  // Branding of the Zitadel login page (instance label policy). Brand colors from src/styles/app.css, background/font = daisyUI theme defaults (light.css/dark.css); one font only, no logo.
+  try {
+    await api("PUT", "/admin/v1/policies/label", {
+      primaryColor: "#2a5280",
+      backgroundColor: "#ffffff",
+      warnColor: "#cc0000",
+      fontColor: "#18181b",
+      primaryColorDark: "#5b8fd0",
+      backgroundColorDark: "#27313e",
+      warnColorDark: "#ff6b6b",
+      fontColorDark: "#ecf9ff",
+      themeMode: "THEME_MODE_AUTO",
+    }).catch((e) => {
+      if (!String(e.message).includes("-> 400")) throw e; // 400 = "no changes", i.e. already applied
+    });
+    // Multipart upload to the Assets API (font and logos).
+    const upload = (path, file, name, type) =>
+      new Promise((resolve, reject) => {
+        const boundary = "----zitadelinit";
+        const body = Buffer.concat([
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${name}"\r\nContent-Type: ${type}\r\n\r\n`),
+          readFileSync(new URL(`../branding/${file}`, import.meta.url)),
+          Buffer.from(`\r\n--${boundary}--\r\n`),
+        ]);
+        const req = http.request(
+          {
+            host: "zitadel",
+            port: 8080,
+            method: "POST",
+            path: `/assets/v1/instance/policy/label/${path}`,
+            headers: {
+              host: ZITADEL_DOMAIN,
+              "x-forwarded-proto": "https",
+              authorization: `Bearer ${pat}`,
+              "content-type": `multipart/form-data; boundary=${boundary}`,
+              "content-length": body.length,
+            },
+          },
+          (res) => {
+            let buf = "";
+            res.on("data", (c) => (buf += c));
+            res.on("end", () => (res.statusCode >= 300 ? reject(new Error(`${path} upload -> ${res.statusCode}: ${buf}`)) : resolve()));
+          },
+        );
+        req.on("error", reject);
+        req.end(body);
+      });
+    await upload("font", "inter-500.ttf", "inter-500.ttf", "font/ttf");
+    await upload("logo", "logo.svg", "logo.svg", "image/svg+xml");
+    await upload("logo/dark", "logo-dark.svg", "logo-dark.svg", "image/svg+xml");
+    await api("POST", "/admin/v1/policies/label/_activate", {});
+    // Login UI v2 texts: name the organisation instead of "Zitadel" (only the keys listed here are overridden).
+    const org = process.env.ORG_NAME;
+    const texts = {
+      de: {
+        common: { title: `Anmelden bei ${org}` },
+        accounts: { description: "Wähle das Konto, mit dem du dich anmelden möchtest.", addAnother: "Mit einem anderen Konto anmelden" },
+        loginname: { title: "Willkommen zurück", description: "Melde dich mit deinen Zugangsdaten an." },
+        register: { description: `Leg dein Konto bei ${org} an.` },
+        logout: { title: "Abmelden", description: "Wähle das Konto, das du abmelden möchtest." },
+      },
+      en: {
+        common: { title: `Sign in to ${org}` },
+        accounts: { description: "Select the account you want to sign in with.", addAnother: "Sign in with another account" },
+        loginname: { title: "Welcome back", description: "Sign in with your credentials." },
+        register: { description: `Create your account for ${org}.` },
+        logout: { title: "Sign out", description: "Select the account you want to sign out." },
+      },
+    };
+    if (org) for (const [locale, translations] of Object.entries(texts)) await api("PUT", "/v2/settings/hosted_login_translation", { instance: true, locale, translations });
+    console.log("[zitadel-init] Login page branding applied.");
+  } catch (e) {
+    console.warn("[zitadel-init] Branding konnte nicht gesetzt werden (optional):", e.message);
+  }
+
   const found = await api("POST", "/management/v1/projects/_search", {
     queries: [{ nameQuery: { name: "on-duty", method: "TEXT_QUERY_METHOD_EQUALS" } }],
   });
