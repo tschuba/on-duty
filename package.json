@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "type": "module",
   "packageManager": "pnpm@12.5.1",
   "engines": {
@@ -16,6 +16,7 @@
     "db:setup": "pnpm db:migrate && pnpm db:seed",
     "db:studio": "drizzle-kit studio",
     "icons:generate": "node scripts/generate-icons.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

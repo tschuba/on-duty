@@ -31,7 +31,7 @@ function upload(head: string[], rows: Record<string, unknown>[]) {
   XLSX.utils.book_append_sheet(wb, ws, "Sheet");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   const fd = new FormData();
-  fd.set("file", new File([buf], "liste.xlsx"));
+  fd.set("file", new File([new Uint8Array(buf)], "liste.xlsx"));
   return fd;
 }
 const post = (path: string, body: BodyInit) => importRoutes.request(path, { method: "POST", body });
