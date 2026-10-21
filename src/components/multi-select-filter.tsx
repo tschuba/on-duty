@@ -1,4 +1,5 @@
-import { Icon, type IconName } from "./icon.js";
+import { Icon } from "./icon.js";
+import type { IconName } from "./icons.generated.js";
 export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string; icon?: IconName };
 
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
