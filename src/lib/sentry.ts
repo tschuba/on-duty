@@ -48,7 +48,6 @@ export function initSentry(opts: { transport?: Sentry.NodeOptions["transport"] }
     environment: process.env.NODE_ENV ?? "production",
     tracesSampleRate: 0,
     defaultIntegrations: false,
-    skipOpenTelemetrySetup: true,
     beforeBreadcrumb: () => null,
     beforeSend: sanitizeEvent,
     transport: opts.transport,
