@@ -23,7 +23,7 @@ export function Pager(props: {
             onchange={`
               const v = this.value;
               ${pageSizeStorageKey ? `localStorage.setItem('${pageSizeStorageKey}', v);` : ""}
-              const url = new URL(window.location.href);
+              const url = new window.URL(window.location.href);
               url.searchParams.set('pageSize', v);
               url.searchParams.set('page', '1');
               window.location = url.toString();
