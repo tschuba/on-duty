@@ -54,6 +54,18 @@ describe("import routes", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("B-Schlauch");
   });
+  it("rejects a file of the wrong kind when kind is set", async () => {
+    const fd = upload(INV_HEAD, [{ InventarID: 1, Bezeichnung: "X" }]);
+    fd.set("kind", "members");
+    const res = await post("/preview", fd);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Inventar-Export");
+  });
+  it("limits the upload page to the given kind", async () => {
+    const html = await (await importRoutes.request("/?kind=inventory")).text();
+    expect(html).toContain('name="kind" value="inventory"');
+    expect(html).not.toContain("mID");
+  });
   it("shows an error without a file", async () => {
     const res = await post("/preview", new FormData());
     expect(res.status).toBeLessThan(500);
