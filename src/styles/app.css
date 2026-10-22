@@ -173,6 +173,12 @@
 .page-header {
   top: var(--nav-h);
 }
+/* main ist flex-col (Pager klebt unten); Kinder brauchen min-width:0, sonst verhindert
+   ihr intrinsischer Inhalt (z.B. SubNav-Breakout) das Schrumpfen auf Viewport-Breite. */
+main > * {
+  min-width: 0;
+  width: 100%;
+}
 @media (min-width: 48rem) {
   body:has([data-subnav]) .page-header {
     top: calc(var(--nav-h) + var(--subnav-h));
