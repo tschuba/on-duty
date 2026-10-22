@@ -36,7 +36,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
           <label class="input input-bordered flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
         )}
         {unusedToggle && (
-          <label class="flex items-center gap-2 px-2 py-1 min-h-11 cursor-pointer text-sm"><input type="checkbox" class="toggle toggle-sm" data-msf-unused-toggle />{unusedToggle.label}</label>
+          <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-xs opacity-60"><input type="checkbox" class="toggle toggle-xs" data-msf-unused-toggle />{unusedToggle.label}</label>
         )}
         <ul class="space-y-0.5 max-h-64 overflow-y-auto">
           {options.length === 0 && emptyLabel && <li class="text-sm opacity-50 px-2 py-1">{emptyLabel}</li>}
