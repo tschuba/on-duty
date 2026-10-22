@@ -57,7 +57,7 @@ export function Pager(props: {
           <a href={pageUrl(page - 1)} class="join-item btn" aria-label={t("pager.prev")}>«</a>
         )}
         {pageWindow(page, totalPages).map((p, i) => {
-          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled hidden sm:inline-flex" aria-disabled="true">…</span>;
+          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled hidden sm:inline-flex px-2 min-w-0" aria-disabled="true">…</span>;
           if (p === page) {
             return totalPages > WINDOW_ALL ? (
               <div key={p} class="dropdown dropdown-top join-item"
