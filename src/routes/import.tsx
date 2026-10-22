@@ -30,8 +30,8 @@ const CATEGORY_LABEL: Record<InventoryCategory, string> = {
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
-const PageTitle = ({ children }: { children: string }) => (
-  <PageHeader title={children} />
+const PageTitle = ({ children, backHref }: { children: string; backHref?: string }) => (
+  <PageHeader title={children} backHref={backHref} />
 );
 
 // Zwischenstand im Browser: nur Formularwerte (nie die Datei), Schlüssel = Datei-Fingerprint, 24 h gültig.
@@ -78,12 +78,12 @@ function UploadPage({ user, error, kind: only }: { user: any; error?: string; ki
   return (
     <Layout title={t("common.nav.import")} user={user} activeNav="import">
       <div class="max-w-2xl mx-auto">
-        <PageTitle>{only ? t("import.title.kind", { kind: KIND_LABEL[only] }) : t("import.title")}</PageTitle>
+        <PageTitle backHref={only && LIST_HREF[only]}>{only ? t("import.title.kind", { kind: KIND_LABEL[only] }) : t("import.title")}</PageTitle>
         {error && <div class="alert alert-error mb-4">{error}</div>}
         <div class="alert alert-info mb-6">{t("import.backupHint")}</div>
 
         <Section title={t("import.upload.supported")} collapsible={false}>
-        <p class="text-sm opacity-70">{t("import.upload.help")}</p>
+        <p class="text-sm opacity-70">{only ? t("import.upload.helpKind", { kind: KIND_LABEL[only] }) : t("import.upload.help")}</p>
         <div class={`grid gap-4 mb-2 ${only ? "" : "sm:grid-cols-2"}`}>
           {([["members", "membersDetect", "membersFields"], ["inventory", "inventoryDetect", "inventoryFields"]] as const).filter(([kind]) => !only || kind === only).map(([kind, detect, fields]) => (
             <div class="card bg-base-200 shadow">
@@ -463,7 +463,7 @@ function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; f
   return (
     <Layout title={t("common.nav.import")} user={props.user} activeNav="import">
       <div class="max-w-6xl mx-auto">
-        <PageTitle>{t("import.preview.title", { kind: KIND_LABEL[props.kind] })}</PageTitle>
+        <PageTitle backHref={props.only && LIST_HREF[props.only]}>{t("import.preview.title", { kind: KIND_LABEL[props.kind] })}</PageTitle>
         <div id="restore-box" class="alert alert-info mb-4 hidden">
           <span>{t("import.restore.prompt")} <span id="restore-at"></span></span>
           <div><button type="button" id="restore-yes" class="btn btn-sm btn-primary mr-2">{t("import.restore.yes")}</button><button type="button" id="restore-no" class="btn btn-sm">{t("common.no")}</button></div>

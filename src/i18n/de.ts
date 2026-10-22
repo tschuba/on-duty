@@ -956,6 +956,8 @@ export const de = {
   "import.error.missingColumns": "Fehlende Spalten: {columns}",
   "import.error.wrongKind.members": "Diese Datei ist ein Inventar-Export, hier werden Mitglieder importiert.",
   "import.error.wrongKind.inventory": "Diese Datei ist ein Mitglieder-Export, hier wird Inventar importiert.",
+  "import.action": "Import",
+  "import.upload.helpKind": "Nur {kind} als Excel-Datei (.xlsx, max. 5 MB). Der Dateityp wird am Inhalt geprüft.",
   "import.title.kind": "Import: {kind}",
   "import.report.back.members": "Zurück zu Mitglieder",
   "import.report.back.inventory": "Zurück zu Inventar",

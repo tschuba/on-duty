@@ -75,7 +75,7 @@ services:
     restart: unless-stopped
     environment:
       SERVICE_FQDN_BUGSINK_8000:
-      SECRET_KEY: ${SERVICE_PASSWORD_BUGSINKSECRET}
+      SECRET_KEY: ${SERVICE_PASSWORD_64_BUGSINKSECRET}
       BASE_URL: https://${SERVICE_FQDN_BUGSINK}
       BEHIND_HTTPS_PROXY: "True"
       CREATE_SUPERUSER: ${BUGSINK_ADMIN_EMAIL:-admin@bugsink.local}:${SERVICE_PASSWORD_BUGSINK}
@@ -100,7 +100,7 @@ services:
     restart: "no"
     user: "0" # writes the DSN into the bugsink-bootstrap volume (root-owned by default)
     environment:
-      SECRET_KEY: ${SERVICE_PASSWORD_BUGSINKSECRET}
+      SECRET_KEY: ${SERVICE_PASSWORD_64_BUGSINKSECRET}
       BASE_URL: https://${SERVICE_FQDN_BUGSINK}
       BUGSINK_HOST: ${SERVICE_FQDN_BUGSINK}
       BUGSINK_RETENTION_EVENTS: ${BUGSINK_RETENTION_EVENTS:-10000}

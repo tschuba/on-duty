@@ -1066,7 +1066,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           <span class="@max-xl:hidden">{t("members.stats.toggle")}</span>
           <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
         </label>
-        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("common.nav.import")} href="/import?kind=members" />}
+        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=members" />}
         <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" />
         {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />

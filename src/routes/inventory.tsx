@@ -713,7 +713,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         showLending={user.permissions.has("lending:read")}
       />
       <PageHeader title={t("inventory.title")} actions={<>
-        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("common.nav.import")} href="/import?kind=inventory" />}
+        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 

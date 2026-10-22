@@ -117,6 +117,15 @@ function makeItem(overrides: Record<string, unknown> = {}) {
 
 // ── GET / (list) ─────────────────────────────────────────────────────────────
 
+describe("GET / import button", () => {
+  it("is shown only with import:run", async () => {
+    expect(await (await inventoryRoutes.request("/")).text()).not.toContain("/import?kind=inventory");
+    currentUser = { ...currentUser, permissions: new Set(["inventory:read", "import:run"]) };
+    expect(await (await inventoryRoutes.request("/")).text()).toContain("/import?kind=inventory");
+    currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
+  });
+});
+
 describe("GET / pagination", () => {
   const many = () => Array.from({ length: 30 }, (_, i) => makeItem({ id: `i${i}`, name: `Item${String(i).padStart(2, "0")}X` }));
   const count = (html: string) => (html.match(/Item\d\dX/g) ?? []).length;
