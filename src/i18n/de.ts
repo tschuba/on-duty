@@ -91,6 +91,7 @@ export const de = {
   "members.stats.formerLeft": "ausgetreten",
   "members.stats.formerDeceased": "verstorben",
   "members.filter.allRoles": "Alle Funktionen",
+  "members.filter.showUnusedRoles": "Ungenutzte Funktionen anzeigen",
   "members.filter.allStatus": "Alle Status",
   "members.filter.currentStatus": "Aktuelle Mitglieder",
   "members.form.lastName": "Nachname",

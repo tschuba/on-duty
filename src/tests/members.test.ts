@@ -24,6 +24,7 @@ function chainOf(rows: unknown) {
 }
 
 let rolesFixture: any[] = [];
+let activeRoleRowsFixture: { id: string }[] = []; // GET /: selectDistinct(memberRoleAssignments) active role ids
 let assignmentRowsFixture: any[] = []; // export: pre-joined {memberId, roleTitle, from, to}
 let findManyResult: any[] = [];
 let findFirstResult: any = undefined;
@@ -101,6 +102,7 @@ vi.mock("../db/index.js", () => ({
       },
     },
     select,
+    selectDistinct: vi.fn(() => ({ from: vi.fn(() => chainOf(activeRoleRowsFixture)) })),
     insert,
     update,
     delete: del,
@@ -134,6 +136,7 @@ beforeEach(() => {
   deleteCalls.length = 0;
   rolesFixture = [];
   assignmentRowsFixture = [];
+  activeRoleRowsFixture = [];
   findManyResult = [];
   findFirstResult = undefined;
   personLookupResult = [];
@@ -441,6 +444,16 @@ describe("GET /", () => {
     const html = await res.text();
     expect(html).toContain("<html");
     expect(html).toContain("Bauer");
+  });
+
+  it("marks roles without an active assignment as unused, independent of the member list", async () => {
+    findManyResult = [];
+    rolesFixture = [roleAktiv, roleVorstand];
+    activeRoleRowsFixture = [{ id: roleAktiv.id }];
+    const html = await (await memberRoutes.request("/?search=zzz")).text();
+    expect(html).toContain(t("members.filter.showUnusedRoles"));
+    const unused = html.match(/<li[^>]*data-unused="1"/g) ?? [];
+    expect(unused).toHaveLength(1);
   });
 
   it("shows the import button only with import:run", async () => {
