@@ -443,6 +443,14 @@ describe("GET /", () => {
     expect(html).toContain("Bauer");
   });
 
+  it("shows the import button only with import:run", async () => {
+    findManyResult = [];
+    expect(await (await memberRoutes.request("/")).text()).not.toContain("/import?kind=members");
+    currentUser = { ...currentUser, permissions: new Set(["members:write", "import:run"]) };
+    expect(await (await memberRoutes.request("/")).text()).toContain("/import?kind=members");
+    currentUser = { ...currentUser, permissions: new Set(["members:write"]) };
+  });
+
   it("returns only the table fragment for an HTMX request", async () => {
     findManyResult = [memberWithAssignments()];
     const res = await memberRoutes.request("/", { headers: { "HX-Request": "true" } });

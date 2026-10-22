@@ -30,8 +30,8 @@ const CATEGORY_LABEL: Record<InventoryCategory, string> = {
 };
 const today = () => new Date().toISOString().slice(0, 10);
 
-const PageTitle = ({ children }: { children: string }) => (
-  <PageHeader title={children} />
+const PageTitle = ({ children, backHref }: { children: string; backHref?: string }) => (
+  <PageHeader title={children} backHref={backHref} />
 );
 
 // Zwischenstand im Browser: nur Formularwerte (nie die Datei), Schlüssel = Datei-Fingerprint, 24 h gültig.
@@ -70,18 +70,22 @@ const DRAFT_SCRIPT = `
 const FP_SCRIPT = `
 document.getElementById("file").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) document.getElementById("fp").value = f.name + "-" + f.size + "-" + f.lastModified; });`;
 
-function UploadPage({ user, error }: { user: any; error?: string }) {
+const parseKind = (v: unknown): ImportKind | undefined => (v === "members" || v === "inventory" ? v : undefined);
+const importHref = (kind?: ImportKind) => (kind ? `/import?kind=${kind}` : "/import");
+const LIST_HREF: Record<ImportKind, string> = { members: "/members", inventory: "/inventory" };
+
+function UploadPage({ user, error, kind: only }: { user: any; error?: string; kind?: ImportKind }) {
   return (
     <Layout title={t("common.nav.import")} user={user} activeNav="import">
       <div class="max-w-2xl mx-auto">
-        <PageTitle>{t("import.title")}</PageTitle>
+        <PageTitle backHref={only && LIST_HREF[only]}>{only ? t("import.title.kind", { kind: KIND_LABEL[only] }) : t("import.title")}</PageTitle>
         {error && <div class="alert alert-error mb-4">{error}</div>}
         <div class="alert alert-info mb-6">{t("import.backupHint")}</div>
 
         <Section title={t("import.upload.supported")} collapsible={false}>
-        <p class="text-sm opacity-70">{t("import.upload.help")}</p>
-        <div class="grid gap-4 sm:grid-cols-2 mb-2">
-          {([["members", "membersDetect", "membersFields"], ["inventory", "inventoryDetect", "inventoryFields"]] as const).map(([kind, detect, fields]) => (
+        <p class="text-sm opacity-70">{only ? t("import.upload.helpKind", { kind: KIND_LABEL[only] }) : t("import.upload.help")}</p>
+        <div class={`grid gap-4 mb-2 ${only ? "" : "sm:grid-cols-2"}`}>
+          {([["members", "membersDetect", "membersFields"], ["inventory", "inventoryDetect", "inventoryFields"]] as const).filter(([kind]) => !only || kind === only).map(([kind, detect, fields]) => (
             <div class="card bg-base-200 shadow">
               <div class="card-body gap-2 p-4">
                 <h3 class="font-bold">{t(`import.kind.${kind}`)}</h3>
@@ -100,6 +104,7 @@ function UploadPage({ user, error }: { user: any; error?: string }) {
           <div class="card-body gap-3">
             <input id="file" type="file" name="file" accept=".xlsx" required class="file-input file-input-bordered w-full" />
             <input id="fp" type="hidden" name="fp" value="" />
+            {only && <input type="hidden" name="kind" value={only} />}
             <p class="text-sm opacity-60">{t("import.draftHint")}</p>
             <div class="flex justify-end"><button type="submit" class="btn btn-primary">{t("import.upload.submit")}</button></div>
           </div>
@@ -110,7 +115,7 @@ function UploadPage({ user, error }: { user: any; error?: string }) {
   );
 }
 
-importRoutes.get("/", guard, (c) => c.html(<UploadPage user={c.get("user")} />));
+importRoutes.get("/", guard, (c) => c.html(<UploadPage user={c.get("user")} kind={parseKind(c.req.query("kind"))} />));
 
 async function loadContext() {
   const roles: RoleOption[] = (await db.select({ id: memberRoles.id, title: memberRoles.title, grantsActiveStatus: memberRoles.grantsActiveStatus }).from(memberRoles))
@@ -121,7 +126,7 @@ async function loadContext() {
   return { roles, existingKeys, numbers };
 }
 
-async function readUpload(body: Body): Promise<{ buf: Buffer; name: string; kind: ImportKind; headers: string[]; rows: ReturnType<typeof readWorkbook>["rows"] }> {
+async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer; name: string; kind: ImportKind; headers: string[]; rows: ReturnType<typeof readWorkbook>["rows"] }> {
   let buf: Buffer, name: string;
   if (body.file instanceof File && body.file.size > 0) {
     name = body.file.name;
@@ -131,7 +136,9 @@ async function readUpload(body: Body): Promise<{ buf: Buffer; name: string; kind
     buf = Buffer.from(body.data, "base64");
   } else throw new ImportError(t("import.error.noFile"));
   checkUpload(name, buf);
-  return { buf, name, ...readWorkbook(buf) };
+  const wb = readWorkbook(buf);
+  if (only && wb.kind !== only) throw new ImportError(t(`import.error.wrongKind.${only}`));
+  return { buf, name, ...wb };
 }
 
 // Durchsuchbare Rollenauswahl: sichtbares Textfeld mit <datalist>, die ID steckt im Hidden-Feld.
@@ -332,8 +339,9 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
 async function handle(c: any, run: boolean) {
   const user = c.get("user");
   const body = (await c.req.parseBody({ all: true })) as Body;
+  const only = parseKind(body.kind);
   try {
-    const up = await readUpload(body);
+    const up = await readUpload(body, only);
     const ctx = await loadContext();
     const unmapped = unmappedColumns(up.kind, up.headers, up.rows);
     const fp = String(body.fp ?? "");
@@ -344,6 +352,7 @@ async function handle(c: any, run: boolean) {
         <input type="hidden" name="name" value={up.name} />
         <input type="hidden" name="fp" value={fp} />
         <input type="hidden" name="_seen" value="1" />
+        {only && <input type="hidden" name="kind" value={only} />}
         <input type="hidden" name="restored" value={String(body.restored ?? "")} />
       </>
     );
@@ -356,10 +365,10 @@ async function handle(c: any, run: boolean) {
       if (run) {
         if (!canRun) throw new ImportError(activeMissing ? t("import.error.activeRoleMissing") : t("import.error.previewIncomplete"));
         const report = await runMembers(plan, ctx.roles, user);
-        return c.html(<ReportPage kind="members" report={report} unmapped={unmapped} user={user} />);
+        return c.html(<ReportPage kind="members" only={only} report={report} unmapped={unmapped} user={user} />);
       }
       return c.html(
-        <PreviewShell user={user} kind="members" fp={fp} hidden={hidden} canRun={canRun} unmapped={unmapped}
+        <PreviewShell user={user} kind="members" only={only} fp={fp} hidden={hidden} canRun={canRun} unmapped={unmapped}
           summary={[
             { label: t("import.summary.read"), value: plan.rows.length },
             { label: t("import.summary.toImport"), value: plan.rows.filter((r) => r.included).length },
@@ -378,10 +387,10 @@ async function handle(c: any, run: boolean) {
     if (run) {
       if (!canRun) throw new ImportError(t("import.error.nothingNew"));
       const report = await runInventory(plan);
-      return c.html(<ReportPage kind="inventory" report={report} unmapped={unmapped} user={user} />);
+      return c.html(<ReportPage kind="inventory" only={only} report={report} unmapped={unmapped} user={user} />);
     }
     return c.html(
-      <PreviewShell user={user} kind="inventory" fp={fp} hidden={hidden} canRun={canRun} unmapped={unmapped} notices={[]}
+      <PreviewShell user={user} kind="inventory" only={only} fp={fp} hidden={hidden} canRun={canRun} unmapped={unmapped} notices={[]}
         summary={[
           { label: t("import.summary.read"), value: plan.rowCount },
           { label: t("import.summary.positions"), value: plan.positions.length },
@@ -392,7 +401,7 @@ async function handle(c: any, run: boolean) {
       </PreviewShell>,
     );
   } catch (e) {
-    if (e instanceof ImportError) return c.html(<UploadPage user={user} error={e.message} />, HTTP_STATUS.BAD_REQUEST);
+    if (e instanceof ImportError) return c.html(<UploadPage user={user} error={e.message} kind={only} />, HTTP_STATUS.BAD_REQUEST);
     throw e;
   }
 }
@@ -449,12 +458,12 @@ const COMBO_SCRIPT = `
 
 type Summary = { label: string; value: number; tone?: "error" | "warning" }[];
 
-function PreviewShell(props: { user: any; kind: ImportKind; fp: string; hidden: unknown; canRun: boolean; unmapped: { column: string; count: number }[]; notices: (string | { text: string; href: string } | false)[]; summary: Summary; children: unknown }) {
+function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; fp: string; hidden: unknown; canRun: boolean; unmapped: { column: string; count: number }[]; notices: (string | { text: string; href: string } | false)[]; summary: Summary; children: unknown }) {
   const notices = props.notices.filter((n): n is string | { text: string; href: string } => !!n);
   return (
     <Layout title={t("common.nav.import")} user={props.user} activeNav="import">
       <div class="max-w-6xl mx-auto">
-        <PageTitle>{t("import.preview.title", { kind: KIND_LABEL[props.kind] })}</PageTitle>
+        <PageTitle backHref={props.only && LIST_HREF[props.only]}>{t("import.preview.title", { kind: KIND_LABEL[props.kind] })}</PageTitle>
         <div id="restore-box" class="alert alert-info mb-4 hidden">
           <span>{t("import.restore.prompt")} <span id="restore-at"></span></span>
           <div><button type="button" id="restore-yes" class="btn btn-sm btn-primary mr-2">{t("import.restore.yes")}</button><button type="button" id="restore-no" class="btn btn-sm">{t("common.no")}</button></div>
@@ -471,7 +480,7 @@ function PreviewShell(props: { user: any; kind: ImportKind; fp: string; hidden: 
                 ))}
               </div>
               <div class="flex items-center gap-2">
-                <a id="discard" href="/import" class="btn btn-sm">{t("import.preview.discard")}</a>
+                <a id="discard" href={importHref(props.only)} class="btn btn-sm">{t("import.preview.discard")}</a>
                 <button id="refresh-btn" type="submit" formaction="/import/preview" class="btn btn-sm">{t("import.preview.refresh")}</button>
                 <button type="submit" name="intent" value="run" class="btn btn-sm btn-primary" disabled={!props.canRun}>{t("import.preview.run")}</button>
               </div>
@@ -499,11 +508,11 @@ function PreviewShell(props: { user: any; kind: ImportKind; fp: string; hidden: 
 
 type Report = { created: number; skipped: number; lines: string[]; links: { id: string; label: string }[]; newRoles: string[] };
 
-function ReportPage({ kind, report, unmapped, user }: { kind: ImportKind; report: Report; unmapped: { column: string; count: number }[]; user: any }) {
+function ReportPage({ kind, only, report, unmapped, user }: { kind: ImportKind; only?: ImportKind; report: Report; unmapped: { column: string; count: number }[]; user: any }) {
   return (
     <Layout title={t("common.nav.import")} user={user} activeNav="import">
       <div class="max-w-3xl mx-auto">
-        <PageTitle>{t("import.report.title", { kind: KIND_LABEL[kind] })}</PageTitle>
+        <PageTitle backHref={only && LIST_HREF[only]}>{t("import.report.title", { kind: KIND_LABEL[kind] })}</PageTitle>
         <div class="alert alert-success mb-4">{t("import.report.summary", { created: report.created, skipped: report.skipped })}</div>
         {report.lines.map((l) => <p>{l}</p>)}
         {report.newRoles.length > 0 && <><h2 class="text-lg font-bold mt-4">{t("import.report.newRoles")}</h2><ul class="list-disc ml-6">{report.newRoles.map((r) => <li>{r}</li>)}</ul></>}
@@ -516,7 +525,7 @@ function ReportPage({ kind, report, unmapped, user }: { kind: ImportKind; report
             <ul class="list-disc ml-6">{unmapped.map((u) => <li>{t("import.report.unmappedLine", { column: u.column, count: u.count })}</li>)}</ul></>
         )}
         <script dangerouslySetInnerHTML={{ __html: `for (const k of Object.keys(localStorage)) if (k.startsWith("onduty-import:")) localStorage.removeItem(k);` }} />
-        <a href="/import" class="btn mt-6">{t("import.report.another")}</a>
+        <a href={importHref(only)} class="btn mt-6">{t("import.report.another")}</a>
       </div>
     </Layout>
   );

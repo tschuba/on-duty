@@ -54,6 +54,29 @@ describe("import routes", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("B-Schlauch");
   });
+  it("rejects a file of the wrong kind when kind is set", async () => {
+    const fd = upload(INV_HEAD, [{ InventarID: 1, Bezeichnung: "X" }]);
+    fd.set("kind", "members");
+    const res = await post("/preview", fd);
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("Inventar-Export");
+  });
+  it("limits the upload page to the given kind", async () => {
+    const html = await (await importRoutes.request("/?kind=inventory")).text();
+    expect(html).toContain('name="kind" value="inventory"');
+    expect(html).not.toContain("mID");
+  });
+  it("accepts a matching file with kind and ignores an invalid kind", async () => {
+    const fd = upload(INV_HEAD, [{ InventarID: 1, "Inventartyp (Voll)": "Schlauch", Bezeichnung: "B-Schlauch", "Inventarnr.": "A1" }]);
+    fd.set("kind", "inventory");
+    expect((await post("/preview", fd)).status).toBe(200);
+    const bad = upload(INV_HEAD, [{ InventarID: 1, Bezeichnung: "X" }]);
+    bad.set("kind", "foo");
+    expect((await post("/preview", bad)).status).toBe(200);
+    const html = await (await importRoutes.request("/?kind=foo")).text();
+    expect(html).toContain("mID");
+    expect(html).toContain("InventarID");
+  });
   it("shows an error without a file", async () => {
     const res = await post("/preview", new FormData());
     expect(res.status).toBeLessThan(500);

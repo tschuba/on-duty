@@ -72,7 +72,7 @@ fi
 if [[ $WITH_ERRORS -eq 1 ]] && ! grep -q '^SERVICE_FQDN_BUGSINK=' "$ENV_FILE"; then
   cat >> "$ENV_FILE" <<EOF
 SERVICE_FQDN_BUGSINK=errors.localhost
-SERVICE_PASSWORD_BUGSINKSECRET=$(openssl rand -hex 32)
+SERVICE_PASSWORD_64_BUGSINKSECRET=$(openssl rand -hex 32)
 SERVICE_PASSWORD_BUGSINK=$(openssl rand -hex 16)
 EOF
 fi

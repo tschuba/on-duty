@@ -712,7 +712,10 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
         showLending={user.permissions.has("lending:read")}
       />
-      <PageHeader title={t("inventory.title")} actions={user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />} />
+      <PageHeader title={t("inventory.title")} actions={<>
+        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
+        {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
+      </>} />
 
       <div class="flex flex-wrap items-center gap-3 mb-4">
         <form method="get" action="/inventory" class="contents">
