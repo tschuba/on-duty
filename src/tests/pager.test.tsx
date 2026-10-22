@@ -31,11 +31,11 @@ describe("Pager rendering", () => {
     const html = await render(1, 3);
     expect(html).toContain('aria-current="page"');
     expect(html).toMatch(/<span[^>]*btn-disabled[^>]*>«/);
-    expect(html).not.toContain("<dialog");
+    expect(html).not.toContain("dropdown-content");
   });
   it("uses a grid popup for 8–50 pages", async () => {
     const html = await render(5, GRID_MAX_PAGES);
-    expect(html).toContain("<dialog");
+    expect(html).toContain("dropdown-content");
     expect(html).toContain("grid-cols-5");
     expect(html).not.toContain('type="number"');
   });
