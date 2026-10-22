@@ -268,9 +268,9 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const kindSummary = allKindsActive ? t("anniversaries.filter.all") : kindOpts.filter(([v]) => filters.includes(v)).map(([, l]) => l).join(", ");
   const modSummary = mods.length === 0 ? t("anniversaries.filter.all") : modOpts.filter(([v]) => mods.includes(v)).map(([, l]) => l).join(", ");
   const mobileFilter = (summary: string, name: string, opts: readonly (readonly [string, string])[], active: string[], allHref: string, hidden: [string, string][]) => (
-    <div class={`dropdown md:hidden max-w-full${name === "mod" ? " dropdown-end" : ""}`}>
+    <div class="dropdown md:hidden max-w-full">
       <button tabindex={0} type="button" class="btn max-w-full"><span class="truncate">{summary}</span></button>
-      <form method="get" action="/anniversaries" tabindex={0} class="dropdown-content bg-base-200 rounded-box z-50 w-64 p-3 shadow flex flex-col gap-2">
+      <form method="get" action="/anniversaries" tabindex={0} class="dropdown-content bg-base-200 rounded-box z-50 fixed left-4 right-4 w-auto p-3 shadow flex flex-col gap-2">
         {hidden.map(([n, v]) => <input type="hidden" name={n} value={v} />)}
         {opts.map(([v, l]) => (
           <label class="flex items-center gap-2 py-1"><input type="checkbox" class="checkbox" name={name} value={v} checked={active.includes(v) && !(name === "filter" && allKindsActive)} />{l}</label>

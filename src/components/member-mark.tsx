@@ -26,9 +26,9 @@ export function MemberFilter({ value, options, href }: {
           <a key={o.value} href={href(o.value)} class={`join-item btn${o.value === value ? " btn-outline btn-primary" : ""}`}>{o.label}</a>
         ))}
       </div>
-      <div class="dropdown dropdown-end md:hidden">
+      <div class="dropdown md:hidden">
         <button tabindex={0} type="button" class="btn max-w-full"><span class="truncate">{current?.label}</span></button>
-        <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-52 p-2 shadow">
+        <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 fixed left-4 right-4 w-auto p-2 shadow">
           {options.map((o) => <li key={o.value}><a href={href(o.value)} class={o.value === value ? "active" : ""}>{o.label}</a></li>)}
         </ul>
       </div>
