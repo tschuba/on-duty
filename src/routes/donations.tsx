@@ -276,8 +276,8 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
       <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
-        <div class="form-control">
-          <label class="input input-bordered flex items-center gap-2 w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+        <div class="form-control w-full md:w-auto">
+          <label class="input input-bordered flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
         <QuickRangeFilter presets={presets} start={from} end={to} href={(p) => buildListUrl("/donations", { search }, { from: p.start, to: p.end })} />
         <div class="form-control">
@@ -292,6 +292,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
       </form>
 
       <ClickToEditHint />
+      <div class="overflow-x-auto">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -334,6 +335,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           ))}
         </tbody>
       </table>
+      </div>
     </Layout>
   );
 });

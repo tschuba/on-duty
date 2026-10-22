@@ -353,6 +353,7 @@ applicationRoutes.get("/", guard, async (c) => {
         </a>
       </div>
       <ClickToEditHint />
+      <div class="overflow-x-auto">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -377,6 +378,7 @@ applicationRoutes.get("/", guard, async (c) => {
           ))}
         </tbody>
       </table>
+      </div>
     </Layout>
   );
 });
