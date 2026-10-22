@@ -98,12 +98,42 @@ describe("members", () => {
     expect(p.rows[0].included).toBe(false);
     const plan = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
     const a = plan.rows[0].assignments;
-    expect(a.map((x) => x.title)).toEqual(["Feuerwehr-Anwärter", "1. Kommandant", "Löschmeister"]);
-    expect(a[1]).toMatchObject({ note: "1.", from: "2026-01-01", assumed: true });
-    expect(a[2].assumed).toBe(true); // no Datum Beförderung → from = Eintritt, flagged
+    expect(a.map((x) => x.title)).toEqual(["1. Kommandant", "Löschmeister"]); // Löschmeister grants → no base role
+    expect(a[0]).toMatchObject({ note: "1.", from: "2026-01-01", assumed: true });
+    expect(a[1].assumed).toBe(true); // no Datum Beförderung → from = Eintritt, flagged
+    expect(plan.rows[2].assignments.map((x) => x.title)).toEqual(["Feuerwehr-Anwärter"]); // active, nothing else → base role
     expect(plan.rows[1].assignments).toEqual([]); // passive: no role
     expect(plan.rows[3].assignments).toEqual([]); // deceased
     expect(plan.titles.find((t) => t.title === "Löschmeister")).toMatchObject({ kind: "rank", grants: true });
+  });
+
+  it("falls back to base role when the granting assignment is ignored or skipped", () => {
+    const ign = planMembers(parsed, roles, new Set(), { _seen: "1", inc: ["1"], ign_0: "1", ign_1: "1" }, "2026-01-01");
+    expect(ign.rows[0].assignments.map((x) => x.title)).toContain("Feuerwehr-Anwärter");
+  });
+
+  it("lets the base role fallback be overridden, dated, annotated or skipped like a regular assignment", () => {
+    const base = { _seen: "1", inc: ["3"] };
+    const plain = planMembers(parsed, roles, new Set(), base, "2026-01-01");
+    expect(plain.rows[2].assignments[0]).toMatchObject({ key: "a", title: "Feuerwehr-Anwärter", from: plain.rows[2].m.entryDate, note: null });
+    const other = planMembers(parsed, roles, new Set(), { ...base, arole_3_a: "r-v" }, "2026-01-01");
+    expect(other.rows[2].assignments[0].roleChoice).toEqual({ kind: "role", roleId: "r-v" });
+    expect(other.rows[2].assignments[0].grants).toBe(false);
+    const edited = planMembers(parsed, roles, new Set(), { ...base, from_3_a: "2026-02-01", note_3_a: "geprüft" }, "2026-01-01");
+    expect(edited.rows[2].assignments[0]).toMatchObject({ from: "2026-02-01", note: "geprüft" });
+    const skipped = planMembers(parsed, roles, new Set(), { ...base, askip_3_a: "1" }, "2026-01-01");
+    expect(skipped.rows[2].assignments[0].skipped).toBe(true);
+  });
+
+  it("flags an assignment as suggested until the admin overrides its role, and never once overridden", () => {
+    const plan = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
+    expect(plan.rows[0].assignments.every((a) => a.suggested)).toBe(true);
+    const overridden = planMembers(parsed, roles, new Set(), { arole_1_0: "r-v" }, "2026-01-01");
+    expect(overridden.rows[0].assignments[0].suggested).toBe(false);
+    expect(overridden.rows[0].assignments[1].suggested).toBe(true);
+    // re-picking the same role the suggestion already had still counts as suggested
+    const reconfirmed = planMembers(parsed, roles, new Set(), { arole_1_0: "r-k" }, "2026-01-01");
+    expect(reconfirmed.rows[0].assignments[0].suggested).toBe(true);
   });
 
   it("honours ignore choice and warns when a passive gets an active-granting role", () => {

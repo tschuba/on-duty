@@ -142,12 +142,13 @@ async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer;
 }
 
 // Durchsuchbare Rollenauswahl: sichtbares Textfeld mit <datalist>, die ID steckt im Hidden-Feld.
-function RoleCombo({ name, value, roles, disabled }: { name: string; value: string; roles: RoleOption[]; disabled?: boolean }) {
+function RoleCombo({ name, value, roles, disabled, suggested }: { name: string; value: string; roles: RoleOption[]; disabled?: boolean; suggested?: boolean }) {
   const label = value === "new" ? t("import.option.new") : roles.find((r) => r.id === value)?.title ?? "";
   return (
     <>
       <input type="text" list="role-options" data-combo value={label} disabled={disabled} autocomplete="off" placeholder={t("import.option.search")}
-        class={`input input-bordered input-sm w-56 ${value === "new" ? "input-warning" : ""}`} />
+        class={`input input-bordered input-sm w-56 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
+        title={suggested ? t("import.role.suggestedHint") : undefined} />
       <input type="hidden" name={name} value={value} disabled={disabled} />
     </>
   );
@@ -201,7 +202,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         <table class="table table-zebra w-full">
           <thead><tr><th></th><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th><th>{t("import.col.notes")}</th></tr></thead>
           <tbody>
-            {plan.rows.map(({ m, included, duplicate, errors, warnings }) => (
+            {plan.rows.map(({ m, included, duplicate, errors, warnings, assignments }) => (
               <tr data-problem={errors.length || warnings.length ? "1" : undefined} class={duplicate ? "opacity-50 italic" : undefined}>
                 <td><input type="checkbox" name="inc" value={m.mid} class="checkbox checkbox-sm" checked={included} disabled={duplicate} /></td>
                 <td>{m.lastName}, {m.firstName}</td>
@@ -235,11 +236,12 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         <table class="table table-zebra w-full">
           <thead><tr><th>{t("import.col.person")}</th><th>{t("import.col.fwportal")}</th><th>{t("import.col.role")}</th><th>{t("import.col.note")}</th><th>{t("import.col.from")}</th><th>{t("import.col.skip")}</th></tr></thead>
           <tbody>
-            {included.flatMap(({ m, assignments }) => assignments.filter((a) => a.key !== "a").map((a) => (
+            {included.flatMap(({ m, assignments }) => assignments.map((a) => (
               <tr class={a.skipped ? "opacity-50" : undefined}>
-                <td>{m.lastName}, {m.firstName}</td><td>{a.title}</td>
+                <td>{m.lastName}, {m.firstName}</td>
+                <td>{a.key === "a" ? <span class="badge badge-info badge-sm" title={t("import.badge.baseRoleHint")}>{t("import.badge.baseRole")}</span> : a.title}</td>
                 <td>
-                  <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} />
+                  <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} suggested={a.suggested} />
                 </td>
                 <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input input-bordered input-sm" disabled={a.skipped} /></td>
                 <td>

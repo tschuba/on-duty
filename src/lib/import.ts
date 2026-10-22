@@ -189,9 +189,10 @@ export function suggestRole(title: string, roles: RoleOption[]): { choice: RoleC
 }
 
 export type TitleDecision = { title: string; kind: "function" | "rank"; count: number; choice: RoleChoice; ignored: boolean; grants: boolean };
+const sameChoice = (a: RoleChoice, b: RoleChoice) => a.kind === b.kind && (a.kind !== "role" || a.roleId === (b as { roleId: string }).roleId);
 export type PlannedAssignment = {
   key: string; title: string; kind: "function" | "rank"; roleChoice: RoleChoice; grants: boolean;
-  from: string; note: string | null; assumed: boolean; skipped: boolean;
+  from: string; note: string | null; assumed: boolean; skipped: boolean; suggested: boolean;
 };
 export type MemberRowPlan = {
   m: ParsedMember; included: boolean; duplicate: boolean; errors: string[]; warnings: string[];
@@ -247,9 +248,6 @@ export function planMembers(
 
     const assignments: PlannedAssignment[] = [];
     if (!m.deathDate && m.entryDate) {
-      if (m.active) {
-        assignments.push({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice: { kind: "role", roleId: ACTIVE_ROLE_ID }, grants: true, from: m.entryDate, note: null, assumed: false, skipped: false });
-      }
       const wanted = [...m.functions.map((title) => ({ title, kind: "function" as const })), ...(m.rank ? [{ title: m.rank, kind: "rank" as const }] : [])];
       wanted.forEach(({ title, kind }, k) => {
         const d = decision.get(title)!;
@@ -266,8 +264,19 @@ export function planMembers(
         const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : d.grants;
         if (!skipped && !m.active && grants && !(m.birthDate && ageInYears(m.birthDate) >= env.ACTIVE_AGE_LIMIT)) warnings.push(t("import.row.activeWarning", { title: title }));
         // Angenommen: Funktionsbeginn (fwportal liefert keins), fehlendes Beförderungsdatum.
-        assignments.push({ key: String(k), title, kind, roleChoice, grants, from, note, assumed: !skipped && (kind === "function" || !rankDate), skipped });
+        assignments.push({ key: String(k), title, kind, roleChoice, grants, from, note, assumed: !skipped && (kind === "function" || !rankDate), skipped, suggested: sameChoice(roleChoice, d.choice) });
       });
+      // Basisrolle nur als Fallback, wenn keine (nicht ausgelassene) Zuweisung den aktiven Status vergibt. Wie jede andere Zuweisung pro Mitglied überschreibbar.
+      if (m.active && !assignments.some((x) => !x.skipped && x.grants)) {
+        const rolePick = str(body, `arole_${m.mid}_a`);
+        const roleChoice: RoleChoice = !rolePick ? { kind: "role", roleId: ACTIVE_ROLE_ID } : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
+        const skipped = str(body, `askip_${m.mid}_a`) === "1";
+        const from = toIsoDate(str(body, `from_${m.mid}_a`)) ?? m.entryDate!;
+        const noteIn = str(body, `note_${m.mid}_a`);
+        const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : null;
+        const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : true;
+        assignments.unshift({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice, grants, from, note, assumed: false, skipped, suggested: sameChoice(roleChoice, { kind: "role", roleId: ACTIVE_ROLE_ID }) });
+      }
     }
     return { m, included, duplicate, errors, warnings, assignments };
   });
