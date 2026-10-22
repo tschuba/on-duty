@@ -12,9 +12,9 @@ export function pageWindow(page: number, total: number): (number | "…")[] {
   return pages.flatMap((p, i) => (i > 0 && p - pages[i - 1] > 1 ? ["…" as const, p] : [p]));
 }
 
-// Prefer height over width: about twice as many rows as columns, max 5 columns.
+// Target a 5:4 (width:height) grid; capped at 7 columns (7 * 2.75rem + padding fits a 360px phone).
 export function gridColumns(total: number): number {
-  return Math.min(5, Math.max(2, Math.ceil(Math.sqrt(total / 2))));
+  return Math.min(7, Math.max(2, Math.ceil(Math.sqrt((total * 5) / 4))));
 }
 
 export function Pager(props: {
