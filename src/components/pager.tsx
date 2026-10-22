@@ -52,7 +52,7 @@ export function Pager(props: {
       )}
       <div class="join">
         {pageWindow(page, totalPages).map((p, i) => {
-          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled hidden sm:inline-flex px-2 min-w-0" aria-disabled="true">…</span>;
+          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled px-2 min-w-0" aria-disabled="true">…</span>;
           if (p === page) {
             return totalPages > WINDOW_ALL ? (
               <div key={p} class="dropdown dropdown-top join-item"
