@@ -710,6 +710,7 @@ export const de = {
   "inventory.tabs.stock": "Bestand",
   "inventory.tabs.inspections": "Prüffristen",
   "inventory.newItem": "Neuer Gegenstand",
+  "inventory.table.count": "{count} Einträge",
   "inventory.table.name": "Name",
   "inventory.table.category": "Kategorie",
   "inventory.table.dueDate": "Nächste Prüfung",
