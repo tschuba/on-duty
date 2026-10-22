@@ -58,11 +58,15 @@ export function Pager(props: {
               <div key={p} class="dropdown dropdown-top join-item"
                 onfocusin={`
                   const c = this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
-                  const r = this.getBoundingClientRect(), w = c.offsetWidth, m = 8;
-                  const x = r.left + r.width / 2 - w / 2;
-                  const left = Math.max(m, Math.min(x, window.innerWidth - m - w)) - r.left;
-                  c.style.left = left + 'px';
-                  a.style.left = (r.width / 2 - left - 6) + 'px';
+                  const r = this.getBoundingClientRect(), m = 8;
+                  let left = r.width / 2 - c.offsetWidth / 2;
+                  const place = () => { c.style.left = left + 'px'; a.style.left = (r.width / 2 - left - 6) + 'px'; };
+                  place();
+                  requestAnimationFrame(() => {
+                    const b = c.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+                    left += Math.max(m - b.left, Math.min(0, vw - m - b.right));
+                    place();
+                  });
                 `}>
                 <div tabindex={0} role="button" class="btn btn-primary join-item gap-1 rounded-none" aria-current="page" aria-haspopup="true" title={t("pager.selectPage")}>
                   {p}
