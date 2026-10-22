@@ -959,8 +959,6 @@ export const de = {
   "import.action": "Import",
   "import.upload.helpKind": "Nur {kind} als Excel-Datei (.xlsx, max. 5 MB). Der Dateityp wird am Inhalt geprüft.",
   "import.title.kind": "Import: {kind}",
-  "import.report.back.members": "Zurück zu Mitglieder",
-  "import.report.back.inventory": "Zurück zu Inventar",
   "import.error.noFile": "Keine Datei hochgeladen.",
   "import.error.noHeader": "Kopfzeile nicht gefunden (erwartet: Spalte „mID“ oder „InventarID“).",
   "import.error.notXlsx": "Nur .xlsx-Dateien werden unterstützt.",

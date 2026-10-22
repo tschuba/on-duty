@@ -512,7 +512,7 @@ function ReportPage({ kind, only, report, unmapped, user }: { kind: ImportKind; 
   return (
     <Layout title={t("common.nav.import")} user={user} activeNav="import">
       <div class="max-w-3xl mx-auto">
-        <PageTitle>{t("import.report.title", { kind: KIND_LABEL[kind] })}</PageTitle>
+        <PageTitle backHref={only && LIST_HREF[only]}>{t("import.report.title", { kind: KIND_LABEL[kind] })}</PageTitle>
         <div class="alert alert-success mb-4">{t("import.report.summary", { created: report.created, skipped: report.skipped })}</div>
         {report.lines.map((l) => <p>{l}</p>)}
         {report.newRoles.length > 0 && <><h2 class="text-lg font-bold mt-4">{t("import.report.newRoles")}</h2><ul class="list-disc ml-6">{report.newRoles.map((r) => <li>{r}</li>)}</ul></>}
@@ -525,10 +525,7 @@ function ReportPage({ kind, only, report, unmapped, user }: { kind: ImportKind; 
             <ul class="list-disc ml-6">{unmapped.map((u) => <li>{t("import.report.unmappedLine", { column: u.column, count: u.count })}</li>)}</ul></>
         )}
         <script dangerouslySetInnerHTML={{ __html: `for (const k of Object.keys(localStorage)) if (k.startsWith("onduty-import:")) localStorage.removeItem(k);` }} />
-        <div class="flex gap-2 mt-6">
-          <a href={importHref(only)} class="btn">{t("import.report.another")}</a>
-          {only && <a href={LIST_HREF[only]} class="btn btn-ghost">{t(`import.report.back.${only}`)}</a>}
-        </div>
+        <a href={importHref(only)} class="btn mt-6">{t("import.report.another")}</a>
       </div>
     </Layout>
   );
