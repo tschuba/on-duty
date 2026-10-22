@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
-import { eq, and, asc, getTableColumns } from "drizzle-orm";
+import { eq, and, asc, isNull, getTableColumns } from "drizzle-orm";
 import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleTypes, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
@@ -953,7 +953,8 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
       param="role"
       autoApply
       searchable
-      options={roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" }))}
+      options={roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), unused: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" }))}
+      unusedToggle={{ label: t("members.filter.showUnusedRoles"), storageKey: "members.showUnusedRoles" }}
       selected={roleFilter}
       allLabel={t("members.filter.allRoles")}
       countLabel={(count) => t("members.table.roleCount", { count })}
@@ -1022,13 +1023,13 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
     q, c.req.queries("status") ?? [], c.req.queries("role") ?? []
   );
 
-  const [all, allRoles] = await Promise.all([
+  const [all, allRoles, activeRoleRows] = await Promise.all([
     fetchMembersWithStatus(search || undefined),
     fetchRoles(),
+    db.selectDistinct({ id: memberRoleAssignments.memberRoleId }).from(memberRoleAssignments).where(isNull(memberRoleAssignments.to)),
   ]);
-  const activeRoleIds = new Set(
-    all.flatMap((m) => m.assignments.filter((a) => !a.to).map((a) => a.memberRoleId))
-  );
+  // Unabhängig von Suche/Statusfilter, damit "ungenutzt" stabil bleibt.
+  const activeRoleIds = new Set(activeRoleRows.map((r) => r.id));
   const filtered = all
     .filter((m) => statusFilter.includes(m.status))
     .filter((m) => roleFilter.length === 0 || m.assignments.some((a) => !a.to && roleFilter.includes(a.memberRoleId)));

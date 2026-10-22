@@ -1,11 +1,11 @@
 import { Icon } from "./icon.js";
 import type { IconName } from "./icons.generated.js";
-export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string; icon?: IconName };
+export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string; icon?: IconName; unused?: boolean };
 
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
 // autoApply: Schließen navigiert (page=1). Sonst gehören die Checkboxen (name=param)
 // zu einem umgebenden <form method="get">, das beim Schließen mit geänderter Auswahl abgeschickt wird. UND/ODER entscheidet die Route.
-export function MultiSelectFilter({ param, options, selected, allLabel, countLabel, applyLabel, resetLabel, searchPlaceholder, emptyLabel, searchable = false, autoApply = false, labelOverride }: {
+export function MultiSelectFilter({ param, options, selected, allLabel, countLabel, applyLabel, resetLabel, searchPlaceholder, emptyLabel, searchable = false, autoApply = false, labelOverride, unusedToggle }: {
   param: string;
   options: FilterOption[];
   selected: string[];
@@ -18,6 +18,8 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
   searchable?: boolean;
   autoApply?: boolean;
   labelOverride?: string;
+  // Blendet Optionen mit unused=true clientseitig aus; Zustand in localStorage[storageKey].
+  unusedToggle?: { label: string; storageKey: string };
 }) {
   const id = `msf-${param}`;
   const label = labelOverride ?? (selected.length === 0
@@ -33,6 +35,9 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
         {searchable && (
           <label class="input input-bordered flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
         )}
+        {unusedToggle && (
+          <label class="flex items-center gap-2 px-2 py-1 min-h-11 cursor-pointer text-sm"><input type="checkbox" class="checkbox checkbox-xs" data-msf-unused-toggle />{unusedToggle.label}</label>
+        )}
         <ul class="space-y-0.5 max-h-64 overflow-y-auto">
           {options.length === 0 && emptyLabel && <li class="text-sm opacity-50 px-2 py-1">{emptyLabel}</li>}
           {options.map((o, i) => (
@@ -40,7 +45,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             {o.group && o.group !== options[i - 1]?.group && (
               <li class="text-xs font-semibold opacity-60 px-2 pt-2" data-msf-group>{o.group}</li>
             )}
-            <li key={o.value} data-title={o.label.toLowerCase()}>
+            <li key={o.value} data-title={o.label.toLowerCase()} data-unused={o.unused && !selected.includes(o.value) ? "1" : undefined}>
               <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${o.dim ? " opacity-50" : ""}`}>
                 <input type="checkbox" class="checkbox checkbox-xs" name={param} value={o.value} checked={selected.includes(o.value)} />
                 {o.icon && <Icon name={o.icon} class="w-4 h-4" />}
@@ -58,6 +63,32 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
           )}
         </div>
       </div>
+      {unusedToggle && (
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            var s = document.currentScript, panel = s.parentElement.querySelector('.msf-panel');
+            var tg = panel.querySelector('[data-msf-unused-toggle]'), key = ${JSON.stringify(unusedToggle.storageKey)};
+            var show = false;
+            try { show = localStorage.getItem(key) === '1'; } catch (e) {}
+            var apply = function() {
+              var lis = Array.from(panel.querySelectorAll('li'));
+              lis.forEach(function(li) { if (li.dataset.unused) li.classList.toggle('hidden', !tg.checked); });
+              lis.forEach(function(li, i) {
+                if (!('msfGroup' in li.dataset)) return;
+                var any = false;
+                for (var j = i + 1; j < lis.length && !('msfGroup' in lis[j].dataset); j++) if (!lis[j].classList.contains('hidden')) any = true;
+                li.classList.toggle('hidden', !any);
+              });
+            };
+            tg.checked = show;
+            tg.addEventListener('change', function() {
+              try { localStorage.setItem(key, tg.checked ? '1' : '0'); } catch (e) {}
+              apply();
+            });
+            apply();
+          })();
+        ` }} />
+      )}
       <script dangerouslySetInnerHTML={{ __html: `
         if (!window.__msf) {
           window.__msf = true;
@@ -103,7 +134,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             var panel = cb.closest('.msf-panel');
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
-              var vis = q(panel, 'li:not([hidden]) input[type=checkbox]');
+              var vis = q(panel, 'li:not([hidden]) input[type=checkbox]').filter(function(c) { return c.offsetParent !== null; });
               var n = vis.indexOf(cb) + (e.key === 'ArrowDown' ? 1 : -1);
               if (n >= 0 && n < vis.length) vis[n].focus();
             } else if (e.key === 'Enter') {
