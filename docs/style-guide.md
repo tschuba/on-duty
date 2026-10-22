@@ -53,7 +53,7 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 | 2 | Untermenü (`.subnav`) | 30 | ab `md` |
 | 3 | `PageHeader` | 20 | immer |
 | 4 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
-| unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase über der aktuellen Seite zur Seitenwahl) | 10 (30 solange die Seitenwahl offen ist) | immer |
+| unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase über der aktuellen Seite zur Seitenwahl; unter `sm` nur aktuelle Seite mit Sprechblase, immer einzeilig) | 10 (30 solange die Seitenwahl offen ist) | immer |
 
 Regeln:
 - Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--subnav-h`, `--header-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
@@ -75,7 +75,7 @@ Zwei Kategorien, bewusst unterschiedlich behandelt — nicht alles muss wie die 
 
 - `class="table table-zebra w-full"`
 - Sortierbare Spalten wo fachlich sinnvoll (Klick auf Spaltenkopf, `SortIcon`-Komponente als Indikator) — nicht zwingend auf jeder Spalte
-- Pagination bei potenziell langen Listen: `<Pager>` (`src/components/pager.tsx`), sticky am unteren Viewport-Rand (`sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers, damit die Version sichtbar bleibt), deckender Hintergrund). Sticky bezieht sich auf den nächsten Scroll-Container: Vorfahren dürfen kein `overflow` ≠ `visible` haben, der Pager steht daher **außerhalb** des `overflow-x-auto`-Tabellen-Wrappers.
+- Pagination bei potenziell langen Listen: `<Pager>` (`src/components/pager.tsx`), sticky am unteren Viewport-Rand (`sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers, damit die Version sichtbar bleibt), deckender Hintergrund). Sticky bezieht sich auf den nächsten Scroll-Container: Vorfahren dürfen kein `overflow` ≠ `visible` haben, der Pager steht daher **außerhalb** des `overflow-x-auto`-Tabellen-Wrappers. Mobil (unter `sm`) bricht der Pager nie um: Zähler, Seitengrößen-Select (ohne Label, nur `aria-label`) und nur die aktuelle Seite; die Seitenwahl läuft immer über die Sprechblase, auch bei ≤ 7 Seiten.
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-8">{leerer-Text}</td></tr>`
 
 Die Kategorie richtet sich nur danach, ob die Tabelle die **primäre Datenliste ihres Tabs/ihrer Seite** ist — nicht danach, ob zusätzlich eine Breiten-Einschränkung (`max-w-*`) angewendet wird. `max-w-*` gehört auf den Wrapper/die Tabelle als zusätzlicher Modifier, entscheidet aber nicht die Kategorie (Haupt-Liste vs. Sub-Tabelle).

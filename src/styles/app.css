@@ -178,9 +178,9 @@
     top: calc(var(--nav-h) + var(--subnav-h));
   }
 }
-/* Such-/Filterleiste klebt unter dem PageHeader. --header-h geschätzt (py-2 + btn 2.5rem), bei Spalt/Überlappung anpassen. */
+/* Such-/Filterleiste klebt unter dem PageHeader. --header-h geschätzt (pt-2 + btn 2.5rem + pb-4 = min-h-16), bei Spalt/Überlappung anpassen. */
 .filter-bar {
-  --header-h: 3.5rem;
+  --header-h: 4rem;
   position: sticky;
   z-index: 15;
   top: calc(var(--nav-h) + var(--header-h));
