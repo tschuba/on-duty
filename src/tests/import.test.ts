@@ -154,6 +154,17 @@ describe("inventory", () => {
     expect(plan.positions[0].category).toBe("ppe");
   });
 
+  it("warns only for unknown types until confirmed; per-position category and tags override", () => {
+    const plan = planInventory(items, new Set(), {});
+    expect(plan.levels.map((l) => l.checkCategory)).toEqual([false, false, true]);
+    expect(plan.positions.find((p) => p.name === "Ding")!.checkCategory).toBe(true);
+    const done = planInventory(items, new Set(), { cat_2: "other", pcat_1: "vehicle", tags_3: ["A", "b"] });
+    expect(done.levels[2].checkCategory).toBe(false);
+    const mikro = done.positions.filter((p) => p.name === "Mikro");
+    expect(mikro).toHaveLength(2); // vehicle cannot bundle
+    expect(done.positions.find((p) => p.name === "Helm")!.tags).toEqual(["A", "b"]);
+  });
+
   it("never bundles non-batch categories", () => {
     const veh = parseInventory(readWorkbook(book(INV_HEAD, [irow(1, "Fahrzeug | A", "A", "1"), irow(2, "Fahrzeug | A", "A", "2")])).rows);
     const plan = planInventory(veh, new Set(), { cat_0: "vehicle" });
