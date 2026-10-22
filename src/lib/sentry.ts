@@ -5,7 +5,7 @@ import { logger } from "./logger.js";
 
 let enabled = false;
 
-function readDsn(): string | undefined {
+export function readDsn(): string | undefined {
   const direct = process.env.SENTRY_DSN?.trim();
   if (direct) return direct;
   const file = process.env.SENTRY_DSN_FILE;

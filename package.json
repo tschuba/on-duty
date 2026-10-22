@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "type": "module",
   "packageManager": "pnpm@12.5.1",
   "engines": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "concurrently \"node --env-file=.env --import=tsx/esm --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
-    "build": "tsup && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
+    "build": "node scripts/build-browser-sentry.mjs && tsup && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs",
+    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs && node scripts/build-browser-sentry.mjs",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@fontsource/inter": "^5.1.0",
     "@fontsource/oswald": "^5.1.0",
+    "@sentry/browser": "^11.8.0",
     "@tailwindcss/cli": "^4.1.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^26.6.5",
@@ -51,6 +52,7 @@
     "concurrently": "^10.0.6",
     "daisyui": "^5.7.50",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
     "heroicons": "^2.2.0",
     "tailwindcss": "^4.1.0",
     "tsup": "^9.0.0",

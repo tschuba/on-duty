@@ -50,7 +50,7 @@ Optional (Defaults in der App):
 | `SMTP_USER` | — | SMTP-Benutzername |
 | `SMTP_PASS` | — | SMTP-Passwort |
 | `SMTP_FROM` | — | Absenderadresse für E-Mail-Benachrichtigungen |
-| `SENTRY_DSN` | — | Fehlererfassung an ein Sentry-kompatibles Backend (Bugsink, GlitchTip, Sentry); leer = aus |
+| `SENTRY_DSN` | — | Fehlererfassung an ein Sentry-kompatibles Backend (Bugsink, GlitchTip, Sentry); leer = aus. Browser-JS-Fehler laufen über `POST /sentry-tunnel` (nur eingeloggt, 100 KB, 20/min je Nutzer); die DSN bleibt serverseitig. Der Browser-Teil ist clientgesteuert, die Server-Allowlist greift dort nicht inhaltlich. Bundle `public/js/sentry.min.js`: 91 KB / 31 KB gzip |
 | `ERROR_TRACKER_URL` | — | Link zum Fehler-Tracker-Dashboard unter Admin → Konfiguration; leer = kein Link |
 
 ### 3. Erste Version deployen
