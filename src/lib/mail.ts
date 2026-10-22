@@ -11,7 +11,7 @@ export function isSmtpConfigured(): boolean {
 // server is unreachable. Callers surface `sent: false` to the user as an inline hint.
 export async function sendMail(to: string, subject: string, text: string): Promise<{ sent: boolean }> {
   if (!isSmtpConfigured()) {
-    logger.warn({ subject }, "[mail] SMTP nicht konfiguriert — E-Mail nicht versendet");
+    logger.warn({ subject }, "[mail] SMTP not configured, email not sent");
     return { sent: false };
   }
 
@@ -24,7 +24,7 @@ export async function sendMail(to: string, subject: string, text: string): Promi
     await transport.sendMail({ from: env.SMTP_FROM, to, subject, text });
     return { sent: true };
   } catch (err) {
-    logger.error({ err, subject }, "[mail] Versand fehlgeschlagen");
+    logger.error({ err, subject }, "[mail] sending failed");
     return { sent: false };
   }
 }

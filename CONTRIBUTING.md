@@ -48,6 +48,8 @@ pnpm install  # richtet den Hook automatisch ein
 | Dokumentation (README, Docs) | Deutsch |
 | UI-Texte | i18n-Dateien (`src/i18n/de.ts` + `src/i18n/en.ts`) |
 
+Log-Nachrichten (Pino) sind durchgehend englisch, ohne Namen, E-Mails oder IBANs; Details als strukturierte Felder (`logger.error({ err }, "…")`).
+
 Keine UI-Texte direkt in Templates — ausschließlich über i18n-Schlüssel.
 
 ## i18n

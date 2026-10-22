@@ -137,16 +137,16 @@ export async function startBackupScheduler(): Promise<void> {
       await fs.access(env.BACKUP_LOCAL_PATH, constants.W_OK);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      logger.error({ path: env.BACKUP_LOCAL_PATH, reason }, "BACKUP_LOCAL_PATH nicht schreibbar");
+      logger.error({ path: env.BACKUP_LOCAL_PATH, reason }, "BACKUP_LOCAL_PATH is not writable");
       process.exit(1);
     }
   }
   if (!isBackupConfigured()) {
-    logger.warn("[backup] Kein Backup-Ziel konfiguriert — Scheduler nicht gestartet.");
+    logger.warn("[backup] no backup target configured, scheduler not started");
     return;
   }
   cron.schedule(env.BACKUP_SCHEDULE, () => {
-    runBackup().catch((err) => logger.error({ err }, "[backup] Unbehandelter Fehler"));
+    runBackup().catch((err) => logger.error({ err }, "[backup] unhandled error"));
   });
   logger.info({ schedule: env.BACKUP_SCHEDULE }, "[backup] Scheduler started");
 }

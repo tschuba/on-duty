@@ -11,7 +11,7 @@ healthRoutes.get("/health", async (c) => {
     await db.execute(sql`select 1`);
     return c.text("ok");
   } catch (err) {
-    c.get("log").error({ err }, "health check: DB nicht erreichbar");
+    c.get("log").error({ err }, "health check: database unreachable");
     return c.text("unavailable", 503);
   }
 });

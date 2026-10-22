@@ -138,9 +138,9 @@ export async function runSeed() {
         createdAt: now,
         updatedAt: now,
       });
-      logger.info("Admin-Account angelegt");
+      logger.info("admin account created");
     } else {
-      logger.info("Admin-Account bereits vorhanden — Passwort unverändert");
+      logger.info("admin account already exists, password unchanged");
     }
   } finally {
     await client.end();

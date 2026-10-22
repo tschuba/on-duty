@@ -149,5 +149,5 @@ app.onError((err, c) => {
 
 serve({ fetch: app.fetch, port: 3000 }, () => {
   logger.info({ org: env.ORG_NAME }, "listening on http://localhost:3000");
-  startBackupScheduler().catch((err) => logger.error({ err }, "[backup] Scheduler-Start fehlgeschlagen"));
+  startBackupScheduler().catch((err) => logger.error({ err }, "[backup] scheduler start failed"));
 });
