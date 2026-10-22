@@ -86,6 +86,8 @@ export const de = {
   "members.stats.children": "Kinderfeuerwehr",
   "members.stats.toggle": "Statistik",
   "members.stats.former": "Ausgeschieden",
+  "members.stats.formerLeft": "ausgetreten",
+  "members.stats.formerDeceased": "verstorben",
   "members.filter.allRoles": "Alle Funktionen",
   "members.filter.allStatus": "Alle Status",
   "members.filter.currentStatus": "Aktuelle Mitglieder",

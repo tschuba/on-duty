@@ -339,6 +339,20 @@ describe("StatsCards", () => {
     expect(html).toContain("♀");
     expect(html).toContain("o.A.");
   });
+
+  it("colors Fördernd and breaks down Ausgeschieden", async () => {
+    const all = [
+      { ...makeMember(), status: "foerdernd", gender: null },
+      { ...makeMember(), status: "ausgetreten", gender: null },
+      { ...makeMember(), status: "ausgetreten", gender: null },
+      { ...makeMember(), status: "verstorben", gender: null },
+    ] as any;
+    const html = await (await renderApp(StatsCards({ all }))).text();
+    expect(html).toContain('stat-value text-secondary">1<');
+    expect(html).toMatch(/text-base-content\/40">3</);
+    expect(html).toMatch(/2 <svg/);
+    expect(html).toMatch(/1 <svg/);
+  });
 });
 
 describe("MembersTable", () => {
