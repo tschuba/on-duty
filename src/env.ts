@@ -73,6 +73,8 @@ export const env = {
   // Sentry-compatible error reporting (opt-in); read in lib/sentry.ts
   SENTRY_DSN: process.env.SENTRY_DSN,
   SENTRY_DSN_FILE: process.env.SENTRY_DSN_FILE,
+  // Link shown in /admin/config (opt-in); not read by lib/sentry.ts, purely informational.
+  ERROR_TRACKER_URL: process.env.ERROR_TRACKER_URL,
 };
 
 export const ENV_META: { key: keyof typeof env; value: string | number | undefined }[] = [
@@ -90,4 +92,5 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "S3_BUCKET",                 value: env.S3_BUCKET },
   { key: "SMTP_HOST",                 value: env.SMTP_HOST },
   { key: "SMTP_FROM",                 value: env.SMTP_FROM },
+  { key: "ERROR_TRACKER_URL",         value: env.ERROR_TRACKER_URL },
 ];

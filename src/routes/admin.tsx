@@ -18,7 +18,7 @@ import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
-import { SubNav } from "../components/sub-nav.js";
+import { SubNav, type SubNavItem } from "../components/sub-nav.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
@@ -45,9 +45,16 @@ export function permissionSearchText(perms: readonly Permission[]): string {
 const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
 
 function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
-  return (
-    <SubNav items={(["users", "permissions", "config", "backup"] as const).map((k) => ({ href: `/admin/${k}`, active: active === k, label: t(`admin.tabs.${k}`) }))} />
-  );
+  const items: SubNavItem[] = (["users", "permissions", "config", "backup"] as const).map((k) => ({ href: `/admin/${k}`, active: active === k, label: t(`admin.tabs.${k}`) }));
+  if (env.ERROR_TRACKER_URL) {
+    items.push({
+      href: env.ERROR_TRACKER_URL,
+      active: false,
+      external: true,
+      label: <>{t("admin.tabs.errorTracker")} <Icon name="arrow-top-right-on-square" class="w-4 h-4 inline-block" /></>,
+    });
+  }
+  return <SubNav items={items} />;
 }
 
 function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; lastFailed: boolean }) {
@@ -952,7 +959,11 @@ adminRoutes.get("/config", guard, async (c) => {
                   </td>
                   <td class="font-mono text-sm">
                     {!r.writable ? (
-                      r.value ?? <span class="opacity-40">—</span>
+                      r.key === "ERROR_TRACKER_URL" && r.value ? (
+                        <a href={String(r.value)} target="_blank" rel="noopener noreferrer" class="link link-primary">{r.value}</a>
+                      ) : (
+                        r.value ?? <span class="opacity-40">—</span>
+                      )
                     ) : r.type === "boolean" ? (
                       <input type="checkbox" class="toggle" name={r.key} value="1" checked={r.value === "true"} />
                     ) : (
