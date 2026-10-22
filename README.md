@@ -1,6 +1,14 @@
 # on-duty
 
-Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer.
+Werkzeugkasten für Wehr und Verein: Mitglieder, Ausrüstung und mehr.
+Entstanden bei und im Einsatz für die Freiwillige Feuerwehr Altenhammer.
+
+## Funktionen
+
+- Mitglieder
+- Inventar und Ausleihe
+- Spenden und Spender
+- Jubiläen
 
 **Stack:** Hono · HTMX · Tailwind v4 · daisyUI v5 · Drizzle ORM · Better Auth · PostgreSQL · Docker
 

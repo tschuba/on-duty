@@ -1,6 +1,6 @@
 # Agent-Hinweise für on-duty
 
-Mitglieder-Datenbank der Freiwilligen Feuerwehr Altenhammer. Stack: Hono · Hono JSX · HTMX · Tailwind CSS v4 · daisyUI v5 · Drizzle ORM · Better Auth · PostgreSQL.
+Werkzeugkasten für Wehr und Verein (entstanden bei der Freiwilligen Feuerwehr Altenhammer). Stack: Hono · Hono JSX · HTMX · Tailwind CSS v4 · daisyUI v5 · Drizzle ORM · Better Auth · PostgreSQL.
 
 ## UI-Arbeit
 
