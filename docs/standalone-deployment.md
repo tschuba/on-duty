@@ -192,6 +192,18 @@ Application wird nur einmal angelegt). Für einen echten Fresh-Install-Test:
 | on-duty-Login schlägt fehl, obwohl OIDC-Vars gesetzt sind | Redirect-URI in der Zitadel-Application stimmt nicht exakt mit `https://<on-duty-domain>/auth/callback/oidc` überein | URI in der Zitadel-Console korrigieren |
 | Caddy bekommt kein Let's-Encrypt-Zertifikat | DNS zeigt noch nicht auf den Server, oder Port 80/443 ist blockiert | DNS-Propagation abwarten, Firewall prüfen (`docker compose logs caddy`) |
 
+## Fehlererfassung (optional)
+
+Unbehandelte Serverfehler (5xx, `uncaughtException`, `unhandledRejection`) können an ein Sentry-kompatibles Backend (Bugsink, GlitchTip, Sentry) gehen. Ohne DSN ist das SDK komplett aus (kein Netzwerkverkehr).
+
+| Variable | Bedeutung |
+|---|---|
+| `SENTRY_DSN` | DSN des Projekts; hat Vorrang |
+| `SENTRY_DSN_FILE` | Pfad zu einer Datei mit der DSN (beim Start gelesen; leer/fehlend = aus) |
+
+- Gesendet werden nur Fehlertyp/Stack, interne `user.id`, Route-Pattern, Request-ID, App-Version und Umgebung. Kein Body, Query-String, Cookie, Header oder IP; keine Performance-Daten.
+- Restgrenze: Fehlermeldungen und Stacks können Werte enthalten (z. B. SQL-Fehler). DSN nur eintragen, wenn dem Empfänger der Daten vertraut wird.
+
 ## Logging
 
 Die App loggt mit Pino auf stdout (`docker logs`).
