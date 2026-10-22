@@ -23,13 +23,18 @@ import { inventoryRoutes } from "./routes/inventory.js";
 import { lendingRoutes } from "./routes/lending.js";
 import { importRoutes } from "./routes/import.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
+import { healthRoutes } from "./routes/health.js";
+import { logger } from "./lib/logger.js";
+import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
 
 validateEnv();
 
-const app = new Hono<{ Variables: Variables }>();
+const app = new Hono<{ Variables: Variables & LogVariables }>();
 
-app.get("/health", (c) => c.text("ok"));
+app.use("*", requestLog());
+
+app.route("/", healthRoutes);
 
 // Static assets
 app.use("/css/*", serveStatic({ root: "./public" }));
@@ -127,13 +132,15 @@ app.notFound((c) => {
 
 // 500
 app.onError((err, c) => {
-  console.error(err);
+  c.get("log").error({ err }, "unhandled error");
   const user = c.get("user");
   return c.html(
     <Layout title="Serverfehler" user={user}>
       <div class="text-center mt-16">
         <h1 class="text-3xl font-bold">500 – Serverfehler</h1>
         <p class="mt-4 opacity-70">Ein unerwarteter Fehler ist aufgetreten.</p>
+        <p class="mt-2 text-sm opacity-60">Fehler-ID: {c.get("requestId")}</p>
+        <p class="mt-2 text-sm opacity-60">Fehler-ID: {c.get("requestId")}</p>
         <a href="/" class="btn btn-primary mt-6">Zur Startseite</a>
       </div>
     </Layout>,
@@ -142,6 +149,6 @@ app.onError((err, c) => {
 });
 
 serve({ fetch: app.fetch, port: 3000 }, () => {
-  console.log(`${env.ORG_NAME} · http://localhost:3000`);
-  startBackupScheduler().catch((err) => console.error("[backup] Scheduler-Start fehlgeschlagen:", err));
+  logger.info({ org: env.ORG_NAME }, "listening on http://localhost:3000");
+  startBackupScheduler().catch((err) => logger.error({ err }, "[backup] Scheduler-Start fehlgeschlagen"));
 });

@@ -1,3 +1,4 @@
+import { logger } from "../lib/logger.js";
 import { hashPassword } from "better-auth/crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -137,9 +138,9 @@ export async function runSeed() {
         createdAt: now,
         updatedAt: now,
       });
-      console.log("Admin-Account angelegt.");
+      logger.info("Admin-Account angelegt");
     } else {
-      console.log("Admin-Account bereits vorhanden — Passwort unverändert.");
+      logger.info("Admin-Account bereits vorhanden — Passwort unverändert");
     }
   } finally {
     await client.end();

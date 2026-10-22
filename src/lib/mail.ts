@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { env } from "../env.js";
+import { logger } from "./logger.js";
 
 export function isSmtpConfigured(): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_FROM);
@@ -10,7 +11,7 @@ export function isSmtpConfigured(): boolean {
 // server is unreachable. Callers surface `sent: false` to the user as an inline hint.
 export async function sendMail(to: string, subject: string, text: string): Promise<{ sent: boolean }> {
   if (!isSmtpConfigured()) {
-    console.warn(`[mail] SMTP nicht konfiguriert — E-Mail an ${to} ("${subject}") nicht versendet.`);
+    logger.warn({ subject }, "[mail] SMTP nicht konfiguriert — E-Mail nicht versendet");
     return { sent: false };
   }
 
@@ -23,7 +24,7 @@ export async function sendMail(to: string, subject: string, text: string): Promi
     await transport.sendMail({ from: env.SMTP_FROM, to, subject, text });
     return { sent: true };
   } catch (err) {
-    console.error(`[mail] Versand an ${to} fehlgeschlagen:`, err);
+    logger.error({ err, subject }, "[mail] Versand fehlgeschlagen");
     return { sent: false };
   }
 }

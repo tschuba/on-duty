@@ -19,6 +19,7 @@ import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { SubNav } from "../components/sub-nav.js";
 import { env, ENV_META } from "../env.js";
+import { logger } from "../lib/logger.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, groupPermissionsForBadges, type Permission } from "../lib/roles.js";
@@ -1186,7 +1187,7 @@ adminRoutes.get("/backup", guard, async (c) => {
 });
 
 adminRoutes.post("/backup/run", guard, async (c) => {
-  runBackup().catch((err) => console.error("[backup] manual run failed:", err));
+  runBackup().catch((err) => logger.error({ err }, "[backup] manual run failed"));
   setFlash(c, t("admin.backup.flash.started"), "success");
   return c.redirect("/admin/backup");
 });

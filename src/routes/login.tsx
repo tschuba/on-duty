@@ -8,6 +8,7 @@ import { accounts } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
+import { logger } from "../lib/logger.js";
 import { env } from "../env.js";
 import { checkRateLimit, recordFailedAttempt, resetRateLimit } from "../lib/ratelimit.js";
 import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
@@ -84,9 +85,9 @@ loginRoutes.get("/auth/oidc-start", async (c) => {
   try {
     const data = (await response.json()) as { url?: string };
     if (data.url) return c.redirect(data.url);
-    console.error("[oidc-start] unexpected json from Better Auth:", data);
+    logger.error({ keys: Object.keys(data) }, "[oidc-start] unexpected json from Better Auth");
   } catch (e) {
-    console.error("[oidc-start] status:", response.status, "error:", e);
+    logger.error({ err: e, status: response.status }, "[oidc-start] failed");
   }
 
   return c.redirect("/login?error=oidc_failed");

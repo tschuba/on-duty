@@ -7,6 +7,7 @@ import { desc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { backupHistory } from "../db/schema/index.js";
 import { env } from "../env.js";
+import { logger } from "./logger.js";
 
 let running = false;
 
@@ -28,7 +29,7 @@ async function writeLocal(tempFile: string, filename: string): Promise<TargetRes
     return { type: "local", status: "success" };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[backup] local write failed:", error);
+    logger.error({ err }, "[backup] local write failed");
     return { type: "local", status: "error", error };
   }
 }
@@ -60,7 +61,7 @@ async function writeS3(tempFile: string, filename: string): Promise<TargetResult
     return { type: "s3", status: "success" };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[backup] S3 write failed:", error);
+    logger.error({ err }, "[backup] S3 write failed");
     return { type: "s3", status: "error", error };
   }
 }
@@ -93,7 +94,7 @@ export async function runBackup(): Promise<void> {
     await db.insert(backupHistory).values({ startedAt, finishedAt: new Date(), status, targets: JSON.stringify(results) });
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[backup] pg_dump failed:", error);
+    logger.error({ err }, "[backup] pg_dump failed");
     await db
       .insert(backupHistory)
       .values({ startedAt, finishedAt: new Date(), status: "failed", targets: JSON.stringify(results), errorMessage: error });
@@ -136,16 +137,16 @@ export async function startBackupScheduler(): Promise<void> {
       await fs.access(env.BACKUP_LOCAL_PATH, constants.W_OK);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      console.error(`BACKUP_LOCAL_PATH "${env.BACKUP_LOCAL_PATH}" nicht schreibbar: ${reason}`);
+      logger.error({ path: env.BACKUP_LOCAL_PATH, reason }, "BACKUP_LOCAL_PATH nicht schreibbar");
       process.exit(1);
     }
   }
   if (!isBackupConfigured()) {
-    console.warn("[backup] Kein Backup-Ziel konfiguriert — Scheduler nicht gestartet.");
+    logger.warn("[backup] Kein Backup-Ziel konfiguriert — Scheduler nicht gestartet.");
     return;
   }
   cron.schedule(env.BACKUP_SCHEDULE, () => {
-    runBackup().catch((err) => console.error("[backup] Unbehandelter Fehler:", err));
+    runBackup().catch((err) => logger.error({ err }, "[backup] Unbehandelter Fehler"));
   });
-  console.log(`[backup] Scheduler started (${env.BACKUP_SCHEDULE})`);
+  logger.info({ schedule: env.BACKUP_SCHEDULE }, "[backup] Scheduler started");
 }

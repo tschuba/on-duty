@@ -813,6 +813,8 @@ describe("GET /backup", () => {
   });
 });
 
+import { logger } from "../lib/logger.js";
+
 describe("POST /backup/run", () => {
   it("triggers a backup asynchronously and redirects immediately", async () => {
     const res = await adminRoutes.request("/backup/run", { method: "POST" });
@@ -822,12 +824,12 @@ describe("POST /backup/run", () => {
   });
 
   it("logs but does not crash when the background backup rejects", async () => {
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     runBackupMock.mockReturnValueOnce(Promise.reject(new Error("boom")));
     const res = await adminRoutes.request("/backup/run", { method: "POST" });
     expect(res.status).toBe(302);
     await new Promise((r) => setImmediate(r));
-    expect(errSpy).toHaveBeenCalledWith("[backup] manual run failed:", expect.any(Error));
+    expect(errSpy).toHaveBeenCalledWith({ err: expect.any(Error) }, "[backup] manual run failed");
     errSpy.mockRestore();
   });
 });
