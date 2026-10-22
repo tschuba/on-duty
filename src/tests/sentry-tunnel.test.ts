@@ -52,6 +52,19 @@ describe("sentry tunnel", () => {
     expect(init.body.split("\n")[0]).toContain("https://secretkey@bugs.example/42");
   });
 
+  it("answers 502 when the backend fails or is unreachable", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 500 }));
+    expect((await post(envelope())).status).toBe(502);
+    fetchMock.mockRejectedValueOnce(new Error("down"));
+    expect((await post(envelope())).status).toBe(502);
+  });
+
+  it("answers 404 without DSN and 400 without header line", async () => {
+    expect((await post("{}")).status).toBe(400);
+    delete process.env.SENTRY_DSN;
+    expect((await post(envelope())).status).toBe(404);
+  });
+
   it("rate-limits per user", () => {
     const results = Array.from({ length: 21 }, () => tunnelRateLimited("same", 1000));
     expect(results.slice(0, 20).every((r) => !r)).toBe(true);
