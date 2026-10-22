@@ -777,6 +777,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
       </div>
 
       <div id="inventory-results">
+      <div class="overflow-x-auto">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -830,6 +831,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           })}
         </tbody>
       </table>
+      </div>
       <Pager
         countLabel={t("inventory.table.count", { count: totalCount })}
         page={page}

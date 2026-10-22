@@ -354,6 +354,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
       </div>
 
       <ClickToEditHint />
+      <div class="overflow-x-auto">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -376,6 +377,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
           ))}
         </tbody>
       </table>
+      </div>
 
       <Pager
         countLabel={t("donors.table.count", { count: sorted.length })}
