@@ -262,6 +262,28 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
   const presets = rangePresets(today, "future");
 
+  // Mobile (< md): Mehrfachauswahl als Dropdown-Formular statt join-Buttongruppe
+  const kindOpts = [["service", t("anniversaries.filter.service")], ["membership", t("anniversaries.filter.membership")], ["birthdays", t("anniversaries.filter.birthdays")]] as const;
+  const modOpts = [["5", t("anniversaries.filter.halfRoundYears")], ["10", t("anniversaries.filter.roundYears")]] as const;
+  const kindSummary = allKindsActive ? t("anniversaries.filter.all") : kindOpts.filter(([v]) => filters.includes(v)).map(([, l]) => l).join(", ");
+  const modSummary = mods.length === 0 ? t("anniversaries.filter.all") : modOpts.filter(([v]) => mods.includes(v)).map(([, l]) => l).join(", ");
+  const mobileFilter = (summary: string, name: string, opts: readonly (readonly [string, string])[], active: string[], allHref: string, hidden: [string, string][]) => (
+    <div class="dropdown md:hidden max-w-full">
+      <button tabindex={0} type="button" class="btn max-w-full"><span class="truncate">{summary}</span></button>
+      <form method="get" action="/anniversaries" tabindex={0} class="dropdown-content bg-base-200 rounded-box z-50 fixed left-4 right-4 w-auto p-3 shadow flex flex-col gap-2">
+        {hidden.map(([n, v]) => <input type="hidden" name={n} value={v} />)}
+        {opts.map(([v, l]) => (
+          <label class="flex items-center gap-2 py-1"><input type="checkbox" class="checkbox" name={name} value={v} checked={active.includes(v) && !(name === "filter" && allKindsActive)} />{l}</label>
+        ))}
+        <div class="flex gap-2">
+          <a href={allHref} class="btn btn-ghost flex-1">{t("anniversaries.filter.all")}</a>
+          <button type="submit" class="btn btn-primary flex-1">{t("common.apply")}</button>
+        </div>
+      </form>
+    </div>
+  );
+  const commonHidden = (): [string, string][] => [["start", start], ["end", end], ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])];
+
   return c.html(
     <Layout title={t("anniversaries.title")} user={user} activeNav="members">
       <div class="max-w-4xl mx-auto">
@@ -274,10 +296,10 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
           <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
 
           {/* Manual date range */}
-          <form method="get" action="/anniversaries" class="flex gap-2 items-center flex-wrap">
-            <input type="date" name="start" value={start} class="input input-bordered w-36" />
+          <form method="get" action="/anniversaries" class="flex gap-2 items-center w-full md:w-auto">
+            <input type="date" name="start" value={start} class="input input-bordered min-w-0 flex-1 md:w-36 md:flex-none" />
             <span class="text-base-content/50">–</span>
-            <input type="date" name="end" value={end} class="input input-bordered w-36" />
+            <input type="date" name="end" value={end} class="input input-bordered min-w-0 flex-1 md:w-36 md:flex-none" />
             {filters.map((f) => <input type="hidden" name="filter" value={f} />)}
             {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
             {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
@@ -285,7 +307,8 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
           </form>
 
           {/* Typ-Filter */}
-          <div class="join">
+          {mobileFilter(`${t("admin.anniversaries.table.kind")}: ${kindSummary}`, "filter", kindOpts, filters, filterAll(), [...commonHidden(), ...mods.map((m): [string, string] => ["mod", m])])}
+          <div class="join hidden md:inline-flex">
             <a href={filterAll()} class={`join-item btn${allKindsActive ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
             {kindBtn("service", t("anniversaries.filter.service"))}
             {kindBtn("membership", t("anniversaries.filter.membership"))}
@@ -306,11 +329,12 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
                 name="gte"
                 value={gte > 0 ? String(gte) : ""}
                 min="0"
-                class="input nput-bordered w-20"
+                class="input input-bordered w-20"
                 placeholder="–"
               />
             </form>
-            <div class="join">
+            {mobileFilter(modSummary, "mod", modOpts, mods, modReset(), [...commonHidden(), ...filters.map((f): [string, string] => ["filter", f])])}
+            <div class="join hidden md:inline-flex">
               <a href={modReset()} class={`join-item btn${mods.length === 0 ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
               <a href={modToggle("5")} class={`join-item btn${mods.includes("5") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.halfRoundYears")}</a>
               <a href={modToggle("10")} class={`join-item btn${mods.includes("10") ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.roundYears")}</a>

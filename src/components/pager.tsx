@@ -81,7 +81,7 @@ export function Pager(props: {
           </div>
   );
   return (
-    <div class="sticky bottom-6 z-10 focus-within:z-30 bg-base-100 border-t border-base-300 py-2 mt-4 flex flex-nowrap sm:flex-wrap items-center justify-end gap-2 sm:gap-4">
+    <div class="sticky bottom-6 z-10 focus-within:z-30 bg-base-100 border-t border-base-300 py-2 mt-auto flex flex-nowrap sm:flex-wrap items-center justify-end gap-2 sm:gap-4">
       <span class="text-sm opacity-70 mr-auto whitespace-nowrap">{countLabel}</span>
       {pageSizeOptions && (
         <div class="flex items-center gap-2 text-sm opacity-70">
