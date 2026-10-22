@@ -11,6 +11,9 @@ import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
+// Full class names so Tailwind's scanner picks them up.
+const SPAN_CLASS = { 1: "sm:col-span-1", 2: "sm:col-span-2", 3: "sm:col-span-3", 4: "sm:col-span-4" } as const;
+
 export const organisationRoutes = new Hono<{ Variables: Variables }>();
 
 type Tab = OrgTab;
@@ -58,9 +61,10 @@ for (const tab of ["master", "tax"] as const) {
             </div>
           )}
           <div class="card bg-base-200 shadow">
-            <div class="card-body gap-4">
-              {TAB_FIELDS[tab].map(({ key, type }) => (
-                <div class="form-control">
+            <div class="card-body grid grid-cols-1 sm:grid-cols-4 gap-4">
+              {TAB_FIELDS[tab].map(({ key, type, span, placeholder, hint, attrs }) => (
+                <>
+                <div class={`form-control ${SPAN_CLASS[span ?? 4]}`}>
                   <label class="label">
                     <span class="label-text">
                       {t(`admin.orgConfig.field.${key}` as never)}
@@ -73,8 +77,12 @@ for (const tab of ["master", "tax"] as const) {
                     class="input input-bordered w-full"
                     value={values[key] ?? ""}
                     disabled={!editable}
+                    placeholder={editable && placeholder ? t(placeholder as never) : undefined}
+                    {...(editable ? attrs : {})}
                   />
                 </div>
+                {editable && hint && <p class="text-sm text-base-content/70 sm:col-span-4 -mt-2">{t(hint as never)}</p>}
+                </>
               ))}
             </div>
           </div>

@@ -503,6 +503,10 @@ export const de = {
   "admin.orgConfig.field.charitablePurpose": "Begünstigter Zweck (Satzungszweck)",
   "admin.orgConfig.section.applications": "Digitale Anträge",
   "admin.orgConfig.field.applicationNotifyEmail": "Benachrichtigungs-E-Mail für neue Anträge",
+  "organisation.placeholder.taxExemptionNumber": "z. B. 143/123/12345",
+  "organisation.placeholder.periodFrom": "z. B. 2022",
+  "organisation.placeholder.periodTo": "z. B. 2024",
+  "organisation.hint.period": "Jahre, auf die sich der Freistellungsbescheid bezieht (vierstellig, z. B. 2022 bis 2024).",
   "admin.orgConfig.flash.saved": "Organisationsdaten gespeichert.",
   "admin.orgConfig.flash.invalidPeriod": "Veranlagungszeitraum bis muss nach Veranlagungszeitraum von liegen.",
 
