@@ -59,16 +59,16 @@ export function Pager(props: {
                 onfocusin={`
                   const c = this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
                   const r = this.getBoundingClientRect(), w = c.offsetWidth, m = 8;
-                  const left = r.left + r.width / 2 - w / 2;
-                  const dx = Math.max(m - left, Math.min(0, window.innerWidth - m - (left + w)));
-                  c.style.translate = (dx - w / 2) + 'px';
-                  a.style.marginLeft = (-dx - 6) + 'px';
+                  const x = r.left + r.width / 2 - w / 2;
+                  const left = Math.max(m, Math.min(x, window.innerWidth - m - w)) - r.left;
+                  c.style.left = left + 'px';
+                  a.style.left = (r.width / 2 - left - 6) + 'px';
                 `}>
                 <div tabindex={0} role="button" class="btn btn-primary join-item gap-1 rounded-none" aria-current="page" aria-haspopup="true" title={t("pager.selectPage")}>
                   {p}
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 12.78a.75.75 0 0 0 1.06 0L10 9.06l3.72 3.72a.75.75 0 1 0 1.06-1.06l-4.25-4.25a.75.75 0 0 0-1.06 0L5.22 11.72a.75.75 0 0 0 0 1.06Z" clip-rule="evenodd" /></svg>
                 </div>
-                <div tabindex={0} class="dropdown-content z-20 mb-3 w-72 left-1/2 right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+                <div tabindex={0} class="dropdown-content z-20 mb-3 w-72 right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
                   {totalPages <= GRID_MAX_PAGES ? (
                     <div class="grid grid-cols-5 gap-2">
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
@@ -99,7 +99,7 @@ export function Pager(props: {
                     </label>
                   )}
                   {/* speech-balloon arrow pointing down at the trigger */}
-                  <span data-arrow class="absolute -bottom-[7px] left-1/2 -ml-1.5 size-3 rotate-45 border-b border-r border-base-300 bg-base-100" aria-hidden="true" />
+                  <span data-arrow class="absolute -bottom-[7px] size-3 rotate-45 border-b border-r border-base-300 bg-base-100" aria-hidden="true" />
                 </div>
               </div>
             ) : (
