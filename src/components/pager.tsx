@@ -68,9 +68,9 @@ export function Pager(props: {
                     place();
                   });
                 `}>
-                <div tabindex={0} role="button" class="btn btn-primary join-item gap-1 rounded-none" aria-current="page" aria-haspopup="true" title={t("pager.selectPage")}>
+                <div tabindex={0} role="button" class="btn btn-outline btn-primary border-2 join-item gap-1 rounded-none tooltip tooltip-bottom" data-tip={t("pager.selectPage")} aria-current="page" aria-haspopup="true" aria-label={t("pager.selectPage")}>
                   {p}
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 12.78a.75.75 0 0 0 1.06 0L10 9.06l3.72 3.72a.75.75 0 1 0 1.06-1.06l-4.25-4.25a.75.75 0 0 0-1.06 0L5.22 11.72a.75.75 0 0 0 0 1.06Z" clip-rule="evenodd" /></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path fill-rule="evenodd" d="M10.53 3.47a.75.75 0 0 0-1.06 0L6.22 6.72a.75.75 0 0 0 1.06 1.06L10 5.06l2.72 2.72a.75.75 0 1 0 1.06-1.06l-3.25-3.25Zm-4.31 9.81 3.25 3.25a.75.75 0 0 0 1.06 0l3.25-3.25a.75.75 0 1 0-1.06-1.06L10 14.94l-2.72-2.72a.75.75 0 0 0-1.06 1.06Z" clip-rule="evenodd" /></svg>
                 </div>
                 <div tabindex={0} class="dropdown-content z-20 mb-3 w-max right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
                   {totalPages <= GRID_MAX_PAGES ? (
