@@ -282,7 +282,7 @@ export const de = {
   "admin.tabs.roleTypes": "Funktionstypen",
   "admin.tabs.config": "Konfiguration",
   "admin.tabs.backup": "Backup",
-  "admin.tabs.errorTracker": "Fehler-Tracker",
+  "admin.tabs.errorTracker": "Fehlerberichte",
   "admin.backup.warnNotConfigured": "Kein Backup konfiguriert. Lege ein Backup-Ziel fest (Env-Vars BACKUP_LOCAL_PATH oder S3_*).",
   "admin.backup.warnLastFailed": "Letztes Backup fehlgeschlagen.",
   "admin.backup.warnDetails": "Details ansehen →",
@@ -481,7 +481,7 @@ export const de = {
   "admin.config.desc.S3_BUCKET": "S3-Bucket-Name.",
   "admin.config.desc.SMTP_HOST": "SMTP-Server für E-Mail-Benachrichtigungen (leer = Versand deaktiviert).",
   "admin.config.desc.SMTP_FROM": "Absenderadresse für E-Mail-Benachrichtigungen.",
-  "admin.config.desc.ERROR_TRACKER_URL": "Link zum Fehler-Tracker (leer = kein Fehler-Tracker eingerichtet).",
+  "admin.config.desc.ERROR_TRACKER_URL": "Link zu den Fehlerberichten (leer = keine Fehlerberichte eingerichtet).",
 
   // ── Admin – Org-Config ───────────────────────────────────────────────────────
   "admin.orgConfig.title": "Organisation",
