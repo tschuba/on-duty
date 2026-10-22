@@ -179,6 +179,11 @@ main > * {
   min-width: 0;
   width: 100%;
 }
+/* Full-bleed subnav computes its own width via negative vw margins; the generic
+   100% above (relative to main's content box) would clip it short on the right. */
+main > [data-subnav] {
+  width: auto;
+}
 @media (min-width: 48rem) {
   body:has([data-subnav]) .page-header {
     top: calc(var(--nav-h) + var(--subnav-h));
