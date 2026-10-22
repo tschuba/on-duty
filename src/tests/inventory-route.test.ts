@@ -117,6 +117,27 @@ function makeItem(overrides: Record<string, unknown> = {}) {
 
 // ── GET / (list) ─────────────────────────────────────────────────────────────
 
+describe("GET / pagination", () => {
+  const many = () => Array.from({ length: 30 }, (_, i) => makeItem({ id: `i${i}`, name: `Item${String(i).padStart(2, "0")}X` }));
+  const count = (html: string) => (html.match(/Item\d\dX/g) ?? []).length;
+
+  it("page 1 shows 25, page 2 shows 5", async () => {
+    itemsFindManyResult = many();
+    expect(count(await (await inventoryRoutes.request("/")).text())).toBe(25);
+    expect(count(await (await inventoryRoutes.request("/?page=2")).text())).toBe(5);
+  });
+
+  it("respects pageSize", async () => {
+    itemsFindManyResult = many();
+    expect(count(await (await inventoryRoutes.request("/?pageSize=10")).text())).toBe(10);
+  });
+
+  it("clamps page to last page", async () => {
+    itemsFindManyResult = many();
+    expect(count(await (await inventoryRoutes.request("/?page=99")).text())).toBe(5);
+  });
+});
+
 describe("GET /", () => {
   it("lists items with category badge", async () => {
     itemsFindManyResult = [makeItem()];

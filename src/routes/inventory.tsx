@@ -12,9 +12,10 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { ChipInput } from "../components/chip-input.js";
 import { trimmed, parseTags, parseList } from "../lib/forms.js";
-import { buildListUrl, parseMulti } from "../lib/list-query.js";
+import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, rangePresets } from "../lib/quick-range.js";
+import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
 import { countOverdueLoans, availableQuantity, itemStatus } from "../lib/lending.js";
@@ -692,6 +693,13 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     return true;
   });
 
+  const { page: reqPage, pageSize } = parsePagination(q);
+  const totalCount = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const page = Math.min(reqPage, totalPages);
+  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, pageSize }, { page: p });
+
   const qs = (extra: Record<string, string | string[] | undefined>) =>
     buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
   const columnCount = 6 + (canLend ? 1 : 0);
@@ -779,9 +787,9 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           </tr>
         </thead>
         <tbody>
-          {filtered.length === 0 ? (
+          {pageItems.length === 0 ? (
             <tr><td colspan={columnCount} class="text-center opacity-50 py-8">{t("inventory.table.empty")}</td></tr>
-          ) : filtered.map((item) => {
+          ) : pageItems.map((item) => {
             const due = item.category === "vehicle" ? item.vehicleInspectionDue : item.nextInspectionDue;
             const lending = lendingByItem.get(item.id);
             const status = itemStatus(item, !!lending);
@@ -819,7 +827,27 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           })}
         </tbody>
       </table>
+      <Pager
+        countLabel={t("inventory.table.count", { count: totalCount })}
+        page={page}
+        totalPages={totalPages}
+        pageUrl={pageUrl}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        pageSizeStorageKey="inventory_pageSize"
+      />
       </div>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function() {
+          const saved = localStorage.getItem('inventory_pageSize');
+          const url = new URL(window.location.href);
+          if (saved && !url.searchParams.has('pageSize')) {
+            url.searchParams.set('pageSize', saved);
+            url.searchParams.set('page', '1');
+            window.location.replace(url.toString());
+          }
+        })();
+      ` }} />
     </Layout>
   );
 });
