@@ -168,10 +168,10 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         <option value={t("import.option.new")} data-id="new" />
         {roles.map((r) => <option value={r.title} data-id={r.id} />)}
       </datalist>
-      <Section title={t("import.titles.heading")} badge={newCount ? t("import.titles.newBadge", { count: newCount }) : plan.titles.length} tone={newCount ? "warning" : undefined} open={newCount > 0}>
+      <Section title={t("import.titles.heading")} badge={plan.titles.length} tone={newCount ? "warning" : undefined} open={newCount > 0}>
         {plan.titles.length === 0 ? <p class="opacity-60">{t("import.titles.none")}</p> : (
           <table class="table table-zebra w-full">
-            <thead><tr><th>{t("import.col.fwportal")}</th><th>{t("import.col.kind")}</th><th>{t("import.col.count")}</th><th>{t("import.col.mapping")}</th><th>{t("import.col.ignore")}</th><th>{t("import.col.grantsActive")}</th></tr></thead>
+            <thead><tr><th>{t("import.col.fwportal")}</th><th>{t("import.col.kind")}</th><th>{t("import.col.count")}</th><th>{t("import.col.mapping")}</th><th>{t("import.col.grantsActive")}</th><th>{t("import.col.use")}</th></tr></thead>
             <tbody>
               {plan.titles.map((d, i) => (
                 <tr>
@@ -179,13 +179,8 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                   <td>
                     <RoleCombo name={`map_${i}`} value={d.choice.kind === "new" ? "new" : (d.choice as { roleId: string }).roleId} roles={roles} disabled={d.ignored} />
                   </td>
-                  <td>
-                    <label class="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" name={`ign_${i}`} value="1" class="toggle toggle-sm" checked={d.ignored} />
-                      <span class="text-sm">{t("import.option.ignore")}</span>
-                    </label>
-                  </td>
                   <td>{d.choice.kind === "new" && !d.ignored ? <input type="checkbox" name={`grants_${i}`} value="1" class="checkbox checkbox-sm" checked={d.grants} /> : "–"}</td>
+                  <td><input type="checkbox" name={`use_${i}`} value="1" class="toggle toggle-sm" checked={!d.ignored} /></td>
                 </tr>
               ))}
             </tbody>
@@ -194,18 +189,17 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         {newCount > 0 && <p class="text-sm opacity-60 mt-1">{t("import.newRolesHint")}</p>}
       </Section>
 
-      <Section title={t("import.members.title")} badge={t("import.members.badge", { selected: included.length, total: plan.rows.length })} open={problems > 0}>
+      <Section title={t("import.members.title")} badge={plan.rows.length} open={problems > 0}>
         <label class="label cursor-pointer justify-start gap-2 mb-2">
           <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
           <span>{t("import.members.onlyProblems", { count: problems })}</span>
         </label>
         <table class="table table-zebra w-full">
-          <thead><tr><th></th><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th><th>{t("import.col.notes")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th><th>{t("import.col.notes")}</th><th>{t("import.col.use")}</th></tr></thead>
           <tbody>
             {plan.rows.map(({ m, included, duplicate, errors, warnings, assignments }) => (
               <tr data-problem={errors.length || warnings.length ? "1" : undefined} class={duplicate ? "opacity-50 italic" : undefined}>
-                <td><input type="checkbox" name="inc" value={m.mid} class="checkbox checkbox-sm" checked={included} disabled={duplicate} /></td>
-                <td>{m.lastName}, {m.firstName}</td>
+                                <td>{m.lastName}, {m.firstName}</td>
                 <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input input-bordered input-sm" />}</td>
                 <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input input-bordered input-sm" />}</td>
                 <td class="text-sm">
@@ -219,13 +213,14 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                   {errors.map((e) => <Err>{e}</Err>)}
                   {warnings.map((w) => <span class="badge badge-warning badge-sm" title={w}>{w}</span>)}
                 </td>
+                <td><input type="checkbox" name="inc" value={m.mid} class="toggle toggle-sm" checked={included} disabled={duplicate} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </Section>
 
-      <Section id="assignments" title={t("import.assignments.heading")} badge={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : ""} tone="warning" open={plan.assumedCount > 0 && !confirmed}>
+      <Section id="assignments" title={t("import.assignments.heading")} badge={plan.rows.reduce((n, r) => n + r.assignments.length, 0)} badge2={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : undefined} open={plan.assumedCount > 0 && !confirmed}>
         {plan.assumedCount > 0 && (
           <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold">
             <input type="checkbox" name="assumed_ok" value="1" class="checkbox checkbox-sm" checked={confirmed} />
@@ -234,7 +229,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         )}
         <div class="alert alert-warning mb-2">{t("import.assignments.assumedHint")}</div>
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.person")}</th><th>{t("import.col.fwportal")}</th><th>{t("import.col.role")}</th><th>{t("import.col.note")}</th><th>{t("import.col.from")}</th><th>{t("import.col.skip")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.person")}</th><th>{t("import.col.fwportal")}</th><th>{t("import.col.role")}</th><th>{t("import.col.note")}</th><th>{t("import.col.from")}</th><th>{t("import.col.use")}</th></tr></thead>
           <tbody>
             {included.flatMap(({ m, assignments }) => assignments.map((a) => (
               <tr class={a.skipped ? "opacity-50" : undefined}>
@@ -248,7 +243,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                   <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from} class="input input-bordered input-sm" disabled={a.skipped} />
                   {a.assumed && <span class="badge badge-warning badge-sm ml-1">{t("import.badge.assumed")}</span>}
                 </td>
-                <td><input type="checkbox" name={`askip_${m.mid}_${a.key}`} value="1" class="toggle toggle-sm" checked={a.skipped} /></td>
+                <td><input type="checkbox" name={`ause_${m.mid}_${a.key}`} value="1" class="toggle toggle-sm" checked={!a.skipped} /></td>
               </tr>
             )))}
           </tbody>
@@ -274,7 +269,7 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
     <>
       {/* Lange Tags (z. B. Fahrzeug + Beladung) umbrechen statt aus der Zelle zu laufen. */}
       <style>{`[data-chip-input] .badge{height:auto;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left;padding-block:.125rem}`}</style>
-      <Section title={t("import.categories.heading")} badge={checkCount ? t("import.categories.checkBadge", { count: checkCount }) : plan.levels.length} tone={checkCount ? "warning" : undefined} open={checkCount > 0}>
+      <Section title={t("import.categories.heading")} badge={plan.levels.length} tone={checkCount ? "warning" : undefined} open={checkCount > 0}>
         <table class="table table-zebra w-full">
           <thead><tr><th title={t("import.col.itemTypeHelp")}>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th></tr></thead>
           <tbody>
@@ -286,7 +281,7 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
           </tbody>
         </table>
       </Section>
-      <Section title={t("import.positions.title")} badge={t("import.positions.badge", { rows: plan.rowCount, positions: plan.positions.length })} tone={existing ? "warning" : undefined} open={existing > 0}>
+      <Section title={t("import.positions.title")} badge={plan.rowCount} tone={existing ? "warning" : undefined} open={existing > 0}>
         <label class="label cursor-pointer justify-start gap-2 mb-2">
           <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
           <span>{t("import.positions.onlyExisting", { count: existing })}</span>
@@ -428,7 +423,7 @@ const AUTOREFRESH_SCRIPT = `
     if (v) { secs.forEach((d, i) => { d.open = v.open.includes(i); }); scrollTo(0, v.y); }
   } catch {}
   form.addEventListener("change", (e) => {
-    if (!/^((map|grants|ign|arole|askip|nob|cat|pcat)_|assumed_ok$)/.test(e.target.name || "")) return;
+    if (!/^((map|grants|use|arole|ause|nob|cat|pcat)_|assumed_ok$)/.test(e.target.name || "")) return;
     sessionStorage.setItem(SK, JSON.stringify({ y: scrollY, open: secs.flatMap((d, i) => (d.open ? [i] : [])) }));
     form.requestSubmit(document.getElementById("refresh-btn"));
   });

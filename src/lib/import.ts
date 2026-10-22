@@ -229,7 +229,7 @@ export function planMembers(
       const suggestion = suggestRole(title, roles).choice;
       const choice: RoleChoice = !sel ? suggestion : sel === "new" ? { kind: "new" } : { kind: "role", roleId: sel };
       const grants = posted ? str(body, `grants_${i}`) === "1" : kind === "rank";
-      return { title, kind, count, choice, ignored: str(body, `ign_${i}`) === "1", grants };
+      return { title, kind, count, choice, ignored: posted && str(body, `use_${i}`) !== "1", grants };
     });
   const decision = new Map(titles.map((d) => [d.title, d]));
 
@@ -257,10 +257,10 @@ export function planMembers(
         const from = toIsoDate(str(body, `from_${m.mid}_${k}`)) ?? defaultFrom;
         const noteIn = str(body, `note_${m.mid}_${k}`);
         const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : suggestRole(title, roles).note;
-        // Pro Zuweisung überschreibbar: andere Rolle (oder „neu“) bzw. diese Zuweisung auslassen.
+        // Pro Zuweisung überschreibbar: andere Rolle (oder „neu“) bzw. diese Zuweisung nicht übernehmen.
         const rolePick = str(body, `arole_${m.mid}_${k}`);
         const roleChoice: RoleChoice = !rolePick ? d.choice : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
-        const skipped = str(body, `askip_${m.mid}_${k}`) === "1";
+        const skipped = posted && str(body, `ause_${m.mid}_${k}`) !== "1";
         const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : d.grants;
         if (!skipped && !m.active && grants && !(m.birthDate && ageInYears(m.birthDate) >= env.ACTIVE_AGE_LIMIT)) warnings.push(t("import.row.activeWarning", { title: title }));
         // Angenommen: Funktionsbeginn (fwportal liefert keins), fehlendes Beförderungsdatum.
@@ -270,7 +270,7 @@ export function planMembers(
       if (m.active && !assignments.some((x) => !x.skipped && x.grants)) {
         const rolePick = str(body, `arole_${m.mid}_a`);
         const roleChoice: RoleChoice = !rolePick ? { kind: "role", roleId: ACTIVE_ROLE_ID } : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
-        const skipped = str(body, `askip_${m.mid}_a`) === "1";
+        const skipped = posted && str(body, `ause_${m.mid}_a`) !== "1";
         const from = toIsoDate(str(body, `from_${m.mid}_a`)) ?? m.entryDate!;
         const noteIn = str(body, `note_${m.mid}_a`);
         const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : null;

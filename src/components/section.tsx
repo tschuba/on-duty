@@ -2,8 +2,8 @@ type Tone = "error" | "warning";
 const toneClass = (tone?: Tone) => (tone ? `badge-${tone}` : "badge-ghost");
 
 // Einheitlicher Bereich mit Überschrift: einklappbar (<details>) oder fest sichtbar, gleiche Optik.
-export function Section({ id, title, badge, tone, open, collapsible = true, class: cls = "", attrs, actions, children }: {
-  id?: string; title: string; badge?: string | number; tone?: Tone; open?: boolean; collapsible?: boolean;
+export function Section({ id, title, badge, badge2, tone, open, collapsible = true, class: cls = "", attrs, actions, children }: {
+  id?: string; title: string; badge?: string | number; badge2?: string; tone?: Tone; open?: boolean; collapsible?: boolean;
   // Rechts im Titel; bei einklappbaren Bereichen nur sichtbar, solange der Bereich offen ist.
   actions?: unknown;
   class?: string; attrs?: Record<string, string>; children: unknown;
@@ -13,6 +13,7 @@ export function Section({ id, title, badge, tone, open, collapsible = true, clas
     <>
       {title}
       {badge !== undefined && badge !== "" && <span class={`badge badge-sm ${toneClass(tone)}`}>{badge}</span>}
+      {badge2 && <span class="badge badge-sm badge-warning">{badge2}</span>}
       {actions ? <span class="section-actions flex flex-1 justify-end font-normal" style="font-family: var(--font-body)">{actions as never}</span> : null}
     </>
   );
