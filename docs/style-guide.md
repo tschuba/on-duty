@@ -53,7 +53,7 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 | 2 | Untermenü (`.subnav`) | 30 | ab `md` |
 | 3 | `PageHeader` | 20 | immer |
 | 4 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
-| unten | `Pager` | 10 | immer |
+| unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Popup zur Seitenwahl) | 10 | immer |
 
 Regeln:
 - Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--subnav-h`, `--header-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
@@ -102,6 +102,6 @@ daisyUI-`btn`-Klassen, Bedeutung ist an die Farbe/Outline-Kombination gebunden, 
 | `btn btn-outline btn-error` | Destruktiver **Trigger**, der zuerst einen Bestätigungsdialog öffnet — nie solid für den Trigger, solid ist reserviert für den tatsächlich ausführenden Button im Dialog |
 | `btn btn-ghost` | Sekundäre/tertiäre Aktion, Navigation (Navbar-Links, Dropdown-Trigger) |
 | `btn btn-outline btn-primary` (in `join-item`-Gruppe) | Aktiver Zustand in Filter-/Quick-Link-Pillen; inaktive Geschwister nutzen `btn-ghost` |
-| `btn` (ohne Farb-Modifier, `join-item`) | Neutrale Pagination-Controls |
+| `btn` (ohne Farb-Modifier, `join-item`) | Neutrale Pagination-Controls; Ausnahme: aktuelle Seite = `btn btn-primary` |
 
 Größen: `btn` ohne Größen-Modifier nur für große ist Standard für Aktionen innerhalb einer Seite (Header-Zeile, Tabellen-Zeilen), `btn-sm` für kompakte oder `btn-xs` für sehr kompakte Kontexte (z.B. innerhalb einer Tabellenzelle).

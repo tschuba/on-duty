@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Pager } from "../components/pager.js";
+import { Pager, pageWindow, GRID_MAX_PAGES } from "../components/pager.js";
 
 describe("Pager", () => {
   it("uses window.URL in the inline handler (bare URL resolves to document.URL)", async () => {
@@ -8,5 +8,40 @@ describe("Pager", () => {
     );
     expect(html).toContain("new window.URL(");
     expect(html).not.toMatch(/new URL\(/);
+  });
+});
+
+describe("pageWindow", () => {
+  it.each([
+    [1, 1, [1]],
+    [4, 7, [1, 2, 3, 4, 5, 6, 7]],
+    [1, 40, [1, 2, "…", 40]],
+    [7, 40, [1, "…", 6, 7, 8, "…", 40]],
+    [40, 40, [1, "…", 39, 40]],
+  ])("page %i of %i", (page, total, expected) => {
+    expect(pageWindow(page, total)).toEqual(expected);
+  });
+});
+
+describe("Pager rendering", () => {
+  const render = async (page: number, total: number) =>
+    String(await (<Pager countLabel="x" page={page} totalPages={total} pageUrl={(p) => `?page=${p}`} />));
+
+  it("marks current page and disables « on first page", async () => {
+    const html = await render(1, 3);
+    expect(html).toContain('aria-current="page"');
+    expect(html).toMatch(/<span[^>]*btn-disabled[^>]*>«/);
+    expect(html).not.toContain("<dialog");
+  });
+  it("uses a grid popup for 8–50 pages", async () => {
+    const html = await render(5, GRID_MAX_PAGES);
+    expect(html).toContain("<dialog");
+    expect(html).toContain("grid-cols-5");
+    expect(html).not.toContain('type="number"');
+  });
+  it("uses a number input above the grid limit", async () => {
+    const html = await render(5, GRID_MAX_PAGES + 1);
+    expect(html).toContain('type="number"');
+    expect(html).not.toContain("grid-cols-5");
   });
 });
