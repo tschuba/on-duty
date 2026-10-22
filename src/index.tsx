@@ -140,7 +140,6 @@ app.onError((err, c) => {
         <h1 class="text-3xl font-bold">500 – Serverfehler</h1>
         <p class="mt-4 opacity-70">Ein unerwarteter Fehler ist aufgetreten.</p>
         <p class="mt-2 text-sm opacity-60">Fehler-ID: {c.get("requestId")}</p>
-        <p class="mt-2 text-sm opacity-60">Fehler-ID: {c.get("requestId")}</p>
         <a href="/" class="btn btn-primary mt-6">Zur Startseite</a>
       </div>
     </Layout>,
