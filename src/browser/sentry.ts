@@ -1,10 +1,10 @@
 import { scrubUrl } from "./scrub-url.js";
 import { init, getDefaultIntegrations } from "@sentry/browser";
 
-// Der Server (/sentry-tunnel) ersetzt diesen Platzhalter durch die echte DSN.
+// The server (/sentry-tunnel) swaps this placeholder for the real DSN.
 export const PLACEHOLDER_DSN = "https://public@tunnel.invalid/1";
 
-// Nur Fehler-Erfassung: kein Breadcrumb-/Replay-/Tracing-Kontext, keine Browser-Metadaten (PII).
+// Error capture only: no breadcrumb/replay/tracing context, no browser metadata (PII).
 const keep = new Set(["GlobalHandlers", "FunctionToString", "InboundFilters", "Dedupe"]);
 
 declare const __APP_VERSION__: string;

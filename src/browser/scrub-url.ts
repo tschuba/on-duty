@@ -1,4 +1,4 @@
-// Pfad-Pattern: IDs (UUID/Zahlen) raus, Query/Hash weg.
+// Path pattern: strip IDs (UUID/numeric), drop query/hash.
 export function scrubUrl(url: string): string {
   try {
     const u = new URL(url);

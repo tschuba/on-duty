@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { readDsn } from "../lib/sentry.js";
 
-// Muss zu PLACEHOLDER_DSN in src/browser/sentry.ts passen; die echte DSN verlässt den Server nie.
+// Must match PLACEHOLDER_DSN in src/browser/sentry.ts; the real DSN never leaves the server.
 const CLIENT_DSN = "https://public@tunnel.invalid/1";
 const MAX_BYTES = 100 * 1024;
 const MAX_PER_MINUTE = 20;
 
-// shortcut: In-Memory pro Prozess, bei mehreren Instanzen pro Instanz gezählt.
+// shortcut: in-memory per process, counted per instance when running several; upgrade to a shared store then.
 const hits = new Map<string, number[]>();
 export function tunnelRateLimited(userId: string, now = Date.now()): boolean {
   const recent = (hits.get(userId) ?? []).filter((t) => now - t < 60_000);
@@ -26,7 +26,7 @@ sentryTunnelRoutes.post("/sentry-tunnel", requireAuth(undefined, { allowPending:
   const body = await c.req.text();
   if (Buffer.byteLength(body) > MAX_BYTES) return c.body(null, 413);
 
-  // Envelope: erste Zeile = JSON-Header, danach Items.
+  // Envelope: first line = JSON header, then items.
   const nl = body.indexOf("\n");
   if (nl < 1) return c.body(null, 400);
   let header: { dsn?: string };
