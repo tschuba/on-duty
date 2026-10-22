@@ -8,6 +8,7 @@ import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { ChipInput } from "../components/chip-input.js";
 import { Section } from "../components/section.js";
 import { HTTP_STATUS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import {
@@ -41,8 +42,12 @@ const DRAFT_SCRIPT = `
   for (const k of Object.keys(localStorage)) if (k.startsWith("onduty-import:")) { try { if (Date.now() - JSON.parse(localStorage[k]).at > TTL) localStorage.removeItem(k); } catch { localStorage.removeItem(k); } }
   const SKIP = new Set(["data", "fp", "kind", "name", "intent", "_seen"]);
   let dirty = false, submitting = false;
-  const collect = () => [...form.elements].filter((e) => e.name && !SKIP.has(e.name) && e.type !== "submit").map((e) => [e.name, e.type === "checkbox" ? e.checked : e.value, e.type === "checkbox" ? e.value : null]);
-  form.addEventListener("change", () => { dirty = true; localStorage[key] = JSON.stringify({ at: Date.now(), v: collect() }); });
+  const collect = () => [...form.elements].filter((e) => e.name && !SKIP.has(e.name) && e.type !== "submit" && !e.closest("[data-chip]")).map((e) => [e.name, e.type === "checkbox" ? e.checked : e.value, e.type === "checkbox" ? e.value : null])
+    .concat([...form.querySelectorAll("[data-chip-input]")].map((r) => ["chips:" + r.dataset.name, [...r.querySelectorAll("[data-chip]")].map((c) => c.dataset.chip), null]));
+  const save = () => { dirty = true; localStorage[key] = JSON.stringify({ at: Date.now(), v: collect() }); };
+  form.addEventListener("change", save);
+  // Chips (ChipInput) feuern kein change: nach Enter/Komma/Entfernen nachziehen.
+  for (const ev of ["click", "keydown"]) form.addEventListener(ev, (e) => { if (e.target.closest("[data-chip-input]")) setTimeout(save, 0); });
   form.addEventListener("submit", (e) => { dirty = false; submitting = true; if (e.submitter && e.submitter.value === "run") localStorage.removeItem(key); });
   addEventListener("beforeunload", (e) => { if (dirty && !submitting) { e.preventDefault(); e.returnValue = ""; } });
   const saved = localStorage[key]; if (!saved || (form.elements.restored && form.elements.restored.value)) return;
@@ -50,7 +55,11 @@ const DRAFT_SCRIPT = `
   const box = document.getElementById("restore-box"); box.classList.remove("hidden");
   document.getElementById("restore-at").textContent = new Date(at).toLocaleString("de-DE");
   document.getElementById("restore-yes").onclick = () => {
-    for (const [n, val, cv] of v) for (const el of form.elements[n] ? (form.elements[n].length ? [...form.elements[n]] : [form.elements[n]]) : []) {
+    for (const [n, val, cv] of v) if (n.startsWith("chips:")) {
+      const name = n.slice(6);
+      form.querySelectorAll("[data-chip-input]").forEach((r) => { if (r.dataset.name === name) r.querySelectorAll("[data-chip] input").forEach((h) => h.remove()); });
+      for (const c of val) { const h = document.createElement("input"); h.type = "hidden"; h.name = name; h.value = c; form.appendChild(h); }
+    } else for (const el of form.elements[n] ? (form.elements[n].length ? [...form.elements[n]] : [form.elements[n]]) : []) {
       if (el.type === "checkbox") { if (cv === null || el.value === cv) el.checked = val; } else el.value = val;
     }
     form.elements.restored.value = "1"; dirty = false; form.requestSubmit(document.getElementById("refresh-btn"));
@@ -240,21 +249,29 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
   );
 }
 
+function CategorySelect({ name, value, check, blank }: { name: string; value: InventoryCategory | ""; check: boolean; blank: string }) {
+  return (
+    <select name={name} style="min-width:11rem" class={`select select-bordered select-sm pr-8 ${check ? "select-warning" : ""}`} title={t("import.categories.selectHelp")}>
+      <option value="" selected={value === ""}>{blank}</option>
+      {CATEGORY_OPTIONS.map((c) => <option value={c} selected={c === value}>{CATEGORY_LABEL[c]}</option>)}
+    </select>
+  );
+}
+
 function InventoryPreview({ plan }: { plan: InventoryPlan }) {
-  const otherLevels = plan.levels.filter((l) => l.category === "other").length;
+  const checkCount = plan.levels.filter((l) => l.checkCategory).length;
   const existing = plan.positions.filter((p) => p.duplicateNumbers.length).length;
   return (
     <>
-      <Section title={t("import.categories.heading")} badge={otherLevels ? t("import.categories.checkBadge", { count: otherLevels }) : plan.levels.length} tone={otherLevels ? "warning" : undefined} open={otherLevels > 0}>
-        {otherLevels > 0 && <div class="alert alert-warning mb-2">{t("import.categories.otherHint")}</div>}
+      {/* Lange Tags (z. B. Fahrzeug + Beladung) umbrechen statt aus der Zelle zu laufen. */}
+      <style>{`[data-chip-input] .badge{height:auto;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left;padding-block:.125rem}`}</style>
+      <Section title={t("import.categories.heading")} badge={checkCount ? t("import.categories.checkBadge", { count: checkCount }) : plan.levels.length} tone={checkCount ? "warning" : undefined} open={checkCount > 0}>
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th></tr></thead>
+          <thead><tr><th title={t("import.col.itemTypeHelp")}>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th></tr></thead>
           <tbody>
             {plan.levels.map((l, i) => (
               <tr><td>{l.level || "–"}</td><td>
-                <select name={`cat_${i}`} class="select select-bordered select-sm">
-                  {CATEGORY_OPTIONS.map((c) => <option value={c} selected={c === l.category}>{CATEGORY_LABEL[c]}</option>)}
-                </select>
+                <CategorySelect name={`cat_${i}`} value={l.checkCategory ? "" : l.category} check={l.checkCategory} blank={t("import.categories.choose")} />
               </td></tr>
             ))}
           </tbody>
@@ -266,31 +283,46 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
           <span>{t("import.positions.onlyExisting", { count: existing })}</span>
         </label>
         <p class="text-sm opacity-70 mb-2">{t("import.positions.bundleHint")}</p>
+        <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.category")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.positions.colCreateAs")}</th><th>{t("import.col.notes")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th><th>{t("import.col.notes")}</th></tr></thead>
           <tbody>
-            {plan.positions.map((p) => (
-              <tr data-problem={p.duplicateNumbers.length ? "1" : undefined} class={p.duplicateNumbers.length ? "opacity-50 italic" : undefined}>
-                <td>{p.name}</td><td class="whitespace-nowrap">{CATEGORY_LABEL[p.category]}</td><td>{p.quantity}</td>
-                <td class="text-sm">
-                  {p.numbers.slice(0, 5).join(", ")}{p.numbers.length > 5 && <span class="opacity-60" title={p.numbers.slice(5).join(", ")}> +{p.numbers.length - 5}</span>}
-                </td>
-                <td>
-                  {p.canBundle && p.items[0].id === p.gid && (
-                    <div class="join" title={t("import.positions.noBundleHelp")}>
-                      <input type="radio" class="join-item btn btn-xs" name={`nob_${p.gid}`} value="" checked={p.bundled} aria-label={t("import.positions.optBundled", { count: p.groupSize })} />
-                      <input type="radio" class="join-item btn btn-xs" name={`nob_${p.gid}`} value="1" checked={!p.bundled} aria-label={t("import.positions.optSingle", { count: p.groupSize })} />
+            {plan.positions.map((p) => {
+              const nums = [...p.numbers].sort((a, b) => a.localeCompare(b, "de", { numeric: true }));
+              return (
+                <tr data-problem={p.duplicateNumbers.length ? "1" : undefined} class={p.duplicateNumbers.length ? "opacity-50 italic" : undefined}>
+                  <td class="min-w-40">{p.name}</td>
+                  <td class="max-w-40 text-sm break-words" title={p.typePath}>{p.typePath || "–"}</td>
+                  <td class="whitespace-nowrap">
+                    <CategorySelect name={`pcat_${p.gid}`} value={p.override ?? (p.checkCategory ? "" : p.category)} check={p.checkCategory} blank={p.checkCategory ? t("import.categories.choose") : t("import.categories.typeDefault")} />
+                    {p.checkCategory && <span class="badge badge-warning badge-sm ml-1" title={t("import.categories.otherHint")}>{t("import.badge.checkCategory")}</span>}
+                  </td>
+                  <td class="whitespace-nowrap">
+                    {!(p.canBundle && p.items[0].id === p.gid) && p.quantity}
+                    {p.canBundle && p.items[0].id === p.gid && (
+                      <div class="join align-middle" title={t("import.positions.noBundleHelp")}>
+                        <input type="radio" class="join-item btn btn-xs" name={`nob_${p.gid}`} value="" checked={p.bundled} aria-label={t("import.positions.optBundled", { count: p.groupSize })} />
+                        <input type="radio" class="join-item btn btn-xs" name={`nob_${p.gid}`} value="1" checked={!p.bundled} aria-label={t("import.positions.optSingle", { count: p.groupSize })} />
+                      </div>
+                    )}
+                  </td>
+                  <td class="text-sm min-w-32">
+                    <div class="flex flex-wrap gap-1">
+                      {nums.slice(0, 5).map((n) => <span class="badge badge-outline badge-sm whitespace-nowrap">{n}</span>)}
+                      {nums.slice(5).map((n) => <span class="badge badge-outline badge-sm whitespace-nowrap hidden" data-more>{n}</span>)}
+                      {nums.length > 5 && <button type="button" class="badge badge-outline badge-sm cursor-pointer hover:bg-base-300" title={t("import.positions.showAll")} onclick="this.parentElement.querySelectorAll('[data-more]').forEach(e=>e.classList.remove('hidden'));this.remove()">+{nums.length - 5}</button>}
                     </div>
-                  )}
-                </td>
-                <td class="space-x-1">
-                  {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic whitespace-nowrap" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
-                  {p.category === "other" && <span class="badge badge-warning badge-sm whitespace-nowrap">{t("import.badge.checkCategory")}</span>}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td class="min-w-80"><ChipInput name={`tags_${p.items[0].id}`} label="" values={p.tags} splitOnComma caseSensitive={false} /></td>
+                  <td>
+                    {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic whitespace-nowrap" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        </div>
       </Section>
     </>
   );
@@ -385,7 +417,7 @@ const AUTOREFRESH_SCRIPT = `
     if (v) { secs.forEach((d, i) => { d.open = v.open.includes(i); }); scrollTo(0, v.y); }
   } catch {}
   form.addEventListener("change", (e) => {
-    if (!/^((map|grants|ign|arole|askip|nob|cat)_|assumed_ok$)/.test(e.target.name || "")) return;
+    if (!/^((map|grants|ign|arole|askip|nob|cat|pcat)_|assumed_ok$)/.test(e.target.name || "")) return;
     sessionStorage.setItem(SK, JSON.stringify({ y: scrollY, open: secs.flatMap((d, i) => (d.open ? [i] : [])) }));
     form.requestSubmit(document.getElementById("refresh-btn"));
   });
@@ -429,7 +461,7 @@ function PreviewShell(props: { user: any; kind: ImportKind; fp: string; hidden: 
         </div>
         <form id="import-form" method="post" action="/import/run" data-fp={props.fp}>
           {props.hidden as never}
-          <div class="sticky top-0 z-10 bg-base-100 border-b border-base-300 py-3 mb-4">
+          <div class="sticky z-10 bg-base-100 border-b border-base-300 py-3 mb-4" style="top: calc(var(--nav-h) + 3rem)">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                 {props.summary.map((x) => (
