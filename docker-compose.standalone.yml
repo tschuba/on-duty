@@ -33,6 +33,9 @@ services:
       # so on-duty reads the file at runtime (empty/missing = webhook inactive).
       ZITADEL_WEBHOOK_SECRET_FILE: /zitadel/bootstrap/webhook.secret
       OIDC_APP_URL: https://${SERVICE_FQDN_APP}
+      # Optional error reporting (Sentry protocol: Bugsink, GlitchTip, Sentry). Empty = off.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_DSN_FILE: ${SENTRY_DSN_FILE:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USER: ${SMTP_USER:-}

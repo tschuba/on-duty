@@ -2,7 +2,9 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { getCookie, deleteCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
 import { validateEnv } from "./env.js";
+import { initSentry, captureServerError } from "./lib/sentry.js";
 import { auth } from "./auth.js";
 import { env } from "./env.js";
 import { startBackupScheduler } from "./lib/backup.js";
@@ -29,6 +31,7 @@ import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
 
 validateEnv();
+initSentry();
 
 const app = new Hono<{ Variables: Variables & LogVariables }>();
 
@@ -134,6 +137,9 @@ app.notFound((c) => {
 app.onError((err, c) => {
   c.get("log").error({ err }, "unhandled error");
   const user = c.get("user");
+  if (!(err instanceof HTTPException && err.status < 500)) {
+    captureServerError(err, { requestId: c.get("requestId"), userId: user?.id, route: c.req.routePath });
+  }
   return c.html(
     <Layout title="Serverfehler" user={user}>
       <div class="text-center mt-16">
