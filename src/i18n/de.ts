@@ -76,6 +76,8 @@ export const de = {
   "members.table.status": "Status",
   "members.table.empty": "Keine Mitglieder gefunden.",
   "members.table.count": "{count} Mitglieder",
+  "pager.selectPage": "Seite wählen",
+  "pager.goToPage": "Gehe zu Seite",
   "members.table.pageSize": "Einträge pro Seite:",
   "members.table.roleCount": "{count} Funktionen",
   "members.table.statusCount": "{count} Status",

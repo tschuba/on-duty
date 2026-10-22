@@ -719,7 +719,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <form method="get" action="/inventory" class="contents">
-          <label class="input input-bordered flex items-center gap-2">
+          <label class="input input-bordered flex items-center gap-2 w-72">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input
               type="search"
@@ -777,15 +777,16 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
       </div>
 
       <div id="inventory-results">
+      <div class="overflow-x-auto">
       <table class="table table-zebra w-full">
         <thead>
           <tr>
             <th>{t("inventory.table.name")}</th>
             <th>{t("inventory.table.category")}</th>
-            <th>{t("inventory.table.dueDate")}</th>
-            <th>{t("inventory.table.tags")}</th>
+            <th class="hidden md:table-cell">{t("inventory.table.dueDate")}</th>
+            <th class="hidden lg:table-cell">{t("inventory.table.tags")}</th>
             <th>{t("inventory.table.status")}</th>
-            <th>{t("inventory.table.quantity")}</th>
+            <th class="hidden md:table-cell">{t("inventory.table.quantity")}</th>
             {canLend && <th></th>}
           </tr>
         </thead>
@@ -800,8 +801,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
                 <td>{item.name}</td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
-                <td>{due ? formatDate(due) : "—"}</td>
-                <td>
+                <td class="hidden md:table-cell">{due ? formatDate(due) : "—"}</td>
+                <td class="hidden lg:table-cell">
                   <div class="flex flex-wrap gap-1">
                     {item.tags.map((tag) => <span class="badge badge-ghost badge-sm">{tag.tag}</span>)}
                   </div>
@@ -811,7 +812,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                   {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
                   {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
                 </td>
-                <td>
+                <td class="hidden md:table-cell">
                   {lending
                     ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-outline"}`}>{t("inventory.lending.available", { count: lending.available })}</span>
                     : item.quantity > 1 && <span class="badge badge-outline badge-sm">{item.quantity - item.retiredQuantity}</span>}
@@ -830,6 +831,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           })}
         </tbody>
       </table>
+      </div>
       <Pager
         countLabel={t("inventory.table.count", { count: totalCount })}
         page={page}

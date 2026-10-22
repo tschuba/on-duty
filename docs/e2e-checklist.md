@@ -46,7 +46,7 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 
 - [ ] Pager bleibt beim Scrollen sticky am unteren Viewport-Rand (deckender Hintergrund)
 - [ ] Seitengröße ändern (nur Mitglieder) → Liste springt auf Seite 1, Wert bleibt erhalten
-- [ ] Seitenwechsel über Zahlen und «/» funktioniert
+- [ ] Seitenwechsel über Nachbarseiten, erste/letzte Seite und Seitenwahl-Balloon funktioniert
 
 ## Admin
 
