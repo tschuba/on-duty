@@ -46,7 +46,6 @@ export function initSentry(opts: { transport?: Sentry.NodeOptions["transport"] }
     dsn,
     release: appVersion(),
     environment: process.env.NODE_ENV ?? "production",
-    sendDefaultPii: false,
     tracesSampleRate: 0,
     defaultIntegrations: false,
     skipOpenTelemetrySetup: true,
