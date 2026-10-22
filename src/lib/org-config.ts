@@ -31,21 +31,27 @@ export const ORG_TABS = {
   tax: { path: "tax-data", read: ["org:tax-data:read", "org:tax-data:write"], write: "org:tax-data:write" },
 } as const;
 
-export const TAB_FIELDS: Record<OrgTab, { key: string; type: string }[]> = {
+// span: columns of 4 from sm up (default 4 = full width). placeholder/hint: i18n keys, shown only when editable.
+export type TabField = {
+  key: string; type: string; span?: 1 | 2 | 3;
+  placeholder?: string; hint?: string; attrs?: Record<string, string>;
+};
+
+export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
   master: [
     { key: "orgName", type: "text" },
-    { key: "orgStreet", type: "text" },
-    { key: "orgHouseNumber", type: "text" },
-    { key: "orgZip", type: "text" },
-    { key: "orgCity", type: "text" },
+    { key: "orgStreet", type: "text", span: 3 },
+    { key: "orgHouseNumber", type: "text", span: 1 },
+    { key: "orgZip", type: "text", span: 1 },
+    { key: "orgCity", type: "text", span: 3 },
     { key: "applicationNotifyEmail", type: "email" },
   ],
   tax: [
-    { key: "taxExemptionDate", type: "date" },
-    { key: "taxExemptionNumber", type: "text" },
+    { key: "taxExemptionDate", type: "date", span: 2 },
+    { key: "taxExemptionNumber", type: "text", span: 2, placeholder: "organisation.placeholder.taxExemptionNumber" },
     { key: "taxOffice", type: "text" },
-    { key: "taxAssessmentPeriodFrom", type: "number" },
-    { key: "taxAssessmentPeriodTo", type: "number" },
+    { key: "taxAssessmentPeriodFrom", type: "number", span: 2, placeholder: "organisation.placeholder.periodFrom", attrs: { inputmode: "numeric", min: "1900", max: "2200" } },
+    { key: "taxAssessmentPeriodTo", type: "number", span: 2, placeholder: "organisation.placeholder.periodTo", hint: "organisation.hint.period", attrs: { inputmode: "numeric", min: "1900", max: "2200" } },
     { key: "charitablePurpose", type: "text" },
   ],
 };
