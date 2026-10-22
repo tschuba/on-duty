@@ -405,8 +405,8 @@ describe("MembersTable", () => {
     expect(count("hidden md:table-cell")).toBe(2);
     expect(count("hidden lg:table-cell")).toBe(2);
     expect(count("hidden xl:table-cell")).toBe(2);
-    // genau 6 hidden-Vorkommen: nur die drei Sekundärspalten (th + td)
-    expect(html.split("hidden").length - 1).toBe(6);
+    // genau 6 Spalten-hidden-Vorkommen (th + td); Pager hat eigenes "hidden sm:inline"
+    expect(html.split(/class="hidden (?:md|lg|xl):table-cell"/).length - 1).toBe(6);
   });
 
   it("hides closed assignments from the open-roles display", async () => {
