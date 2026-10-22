@@ -50,6 +50,8 @@ Optional (Defaults in der App):
 | `SMTP_USER` | — | SMTP-Benutzername |
 | `SMTP_PASS` | — | SMTP-Passwort |
 | `SMTP_FROM` | — | Absenderadresse für E-Mail-Benachrichtigungen |
+| `SENTRY_DSN` | — | Fehlererfassung an ein Sentry-kompatibles Backend (Bugsink, GlitchTip, Sentry); leer = aus |
+| `ERROR_TRACKER_URL` | — | Link zum Fehler-Tracker-Dashboard unter Admin → Konfiguration; leer = kein Link |
 
 ### 3. Erste Version deployen
 

@@ -1,13 +1,13 @@
 import type { Child } from "hono/jsx";
 
-export type SubNavItem = { href: string; label: Child; active: boolean; badge?: Child };
+export type SubNavItem = { href: string; label: Child; active: boolean; badge?: Child; external?: boolean };
 
 // Untermenü: kompakt (~40 px), eigener Hintergrund, sticky ab md (siehe app.css, --subnav-h).
 export function SubNav({ items }: { items: SubNavItem[] }) {
   return (
     <div role="tablist" data-subnav class="subnav tabs tabs-sm h-10 bg-base-300 -mt-6 mb-4 sticky z-30 items-stretch">
       {items.map((i) => (
-        <a href={i.href} role="tab" class={`tab h-full ${i.active ? "tab-active text-primary font-semibold" : ""}`}>
+        <a href={i.href} role="tab" class={`tab h-full ${i.active ? "tab-active text-primary font-semibold" : ""}`} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
           {i.label}
           {i.badge}
         </a>

@@ -159,6 +159,20 @@ Login-Name und Passwort am Ende jedes Laufs. Der Login-Name ist nicht der reine
 `SERVICE_PASSWORD_ZITADEL_ADMIN` aus `.env.standalone.local`; der erste Login
 erzwingt eine Änderung, danach gilt das neue Passwort.
 
+### Bugsink lokal
+
+Standardmäßig aus (siehe unten). Lokal dazustarten:
+
+```bash
+docker compose -p on-duty-standalone-local -f docker-compose.standalone.yml -f docker-compose.standalone.local.yml --env-file .env.standalone.local --profile errors up -d
+```
+
+`https://errors.localhost` (Zertifikatswarnung akzeptieren). Login:
+`admin@bugsink.local` (Default von `BUGSINK_ADMIN_EMAIL`) und
+`SERVICE_PASSWORD_BUGSINK` aus `.env.standalone.local`. Nach dem ersten Lauf
+von `bugsink-init` einmal `app` neu starten, damit die DSN greift (siehe
+unten).
+
 ### Selbstregistrierung lokal testen
 
 1. Zitadel-Console: **Settings → Login Behavior and Security → Register allowed**
@@ -203,6 +217,18 @@ Unbehandelte Serverfehler (5xx, `uncaughtException`, `unhandledRejection`) könn
 
 - Gesendet werden nur Fehlertyp/Stack, interne `user.id`, Route-Pattern, Request-ID, App-Version und Umgebung. Kein Body, Query-String, Cookie, Header oder IP; keine Performance-Daten.
 - Restgrenze: Fehlermeldungen und Stacks können Werte enthalten (z. B. SQL-Fehler). DSN nur eintragen, wenn dem Empfänger der Daten vertraut wird.
+
+### Bugsink mitliefern (Compose-Profil `errors`)
+
+Optional und standardmäßig aus. Aktivieren: in Coolify die Variable `COMPOSE_PROFILES=errors` setzen und neu deployen. Ohne Profil starten weder `bugsink` noch `bugsink-init`. (Coolify beachtet Profile ggf. nicht, siehe Coolify-Issue #6395; dann `bugsink`/`bugsink-init` in eine eigene Compose-Datei auslagern.)
+
+- Bugsink bekommt eine eigene Domain (`SERVICE_FQDN_BUGSINK_8000`). Login: `BUGSINK_ADMIN_EMAIL` (Default `admin@bugsink.local`) und das von Coolify erzeugte `SERVICE_PASSWORD_BUGSINK`.
+- `bugsink-init` legt Team und Projekt `on-duty` an und schreibt die DSN nach `/bugsink/dsn` (idempotent). Die App liest sie als `SENTRY_DSN_FILE`; **nach dem ersten Lauf die App einmal neu starten**. Eine explizite `SENTRY_DSN` hat Vorrang.
+- Unter **Admin → Konfiguration** erscheint bei aktivem Profil ein Link zur Issue-Liste von Bugsink (`ERROR_TRACKER_URL`, Default `https://<SERVICE_FQDN_BUGSINK>/issues/`, per expliziter Variable überschreibbar). Login erfolgt dort separat (eigenes Bugsink-Konto, siehe oben), kein SSO.
+- Limits: `BUGSINK_MAX_EVENTS_PER_HOUR` (Default 1000; Bugsink-Default 5000/Projekt) und `BUGSINK_RETENTION_EVENTS` (Default 10000 Events pro Projekt, gilt nur beim Anlegen des Projekts).
+- Mail: Bugsink nutzt dieselben `SMTP_*`-Werte wie die App (für Passwort-Resets; Issue-Benachrichtigungen sind nicht eingeplant). Ohne `SMTP_HOST` versendet Bugsink nichts. Verschlüsselung ist STARTTLS; für Port 465 `BUGSINK_EMAIL_USE_SSL=True` und `BUGSINK_EMAIL_USE_TLS=False` setzen.
+- Speicher: SQLite im Volume `bugsink-data`, **kein Backup**.
+- Live-Logs: Dozzle wird nicht mitgeliefert, bei Bedarf separat betreiben.
 
 ## Logging
 

@@ -32,6 +32,7 @@ const ICONS = {
   "pencil": "24/outline/pencil.svg",
   "no-symbol": "24/outline/no-symbol.svg",
   "arrow-right-start-on-rectangle": "24/outline/arrow-right-start-on-rectangle.svg",
+  "arrow-top-right-on-square": "24/outline/arrow-top-right-on-square.svg",
 };
 
 function attr(str, name) {

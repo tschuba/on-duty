@@ -27,10 +27,10 @@ function appVersion(): string | undefined {
 
 // Allowlist: member data is sensitive, so build the event anew instead of stripping fields.
 export function sanitizeEvent(event: ErrorEvent): ErrorEvent {
-  const { event_id, timestamp, platform, level, exception, release, environment, sdk } = event;
-  const out: ErrorEvent = { type: undefined, event_id, timestamp, platform, level, exception, release, environment, sdk };
+  const { event_id, timestamp, platform, level, exception, release, environment, sdk, fingerprint } = event;
+  const out: ErrorEvent = { type: undefined, fingerprint, event_id, timestamp, platform, level, exception, release, environment, sdk };
   const tags: Record<string, string> = {};
-  for (const k of ["request_id", "route"]) {
+  for (const k of ["request_id", "route", "error_kind"]) {
     const v = event.tags?.[k];
     if (typeof v === "string") tags[k] = v;
   }
@@ -64,11 +64,31 @@ export function initSentry(opts: { transport?: Sentry.NodeOptions["transport"] }
   return true;
 }
 
-export function captureServerError(err: unknown, ctx: { requestId?: string; userId?: string; route?: string }): void {
+const DB_DOWN = /^(ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|57P01|57P03|08\w{3})$/;
+
+// Walks the cause chain (Better Auth wraps the pg error); shortcut: code match only, no message sniffing.
+export function isDbUnavailable(err: unknown): boolean {
+  for (let e = err as any, i = 0; e && i < 5; e = e.cause ?? e.errors?.[0], i++) {
+    if (typeof e.code === "string" && DB_DOWN.test(e.code)) return true;
+  }
+  return false;
+}
+
+// Better Auth swallows the pg error on FAILED_TO_GET_SESSION (no cause) - that's the only case worth a DB probe.
+export function isAuthSessionError(err: unknown): boolean {
+  return (err as { body?: { code?: string } })?.body?.code === "FAILED_TO_GET_SESSION";
+}
+
+export function captureServerError(err: unknown, ctx: { requestId?: string; userId?: string; route?: string; dbDown?: boolean }): void {
   if (!enabled) return;
   Sentry.withScope((scope) => {
     if (ctx.requestId) scope.setTag("request_id", ctx.requestId);
     if (ctx.route) scope.setTag("route", ctx.route);
+    if (ctx.dbDown || isDbUnavailable(err)) {
+      scope.setTag("error_kind", "db_unavailable");
+      scope.setFingerprint(["db_unavailable"]);
+      err = new Error(`Database unavailable (${err instanceof Error ? err.message : String(err)})`, { cause: err });
+    }
     if (ctx.userId) scope.setUser({ id: ctx.userId });
     Sentry.captureException(err);
   });

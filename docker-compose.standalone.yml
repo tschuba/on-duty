@@ -35,7 +35,10 @@ services:
       OIDC_APP_URL: https://${SERVICE_FQDN_APP}
       # Optional error reporting (Sentry protocol: Bugsink, GlitchTip, Sentry). Empty = off.
       SENTRY_DSN: ${SENTRY_DSN:-}
-      SENTRY_DSN_FILE: ${SENTRY_DSN_FILE:-}
+      # Written by bugsink-init (profile `errors`); missing file = off. Needs one app restart after the first run.
+      SENTRY_DSN_FILE: ${SENTRY_DSN_FILE:-/bugsink/dsn}
+      # Link shown in /admin/config; defaults to the Bugsink issue list, empty when the `errors` profile is off.
+      ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-${SERVICE_FQDN_BUGSINK:+https://${SERVICE_FQDN_BUGSINK}/issues/}}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USER: ${SMTP_USER:-}
@@ -57,11 +60,87 @@ services:
       - '[ -n "$$OIDC_CLIENT_ID" ] || . /zitadel/bootstrap/oidc.env; export OIDC_CLIENT_ID OIDC_CLIENT_SECRET; exec node dist/entrypoint.js'
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
+      - bugsink-bootstrap:/bugsink:ro
     depends_on:
       db:
         condition: service_healthy
       zitadel-init:
         condition: service_completed_successfully
+
+  # Optional error tracker (compose profile `errors`, off by default): `COMPOSE_PROFILES=errors`.
+  # SQLite in its own volume, NOT backed up.
+  bugsink:
+    image: bugsink/bugsink:2.6
+    profiles: [errors]
+    restart: unless-stopped
+    environment:
+      SERVICE_FQDN_BUGSINK_8000:
+      SECRET_KEY: ${SERVICE_PASSWORD_BUGSINKSECRET}
+      BASE_URL: https://${SERVICE_FQDN_BUGSINK}
+      BEHIND_HTTPS_PROXY: "True"
+      CREATE_SUPERUSER: ${BUGSINK_ADMIN_EMAIL:-admin@bugsink.local}:${SERVICE_PASSWORD_BUGSINK}
+      # Limits (docs defaults: 5000/h per project); retention per project is set by bugsink-init.
+      MAX_EVENTS_PER_PROJECT_PER_HOUR: ${BUGSINK_MAX_EVENTS_PER_HOUR:-1000}
+      # Mail (password resets) from the same SMTP_* values as the app. Empty SMTP_HOST = Bugsink sends nothing.
+      # STARTTLS (587) is the default like in the app; for port 465 set BUGSINK_EMAIL_USE_SSL=True and BUGSINK_EMAIL_USE_TLS=False.
+      EMAIL_HOST: ${SMTP_HOST:-}
+      EMAIL_PORT: ${SMTP_PORT:-587}
+      EMAIL_HOST_USER: ${SMTP_USER:-}
+      EMAIL_HOST_PASSWORD: ${SMTP_PASS:-}
+      EMAIL_USE_TLS: ${BUGSINK_EMAIL_USE_TLS:-True}
+      EMAIL_USE_SSL: ${BUGSINK_EMAIL_USE_SSL:-False}
+      DEFAULT_FROM_EMAIL: ${SMTP_FROM:-}
+    volumes:
+      - bugsink-data:/data
+
+  # One-shot: creates team + project once and writes the DSN to the bootstrap volume (idempotent).
+  bugsink-init:
+    image: bugsink/bugsink:2.6
+    profiles: [errors]
+    restart: "no"
+    user: "0" # writes the DSN into the bugsink-bootstrap volume (root-owned by default)
+    environment:
+      SECRET_KEY: ${SERVICE_PASSWORD_BUGSINKSECRET}
+      BASE_URL: https://${SERVICE_FQDN_BUGSINK}
+      BUGSINK_HOST: ${SERVICE_FQDN_BUGSINK}
+      BUGSINK_RETENTION_EVENTS: ${BUGSINK_RETENTION_EVENTS:-10000}
+    volumes:
+      - bugsink-data:/data
+      - bugsink-bootstrap:/bugsink:rw
+    depends_on:
+      - bugsink
+    entrypoint: ["python", "-c"]
+    command:
+      - |
+        import json, os, subprocess, sys, time, urllib.error, urllib.request
+        OUT = "/bugsink/dsn"
+        if os.path.exists(OUT) and os.path.getsize(OUT):
+            print("[bugsink-init] DSN exists, nothing to do."); sys.exit(0)
+        # Bugsink migrates the shared SQLite DB on start; only create the token once it answers.
+        for _ in range(90):
+            try: urllib.request.urlopen(urllib.request.Request("http://bugsink:8000/", headers={"Host": os.environ["BUGSINK_HOST"]}), timeout=5); break
+            except urllib.error.HTTPError: break
+            except Exception as e: err = e; time.sleep(2)
+        else: sys.exit("[bugsink-init] Bugsink not reachable: %s" % err)
+        token = subprocess.run(["bugsink-manage", "create_auth_token"], check=True, capture_output=True, text=True).stdout.strip().splitlines()[-1]
+        def api(method, path, body=None):
+            req = urllib.request.Request("http://bugsink:8000/api/canonical/0/" + path, method=method,
+                data=json.dumps(body).encode() if body else None,
+                headers={"Authorization": "Bearer " + token, "Content-Type": "application/json", "Host": os.environ["BUGSINK_HOST"]})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return json.load(r)
+        def items(x): return x["results"] if isinstance(x, dict) else x
+        for _ in range(60):
+            try: teams = items(api("GET", "teams/")); break
+            except Exception as e: err = e; time.sleep(2)
+        else: sys.exit("[bugsink-init] Bugsink not reachable: %s" % err)
+        team = teams[0] if teams else api("POST", "teams/", {"name": "on-duty"})
+        project = next((p for p in items(api("GET", "projects/")) if p["name"] == "on-duty"), None)
+        if not project:
+            project = api("POST", "projects/", {"team": team["id"], "name": "on-duty", "retention_max_event_count": int(os.environ["BUGSINK_RETENTION_EVENTS"])})
+        dsn = api("GET", "projects/%s/" % project["id"])["dsn"]
+        open(OUT, "w").write(dsn)
+        print("[bugsink-init] DSN written. Restart the app once.")
 
   db:
     image: postgres:17.11-alpine
@@ -238,6 +317,8 @@ services:
         condition: service_healthy
 
 volumes:
+  bugsink-data:
+  bugsink-bootstrap:
   pgdata:
   zitadel-bootstrap:
   zitadel-admin:

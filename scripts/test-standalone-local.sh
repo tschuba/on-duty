@@ -17,27 +17,37 @@ PROJECT=on-duty-standalone-local
 ENV_FILE=.env.standalone.local
 COMPOSE=(docker compose -p "$PROJECT" -f docker-compose.standalone.yml -f docker-compose.standalone.local.yml --env-file "$ENV_FILE")
 
-case "${1:-}" in
-  --clean)
-    echo "Räume vorherigen lokalen Teststack weg (Volumes inklusive)..."
-    [[ -f "$ENV_FILE" ]] && "${COMPOSE[@]}" down -v || true
-    rm -f "$ENV_FILE"
-    ;;
-  -h|--help)
-    cat <<EOF
-Usage: $0 [--clean]
+CLEAN=0
+WITH_ERRORS=0
+for arg in "$@"; do
+  case "$arg" in
+    --clean) CLEAN=1 ;;
+    --with-errors) WITH_ERRORS=1 ;;
+    -h|--help)
+      cat <<EOF
+Usage: $0 [--clean] [--with-errors]
 
-  --clean      Vorherigen lokalen Teststack samt Volumes entfernen und $ENV_FILE neu erzeugen
-  -h, --help   Diese Hilfe anzeigen
+  --clean        Vorherigen lokalen Teststack samt Volumes entfernen und $ENV_FILE neu erzeugen
+  --with-errors  Zusätzlich Bugsink (Compose-Profil errors) starten: https://errors.localhost
+  -h, --help     Diese Hilfe anzeigen
 EOF
-    exit 0
-    ;;
-  "") ;;
-  *)
-    echo "Unbekannte Option: $1 (siehe --help)" >&2
-    exit 1
-    ;;
-esac
+      exit 0
+      ;;
+    *)
+      echo "Unbekannte Option: $arg (siehe --help)" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ $CLEAN -eq 1 ]]; then
+  echo "Räume vorherigen lokalen Teststack weg (Volumes inklusive)..."
+  # --profile errors, damit auch ein früher gestartetes Bugsink samt Volumes entfernt wird
+  [[ -f "$ENV_FILE" ]] && "${COMPOSE[@]}" --profile errors down -v || true
+  rm -f "$ENV_FILE"
+fi
+
+[[ $WITH_ERRORS -eq 1 ]] && COMPOSE+=(--profile errors)
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Erzeuge $ENV_FILE (Fake-Domains + zufällige Secrets)..."
@@ -56,6 +66,14 @@ SERVICE_PASSWORD_ZITADELMASTER=$(openssl rand -hex 16)
 SERVICE_PASSWORD_ZITADELCOOKIE=$(openssl rand -hex 32)
 SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN=Aa1@$(openssl rand -hex 20)
 ORG_NAME=on-duty Standalone Local Test
+EOF
+fi
+
+if [[ $WITH_ERRORS -eq 1 ]] && ! grep -q '^SERVICE_FQDN_BUGSINK=' "$ENV_FILE"; then
+  cat >> "$ENV_FILE" <<EOF
+SERVICE_FQDN_BUGSINK=errors.localhost
+SERVICE_PASSWORD_BUGSINKSECRET=$(openssl rand -hex 32)
+SERVICE_PASSWORD_BUGSINK=$(openssl rand -hex 16)
 EOF
 fi
 
@@ -91,7 +109,18 @@ echo "Baue App-Image aus lokalem Dockerfile..."
 echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
 # On the very first Zitadel setup, zitadel-init creates project + OIDC app and writes
 # client id/secret to the bootstrap volume; app reads them from there.
-"${COMPOSE[@]}" up -d db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks
+SERVICES=(db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks)
+[[ $WITH_ERRORS -eq 1 ]] && SERVICES+=(bugsink bugsink-init)
+"${COMPOSE[@]}" up -d "${SERVICES[@]}"
+
+# bugsink-init must finish before the app restart below, so the app reads the DSN file on that one restart.
+if [[ $WITH_ERRORS -eq 1 ]]; then
+  echo "Warte auf bugsink-init (legt Projekt an, schreibt DSN)..."
+  until [[ "$(docker inspect -f '{{.State.Status}}' "$("${COMPOSE[@]}" ps -aq bugsink-init)")" == "exited" ]]; do sleep 2; done
+  "${COMPOSE[@]}" run --rm --no-deps -T --entrypoint test bugsink-init -s /bugsink/dsn \
+    || { echo "FEHLER: bugsink-init hat keine DSN geschrieben" >&2; "${COMPOSE[@]}" logs bugsink-init >&2; exit 1; }
+  echo "OK: DSN-Datei vorhanden"
+fi
 
 echo "Warte auf Caddys lokales CA-Zertifikat..."
 until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/root.crt 2>/dev/null; do
@@ -137,6 +166,14 @@ ADMIN_PASS=$(grep '^SERVICE_PASSWORD_ADMIN=' "$ENV_FILE" | cut -d= -f2)
 ZITADEL_DOMAIN=$(grep '^SERVICE_FQDN_ZITADEL=' "$ENV_FILE" | cut -d= -f2)
 ZITADEL_PASS=$(grep '^SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN=' "$ENV_FILE" | cut -d= -f2)Aa1!
 ZITADEL_LOGIN_NAME=$(zitadel_login_name)
+BUGSINK_INFO=""
+if [[ $WITH_ERRORS -eq 1 ]]; then
+  BUGSINK_INFO="Bugsink: https://$(grep '^SERVICE_FQDN_BUGSINK=' "$ENV_FILE" | cut -d= -f2)
+  Login: admin@bugsink.local / $(grep '^SERVICE_PASSWORD_BUGSINK=' "$ENV_FILE" | cut -d= -f2)
+  Link auch unter Admin → Konfiguration (Tab \"Fehler-Tracker\")
+
+"
+fi
 cat <<EOF
 
 Fertig. https://$APP_DOMAIN ist erreichbar (Zertifikatswarnung akzeptieren).
@@ -156,6 +193,6 @@ Selbstregistrierung testen:
      (und ggf. registrationAutoApprove + registrationDefaultRoleId)
   Siehe docs/oidc.md, Abschnitt "Selbstregistrierung".
 
-Neustart nach Codeänderungen: einfach erneut ausführen (baut App neu, Volumes
+${BUGSINK_INFO}Neustart nach Codeänderungen: einfach erneut ausführen (baut App neu, Volumes
 bleiben erhalten). Fresh-Install-Test: $0 --clean
 EOF

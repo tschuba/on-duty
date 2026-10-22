@@ -37,6 +37,7 @@ services:
     environment:
       APP_DOMAIN: ${SERVICE_FQDN_APP}
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
+      BUGSINK_DOMAIN: ${SERVICE_FQDN_BUGSINK:-errors.localhost}
     volumes:
       - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -50,6 +51,7 @@ services:
         # Compose-Netzwerks stattdessen auf Caddy auflösbar.
         aliases:
           - ${SERVICE_FQDN_APP}
+          - ${SERVICE_FQDN_BUGSINK:-errors.localhost}
           - ${SERVICE_FQDN_ZITADEL}
 
 volumes:

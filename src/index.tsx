@@ -1,10 +1,12 @@
+import { sql } from "drizzle-orm";
+import { db } from "./db/index.js";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { getCookie, deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { validateEnv } from "./env.js";
-import { initSentry, captureServerError } from "./lib/sentry.js";
+import { initSentry, captureServerError, isAuthSessionError } from "./lib/sentry.js";
 import { auth } from "./auth.js";
 import { env } from "./env.js";
 import { startBackupScheduler } from "./lib/backup.js";
@@ -134,11 +136,12 @@ app.notFound((c) => {
 });
 
 // 500
-app.onError((err, c) => {
+app.onError(async (err, c) => {
   c.get("log").error({ err }, "unhandled error");
   const user = c.get("user");
   if (!(err instanceof HTTPException && err.status < 500)) {
-    captureServerError(err, { requestId: c.get("requestId"), userId: user?.id, route: c.req.routePath });
+    const dbDown = isAuthSessionError(err) && (await db.execute(sql`select 1`).then(() => false, () => true));
+    captureServerError(err, { dbDown, requestId: c.get("requestId"), userId: user?.id, route: c.req.routePath });
   }
   return c.html(
     <Layout title="Serverfehler" user={user}>
