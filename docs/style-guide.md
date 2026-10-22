@@ -53,7 +53,7 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 | 2 | Untermenü (`.subnav`) | 30 | ab `md` |
 | 3 | `PageHeader` | 20 | immer |
 | 4 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
-| unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase über der aktuellen Seite zur Seitenwahl) | 10 | immer |
+| unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase über der aktuellen Seite zur Seitenwahl) | 10 (30 solange die Seitenwahl offen ist) | immer |
 
 Regeln:
 - Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--subnav-h`, `--header-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
