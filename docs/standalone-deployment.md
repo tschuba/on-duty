@@ -191,3 +191,20 @@ Application wird nur einmal angelegt). Für einen echten Fresh-Install-Test:
 | on-duty-Login: `Errors.App.NotFound` | Die Client-ID existiert in Zitadel nicht (Instanz zurückgesetzt, `oidc.env`/`.env.standalone` veraltet) | Bei frischer Instanz Bootstrap-Volume + DB gemeinsam zurücksetzen (`down -v`); sonst Application neu anlegen und `OIDC_CLIENT_ID`/`OIDC_CLIENT_SECRET` setzen |
 | on-duty-Login schlägt fehl, obwohl OIDC-Vars gesetzt sind | Redirect-URI in der Zitadel-Application stimmt nicht exakt mit `https://<on-duty-domain>/auth/callback/oidc` überein | URI in der Zitadel-Console korrigieren |
 | Caddy bekommt kein Let's-Encrypt-Zertifikat | DNS zeigt noch nicht auf den Server, oder Port 80/443 ist blockiert | DNS-Propagation abwarten, Firewall prüfen (`docker compose logs caddy`) |
+
+## Logging
+
+Die App loggt mit Pino auf stdout (`docker logs`).
+
+| Variable | Werte | Default |
+|---|---|---|
+| `LOG_LEVEL` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` | `info` |
+| `LOG_FORMAT` | `json` (eine JSON-Zeile je Eintrag), `pretty` (lesbar) | `json`; in der Entwicklung `pretty` |
+
+- Jeder Request erhält eine ID (`X-Request-Id` des Proxys oder neu erzeugt), die in jeder Log-Zeile und im Response-Header steht. Bei einem Serverfehler zeigt die 500-Seite sie als „Fehler-ID“ – damit lässt sich die Log-Zeile finden.
+- Es werden nur IDs geloggt, keine Namen, E-Mails oder IBANs. Die Redaction (`email`, `iban`, `password`, `authorization`, `cookie`) greift nur auf Feldnamen, nicht in Freitext.
+- `/health` prüft die Datenbank (`select 1`): `200` bei Erfolg, `503` bei Fehler, ohne Details. Der Compose-Healthcheck nutzt das automatisch.
+
+### Live-Logs (optional)
+
+Empfehlung: [Dozzle](https://dozzle.dev). Wird nicht mitgeliefert. Absicherung per OIDC oder `users.yml`. **Achtung:** `docker.sock` gibt weitreichende Rechte auf den Host – nur über einen `docker-socket-proxy` (nur lesend) einbinden und bewusst aufsetzen.

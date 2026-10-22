@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Hono } from "hono";
 import { env } from "../env.js";
+import { logger } from "../lib/logger.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { handleZitadelEvent, verifySignature, type ZitadelEvent } from "../lib/zitadel-webhook.js";
 
@@ -26,7 +27,7 @@ hookRoutes.post("/zitadel", async (c) => {
   try {
     return c.json({ result: await handleZitadelEvent(JSON.parse(raw) as ZitadelEvent) });
   } catch (err) {
-    console.error("[hooks/zitadel] failed:", err);
+    logger.error({ err }, "[hooks/zitadel] failed");
     return c.json({ error: "failed" }, HTTP_STATUS.INTERNAL_SERVER_ERROR);
   }
 });

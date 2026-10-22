@@ -1,3 +1,4 @@
+import { logger } from "./lib/logger.js"
 import { fileURLToPath } from 'url'
 import { join } from 'path'
 import postgres from 'postgres'
@@ -12,7 +13,7 @@ try {
   await migrate(db, { migrationsFolder: join(fileURLToPath(new URL('.', import.meta.url)), '../drizzle') })
   await runSeed()
 } catch (err) {
-  console.error('Startup failed:', err)
+  logger.fatal({ err }, "Startup failed")
   process.exit(1)
 } finally {
   await sql.end()
