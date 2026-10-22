@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Pager, pageWindow, GRID_MAX_PAGES, gridColumns, jumpStep } from "../components/pager.js";
+import { Pager, pageWindow, GRID_MAX_PAGES, gridColumns } from "../components/pager.js";
 
 describe("Pager", () => {
   it("uses window.URL in the inline handler (bare URL resolves to document.URL)", async () => {
@@ -49,11 +49,5 @@ describe("Pager rendering", () => {
 describe("gridColumns", () => {
   it.each([[8, 3], [16, 4], [32, 6], [50, 7]])("%i pages -> %i columns", (n, c) => {
     expect(gridColumns(n)).toBe(c);
-  });
-});
-
-describe("jumpStep", () => {
-  it.each([[1, 2], [8, 3], [40, 6], [200, 14]])("%i pages -> step %i", (n, c) => {
-    expect(jumpStep(n)).toBe(c);
   });
 });

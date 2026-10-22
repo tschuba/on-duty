@@ -17,11 +17,6 @@ export function gridColumns(total: number): number {
   return Math.min(7, Math.max(2, Math.ceil(Math.sqrt((total * 4) / 5))));
 }
 
-// Jump size of « / »: grows with list length (neighbour links already cover ±1).
-export function jumpStep(total: number): number {
-  return Math.max(2, Math.round(Math.sqrt(total)));
-}
-
 export function Pager(props: {
   countLabel: string;
   page: number;
@@ -57,9 +52,9 @@ export function Pager(props: {
       )}
       <div class="join">
         {page <= 1 ? (
-          <span class="join-item btn btn-disabled" aria-disabled="true" aria-label={t("pager.prev", { n: jumpStep(totalPages) })}>«</span>
+          <span class="join-item btn btn-disabled" aria-disabled="true" aria-label={t("pager.prev")}>«</span>
         ) : (
-          <a href={pageUrl(Math.max(1, page - jumpStep(totalPages)))} class="join-item btn" aria-label={t("pager.prev", { n: jumpStep(totalPages) })}>«</a>
+          <a href={pageUrl(page - 1)} class="join-item btn" aria-label={t("pager.prev")}>«</a>
         )}
         {pageWindow(page, totalPages).map((p, i) => {
           if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled hidden sm:inline-flex px-2 min-w-0" aria-disabled="true">…</span>;
@@ -123,9 +118,9 @@ export function Pager(props: {
           return <a key={p} href={pageUrl(p)} class="join-item btn">{p}</a>;
         })}
         {page >= totalPages ? (
-          <span class="join-item btn btn-disabled" aria-disabled="true" aria-label={t("pager.next", { n: jumpStep(totalPages) })}>»</span>
+          <span class="join-item btn btn-disabled" aria-disabled="true" aria-label={t("pager.next")}>»</span>
         ) : (
-          <a href={pageUrl(Math.min(totalPages, page + jumpStep(totalPages)))} class="join-item btn" aria-label={t("pager.next", { n: jumpStep(totalPages) })}>»</a>
+          <a href={pageUrl(page + 1)} class="join-item btn" aria-label={t("pager.next")}>»</a>
         )}
       </div>
     </div>
