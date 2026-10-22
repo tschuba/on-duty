@@ -275,7 +275,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
       <PageHeader title={t("donations.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />} />
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
-      <form method="get" class="flex flex-wrap gap-3 mb-4 items-end">
+      <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
         <div class="form-control">
           <label class="input input-bordered flex items-center gap-2 w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>

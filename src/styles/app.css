@@ -178,7 +178,24 @@
     top: calc(var(--nav-h) + var(--subnav-h));
   }
 }
+/* Such-/Filterleiste klebt unter dem PageHeader. --header-h geschätzt (py-2 + btn 2.5rem), bei Spalt/Überlappung anpassen. */
+.filter-bar {
+  --header-h: 3.5rem;
+  position: sticky;
+  z-index: 15;
+  top: calc(var(--nav-h) + var(--header-h));
+  background: var(--color-base-100);
+  padding-block: 0.5rem;
+}
+@media (min-width: 48rem) {
+  body:has([data-subnav]) .filter-bar {
+    top: calc(var(--nav-h) + var(--subnav-h) + var(--header-h));
+  }
+}
 @media (max-width: 47.99rem) {
+  .filter-bar {
+    position: static;
+  }
   .subnav {
     position: static;
   }

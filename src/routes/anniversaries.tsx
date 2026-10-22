@@ -270,7 +270,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
         <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" />} />
 
         {/* Controls */}
-        <div class="flex flex-wrap gap-3 items-end">
+        <div class="filter-bar flex flex-wrap gap-3 items-end">
           <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
 
           {/* Manual date range */}

@@ -37,6 +37,8 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 
 **Seitenkopf:** `PageHeader` (`title`, `backHref?`/`backLabel?`, `subtitle?`, `actions?`) — Titel links, Aktionen rechtsbündig (Primär zuletzt). Aktionen sind `HeaderAction` (`variant`, `icon`, `label`; setzt `aria-label` + `title`) bzw. `FormActions` (Abbrechen / Speichern & Neu / Speichern).
 
+**Such-/Filterleiste:** Listenseiten mit Suche/Filtern setzen `filter-bar` auf den Wrapper (`src/styles/app.css`); sie klebt unter dem `PageHeader` (unter 48rem nicht sticky). Kein `display: contents` am Wrapper.
+
 **Formulare:** Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes Formular bekommt eine feste `id`; der Kopf-Button verweist per `form="<id>"` darauf (kein JS, Enter im Feld funktioniert weiter). Löschen = eigenes kleines `<form>` im Inhalt, Button im Kopf zeigt per `form=` darauf. Bei mehreren Formularen zeigt der Kopf nur auf das Hauptformular.
 
 **Icon-only (Container-Queries):** Stufe 1 (Kopf < `@xl`): Labels der sekundären Aktionen entfallen; Stufe 2 (< `@md`): auch das Label der primären Aktion. Icon bleibt, `aria-label`/`title` tragen den Namen.

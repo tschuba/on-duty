@@ -55,7 +55,7 @@ yearRoutes.get("/", yearsRead, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.anniversaries.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
 
-      <div class="join mb-4">
+      <div class="filter-bar join mb-4">
         <a href={`/anniversary-years?sort=${sort}&dir=${dir}`} class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
         {ANNIVERSARY_KINDS.map((k) => (
           <a href={`/anniversary-years?kind=${k}&sort=${sort}&dir=${dir}`} class={`join-item btn${kindFilter === k ? " btn-primary btn-outline" : " btn-ghost"}`}>{t(`admin.anniversaries.kind.${k}`)}</a>

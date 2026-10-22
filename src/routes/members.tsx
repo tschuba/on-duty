@@ -1074,7 +1074,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       <StatsCards all={all} />
 
       {/* Toolbar */}
-      <div class="flex flex-wrap gap-3 mb-4 items-center">
+      <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
         <label class="input input-bordered flex items-center gap-2 w-64">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input

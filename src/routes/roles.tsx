@@ -165,7 +165,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>
       <PageHeader title={t("admin.roles.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
-      <div class="mb-4"><div class="join">
+      <div class="filter-bar mb-4"><div class="join">
             <a href="/roles" class={`btn join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
             <a href="/roles?active=1" class={`btn join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
             <a href="/roles?active=0" class={`btn join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>

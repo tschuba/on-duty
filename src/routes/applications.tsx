@@ -328,7 +328,7 @@ applicationRoutes.get("/", guard, async (c) => {
           });
         })();
       ` }} />
-      <form method="get" action="/applications" class="flex flex-wrap gap-2 items-center mb-4">
+      <form method="get" action="/applications" class="filter-bar flex flex-wrap gap-2 items-center mb-4">
         {statusFilter.map((st) => <input type="hidden" name="status" value={st} />)}
         <input type="hidden" name="sort" value={sort} />
         <input type="hidden" name="sort_dir" value={dir} />

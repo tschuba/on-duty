@@ -620,7 +620,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
-      <label class="input input-bordered input-sm flex items-center gap-2 mb-3 max-w-xs">
+      <label class="filter-bar input input-bordered input-sm flex items-center gap-2 mb-3 max-w-xs">
         <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
         <input
           type="search"
@@ -933,7 +933,7 @@ adminRoutes.get("/config", guard, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
-        <div class="flex flex-wrap items-center gap-2 mb-4">
+        <div class="filter-bar flex flex-wrap items-center gap-2 mb-4">
           <label class="input input-bordered input-sm flex items-center gap-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
           <label class="label cursor-pointer gap-2">
             <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
