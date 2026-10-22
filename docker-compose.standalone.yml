@@ -78,7 +78,7 @@ services:
       SECRET_KEY: ${SERVICE_PASSWORD_BUGSINKSECRET}
       BASE_URL: https://${SERVICE_FQDN_BUGSINK}
       BEHIND_HTTPS_PROXY: "True"
-      CREATE_SUPERUSER: ${BUGSINK_ADMIN_EMAIL:-admin@example.org}:${SERVICE_PASSWORD_BUGSINK}
+      CREATE_SUPERUSER: ${BUGSINK_ADMIN_EMAIL:-admin@bugsink.local}:${SERVICE_PASSWORD_BUGSINK}
       # Limits (docs defaults: 5000/h per project); retention per project is set by bugsink-init.
       MAX_EVENTS_PER_PROJECT_PER_HOUR: ${BUGSINK_MAX_EVENTS_PER_HOUR:-1000}
       # Mail (password resets) from the same SMTP_* values as the app. Empty SMTP_HOST = Bugsink sends nothing.

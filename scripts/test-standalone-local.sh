@@ -169,7 +169,7 @@ ZITADEL_LOGIN_NAME=$(zitadel_login_name)
 BUGSINK_INFO=""
 if [[ $WITH_ERRORS -eq 1 ]]; then
   BUGSINK_INFO="Bugsink: https://$(grep '^SERVICE_FQDN_BUGSINK=' "$ENV_FILE" | cut -d= -f2)
-  Login: admin@example.org / $(grep '^SERVICE_PASSWORD_BUGSINK=' "$ENV_FILE" | cut -d= -f2)
+  Login: admin@bugsink.local / $(grep '^SERVICE_PASSWORD_BUGSINK=' "$ENV_FILE" | cut -d= -f2)
   Link auch unter Admin → Konfiguration (Tab \"Fehler-Tracker\")
 
 "
