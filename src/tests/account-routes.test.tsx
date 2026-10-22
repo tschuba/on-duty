@@ -68,6 +68,18 @@ describe("/account", () => {
   it("renders a dash without roles", async () => {
     expect(await (await app.request("/account")).text()).toContain("—");
   });
+  it("shows permission labels", async () => {
+    user.permissions = new Set(["members:read"]);
+    expect(await (await app.request("/account")).text()).toContain("Mitglieder ansehen");
+  });
+  it("shows the full badge for all permissions", async () => {
+    const { PERMISSIONS } = await import("../lib/roles.js");
+    const { PermissionBadges } = await import("../components/permission-badges.js");
+    expect(String(<PermissionBadges permissions={[...PERMISSIONS]} />)).toContain("Unbeschränkter Vollzugriff");
+  });
+  it("renders two dashes without roles and permissions", async () => {
+    expect(((await (await app.request("/account")).text()).match(/—/g) ?? []).length).toBe(2);
+  });
   it("delete: blocked redirects back to /account", async () => {
     block = "lastAdmin";
     const res = await app.request("/account/delete", { method: "POST" });

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { requireAuth, type Variables } from "../middleware/auth.js";
+import { PermissionBadges } from "../components/permission-badges.js";
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
@@ -85,6 +86,8 @@ accountRoutes.get("/", guard, async (c) => {
           <dd class="flex flex-wrap gap-1">
             {roles.length === 0 ? <span class="opacity-40">—</span> : roles.map((r) => <span class="badge badge-outline badge-sm">{r.name}</span>)}
           </dd>
+          <dt class="opacity-60">{t("account.profile.permissions")}</dt>
+          <dd>{user.permissions.size === 0 ? <span class="opacity-40">—</span> : <PermissionBadges permissions={[...user.permissions]} />}</dd>
         </dl>
         {env.OIDC_ACCOUNT_URL && (
           <p class="mb-4">
