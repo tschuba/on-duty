@@ -224,7 +224,7 @@ Optional und standardmäßig aus. Aktivieren: in Coolify die Variable `COMPOSE_P
 
 - Bugsink bekommt eine eigene Domain (`SERVICE_FQDN_BUGSINK_8000`). Login: `BUGSINK_ADMIN_EMAIL` (Default `admin@example.org`) und das von Coolify erzeugte `SERVICE_PASSWORD_BUGSINK`.
 - `bugsink-init` legt Team und Projekt `on-duty` an und schreibt die DSN nach `/bugsink/dsn` (idempotent). Die App liest sie als `SENTRY_DSN_FILE`; **nach dem ersten Lauf die App einmal neu starten**. Eine explizite `SENTRY_DSN` hat Vorrang.
-- Unter **Admin → Konfiguration** erscheint bei aktivem Profil ein Link zur Bugsink-Oberfläche (`ERROR_TRACKER_URL`, aus `SERVICE_FQDN_BUGSINK`). Login erfolgt dort separat (eigenes Bugsink-Konto, siehe oben), kein SSO.
+- Unter **Admin → Konfiguration** erscheint bei aktivem Profil ein Link zur Issue-Liste von Bugsink (`ERROR_TRACKER_URL`, Default `https://<SERVICE_FQDN_BUGSINK>/issues/`, per expliziter Variable überschreibbar). Login erfolgt dort separat (eigenes Bugsink-Konto, siehe oben), kein SSO.
 - Limits: `BUGSINK_MAX_EVENTS_PER_HOUR` (Default 1000; Bugsink-Default 5000/Projekt) und `BUGSINK_RETENTION_EVENTS` (Default 10000 Events pro Projekt, gilt nur beim Anlegen des Projekts).
 - Speicher: SQLite im Volume `bugsink-data`, **kein Backup**.
 - Live-Logs: Dozzle wird nicht mitgeliefert, bei Bedarf separat betreiben.
