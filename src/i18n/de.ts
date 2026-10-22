@@ -879,6 +879,7 @@ export const de = {
   "account.profile.name": "Name",
   "account.profile.email": "E-Mail",
   "account.profile.roles": "Rollen",
+  "account.profile.permissions": "Berechtigungen",
   "account.delete.heading": "Konto löschen",
   "account.delete.body": "Dein on-duty-Konto wird endgültig gelöscht. Dein Konto beim Anmeldedienst (OIDC-Provider) bleibt bestehen und muss dort separat gelöscht werden.",
   "account.delete.confirmTitle": "Konto wirklich löschen?",
