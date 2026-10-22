@@ -221,7 +221,7 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.supporting")}</div>
-        <div class="stat-value">{counts.foerdernd}</div>
+        <div class="stat-value text-secondary">{counts.foerdernd}</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.youth")}</div>
@@ -239,7 +239,13 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.former")}</div>
-        <div class="stat-value text-base-content/40">{counts.ausgetreten + counts.verstorben}</div>
+        <div class="flex flex-wrap items-baseline gap-x-3">
+          <div class="stat-value text-base-content/40">{counts.ausgetreten + counts.verstorben}</div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">
+            {counts.ausgetreten > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.ausgetreten} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
+            {counts.verstorben > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.verstorben} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
+          </div>
+        </div>
       </div>
     </div>
   );
