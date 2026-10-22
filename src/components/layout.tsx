@@ -69,7 +69,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <script src="/js/htmx.min.js" />
       {user && readDsn() && <script src="/js/sentry.min.js" />}
     </head>
-    <body class="bg-base-100 min-h-screen">
+    <body class="bg-base-100 min-h-dvh flex flex-col">
       {/* Toast container — filled by HX-Trigger: showToast */}
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
@@ -195,8 +195,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           </div>
         )}
       </nav>
-      <main class="container mx-auto px-4 py-6 pb-10">{children}</main>
-      <footer class="fixed bottom-0 inset-x-0 h-6 px-4 flex items-center justify-end text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={`https://github.com/tschuba/on-duty/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
+      <main class="container mx-auto px-4 py-6 flex-1">{children}</main>
+      <footer class="sticky bottom-0 mt-auto h-6 shrink-0 px-4 flex items-center justify-end text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={`https://github.com/tschuba/on-duty/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
 
       {/* Toast handler + flash cookie reader */}
       <script dangerouslySetInnerHTML={{ __html: `
