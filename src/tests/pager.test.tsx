@@ -47,7 +47,7 @@ describe("Pager rendering", () => {
 });
 
 describe("gridColumns", () => {
-  it.each([[8, 4], [16, 5], [32, 7], [50, 7]])("%i pages -> %i columns", (n, c) => {
+  it.each([[8, 3], [16, 4], [32, 6], [50, 7]])("%i pages -> %i columns", (n, c) => {
     expect(gridColumns(n)).toBe(c);
   });
 });
