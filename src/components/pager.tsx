@@ -12,6 +12,11 @@ export function pageWindow(page: number, total: number): (number | "…")[] {
   return pages.flatMap((p, i) => (i > 0 && p - pages[i - 1] > 1 ? ["…" as const, p] : [p]));
 }
 
+// Prefer height over width: about twice as many rows as columns, max 5 columns.
+export function gridColumns(total: number): number {
+  return Math.min(5, Math.max(2, Math.ceil(Math.sqrt(total / 2))));
+}
+
 export function Pager(props: {
   countLabel: string;
   page: number;
@@ -72,9 +77,9 @@ export function Pager(props: {
                   {p}
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 12.78a.75.75 0 0 0 1.06 0L10 9.06l3.72 3.72a.75.75 0 1 0 1.06-1.06l-4.25-4.25a.75.75 0 0 0-1.06 0L5.22 11.72a.75.75 0 0 0 0 1.06Z" clip-rule="evenodd" /></svg>
                 </div>
-                <div tabindex={0} class="dropdown-content z-20 mb-3 w-72 right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+                <div tabindex={0} class="dropdown-content z-20 mb-3 w-max right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
                   {totalPages <= GRID_MAX_PAGES ? (
-                    <div class="grid grid-cols-5 gap-2">
+                    <div class="grid gap-2" style={`grid-template-columns: repeat(${gridColumns(totalPages)}, 2.75rem)`}>
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
                         <a key={n} href={pageUrl(n)} class={`btn btn-sm${n === page ? " btn-primary" : ""}`}>{n}</a>
                       ))}

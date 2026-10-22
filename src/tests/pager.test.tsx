@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Pager, pageWindow, GRID_MAX_PAGES } from "../components/pager.js";
+import { Pager, pageWindow, GRID_MAX_PAGES, gridColumns } from "../components/pager.js";
 
 describe("Pager", () => {
   it("uses window.URL in the inline handler (bare URL resolves to document.URL)", async () => {
@@ -36,12 +36,18 @@ describe("Pager rendering", () => {
   it("uses a grid popup for 8–50 pages", async () => {
     const html = await render(5, GRID_MAX_PAGES);
     expect(html).toContain("dropdown-content");
-    expect(html).toContain("grid-cols-5");
+    expect(html).toContain("repeat(5,");
     expect(html).not.toContain('type="number"');
   });
   it("uses a number input above the grid limit", async () => {
     const html = await render(5, GRID_MAX_PAGES + 1);
     expect(html).toContain('type="number"');
-    expect(html).not.toContain("grid-cols-5");
+    expect(html).not.toContain("repeat(5,");
+  });
+});
+
+describe("gridColumns", () => {
+  it.each([[8, 2], [16, 3], [32, 4], [50, 5]])("%i pages -> %i columns", (n, c) => {
+    expect(gridColumns(n)).toBe(c);
   });
 });
