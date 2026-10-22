@@ -27,6 +27,8 @@ import { inventoryRoutes } from "./routes/inventory.js";
 import { lendingRoutes } from "./routes/lending.js";
 import { importRoutes } from "./routes/import.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
+import { sentryTunnelRoutes } from "./routes/sentry-tunnel.js";
+import { readDsn } from "./lib/sentry.js";
 import { healthRoutes } from "./routes/health.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
@@ -45,6 +47,8 @@ app.route("/", healthRoutes);
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
 app.use("/js/*", serveStatic({ root: "./public" }));
+
+if (readDsn()) app.route("/", sentryTunnelRoutes);
 
 // Auth + password routes
 app.route("/", loginRoutes);

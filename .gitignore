@@ -14,3 +14,4 @@ data/
 .DS_Store
 coverage/
 .vitest/
+public/js/sentry.min.js

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { PropsWithChildren } from "hono/jsx";
 import type { AuthedUser } from "../middleware/auth.js";
+import { readDsn } from "../lib/sentry.js";
 import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
 import { countOpenReceipts } from "../lib/donations.js";
@@ -66,6 +67,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}` }} />
       <link rel="stylesheet" href="/css/app.css" />
       <script src="/js/htmx.min.js" />
+      {user && readDsn() && <script src="/js/sentry.min.js" />}
     </head>
     <body class="bg-base-100 min-h-screen">
       {/* Toast container — filled by HX-Trigger: showToast */}
