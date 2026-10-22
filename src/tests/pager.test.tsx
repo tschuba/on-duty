@@ -28,10 +28,19 @@ describe("Pager rendering", () => {
     String(await (<Pager countLabel="x" page={page} totalPages={total} pageUrl={(p) => `?page=${p}`} />));
 
   it("marks the current page", async () => {
-    const html = await render(1, 3);
+    const html = await render(1, 1);
     expect(html).toContain('aria-current="page"');
     expect(html).not.toContain("«");
     expect(html).not.toContain("dropdown-content");
+  });
+  it("stays on one line and compact on mobile", async () => {
+    const html = String(await (<Pager countLabel="x" page={2} totalPages={5} pageUrl={(p) => `?page=${p}`} pageSize={10} pageSizeOptions={[10, 25]} />));
+    expect(html).toContain("flex-nowrap");
+    expect(html).toContain("aria-label=");
+    expect(html).toContain("whitespace-nowrap hidden sm:inline");
+    expect(html).toContain("dropdown dropdown-top join-item sm:hidden");
+    expect(html).toContain("join-item btn btn-primary hidden sm:inline-flex");
+    expect(html).toContain("join-item btn hidden sm:inline-flex");
   });
   it("uses a grid popup for 8–50 pages", async () => {
     const html = await render(5, GRID_MAX_PAGES);

@@ -27,14 +27,68 @@ export function Pager(props: {
   pageSizeStorageKey?: string;
 }) {
   const { countLabel, page, totalPages, pageUrl, pageSize, pageSizeOptions, pageSizeStorageKey } = props;
+  const picker = (p: number, mobileOnly: boolean) => (
+          <div key={`pick${p}`} class={`dropdown dropdown-top join-item${mobileOnly ? " sm:hidden" : ""}`}
+            onfocusin={`
+              const c = this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
+              const r = this.getBoundingClientRect(), m = 8;
+              let left = r.width / 2 - c.offsetWidth / 2;
+              const place = () => { c.style.left = left + 'px'; a.style.left = (r.width / 2 - left - 6) + 'px'; };
+              place();
+              requestAnimationFrame(() => {
+                const b = c.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+                left += Math.max(m - b.left, Math.min(0, vw - m - b.right));
+                place();
+              });
+            `}>
+            <div tabindex={0} role="button" class="btn btn-outline btn-primary border-2 join-item gap-1 rounded-none tooltip tooltip-bottom" data-tip={t("pager.selectPage")} aria-current="page" aria-haspopup="true" aria-label={t("pager.selectPage")}>
+              {p}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path fill-rule="evenodd" d="M10.53 3.47a.75.75 0 0 0-1.06 0L6.22 6.72a.75.75 0 0 0 1.06 1.06L10 5.06l2.72 2.72a.75.75 0 1 0 1.06-1.06l-3.25-3.25Zm-4.31 9.81 3.25 3.25a.75.75 0 0 0 1.06 0l3.25-3.25a.75.75 0 1 0-1.06-1.06L10 14.94l-2.72-2.72a.75.75 0 0 0-1.06 1.06Z" clip-rule="evenodd" /></svg>
+            </div>
+            <div tabindex={0} class="dropdown-content z-20 mb-3 w-max right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+              {totalPages <= GRID_MAX_PAGES ? (
+                <div class="grid gap-2" style={`grid-template-columns: repeat(${gridColumns(totalPages)}, 2.75rem)`}>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                    <a key={n} href={pageUrl(n)} class={`btn btn-sm${n === page ? " btn-primary" : ""}`}>{n}</a>
+                  ))}
+                </div>
+              ) : (
+                <label class="flex items-center gap-2 whitespace-nowrap">
+                  <span>{t("pager.goToPage")}</span>
+                  <input
+                    type="number"
+                    class="input input-bordered w-16 text-base"
+                    min={1}
+                    max={totalPages}
+                    value={page}
+                    inputmode="numeric"
+                    enterkeyhint="go"
+                    onkeydown={`
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      const n = Math.min(${totalPages}, Math.max(1, parseInt(this.value, 10) || 0));
+                      if (!n || n === ${page}) { this.blur(); return; }
+                      const url = new window.URL(window.location.href);
+                      url.searchParams.set('page', String(n));
+                      window.location = url.toString();
+                    `}
+                  />
+                </label>
+              )}
+              {/* speech-balloon arrow pointing down at the trigger */}
+              <span data-arrow class="absolute -bottom-[7px] size-3 rotate-45 border-b border-r border-base-300 bg-base-100" aria-hidden="true" />
+            </div>
+          </div>
+  );
   return (
-    <div class="sticky bottom-6 z-10 focus-within:z-30 bg-base-100 border-t border-base-300 py-2 mt-4 flex flex-wrap items-center justify-end gap-4">
-      <span class="text-sm opacity-70 mr-auto">{countLabel}</span>
+    <div class="sticky bottom-6 z-10 focus-within:z-30 bg-base-100 border-t border-base-300 py-2 mt-4 flex flex-nowrap sm:flex-wrap items-center justify-end gap-2 sm:gap-4">
+      <span class="text-sm opacity-70 mr-auto whitespace-nowrap">{countLabel}</span>
       {pageSizeOptions && (
         <div class="flex items-center gap-2 text-sm opacity-70">
-          <span class="whitespace-nowrap">{t("members.table.pageSize")}</span>
+          <span class="whitespace-nowrap hidden sm:inline">{t("members.table.pageSize")}</span>
           <select
             class="select select-bordered"
+            aria-label={t("members.table.pageSize")}
             onchange={`
               const v = this.value;
               ${pageSizeStorageKey ? `localStorage.setItem('${pageSizeStorageKey}', v);` : ""}
@@ -52,65 +106,16 @@ export function Pager(props: {
       )}
       <div class="join">
         {pageWindow(page, totalPages).map((p, i) => {
-          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled px-2 min-w-0" aria-disabled="true">…</span>;
+          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled px-2 min-w-0 hidden sm:inline-flex" aria-disabled="true">…</span>;
           if (p === page) {
-            return totalPages > WINDOW_ALL ? (
-              <div key={p} class="dropdown dropdown-top join-item"
-                onfocusin={`
-                  const c = this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
-                  const r = this.getBoundingClientRect(), m = 8;
-                  let left = r.width / 2 - c.offsetWidth / 2;
-                  const place = () => { c.style.left = left + 'px'; a.style.left = (r.width / 2 - left - 6) + 'px'; };
-                  place();
-                  requestAnimationFrame(() => {
-                    const b = c.getBoundingClientRect(), vw = document.documentElement.clientWidth;
-                    left += Math.max(m - b.left, Math.min(0, vw - m - b.right));
-                    place();
-                  });
-                `}>
-                <div tabindex={0} role="button" class="btn btn-outline btn-primary border-2 join-item gap-1 rounded-none tooltip tooltip-bottom" data-tip={t("pager.selectPage")} aria-current="page" aria-haspopup="true" aria-label={t("pager.selectPage")}>
-                  {p}
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4" aria-hidden="true"><path fill-rule="evenodd" d="M10.53 3.47a.75.75 0 0 0-1.06 0L6.22 6.72a.75.75 0 0 0 1.06 1.06L10 5.06l2.72 2.72a.75.75 0 1 0 1.06-1.06l-3.25-3.25Zm-4.31 9.81 3.25 3.25a.75.75 0 0 0 1.06 0l3.25-3.25a.75.75 0 1 0-1.06-1.06L10 14.94l-2.72-2.72a.75.75 0 0 0-1.06 1.06Z" clip-rule="evenodd" /></svg>
-                </div>
-                <div tabindex={0} class="dropdown-content z-20 mb-3 w-max right-auto rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
-                  {totalPages <= GRID_MAX_PAGES ? (
-                    <div class="grid gap-2" style={`grid-template-columns: repeat(${gridColumns(totalPages)}, 2.75rem)`}>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                        <a key={n} href={pageUrl(n)} class={`btn btn-sm${n === page ? " btn-primary" : ""}`}>{n}</a>
-                      ))}
-                    </div>
-                  ) : (
-                    <label class="flex items-center gap-2 whitespace-nowrap">
-                      <span>{t("pager.goToPage")}</span>
-                      <input
-                        type="number"
-                        class="input input-bordered w-16 text-base"
-                        min={1}
-                        max={totalPages}
-                        value={page}
-                        inputmode="numeric"
-                        enterkeyhint="go"
-                        onkeydown={`
-                          if (event.key !== 'Enter') return;
-                          event.preventDefault();
-                          const n = Math.min(${totalPages}, Math.max(1, parseInt(this.value, 10) || 0));
-                          if (!n || n === ${page}) { this.blur(); return; }
-                          const url = new window.URL(window.location.href);
-                          url.searchParams.set('page', String(n));
-                          window.location = url.toString();
-                        `}
-                      />
-                    </label>
-                  )}
-                  {/* speech-balloon arrow pointing down at the trigger */}
-                  <span data-arrow class="absolute -bottom-[7px] size-3 rotate-45 border-b border-r border-base-300 bg-base-100" aria-hidden="true" />
-                </div>
-              </div>
-            ) : (
-              <span key={p} class="join-item btn btn-primary" aria-current="page">{p}</span>
-            );
+            if (totalPages > WINDOW_ALL) return picker(p, false);
+            if (totalPages === 1) return <span key={p} class="join-item btn btn-primary" aria-current="page">{p}</span>;
+            return [
+              picker(p, true),
+              <span key={p} class="join-item btn btn-primary hidden sm:inline-flex" aria-current="page">{p}</span>,
+            ];
           }
-          return <a key={p} href={pageUrl(p)} class="join-item btn">{p}</a>;
+          return <a key={p} href={pageUrl(p)} class="join-item btn hidden sm:inline-flex">{p}</a>;
         })}
       </div>
     </div>
