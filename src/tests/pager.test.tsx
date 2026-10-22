@@ -27,10 +27,10 @@ describe("Pager rendering", () => {
   const render = async (page: number, total: number) =>
     String(await (<Pager countLabel="x" page={page} totalPages={total} pageUrl={(p) => `?page=${p}`} />));
 
-  it("marks current page and disables « on first page", async () => {
+  it("marks the current page", async () => {
     const html = await render(1, 3);
     expect(html).toContain('aria-current="page"');
-    expect(html).toMatch(/<span[^>]*btn-disabled[^>]*>«/);
+    expect(html).not.toContain("«");
     expect(html).not.toContain("dropdown-content");
   });
   it("uses a grid popup for 8–50 pages", async () => {

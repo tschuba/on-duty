@@ -51,11 +51,6 @@ export function Pager(props: {
         </div>
       )}
       <div class="join">
-        {page <= 1 ? (
-          <span class="join-item btn btn-disabled" aria-disabled="true" aria-label={t("pager.prev")}>«</span>
-        ) : (
-          <a href={pageUrl(page - 1)} class="join-item btn" aria-label={t("pager.prev")}>«</a>
-        )}
         {pageWindow(page, totalPages).map((p, i) => {
           if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled hidden sm:inline-flex px-2 min-w-0" aria-disabled="true">…</span>;
           if (p === page) {
@@ -117,11 +112,6 @@ export function Pager(props: {
           }
           return <a key={p} href={pageUrl(p)} class="join-item btn">{p}</a>;
         })}
-        {page >= totalPages ? (
-          <span class="join-item btn btn-disabled" aria-disabled="true" aria-label={t("pager.next")}>»</span>
-        ) : (
-          <a href={pageUrl(page + 1)} class="join-item btn" aria-label={t("pager.next")}>»</a>
-        )}
       </div>
     </div>
   );
