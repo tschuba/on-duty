@@ -81,6 +81,15 @@ services:
       CREATE_SUPERUSER: ${BUGSINK_ADMIN_EMAIL:-admin@example.org}:${SERVICE_PASSWORD_BUGSINK}
       # Limits (docs defaults: 5000/h per project); retention per project is set by bugsink-init.
       MAX_EVENTS_PER_PROJECT_PER_HOUR: ${BUGSINK_MAX_EVENTS_PER_HOUR:-1000}
+      # Mail (password resets) from the same SMTP_* values as the app. Empty SMTP_HOST = Bugsink sends nothing.
+      # STARTTLS (587) is the default like in the app; for port 465 set BUGSINK_EMAIL_USE_SSL=True and BUGSINK_EMAIL_USE_TLS=False.
+      EMAIL_HOST: ${SMTP_HOST:-}
+      EMAIL_PORT: ${SMTP_PORT:-587}
+      EMAIL_HOST_USER: ${SMTP_USER:-}
+      EMAIL_HOST_PASSWORD: ${SMTP_PASS:-}
+      EMAIL_USE_TLS: ${BUGSINK_EMAIL_USE_TLS:-True}
+      EMAIL_USE_SSL: ${BUGSINK_EMAIL_USE_SSL:-False}
+      DEFAULT_FROM_EMAIL: ${SMTP_FROM:-}
     volumes:
       - bugsink-data:/data
 
