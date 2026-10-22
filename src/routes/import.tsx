@@ -470,7 +470,7 @@ function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; f
         </div>
         <form id="import-form" method="post" action="/import/run" data-fp={props.fp}>
           {props.hidden as never}
-          <div class="sticky z-10 bg-base-100 border-b border-base-300 py-3 mb-4" style="top: calc(var(--nav-h) + 3rem)">
+          <div class="filter-bar border-b border-base-300 py-3 mb-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                 {props.summary.map((x) => (

@@ -37,13 +37,32 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 
 **Seitenkopf:** `PageHeader` (`title`, `backHref?`/`backLabel?`, `subtitle?`, `actions?`) — Titel links, Aktionen rechtsbündig (Primär zuletzt). Aktionen sind `HeaderAction` (`variant`, `icon`, `label`; setzt `aria-label` + `title`) bzw. `FormActions` (Abbrechen / Speichern & Neu / Speichern).
 
+**Such-/Filterleiste:** Listenseiten mit Suche/Filtern setzen die Klasse `filter-bar` (`src/styles/app.css`) auf den Wrapper der Leiste. Sticky-Verhalten siehe unten.
+
 **Formulare:** Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes Formular bekommt eine feste `id`; der Kopf-Button verweist per `form="<id>"` darauf (kein JS, Enter im Feld funktioniert weiter). Löschen = eigenes kleines `<form>` im Inhalt, Button im Kopf zeigt per `form=` darauf. Bei mehreren Formularen zeigt der Kopf nur auf das Hauptformular.
 
 **Icon-only (Container-Queries):** Stufe 1 (Kopf < `@xl`): Labels der sekundären Aktionen entfallen; Stufe 2 (< `@md`): auch das Label der primären Aktion. Icon bleibt, `aria-label`/`title` tragen den Namen.
 
 **Untermenü:** `SubNav` (`src/components/sub-nav.tsx`) ersetzt alle `tabs-lifted`: `tabs-sm` (~32 px), `bg-base-300`, 1 px Rahmen unten, aktiver Tab mit `primary`-Unterstrich.
 
-**Sticky:** Hauptnav ist immer sticky; ab `md` zusätzlich Untermenü und Seitenkopf (Offsets über `--nav-h`/`--subnav-h` in `app.css`), darunter nur Hauptnav + Seitenkopf (Untermenü scrollt mit). Vorfahren dürfen kein `overflow` ≠ `visible` setzen, sonst bricht Sticky.
+**Sticky:** Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
+
+| Ebene | Element | z-index | Sichtbar |
+|---|---|---|---|
+| 1 | Hauptnav | 40 | immer |
+| 2 | Untermenü (`.subnav`) | 30 | ab `md` |
+| 3 | `PageHeader` | 20 | immer |
+| 4 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
+| unten | `Pager` | 10 | immer |
+
+Regeln:
+- Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--subnav-h`, `--header-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
+- Sticky-Elemente brauchen einen deckenden Hintergrund (`bg-base-100`/`bg-base-300`).
+- Popover/Dropdowns (`MultiSelectFilter`) liegen über allen Ebenen (`z-50` bzw. Top Layer); neue Ebenen bleiben unter 20.
+- Kein Vorfahr darf `overflow` ≠ `visible` haben, sonst bricht Sticky. Deshalb stehen Pager und Leiste **außerhalb** von `overflow-x-auto`-Wrappern.
+- Sticky gilt nur innerhalb des Eltern-Elements: Leiste und Liste/Tabelle müssen im selben Container liegen, ohne Zwischen-Wrapper mit kurzer Höhe. Fehlerbild: Leiste scrollt nach kurzer Strecke weg (so zuvor in `/anniversaries`).
+- `display: contents` am Sticky-Element selbst ist wirkungslos; Klasse an das umgebende `<div>` setzen.
+- `--header-h` ist geschätzt (3.5rem); ändert sich die Höhe des `PageHeader`, muss der Wert mit.
 
 **Zurück-Link:** Detail- und Formularseiten setzen `backHref` auf die Liste.
 

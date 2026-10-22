@@ -717,7 +717,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 
-      <div class="flex flex-wrap items-center gap-3 mb-4">
+      <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <form method="get" action="/inventory" class="contents">
           <label class="input input-bordered flex items-center gap-2">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
@@ -1328,7 +1328,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
       />
       <PageHeader title={t("inventory.inspections.title")} />
 
-      <div class="flex flex-wrap items-center gap-3 mb-4">
+      <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <form method="get" class="flex items-end gap-2">
           {categoryFilter.map((cat) => <input type="hidden" name="category" value={cat} />)}
           <div class="form-control">

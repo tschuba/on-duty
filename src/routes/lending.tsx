@@ -193,7 +193,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
       />
       <PageHeader title={t("lending.title")} actions={user.permissions.has("lending:manage") && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />} />
 
-      <form method="get" action="/inventory/lending" class="flex gap-2 items-center flex-wrap mb-4">
+      <form method="get" action="/inventory/lending" class="filter-bar flex gap-2 items-center flex-wrap mb-4">
         <label class="input input-bordered flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
         <MultiSelectFilter
           param="status"

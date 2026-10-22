@@ -328,7 +328,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
       <DonationTabs active="donors" openReceiptsCount={openReceipts} />
       <PageHeader title={t("donors.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />} />
 
-      <div class="flex flex-wrap gap-3 mb-4 items-center">
+      <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
         <form method="get" class="flex gap-2">
           <label class="input input-bordered flex items-center gap-2 w-64">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />

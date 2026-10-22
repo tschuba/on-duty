@@ -266,11 +266,11 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
     <Layout title={t("anniversaries.title")} user={user} activeNav="members">
       <div class="max-w-4xl mx-auto">
       <MemberTabs active="anniversaries" user={user} />
-      <div class="mb-6">
+      <div class="contents">
         <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" />} />
 
         {/* Controls */}
-        <div class="flex flex-wrap gap-3 items-end">
+        <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
           <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
 
           {/* Manual date range */}
