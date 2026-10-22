@@ -37,7 +37,7 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 
 **Seitenkopf:** `PageHeader` (`title`, `backHref?`/`backLabel?`, `subtitle?`, `actions?`) — Titel links, Aktionen rechtsbündig (Primär zuletzt). Aktionen sind `HeaderAction` (`variant`, `icon`, `label`; setzt `aria-label` + `title`) bzw. `FormActions` (Abbrechen / Speichern & Neu / Speichern).
 
-**Such-/Filterleiste:** Listenseiten mit Suche/Filtern setzen `filter-bar` auf den Wrapper (`src/styles/app.css`); sie klebt unter dem `PageHeader` (unter 48rem nicht sticky). Kein `display: contents` am Wrapper.
+**Such-/Filterleiste:** Listenseiten mit Suche/Filtern setzen `filter-bar` auf den Wrapper (`src/styles/app.css`); sie klebt unter dem `PageHeader` (unter 48rem nicht sticky). Kein `display: contents` an der Leiste selbst. Die Leiste klebt nur innerhalb ihres Eltern-Elements: Liste/Tabelle muss Geschwister der Leiste im selben Container sein, nicht dahinter (Fehlerbild: Leiste scrollt nach kurzer Strecke weg, so zuvor in `/anniversaries`).
 
 **Formulare:** Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes Formular bekommt eine feste `id`; der Kopf-Button verweist per `form="<id>"` darauf (kein JS, Enter im Feld funktioniert weiter). Löschen = eigenes kleines `<form>` im Inhalt, Button im Kopf zeigt per `form=` darauf. Bei mehreren Formularen zeigt der Kopf nur auf das Hauptformular.
 
