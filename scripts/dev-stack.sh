@@ -65,9 +65,11 @@ EOT
     # shellcheck disable=SC1090
     eval "$(volume_cat zitadel-init /zitadel/bootstrap/oidc.env | sed 's/^/export /')"
     DSN=""
+    ERROR_TRACKER_URL=""
     if [[ $WITH_ERRORS -eq 1 ]]; then
       wait_exited bugsink-init
       DSN=$(volume_cat bugsink-init /bugsink/dsn)
+      ERROR_TRACKER_URL="https://errors.localhost"
     fi
 
     cat > "$APP_ENV_FILE" <<EOT
@@ -82,6 +84,7 @@ OIDC_CLIENT_SECRET=$OIDC_CLIENT_SECRET
 NODE_EXTRA_CA_CERTS=$PWD/$OUT_DIR/caddy-root.crt
 ZITADEL_WEBHOOK_SECRET_FILE=$PWD/$OUT_DIR/webhook.secret
 SENTRY_DSN=$DSN
+ERROR_TRACKER_URL=$ERROR_TRACKER_URL
 EOT
 
     echo "Migriere DB + lege Admin an..."
