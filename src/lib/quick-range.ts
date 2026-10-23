@@ -1,4 +1,5 @@
-import type { t } from "../i18n/index.js";
+import { t } from "../i18n/index.js";
+import { formatDate } from "./format.js";
 
 type TranslationKey = Parameters<typeof t>[0];
 
@@ -105,4 +106,46 @@ export function rangeParams(r: ParsedRange, names: { start: string; end: string 
   if (r.mode === "rel") return { range: "rel", rel: `P${r.rel!.n}${r.rel!.unit}`, dir: r.rel!.dir };
   if (r.mode === "custom") return { range: "custom", [names.start]: r.start, [names.end]: r.end };
   return {};
+}
+
+// ── Anzeige ───────────────────────────────────────────────────────────────────
+
+const MONTH_KEYS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"] as const;
+const monthName = (m: number, short: boolean) => {
+  const n = t(`month.${MONTH_KEYS[m - 1]}` as TranslationKey);
+  return short && n.length > 4 ? n.slice(0, 3) : n;
+};
+const daysIn = (y: number, m: number) => new Date(y, m, 0).getDate();
+
+// Kurzform für schnelle Lesbarkeit: "März 2026", "Jan – März 2026", "heute bis 23.01.2027", "23.01. – 23.06.2026".
+export function formatRange(start: string, end: string, today: string): string {
+  if (!start && !end) return "";
+  if (!end) return `ab ${formatDate(start)}`;
+  if (!start) return `bis ${formatDate(end)}`;
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const [ey, em, ed] = end.split("-").map(Number);
+  if (sd === 1 && ed === daysIn(ey, em) && start <= end) { // ganze Kalendermonate
+    if (sy === ey && sm === 1 && em === 12) return String(sy);
+    if (sy === ey && sm === em) return `${monthName(sm, false)} ${sy}`;
+    if (sy === ey) return `${monthName(sm, true)} – ${monthName(em, true)} ${sy}`;
+    return `${monthName(sm, true)} ${sy} – ${monthName(em, true)} ${ey}`;
+  }
+  if (start === today && end === today) return t("filter.quick.today");
+  if (start === today) return `${t("filter.quick.today")} bis ${formatDate(end)}`;
+  if (end === today) return `${formatDate(start)} bis ${t("filter.quick.today")}`;
+  if (sy === ey) return `${formatDate(start).slice(0, 6)} – ${formatDate(end)}`;
+  return `${formatDate(start)} – ${formatDate(end)}`;
+}
+
+const UNIT_LABEL: Record<RelUnit, [TranslationKey, TranslationKey]> = {
+  D: ["filter.quick.unit1.D", "filter.quick.unit.D"],
+  W: ["filter.quick.unit1.W", "filter.quick.unit.W"],
+  M: ["filter.quick.unit1.M", "filter.quick.unit.M"],
+  Y: ["filter.quick.unit1.Y", "filter.quick.unit.Y"],
+};
+
+// Button-Label für "Relativ": "+3 Monate", "−1 Woche", "±10 Tage".
+export function relLabel(n: number, unit: RelUnit, dir: RelDir): string {
+  const sign = dir === "future" ? "+" : dir === "past" ? "−" : "±";
+  return `${sign}${n} ${t(UNIT_LABEL[unit][n === 1 ? 0 : 1])}`;
 }

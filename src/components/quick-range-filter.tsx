@@ -1,7 +1,7 @@
 import { t } from "../i18n/index.js";
 import { Icon } from "./icon.js";
 import { formatDate } from "../lib/format.js";
-import { REL_DIRS, REL_UNITS, type ParsedRange, type RangePreset } from "../lib/quick-range.js";
+import { REL_UNITS, formatRange, relLabel, todayStr, type ParsedRange, type RangePreset } from "../lib/quick-range.js";
 
 const UNIT_KEY = { D: "filter.quick.unit.D", W: "filter.quick.unit.W", M: "filter.quick.unit.M", Y: "filter.quick.unit.Y" } as const;
 const DIR_KEY = { past: "filter.quick.dir.past", future: "filter.quick.dir.future", both: "filter.quick.dir.both" } as const;
@@ -34,9 +34,10 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const id = `${uid}-popover`;
   const rel = range.rel ?? { n: 3, unit: "M" as const, dir };
   const label = range.mode === "preset" ? t(presets.find((p) => p.id === range.id)!.key)
-    : range.mode === "rel" ? t("filter.quick.relative")
+    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir)
     : range.mode === "custom" ? t("filter.quick.custom")
     : t("filter.quick.label");
+  const dateText = range.mode === "default" ? "" : formatRange(range.start, range.end, todayStr());
   const showRel = range.mode === "rel", showCustom = range.mode === "custom";
   const item = "flex w-full items-center gap-2 px-2 py-1 min-h-11 rounded hover:bg-base-200 text-left";
   const mark = (on: boolean) => <span class="w-4">{on ? "✓" : ""}</span>;
@@ -44,9 +45,9 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const Wrap = bare ? "div" : "form";
   const eid = `${uid}-editor`;
   const initialLabel = label;
-  const dirIcon = (d: (typeof REL_DIRS)[number]) => (
+  const toggle = (d: "past" | "future") => (
     <label class="btn join-item flex-1 min-h-11 has-[:checked]:btn-primary has-[:focus-visible]:outline">
-      <input type="radio" name="dir" value={d} checked={d === rel.dir} disabled={!showRel} class="sr-only" />
+      <input type="checkbox" data-qrf-dir={d} checked={rel.dir === d || rel.dir === "both"} disabled={!showRel} class="sr-only" />
       {t(DIR_KEY[d])}
     </label>
   );
@@ -55,8 +56,12 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
       <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : "rel"} disabled={!showRel && !showCustom} />
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
+      <input type="hidden" name="dir" value={rel.dir} disabled={!showRel} />
       <div class="inline-block">
-        <button type="button" class="btn btn-ghost m-0" popovertarget={id}><span data-qrf-label>{label}</span> ▾</button>
+        <button type="button" class="btn btn-ghost m-0 h-auto min-h-11 py-1 flex-col items-start gap-0 font-normal" popovertarget={id}>
+          <span class="font-semibold"><span data-qrf-label>{label}</span> ▾</span>
+          <span data-qrf-date class={`text-xs opacity-70${dateText ? "" : " hidden"}`}>{dateText}</span>
+        </button>
         <div id={id} popover="auto" class="qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
           <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100" aria-hidden="true" />
           <ul class="space-y-0.5">
@@ -72,16 +77,13 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           </ul>
         </div>
       </div>
-      {range.mode !== "default" && (
-        <span class="text-sm opacity-70 whitespace-nowrap" data-qrf-readonly>{formatDate(range.start)} – {formatDate(range.end)}</span>
-      )}
       {/* Editor: Popup am Button (Desktop), Bottom-Sheet (< sm) */}
       <div id={eid} popover="auto" class="qrf-popup qrf-editor bg-base-100 border border-base-300 rounded-box shadow-lg p-4 m-0 w-80 max-w-full">
         <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100 max-sm:hidden" aria-hidden="true" />
         <h3 class="font-bold mb-3" data-qrf-title>{showCustom ? t("filter.quick.custom") : t("filter.quick.relative")}</h3>
         <div data-qrf-fields="rel" class={`space-y-3${showRel ? "" : " hidden"}`}>
-          <div class="join w-full" role="radiogroup" aria-label={t("filter.quick.direction")}>
-            {REL_DIRS.map(dirIcon)}
+          <div class="join w-full" role="group" aria-label={t("filter.quick.direction")}>
+            {toggle("past")}{toggle("future")}
           </div>
           <div class="flex gap-2">
             <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input input-bordered w-24 min-h-11 text-base" aria-label={t("filter.quick.amount")} disabled={!showRel} />
@@ -108,7 +110,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <script dangerouslySetInnerHTML={{ __html: `
         (function(){
           var f=document.getElementById('${uid}'), pop=document.getElementById('${id}'), ed=document.getElementById('${eid}');
-          var init=${JSON.stringify({ mode: range.mode, label: initialLabel })};
+          var init=${JSON.stringify({ mode: range.mode, label, date: dateText })};
           // Positioniert das Popup unter dem Button; der Zeiger zeigt auf die Button-Mitte.
           // sheet=true: unter sm als Bottom-Sheet per CSS, keine Positionierung.
           function place(p, sheet){
@@ -125,28 +127,34 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           pop.addEventListener('toggle', function(e){ if (e.newState==='open') place(pop, false); });
           ed.addEventListener('toggle', function(e){
             if (e.newState==='open') { place(ed, true); return; }
-            if (!ed.dataset.applied) apply(init.mode, init.label); // Abbrechen: Ausgangszustand
+            if (!ed.dataset.applied) apply(init.mode, init.label, init.date); // Abbrechen: Ausgangszustand
           });
           function qs(s){return f.querySelector(s);}
-          function apply(m,label){
+          function apply(m,label,date){
             ['rel','custom'].forEach(function(k){
               var g=qs('[data-qrf-fields='+k+']'); g.classList.toggle('hidden',k!==m);
               g.querySelectorAll('input,select').forEach(function(i){i.disabled=k!==m;});
             });
             var r=qs('input[name=range]'); r.disabled=m!=='rel'&&m!=='custom'; r.value=m;
-            qs('input[name=rel]').disabled=m!=='rel';
+            qs('input[name=rel]').disabled=m!=='rel'; qs('input[name=dir]').disabled=m!=='rel';
             qs('[data-qrf-label]').textContent=label;
-            var ro=qs('[data-qrf-readonly]'); if(ro) ro.classList.toggle('hidden',m==='rel'||m==='custom'?m!==init.mode:false);
+            var d=qs('[data-qrf-date]'); d.textContent=date||''; d.classList.toggle('hidden',!date);
             sync();
           }
           function sync(){
+            var p=qs('[data-qrf-dir=past]'), n=qs('[data-qrf-dir=future]');
+            qs('input[name=dir]').value=p.checked&&n.checked?'both':p.checked?'past':'future';
             qs('input[name=rel]').value='P'+(parseInt(qs('[data-qrf-n]').value,10)||1)+qs('[data-qrf-unit]').value;
           }
           f.querySelectorAll('[data-qrf-mode]').forEach(function(b){b.addEventListener('click',function(){
-            var m=b.dataset.qrfMode; apply(m,b.dataset.qrfText);
+            var m=b.dataset.qrfMode; apply(m,b.dataset.qrfText,'');
             qs('[data-qrf-title]').textContent=b.dataset.qrfText;
-            var ro=qs('[data-qrf-readonly]'); if(ro) ro.classList.add('hidden');
             pop.hidePopover(); ed.showPopover();
+          });});
+          // Mind. ein Schalter aktiv: den letzten abzuschalten aktiviert den anderen.
+          f.querySelectorAll('[data-qrf-dir]').forEach(function(c){c.addEventListener('change',function(){
+            if(!c.checked){ var o=qs('[data-qrf-dir='+(c.dataset.qrfDir==='past'?'future':'past')+']'); if(!o.checked) o.checked=true; }
+            sync();
           });});
           f.addEventListener('input',sync);
           f.addEventListener('submit',function(){ed.dataset.applied='1';});

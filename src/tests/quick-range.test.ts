@@ -57,3 +57,34 @@ describe("parseRange", () => {
     expect(parseRange({ start: "2026-01-01", end: "2026-02-01" }, t, "future", def).mode).toBe("custom");
   });
 });
+
+import { formatRange, relLabel } from "../lib/quick-range.js";
+
+describe("formatRange", () => {
+  const today = "2026-10-23";
+  it.each([
+    ["2026-03-01", "2026-03-31", "März 2026"],
+    ["2026-02-01", "2026-02-28", "Februar 2026"],
+    ["2028-02-01", "2028-02-29", "Februar 2028"],
+    ["2026-01-01", "2026-03-31", "Jan – März 2026"],
+    ["2026-11-01", "2027-02-28", "Nov 2026 – Feb 2027"],
+    ["2026-01-01", "2026-12-31", "2026"],
+    ["2026-10-23", "2027-01-23", "heute bis 23.01.2027"],
+    ["2026-07-23", "2026-10-23", "23.07.2026 bis heute"],
+    ["2026-01-23", "2026-06-23", "23.01. – 23.06.2026"],
+    ["2026-10-23", "2027-10-23", "heute bis 23.10.2027"],
+    ["2026-10-14", "2027-01-14", "14.10.2026 – 14.01.2027"],
+    ["2026-01-01", "", "ab 01.01.2026"],
+    ["", "2027-01-23", "bis 23.01.2027"],
+  ])("%s … %s → %s", (s, e, out) => expect(formatRange(s, e, today)).toBe(out));
+  it("Monatsregel hat Vorrang vor heute", () => expect(formatRange("2026-03-01", "2026-03-31", "2026-03-01")).toBe("März 2026"));
+});
+
+describe("relLabel", () => {
+  it("Vorzeichen und Singular", () => {
+    expect(relLabel(3, "M", "future")).toBe("+3 Monate");
+    expect(relLabel(1, "W", "past")).toBe("−1 Woche");
+    expect(relLabel(10, "D", "both")).toBe("±10 Tage");
+    expect(relLabel(1, "Y", "future")).toBe("+1 Jahr");
+  });
+});

@@ -148,7 +148,9 @@ describe("GET /inventory/lending", () => {
     expect(html).toMatch(/href="\/inventory\/lending\?[^"]*range=rel&rel=P1M&dir=both[^"]*member=no/);
     expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="rel" value="P1M"(?![^>]*disabled)/);
-    expect(html).toMatch(/<input type="radio" name="dir" value="both" checked/);
+    expect(html).toMatch(/<input type="hidden" name="dir" value="both"(?![^>]*disabled)/);
+    expect(html).toMatch(/data-qrf-dir="past" checked/);
+    expect(html).toMatch(/data-qrf-dir="future" checked/);
   });
 
   it("shows the borrower's contact for lending:read", async () => {
