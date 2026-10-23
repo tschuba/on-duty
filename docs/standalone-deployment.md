@@ -221,7 +221,9 @@ pnpm dev               # → https://app.localhost (Zertifikatswarnung akzeptier
   `NODE_EXTRA_CA_CERTS` (zeigt auf die exportierte CA — nötig für
   OIDC-Discovery und Bugsink-Reporting), `ZITADEL_WEBHOOK_SECRET_FILE`,
   bei `--with-errors` auch `SENTRY_DSN`/`ERROR_TRACKER_URL`
-- führt `pnpm db:setup` aus (Migration + Admin-Account)
+- führt `pnpm db:setup` aus (Migration + Admin-Account); dabei ist
+  Selbstregistrierung (`registrationEnabled`) direkt aktiv, damit sich der
+  OIDC-Registrierungs-Webhook ohne Umweg über `/admin/config` testen lässt
 
 `pnpm dev` lädt `.env.dev-stack` automatisch (`--env-file-if-exists`, spätere
 Datei gewinnt) und verbindet sich mit dem Stack. Caddy proxyt dafür auf

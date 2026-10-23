@@ -83,6 +83,9 @@ OIDC_CLIENT_ID=$OIDC_CLIENT_ID
 OIDC_CLIENT_SECRET=$OIDC_CLIENT_SECRET
 NODE_EXTRA_CA_CERTS=$PWD/$OUT_DIR/caddy-root.crt
 ZITADEL_WEBHOOK_SECRET_FILE=$PWD/$OUT_DIR/webhook.secret
+# Einmaliges Preset für db:seed (nur gesetzt, wenn appSettings.registrationEnabled fehlt) — lokale
+# Entwicklung soll den OIDC-Registrierungs-Webhook direkt testen können, ohne manuell /admin/config zu öffnen.
+REGISTRATION_ENABLED=true
 SENTRY_DSN=$DSN
 ERROR_TRACKER_URL=$ERROR_TRACKER_URL
 EOT
