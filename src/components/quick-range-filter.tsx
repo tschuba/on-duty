@@ -28,7 +28,9 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   bare?: boolean; // true: kein eigenes <form>, Felder landen im umgebenden Formular der Seite
   href: (params: Record<string, string>) => string;
 }) {
-  const id = "qrf-popover";
+  // IDs aus der Ziel-URL ableiten, damit mehrere Filter auf einer Seite nicht kollidieren.
+  const uid = "qrf-" + action.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "");
+  const id = `${uid}-popover`;
   const rel = range.rel ?? { n: 3, unit: "M" as const, dir };
   const label = range.mode === "preset" ? t(presets.find((p) => p.id === range.id)!.key)
     : range.mode === "rel" ? t("filter.quick.relative")
@@ -40,7 +42,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const on = (b: boolean) => (b ? " font-semibold text-primary" : "");
   const Wrap = bare ? "div" : "form";
   return (
-    <Wrap {...(bare ? {} : { method: "get", action })} id="qrf-form" class={bare ? "contents" : "filter-bar flex flex-wrap gap-2 items-center"}>
+    <Wrap {...(bare ? {} : { method: "get", action })} id={uid} class={bare ? "contents" : "filter-bar flex flex-wrap gap-2 items-center"}>
       {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
       <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : "rel"} disabled={!showRel && !showCustom} />
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
@@ -77,7 +79,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <div data-qrf-apply class={showRel || showCustom ? "" : "hidden"}><ApplyButton /></div>
       <script dangerouslySetInnerHTML={{ __html: `
         (function(){
-          var f=document.getElementById('qrf-form'), pop=document.getElementById('${id}');
+          var f=document.getElementById('${uid}'), pop=document.getElementById('${id}');
           pop.addEventListener('toggle', function(e) {
             if (e.newState !== 'open') return;
             var r = pop.previousElementSibling.getBoundingClientRect();
