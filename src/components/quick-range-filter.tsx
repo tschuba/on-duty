@@ -34,7 +34,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const id = `${uid}-popover`;
   const rel = range.rel ?? { n: 3, unit: "M" as const, dir };
   const label = range.mode === "preset" ? t(presets.find((p) => p.id === range.id)!.key)
-    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir)
+    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir) + (rel.ref ? ` ${t("filter.quick.ref").toLowerCase()} ${formatDate(rel.ref)}` : "")
     : range.mode === "custom" ? t("filter.quick.custom")
     : t("filter.quick.label");
   const dateText = range.mode === "default" ? "" : formatRange(range.start, range.end, todayStr());
@@ -46,9 +46,9 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const eid = `${uid}-editor`;
   const initialLabel = label;
   const toggle = (d: "past" | "future") => (
-    <label class="btn join-item flex-1 min-h-11 has-[:checked]:btn-primary has-[:focus-visible]:outline">
-      <input type="checkbox" data-qrf-dir={d} checked={rel.dir === d || rel.dir === "both"} disabled={!showRel} class="sr-only" />
-      {t(DIR_KEY[d])}
+    <label class="flex items-center gap-3 min-h-11 cursor-pointer">
+      <input type="checkbox" class="toggle toggle-primary" data-qrf-dir={d} checked={rel.dir === d || rel.dir === "both"} disabled={!showRel} />
+      <span>{t(DIR_KEY[d])}</span>
     </label>
   );
   return (
@@ -67,7 +67,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           <ul class="space-y-0.5">
             {presets.map((p) => (
               <li key={p.id}>
-                <a href={href({ range: p.id, rel: "", dir: "", start: "", end: "", from: "", to: "" })} class={`${item}${on(range.mode === "preset" && p.id === range.id)}`}>
+                <a href={href({ range: p.id, rel: "", dir: "", ref: "", start: "", end: "", from: "", to: "" })} class={`${item}${on(range.mode === "preset" && p.id === range.id)}`}>
                   {mark(range.mode === "preset" && p.id === range.id)}{t(p.key)}
                 </a>
               </li>
@@ -82,7 +82,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
         <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100 max-sm:hidden" aria-hidden="true" />
         <h3 class="font-bold mb-3" data-qrf-title>{showCustom ? t("filter.quick.custom") : t("filter.quick.relative")}</h3>
         <div data-qrf-fields="rel" class={`space-y-3${showRel ? "" : " hidden"}`}>
-          <div class="join w-full" role="group" aria-label={t("filter.quick.direction")}>
+          <div role="group" aria-label={t("filter.quick.direction")}>
             {toggle("past")}{toggle("future")}
           </div>
           <div class="flex gap-2">
@@ -91,6 +91,10 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               {REL_UNITS.map((u) => <option value={u} selected={u === rel.unit}>{t(UNIT_KEY[u])}</option>)}
             </select>
           </div>
+          <label class="form-control block">
+            <span class="label-text text-xs">{t("filter.quick.ref")}</span>
+            <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input input-bordered w-full min-h-11 text-base" disabled={!showRel} />
+          </label>
         </div>
         <div data-qrf-fields="custom" class={`space-y-3${showCustom ? "" : " hidden"}`}>
           <label class="form-control block">
@@ -157,7 +161,10 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             sync();
           });});
           f.addEventListener('input',sync);
-          f.addEventListener('submit',function(){ed.dataset.applied='1';});
+          f.addEventListener('submit',function(){
+            ed.dataset.applied='1';
+            var r=qs('[data-qrf-ref]'); if(r.value===r.dataset.qrfRef) r.disabled=true; // heute = Standard, nicht in die URL
+          });
         })();
       ` }} />
     </Wrap>

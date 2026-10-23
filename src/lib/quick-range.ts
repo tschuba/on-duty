@@ -72,10 +72,10 @@ export type ParsedRange = {
   start: string;
   end: string;
   id?: string; // preset
-  rel?: { n: number; unit: RelUnit; dir: RelDir };
+  rel?: { n: number; unit: RelUnit; dir: RelDir; ref?: string }; // ref nur, wenn ≠ heute
 };
 
-type RangeQuery = { range?: string; rel?: string; dir?: string; start?: string; end?: string };
+type RangeQuery = { range?: string; rel?: string; dir?: string; ref?: string; start?: string; end?: string };
 
 // Löst die URL-Parameter gegen heute auf. Ungültiges fällt still auf den Seiten-Standard zurück.
 // `start`/`end` sind hier die Werte der Seite (je nach Route aus start/end bzw. from/to gelesen).
@@ -90,7 +90,8 @@ export function parseRange(q: RangeQuery, today: string, dir: "future" | "past",
     const d = REL_DIRS.find((x) => x === q.dir);
     if (!m || !d || Number(m[1]) < 1) return fallback;
     const n = Number(m[1]), unit = m[2] as RelUnit;
-    return { mode: "rel", ...relativeRange(today, n, unit, d), rel: { n, unit, dir: d } };
+    const ref = q.ref && /^\d{4}-\d{2}-\d{2}$/.test(q.ref) && q.ref !== today ? q.ref : undefined;
+    return { mode: "rel", ...relativeRange(ref ?? today, n, unit, d), rel: { n, unit, dir: d, ref } };
   }
   const p = presets.find((x) => x.id === q.range);
   if (p) return { mode: "preset", start: p.start, end: p.end, id: p.id };
@@ -103,7 +104,7 @@ export function parseRange(q: RangeQuery, today: string, dir: "future" | "past",
 // Parameter, die den Bereich in Links/Formularen erhalten (ohne Standard); `names` = Datumsparameter der Seite.
 export function rangeParams(r: ParsedRange, names: { start: string; end: string } = { start: "start", end: "end" }): Record<string, string | undefined> {
   if (r.mode === "preset") return { range: r.id };
-  if (r.mode === "rel") return { range: "rel", rel: `P${r.rel!.n}${r.rel!.unit}`, dir: r.rel!.dir };
+  if (r.mode === "rel") return { range: "rel", rel: `P${r.rel!.n}${r.rel!.unit}`, dir: r.rel!.dir, ref: r.rel!.ref };
   if (r.mode === "custom") return { range: "custom", [names.start]: r.start, [names.end]: r.end };
   return {};
 }
