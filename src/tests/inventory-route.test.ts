@@ -401,6 +401,18 @@ describe("GET / lending columns", () => {
 // ── Inspections overview ─────────────────────────────────────────────────────
 
 describe("GET /inspections", () => {
+  it("keeps range/rel/dir in the filter form and preset link resets them", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
+    const html = (await (await inventoryRoutes.request("/inspections?category=vehicle&range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
+    expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
+    expect(html).toMatch(/<input type="hidden" name="rel" value="P6M"(?![^>]*disabled)/);
+    expect(html).toMatch(/<input type="hidden" name="category" value="vehicle"/);
+    // Preset-Link: behält category, setzt range auf Preset-Id; rel/dir/start/end fallen weg
+    const preset = html.match(/href="(\/inventory\/inspections\?[^"]*range=3m[^"]*)"/)![1];
+    expect(preset).toContain("category=vehicle");
+    expect(preset).not.toMatch(/rel=|dir=|start=|end=/);
+  });
+
   it("marks an overdue item", async () => {
     itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
     const res = await inventoryRoutes.request("/inspections?start=1999-01-01&end=2100-01-01");

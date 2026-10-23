@@ -183,6 +183,17 @@ describe("GET /", () => {
     expect(html).toContain("15.06.2026");
   });
 
+  it("resolves range=rel against today and keeps the mode in the search form", async () => {
+    const d = (offsetDays: number) => { const x = new Date(); x.setDate(x.getDate() + offsetDays); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
+    const ger = (iso: string) => iso.split("-").reverse().join(".");
+    donationsFindManyResult = [makeDonation({ id: "don1", date: d(-5) }), makeDonation({ id: "don2", date: d(-60) })];
+    const html = await (await donationRoutes.request("/?range=rel&rel=P2W&dir=past")).text();
+    expect(html).toContain(ger(d(-5)));
+    expect(html).not.toContain(ger(d(-60)));
+    expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
+    expect(html).toMatch(/<input type="hidden" name="rel" value="P2W"(?![^>]*disabled)/);
+  });
+
   it("excludes donations after the 'to' cutoff", async () => {
     donationsFindManyResult = [
       makeDonation({ id: "don1", date: "2026-01-15" }),
