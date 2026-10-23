@@ -184,7 +184,7 @@ function AnniversariesExportModal() {
           document.getElementById('ann-export-download').addEventListener('click',function(){
             var url=new URL(window.location.href);
             var p=new URLSearchParams();
-            ['range','rel','dir','start','end'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
+            ['range','rel','dir','ref','yr','start','end'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
             url.searchParams.getAll('filter').forEach(function(f){p.append('filter',f)});
             var gte=url.searchParams.get('gte');if(gte)p.set('gte',gte);
             url.searchParams.getAll('mod').forEach(function(m){p.append('mod',m)});
@@ -205,7 +205,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user")!;
   const today = todayStr();
 
-  const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) });
+  const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) }, env.ANNIVERSARY_CUTOFF);
   const { start, end } = range;
   const rp = rangeParams(range);
   const filters = parseKindFilters(c.req.queries("filter"));
@@ -293,7 +293,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
         {/* Controls */}
         <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-          <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries"
+          <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries" cutoff
             hidden={[...filters.map((f): [string, string] => ["filter", f]), ...mods.map((m): [string, string] => ["mod", m]), ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])]}
             href={(p) => qs(p)} />
 
@@ -359,7 +359,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const q = c.req.query();
   const today = todayStr();
-  const { start, end } = parseRange(q, today, "future", { start: today, end: addMonths(today, 12) });
+  const { start, end } = parseRange(q, today, "future", { start: today, end: addMonths(today, 12) }, env.ANNIVERSARY_CUTOFF);
   const filters = parseKindFilters(c.req.queries("filter"));
   const inclContact = q.contact === "1";
   const inclAddr = q.addr === "1";
