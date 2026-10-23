@@ -1,3 +1,4 @@
+import { RowAction } from "../components/row-action.js";
 import { Hono } from "hono";
 import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -97,12 +98,7 @@ yearRoutes.get("/", yearsRead, async (c) => {
                   {canDelete && (
                   <td>
                     <div class="flex gap-2 justify-end">
-                      <button
-                        class="btn btn-outline btn-error btn-xs"
-                        onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.kind}-${y.year}').showModal()`}
-                      >
-                        {t("common.delete")}
-                      </button>
+                      <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.kind}-${y.year}').showModal()`} />
                     </div>
                     <dialog id={`delete-year-${y.kind}-${y.year}`} class="modal" onclick="event.stopPropagation()">
                       <div class="modal-box">

@@ -251,3 +251,22 @@ details:not([open]) > summary .section-actions {
 @media (max-width: 39.99rem) {
   .qrf-editor[popover] { overflow-y: auto; max-height: 90dvh; }
 }
+
+/* Touch targets >= 44px on coarse pointers (phones, tablets); mouse keeps the compact sizes. min-width only for icon-only buttons. */
+@media (pointer: coarse) {
+  .btn,
+  .join-item,
+  .menu :where(a, button, summary) {
+    min-height: 2.75rem;
+  }
+  .row-action,
+  .btn-square,
+  .btn-circle {
+    min-width: 2.75rem;
+  }
+  .table input[type="checkbox"]:not(.toggle),
+  .filter-bar input[type="checkbox"]:not(.toggle) {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+}
