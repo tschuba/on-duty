@@ -58,9 +58,9 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
       <input type="hidden" name="dir" value={rel.dir} disabled={!showRel} />
       <div class="inline-block">
-        <button type="button" class="btn btn-ghost m-0 h-auto min-h-11 py-1 flex-col items-start gap-0 font-normal" popovertarget={id}>
-          <span class="font-semibold"><span data-qrf-label>{label}</span> ▾</span>
-          <span data-qrf-date class={`text-xs opacity-70${dateText ? "" : " hidden"}`}>{dateText}</span>
+        <button type="button" class="btn btn-ghost m-0 py-0 flex-col items-start justify-center gap-0 font-normal leading-tight" popovertarget={id}>
+          <span class="font-semibold text-sm"><span data-qrf-label>{label}</span> ▾</span>
+          <span data-qrf-date class={`text-[11px] leading-none opacity-70${dateText ? "" : " hidden"}`}>{dateText}</span>
         </button>
         <div id={id} popover="auto" class="qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
           <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100" aria-hidden="true" />
