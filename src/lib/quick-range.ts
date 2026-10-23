@@ -53,18 +53,34 @@ function addDays(dateStr: string, days: number): string {
   return fmt(new Date(y, m - 1, d + days));
 }
 
-function shift(today: string, n: number, unit: RelUnit): string {
-  if (unit === "D") return addDays(today, n);
-  if (unit === "W") return addDays(today, 7 * n);
-  return addMonths(today, unit === "M" ? n : 12 * n);
+const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
+
+// Cutoff "MM-DD" in year y (Feb 29 clamped). A ceremony year ends on its cutoff date.
+function cutoffDate(y: number, cutoff: string): string {
+  const [cm, cd] = cutoff.split("-").map(Number);
+  return fmt(new Date(y, cm - 1, Math.min(cd, daysInMonth(y, cm))));
 }
 
-// Heute ist immer enthalten; Monatsende wird abgeschnitten (addMonths via Date).
-export function relativeRange(today: string, n: number, unit: RelUnit, dir: RelDir): { start: string; end: string } {
-  return {
-    start: dir === "future" ? today : shift(today, -n, unit),
-    end: dir === "past" ? today : shift(today, n, unit),
-  };
+// Whole unit k steps away from the unit containing ref (k < 0 = past). Weeks start on Monday.
+function unitSpan(ref: string, unit: RelUnit, k: number, cutoff?: string): { start: string; end: string } {
+  const [y, m, d] = ref.split("-").map(Number);
+  if (unit === "D") return { start: addDays(ref, k), end: addDays(ref, k) };
+  if (unit === "W") {
+    const start = addDays(ref, -((new Date(y, m - 1, d).getDay() + 6) % 7) + 7 * k);
+    return { start, end: addDays(start, 6) };
+  }
+  if (unit === "M") return { start: fmt(new Date(y, m - 1 + k, 1)), end: fmt(new Date(y, m + k, 0)) };
+  if (!cutoff) return { start: `${y + k}-01-01`, end: `${y + k}-12-31` };
+  const endYear = ref <= cutoffDate(y, cutoff) ? y : y + 1; // ceremony year containing ref
+  return { start: addDays(cutoffDate(endYear - 1 + k, cutoff), 1), end: cutoffDate(endYear + k, cutoff) };
+}
+
+// Whole units around the current unit (the one containing ref). The current unit counts for past/future, not for "both".
+// cutoff ("MM-DD") switches unit Y to ceremony years.
+export function relativeRange(ref: string, n: number, unit: RelUnit, dir: RelDir, cutoff?: string): { start: string; end: string } {
+  const lo = dir === "future" ? 0 : dir === "past" ? -(n - 1) : -n;
+  const hi = dir === "past" ? 0 : dir === "future" ? n - 1 : n;
+  return { start: unitSpan(ref, unit, lo, cutoff).start, end: unitSpan(ref, unit, hi, cutoff).end };
 }
 
 export type ParsedRange = {
@@ -72,14 +88,14 @@ export type ParsedRange = {
   start: string;
   end: string;
   id?: string; // preset
-  rel?: { n: number; unit: RelUnit; dir: RelDir; ref?: string }; // ref nur, wenn ≠ heute
+  rel?: { n: number; unit: RelUnit; dir: RelDir; ref?: string; ceremony?: boolean }; // ref nur, wenn ≠ heute
 };
 
-type RangeQuery = { range?: string; rel?: string; dir?: string; ref?: string; start?: string; end?: string };
+type RangeQuery = { range?: string; rel?: string; dir?: string; ref?: string; yr?: string; start?: string; end?: string };
 
 // Löst die URL-Parameter gegen heute auf. Ungültiges fällt still auf den Seiten-Standard zurück.
 // `start`/`end` sind hier die Werte der Seite (je nach Route aus start/end bzw. from/to gelesen).
-export function parseRange(q: RangeQuery, today: string, dir: "future" | "past", defaults: { start: string; end: string }): ParsedRange {
+export function parseRange(q: RangeQuery, today: string, dir: "future" | "past", defaults: { start: string; end: string }, cutoff?: string): ParsedRange {
   const fallback: ParsedRange = { mode: "default", ...defaults };
   const hasDates = q.start !== undefined || q.end !== undefined;
   const custom: ParsedRange = { mode: "custom", start: q.start ?? defaults.start, end: q.end ?? defaults.end };
@@ -91,7 +107,9 @@ export function parseRange(q: RangeQuery, today: string, dir: "future" | "past",
     if (!m || !d || Number(m[1]) < 1) return fallback;
     const n = Number(m[1]), unit = m[2] as RelUnit;
     const ref = q.ref && /^\d{4}-\d{2}-\d{2}$/.test(q.ref) && q.ref !== today ? q.ref : undefined;
-    return { mode: "rel", ...relativeRange(ref ?? today, n, unit, d), rel: { n, unit, dir: d, ref } };
+    // yr=ceremony only counts for unit Y on pages that have a cutoff
+    const ceremony = unit === "Y" && q.yr === "ceremony" && !!cutoff;
+    return { mode: "rel", ...relativeRange(ref ?? today, n, unit, d, ceremony ? cutoff : undefined), rel: { n, unit, dir: d, ref, ceremony } };
   }
   const p = presets.find((x) => x.id === q.range);
   if (p) return { mode: "preset", start: p.start, end: p.end, id: p.id };
@@ -104,7 +122,7 @@ export function parseRange(q: RangeQuery, today: string, dir: "future" | "past",
 // Parameter, die den Bereich in Links/Formularen erhalten (ohne Standard); `names` = Datumsparameter der Seite.
 export function rangeParams(r: ParsedRange, names: { start: string; end: string } = { start: "start", end: "end" }): Record<string, string | undefined> {
   if (r.mode === "preset") return { range: r.id };
-  if (r.mode === "rel") return { range: "rel", rel: `P${r.rel!.n}${r.rel!.unit}`, dir: r.rel!.dir, ref: r.rel!.ref };
+  if (r.mode === "rel") return { range: "rel", rel: `P${r.rel!.n}${r.rel!.unit}`, dir: r.rel!.dir, ref: r.rel!.ref, yr: r.rel!.ceremony ? "ceremony" : undefined };
   if (r.mode === "custom") return { range: "custom", [names.start]: r.start, [names.end]: r.end };
   return {};
 }
@@ -138,17 +156,18 @@ export function formatRange(start: string, end: string, today: string): string {
   return `${formatDate(start)} – ${formatDate(end)}`;
 }
 
-const UNIT_LABEL: Record<RelUnit, [TranslationKey, TranslationKey]> = {
+const UNIT_LABEL: Record<RelUnit | "YC", [TranslationKey, TranslationKey]> = {
   D: ["filter.quick.unit1.D", "filter.quick.unit.D"],
   W: ["filter.quick.unit1.W", "filter.quick.unit.W"],
   M: ["filter.quick.unit1.M", "filter.quick.unit.M"],
   Y: ["filter.quick.unit1.Y", "filter.quick.unit.Y"],
+  YC: ["filter.quick.unit1.YC", "filter.quick.unit.YC"],
 };
 
 // Button-Label für "Relativ": "+3 Monate", "−1 Woche", "±10 Tage".
-export function relLabel(n: number, unit: RelUnit, dir: RelDir): string {
+export function relLabel(n: number, unit: RelUnit, dir: RelDir, ceremony = false): string {
   const sign = dir === "future" ? "+" : dir === "past" ? "−" : "±";
-  return `${sign}${n} ${t(UNIT_LABEL[unit][n === 1 ? 0 : 1])}`;
+  return `${sign}${n} ${t(UNIT_LABEL[ceremony ? "YC" : unit][n === 1 ? 0 : 1])}`;
 }
 
 // "ab"-Zusatz im Titel, wenn das Referenzdatum vom heutigen abweicht: "30.10." (Jahr nur falls ≠ heute: "30.10.2027").

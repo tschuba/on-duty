@@ -16,26 +16,35 @@ describe("rangePresets", () => {
 
 import { parseRange, relativeRange, rangeParams } from "../lib/quick-range.js";
 
-describe("relativeRange", () => {
-  const t = "2026-10-14";
-  it("Richtungen", () => {
-    expect(relativeRange(t, 3, "M", "past")).toEqual({ start: "2026-07-14", end: t });
-    expect(relativeRange(t, 3, "M", "future")).toEqual({ start: t, end: "2027-01-14" });
-    expect(relativeRange(t, 2, "W", "both")).toEqual({ start: "2026-09-30", end: "2026-10-28" });
+describe("relativeRange (whole units)", () => {
+  const t = "2026-10-14"; // Wednesday
+  it("months", () => {
+    expect(relativeRange(t, 2, "M", "future")).toEqual({ start: "2026-10-01", end: "2026-11-30" });
+    expect(relativeRange(t, 2, "M", "past")).toEqual({ start: "2026-09-01", end: "2026-10-31" });
+    expect(relativeRange(t, 1, "M", "both")).toEqual({ start: "2026-09-01", end: "2026-11-30" });
   });
-  it("Einheiten D/Y", () => {
-    expect(relativeRange(t, 10, "D", "future").end).toBe("2026-10-24");
-    expect(relativeRange(t, 1, "Y", "past").start).toBe("2025-10-14");
+  it("weeks start on Monday", () => {
+    expect(relativeRange(t, 2, "W", "future")).toEqual({ start: "2026-10-12", end: "2026-10-25" });
   });
-  it("Monatsende wird abgeschnitten, Schaltjahr", () => {
-    expect(relativeRange("2026-01-31", 1, "M", "future").end).toBe("2026-02-28");
-    expect(relativeRange("2028-01-31", 1, "M", "future").end).toBe("2028-02-29");
-    expect(relativeRange("2026-03-31", 1, "M", "past").start).toBe("2026-02-28");
-    expect(relativeRange("2024-02-29", 1, "Y", "past").start).toBe("2023-02-28");
-    expect(relativeRange(t, 999, "Y", "future").end).toBe("3025-10-14");
-    expect(relativeRange(t, 1, "D", "both")).toEqual({ start: "2026-10-13", end: "2026-10-15" });
+  it("days", () => {
+    expect(relativeRange(t, 7, "D", "future")).toEqual({ start: t, end: "2026-10-20" });
+    expect(relativeRange(t, 7, "D", "past")).toEqual({ start: "2026-10-08", end: t });
   });
-
+  it("calendar years", () => {
+    expect(relativeRange(t, 2, "Y", "past")).toEqual({ start: "2025-01-01", end: "2026-12-31" });
+  });
+  it("ceremony years (cutoff 01-06)", () => {
+    expect(relativeRange(t, 2, "Y", "future", "01-06")).toEqual({ start: "2026-01-07", end: "2028-01-06" });
+    expect(relativeRange("2026-01-06", 1, "Y", "future", "01-06")).toEqual({ start: "2025-01-07", end: "2026-01-06" });
+  });
+  it("yr=ceremony only with cutoff and unit Y", () => {
+    const q = { range: "rel", rel: "P2Y", dir: "future", yr: "ceremony" };
+    const def = { start: t, end: t };
+    expect(parseRange(q, t, "future", def, "01-06").start).toBe("2026-01-07");
+    expect(parseRange(q, t, "future", def).start).toBe("2026-01-01");
+    expect(parseRange({ ...q, rel: "P2M" }, t, "future", def, "01-06").rel!.ceremony).toBe(false);
+    expect(rangeParams(parseRange(q, t, "future", def, "01-06")).yr).toBe("ceremony");
+  });
 });
 
 describe("parseRange", () => {

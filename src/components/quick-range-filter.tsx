@@ -19,13 +19,14 @@ export function ApplyButton({ full = false }: { full?: boolean }) {
 // Zeitraum-Filter: Presets (Links, wenden sofort an), "Relativ" und "Benutzerdefiniert" (Felder + Anzeigen).
 // Die Komponente rendert das GET-Formular; `hidden` trägt Sortierung/Filter der Seite. `href(params)` baut Preset-Links
 // (ohne Datums-/Range-Parameter der Seite). `names` = Datumsparameter (start/end bzw. from/to).
-export function QuickRangeFilter({ presets, range, dir, action, hidden = [], names = { start: "start", end: "end" }, bare = false, href }: {
+export function QuickRangeFilter({ presets, range, dir, action, hidden = [], names = { start: "start", end: "end" }, bare = false, href, cutoff = false }: {
   presets: RangePreset[];
   range: ParsedRange;
   dir: "future" | "past";
   action: string;
   hidden?: [string, string][];
   names?: { start: string; end: string };
+  cutoff?: boolean; // page has an anniversary cutoff: offer ceremony years
   bare?: boolean; // true: kein eigenes <form>, Felder landen im umgebenden Formular der Seite
   href: (params: Record<string, string>) => string;
 }) {
@@ -34,7 +35,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const id = `${uid}-popover`;
   const rel = range.rel ?? { n: 3, unit: "M" as const, dir };
   const label = range.mode === "preset" ? t(presets.find((p) => p.id === range.id)!.key)
-    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir) + (rel.ref ? ` ${t("filter.quick.ref").toLowerCase()} ${refLabel(rel.ref, todayStr())}` : "")
+    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir, rel.ceremony) + (rel.ref ? ` ${t("filter.quick.ref").toLowerCase()} ${refLabel(rel.ref, todayStr())}` : "")
     : range.mode === "custom" ? t("filter.quick.custom")
     : t("filter.quick.label");
   const dateText = range.mode === "default" ? "" : formatRange(range.start, range.end, todayStr());
@@ -57,6 +58,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : "rel"} disabled={!showRel && !showCustom} />
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
       <input type="hidden" name="dir" value={rel.dir} disabled={!showRel} />
+      {cutoff && <input type="hidden" name="yr" value="ceremony" disabled={!showRel || !rel.ceremony} />}
       <div class="inline-block">
         <button type="button" class="btn btn-ghost m-0 h-10 py-0 flex-col items-start justify-center gap-0 font-normal leading-tight" popovertarget={id}>
           <span class="font-semibold text-sm"><span data-qrf-label>{label}</span> ▾</span>
@@ -88,9 +90,13 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           <div class="flex gap-2">
             <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input input-bordered w-24 min-h-11 text-base" aria-label={t("filter.quick.amount")} disabled={!showRel} />
             <select data-qrf-unit class="select select-bordered flex-1 min-h-11 text-base" aria-label={t("filter.quick.unit")} disabled={!showRel}>
-              {REL_UNITS.map((u) => <option value={u} selected={u === rel.unit}>{t(UNIT_KEY[u])}</option>)}
+              {REL_UNITS.flatMap((u) => u === "Y" && cutoff
+                ? [<option value="Y" selected={u === rel.unit && !rel.ceremony}>{t("filter.quick.unit.Ycal")}</option>,
+                   <option value="YC" selected={u === rel.unit && !!rel.ceremony}>{t("filter.quick.unit.YC")}</option>]
+                : [<option value={u} selected={u === rel.unit}>{t(UNIT_KEY[u])}</option>])}
             </select>
           </div>
+          <p class="text-xs opacity-70">{t("filter.quick.relHint")}</p>
           <label class="form-control block">
             <span class="label-text text-xs">{t("filter.quick.ref")}</span>
             <div class="join w-full">
@@ -155,7 +161,9 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             var p=qs('[data-qrf-dir=past]'), n=qs('[data-qrf-dir=future]');
             qs('input[name=dir]').value=p.checked&&n.checked?'both':p.checked?'past':'future';
             var rf=qs('[data-qrf-ref]'); qs('[data-qrf-today]').disabled=rf.value===rf.dataset.qrfRef;
-            qs('input[name=rel]').value='P'+(parseInt(qs('[data-qrf-n]').value,10)||1)+qs('[data-qrf-unit]').value;
+            var u=qs('[data-qrf-unit]').value;
+            qs('input[name=rel]').value='P'+(parseInt(qs('[data-qrf-n]').value,10)||1)+u.charAt(0);
+            var yr=qs('input[name=yr]'); if(yr) yr.disabled=u!=='YC'||qs('input[name=rel]').disabled;
           }
           f.querySelectorAll('[data-qrf-mode]').forEach(function(b){b.addEventListener('click',function(){
             var m=b.dataset.qrfMode; apply(m,b.dataset.qrfText,'');
