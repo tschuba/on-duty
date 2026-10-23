@@ -80,7 +80,7 @@ describe("GET /anniversaries range persistence", () => {
     const html = (await (await anniversaryRoutes.request("/?range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
     expect(html).toMatch(/href="\/anniversaries\?[^"]*range=rel&rel=P6M&dir=future[^"]*filter=/);
     expect(html).toMatch(/<form[^>]*id="gte-form"[^>]*>\s*<input type="hidden" name="range" value="rel"/);
-    expect(html).toContain("'range','rel','dir','start','end'");
+    expect(html).toContain("'range','rel','dir','ref','yr','start','end'");
   });
 
   it("exports the same resolved range as range=rel", async () => {
