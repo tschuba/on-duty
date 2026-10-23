@@ -150,3 +150,8 @@ export function relLabel(n: number, unit: RelUnit, dir: RelDir): string {
   const sign = dir === "future" ? "+" : dir === "past" ? "−" : "±";
   return `${sign}${n} ${t(UNIT_LABEL[unit][n === 1 ? 0 : 1])}`;
 }
+
+// "ab"-Zusatz im Titel, wenn das Referenzdatum vom heutigen abweicht: "30.10." (Jahr nur falls ≠ heute: "30.10.2027").
+export function refLabel(ref: string, today: string): string {
+  return ref.slice(0, 4) === today.slice(0, 4) ? `${formatDate(ref).slice(0, 6)}` : formatDate(ref);
+}

@@ -1,7 +1,7 @@
 import { t } from "../i18n/index.js";
 import { Icon } from "./icon.js";
 import { formatDate } from "../lib/format.js";
-import { REL_UNITS, formatRange, relLabel, todayStr, type ParsedRange, type RangePreset } from "../lib/quick-range.js";
+import { REL_UNITS, formatRange, relLabel, refLabel, todayStr, type ParsedRange, type RangePreset } from "../lib/quick-range.js";
 
 const UNIT_KEY = { D: "filter.quick.unit.D", W: "filter.quick.unit.W", M: "filter.quick.unit.M", Y: "filter.quick.unit.Y" } as const;
 const DIR_KEY = { past: "filter.quick.dir.past", future: "filter.quick.dir.future", both: "filter.quick.dir.both" } as const;
@@ -34,7 +34,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const id = `${uid}-popover`;
   const rel = range.rel ?? { n: 3, unit: "M" as const, dir };
   const label = range.mode === "preset" ? t(presets.find((p) => p.id === range.id)!.key)
-    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir) + (rel.ref ? ` ${t("filter.quick.ref").toLowerCase()} ${formatDate(rel.ref)}` : "")
+    : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir) + (rel.ref ? ` ${t("filter.quick.ref").toLowerCase()} ${refLabel(rel.ref, todayStr())}` : "")
     : range.mode === "custom" ? t("filter.quick.custom")
     : t("filter.quick.label");
   const dateText = range.mode === "default" ? "" : formatRange(range.start, range.end, todayStr());
@@ -72,8 +72,8 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
                 </a>
               </li>
             ))}
-            <li><button type="button" data-qrf-mode="rel" data-qrf-text={t("filter.quick.relative")} class={`${item}${on(showRel)}`}>{mark(showRel)}{t("filter.quick.relative")}</button></li>
-            <li><button type="button" data-qrf-mode="custom" data-qrf-text={t("filter.quick.custom")} class={`${item}${on(showCustom)}`}>{mark(showCustom)}{t("filter.quick.custom")}</button></li>
+            <li><button type="button" data-qrf-mode="rel" data-qrf-text={t("filter.quick.relative")} class={`${item}${on(showRel)}`}>{mark(showRel)}{t("filter.quick.relative")}<span class="ml-auto opacity-60" aria-hidden="true">›</span></button></li>
+            <li><button type="button" data-qrf-mode="custom" data-qrf-text={t("filter.quick.custom")} class={`${item}${on(showCustom)}`}>{mark(showCustom)}{t("filter.quick.custom")}<span class="ml-auto opacity-60" aria-hidden="true">›</span></button></li>
           </ul>
         </div>
       </div>
@@ -93,7 +93,13 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           </div>
           <label class="form-control block">
             <span class="label-text text-xs">{t("filter.quick.ref")}</span>
-            <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input input-bordered w-full min-h-11 text-base" disabled={!showRel} />
+            <div class="join w-full">
+              <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input input-bordered join-item w-full min-h-11 text-base" disabled={!showRel} />
+              <button type="button" data-qrf-today class="btn join-item min-h-11" aria-label={t("filter.quick.todayBtn")} title={t("filter.quick.todayBtn")} disabled={!rel.ref}>
+                <Icon name="arrow-uturn-left" class="w-5 h-5 sm:hidden" />
+                <span class="hidden sm:inline">{t("filter.quick.todayBtn")}</span>
+              </button>
+            </div>
           </label>
         </div>
         <div data-qrf-fields="custom" class={`space-y-3${showCustom ? "" : " hidden"}`}>
@@ -148,6 +154,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           function sync(){
             var p=qs('[data-qrf-dir=past]'), n=qs('[data-qrf-dir=future]');
             qs('input[name=dir]').value=p.checked&&n.checked?'both':p.checked?'past':'future';
+            var rf=qs('[data-qrf-ref]'); qs('[data-qrf-today]').disabled=rf.value===rf.dataset.qrfRef;
             qs('input[name=rel]').value='P'+(parseInt(qs('[data-qrf-n]').value,10)||1)+qs('[data-qrf-unit]').value;
           }
           f.querySelectorAll('[data-qrf-mode]').forEach(function(b){b.addEventListener('click',function(){
@@ -160,6 +167,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             if(!c.checked){ var o=qs('[data-qrf-dir='+(c.dataset.qrfDir==='past'?'future':'past')+']'); if(!o.checked) o.checked=true; }
             sync();
           });});
+          qs('[data-qrf-today]').addEventListener('click',function(){var r=qs('[data-qrf-ref]'); r.value=r.dataset.qrfRef; sync();});
           f.addEventListener('input',sync);
           f.addEventListener('submit',function(){
             ed.dataset.applied='1';

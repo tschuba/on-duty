@@ -562,6 +562,7 @@ export const de = {
   "filter.quick.from": "Von",
   "filter.quick.to": "Bis",
   "filter.quick.ref": "Ab",
+  "filter.quick.todayBtn": "Heute",
   "filter.quick.unit": "Einheit",
   "filter.quick.today": "heute",
   "filter.quick.unit1.D": "Tag",
