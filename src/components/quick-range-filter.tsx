@@ -50,7 +50,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           <ul class="space-y-0.5">
             {presets.map((p) => (
               <li key={p.id}>
-                <a href={href({ range: p.id })} class={`${item}${on(range.mode === "preset" && p.id === range.id)}`}>
+                <a href={href({ range: p.id, rel: "", dir: "", start: "", end: "", from: "", to: "" })} class={`${item}${on(range.mode === "preset" && p.id === range.id)}`}>
                   {mark(range.mode === "preset" && p.id === range.id)}{t(p.key)}
                 </a>
               </li>
