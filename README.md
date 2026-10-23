@@ -84,7 +84,7 @@ pnpm dev
 | `pnpm db:generate` | Drizzle-Migration aus Schema generieren |
 | `pnpm db:migrate` | Migrationen ausführen |
 | `pnpm db:seed` | Admin-Account anlegen (idempotent) |
-| `pnpm stack:up` / `stack:down` / `stack:reset` | Dev-Stack (Docker) starten / stoppen / komplett löschen |
+| `pnpm stack:up` / `stack:down` / `stack:reset` | Dev-Stack (Docker) starten / stoppen / komplett löschen — Details: [docs/standalone-deployment.md](docs/standalone-deployment.md#dev-stack-im-host-modus) |
 | `pnpm db:setup` | Migrate + Seed (Ersteinrichtung) |
 | `pnpm db:studio` | Drizzle Studio öffnen |
 

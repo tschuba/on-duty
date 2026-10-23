@@ -195,6 +195,49 @@ Application wird nur einmal angelegt). Für einen echten Fresh-Install-Test:
 ./scripts/test-standalone-local.sh --clean
 ```
 
+## Dev-Stack im Host-Modus
+
+Für die normale Entwicklung (nicht den Release-Test oben): DB, Zitadel (+
+Login, Init) und optional Bugsink laufen in Docker, die App selbst **nicht**
+als Container, sondern per `pnpm dev` auf dem Host — mit Hot-Reload.
+Basis sind dieselben Compose-Dateien wie oben, nur ohne das Compose-Profil
+`app`.
+
+```bash
+pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors
+pnpm dev               # → https://app.localhost (Zertifikatswarnung akzeptieren)
+```
+
+`pnpm stack:up`:
+
+- generiert `.env.standalone.dev` (Compose-`--env-file`, analog
+  `.env.standalone.local` oben) und startet `db`, `zitadel`,
+  `zitadel-login`, `caddy`, `zitadel-init`, `zitadel-init-hooks` (mit
+  `--with-errors` zusätzlich `bugsink`/`bugsink-init`) — **ohne** `app`
+- exportiert Caddys lokales CA-Zertifikat und das Zitadel-Webhook-Secret
+  nach `.dev-stack/` (gitignored)
+- schreibt `.env.dev-stack`: `DATABASE_URL` (Postgres auf
+  `127.0.0.1:5433`), `OIDC_*`, `BETTER_AUTH_SECRET`, `ADMIN_PASSWORD`,
+  `NODE_EXTRA_CA_CERTS` (zeigt auf die exportierte CA — nötig für
+  OIDC-Discovery und Bugsink-Reporting), `ZITADEL_WEBHOOK_SECRET_FILE`,
+  bei `--with-errors` auch `SENTRY_DSN`/`ERROR_TRACKER_URL`
+- führt `pnpm db:setup` aus (Migration + Admin-Account)
+
+`pnpm dev` lädt `.env.dev-stack` automatisch (`--env-file-if-exists`, spätere
+Datei gewinnt) und verbindet sich mit dem Stack. Caddy proxyt dafür auf
+`host.docker.internal:3000` statt auf `app:3000`; Zitadels `HTTPClient.DenyList`
+lässt diese Adresse zu (sonst würde `DeniedURL` den Webhook blockieren, siehe
+oben).
+
+Aufräumen: `pnpm stack:down` (Container stoppen, Volumes bleiben) bzw.
+`pnpm stack:reset` (alles löschen, inkl. `.env.standalone.dev`,
+`.env.dev-stack`, `.dev-stack/`).
+
+**Achtung:** `test-standalone-local.sh` und `dev-stack.sh` nutzen
+unterschiedliche Compose-Projekte, belegen aber dasselbe Docker-Subnetz und
+dieselben Ports 80/443 — vorher den jeweils anderen Stack stoppen
+(`docker compose -p on-duty-standalone-local … down` bzw. `pnpm stack:down`).
+
 ## Fehlerbehebung
 
 | Symptom | Ursache | Lösung |
