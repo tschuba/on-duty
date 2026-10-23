@@ -1,5 +1,7 @@
 services:
   app:
+    # Nur im Container-Modus (`--profile app`); sonst läuft die App per `pnpm dev` auf dem Host.
+    profiles: ["app"]
     image: on-duty-standalone-local:latest
     build:
       context: .
@@ -19,23 +21,41 @@ services:
     image: on-duty-standalone-local:latest
     environment:
       # *.localhost resolves to loopback, so the public URL is unreachable here -> go straight to the app network.
-      WEBHOOK_URL: http://app:3000/hooks/zitadel
+      # Host-Modus (scripts/dev-stack.sh) setzt WEBHOOK_URL auf host.docker.internal.
+      WEBHOOK_URL: ${WEBHOOK_URL:-http://app:3000/hooks/zitadel}
+    depends_on:
+      # Im Host-Modus gibt es keinen app-Container — dann nicht darauf warten.
+      app:
+        condition: service_healthy
+        required: false
 
   # Fixed subnet + deny list without 172.16.0.0/12 so Zitadel allows the webhook to app:3000.
   # Local test only (Zitadel's default blocks all private networks).
   zitadel:
+    # Linux: host.docker.internal -> Host-Gateway (Host-Modus-Webhook).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,192.168.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
+      # 192.168.0.0/16 bewusst nicht gesperrt: Docker Desktop löst host.docker.internal dorthin auf.
+      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
+
+  db:
+    ports:
+      - "127.0.0.1:5433:5432"
 
   # Lokal ersetzt Caddy das Coolify-Traefik (Basis-Compose enthält keinen Proxy).
   caddy:
     image: caddy:2
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "80:80"
       - "443:443"
     environment:
       APP_DOMAIN: ${SERVICE_FQDN_APP}
+      # Container-Modus: app:3000; Host-Modus: host.docker.internal:3000 (.env.standalone.dev).
+      APP_UPSTREAM: ${APP_UPSTREAM:-app:3000}
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       BUGSINK_DOMAIN: ${SERVICE_FQDN_BUGSINK:-errors.localhost}
     volumes:
