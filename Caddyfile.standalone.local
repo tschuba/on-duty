@@ -1,6 +1,6 @@
 {$APP_DOMAIN} {
 	tls internal
-	reverse_proxy app:3000
+	reverse_proxy {$APP_UPSTREAM}
 }
 
 {$BUGSINK_DOMAIN} {
