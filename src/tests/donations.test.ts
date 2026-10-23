@@ -266,8 +266,8 @@ describe("GET /:id/receipt", () => {
     currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts", "org:tax-data:read"]) };
     const res = await donationRoutes.request("/don1/receipt");
     const html = await res.text();
-    expect(html).toContain("/organisation/tax-data");
-    expect(html).not.toContain("/organisation/master-data");
+    expect(html).toContain("/organisation#tax-data");
+    expect(html).not.toContain("/organisation#master-data");
     expect(html).toContain("disabled");
   });
 
