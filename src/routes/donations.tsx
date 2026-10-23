@@ -32,7 +32,7 @@ function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>;
         <p>{t("donations.receipt.blockedMissing")} {tabs.flatMap((tab) => missing[tab]).map((k) => t(`admin.orgConfig.field.${k}` as never)).join(", ")}</p>
         {linkable.length === 0
           ? <p>{t("donations.receipt.blockedContactAdmin")}</p>
-          : linkable.map((tab) => <a href={`/organisation/${ORG_TABS[tab].path}`} class="link mr-4">{t(`organisation.tabs.${tab}` as never)} →</a>)}
+          : linkable.map((tab) => <a href={`/organisation#${ORG_TABS[tab].path}`} class="link mr-4">{t(`organisation.tabs.${tab}` as never)} →</a>)}
       </div>
     </div>
   );

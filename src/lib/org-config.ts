@@ -60,6 +60,10 @@ export function canReadOrgTab(perms: Set<string>, tab: OrgTab): boolean {
   return ORG_TABS[tab].read.some((p) => perms.has(p));
 }
 
+export function canWriteOrgTab(perms: Set<string>, tab: OrgTab): boolean {
+  return perms.has(ORG_TABS[tab].write);
+}
+
 // Missing required receipt fields (empty value), grouped by tab.
 export function missingReceiptFields(config: Record<string, string>): Record<OrgTab, string[]> {
   const required: readonly string[] = REQUIRED_RECEIPT_FIELDS;
