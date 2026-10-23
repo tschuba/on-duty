@@ -58,6 +58,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <div class="inline-block">
         <button type="button" class="btn btn-ghost m-0" popovertarget={id}><span data-qrf-label>{label}</span> ▾</button>
         <div id={id} popover="auto" class="qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
+          <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100" aria-hidden="true" />
           <ul class="space-y-0.5">
             {presets.map((p) => (
               <li key={p.id}>
@@ -76,6 +77,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       )}
       {/* Editor: Popup am Button (Desktop), Bottom-Sheet (< sm) */}
       <div id={eid} popover="auto" class="qrf-popup qrf-editor bg-base-100 border border-base-300 rounded-box shadow-lg p-4 m-0 w-80 max-w-full">
+        <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100 max-sm:hidden" aria-hidden="true" />
         <h3 class="font-bold mb-3" data-qrf-title>{showCustom ? t("filter.quick.custom") : t("filter.quick.relative")}</h3>
         <div data-qrf-fields="rel" class={`space-y-3${showRel ? "" : " hidden"}`}>
           <div class="join w-full" role="radiogroup" aria-label={t("filter.quick.direction")}>
@@ -107,17 +109,22 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
         (function(){
           var f=document.getElementById('${uid}'), pop=document.getElementById('${id}'), ed=document.getElementById('${eid}');
           var init=${JSON.stringify({ mode: range.mode, label: initialLabel })};
-          function place(p){
-            if (window.innerWidth < 640) return; // Bottom-Sheet per CSS
-            var r = p.parentElement.querySelector('button[popovertarget]').getBoundingClientRect();
+          // Positioniert das Popup unter dem Button; der Zeiger zeigt auf die Button-Mitte.
+          // sheet=true: unter sm als Bottom-Sheet per CSS, keine Positionierung.
+          function place(p, sheet){
+            if (sheet && window.innerWidth < 640) return;
+            var r = f.querySelector('button[popovertarget="${id}"]').getBoundingClientRect(), m = 4;
             p.style.position = 'fixed'; p.style.inset = 'auto';
-            p.style.top = (r.bottom + 4) + 'px';
-            p.style.left = Math.max(4, Math.min(r.left, window.innerWidth - p.offsetWidth - 4)) + 'px';
+            p.style.top = (r.bottom + 8) + 'px';
+            var left = Math.max(m, Math.min(r.left, window.innerWidth - p.offsetWidth - m));
+            p.style.left = left + 'px';
+            var a = p.querySelector('[data-arrow]');
+            if (a) a.style.left = Math.max(8, Math.min(p.offsetWidth - 20, r.left + r.width / 2 - left - 6)) + 'px';
           }
           var btn=f.querySelector('button[popovertarget="${id}"]');
-          pop.addEventListener('toggle', function(e){ if (e.newState==='open') place(pop); });
+          pop.addEventListener('toggle', function(e){ if (e.newState==='open') place(pop, false); });
           ed.addEventListener('toggle', function(e){
-            if (e.newState==='open') { place(ed); return; }
+            if (e.newState==='open') { place(ed, true); return; }
             if (!ed.dataset.applied) apply(init.mode, init.label); // Abbrechen: Ausgangszustand
           });
           function qs(s){return f.querySelector(s);}
