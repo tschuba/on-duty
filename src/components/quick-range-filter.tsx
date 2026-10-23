@@ -46,7 +46,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const eid = `${uid}-editor`;
   const initialLabel = label;
   const toggle = (d: "past" | "future") => (
-    <label class="flex items-center gap-3 min-h-11 cursor-pointer">
+    <label class="flex items-center gap-2 min-h-11 cursor-pointer">
       <input type="checkbox" class="toggle toggle-primary" data-qrf-dir={d} checked={rel.dir === d || rel.dir === "both"} disabled={!showRel} />
       <span>{t(DIR_KEY[d])}</span>
     </label>
@@ -82,7 +82,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
         <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100 max-sm:hidden" aria-hidden="true" />
         <h3 class="font-bold mb-3" data-qrf-title>{showCustom ? t("filter.quick.custom") : t("filter.quick.relative")}</h3>
         <div data-qrf-fields="rel" class={`space-y-3${showRel ? "" : " hidden"}`}>
-          <div role="group" aria-label={t("filter.quick.direction")}>
+          <div role="group" class="flex flex-wrap gap-x-4" aria-label={t("filter.quick.direction")}>
             {toggle("past")}{toggle("future")}
           </div>
           <div class="flex gap-2">
