@@ -6,12 +6,12 @@ import { REL_DIRS, REL_UNITS, type ParsedRange, type RangePreset } from "../lib/
 const UNIT_KEY = { D: "filter.quick.unit.D", W: "filter.quick.unit.W", M: "filter.quick.unit.M", Y: "filter.quick.unit.Y" } as const;
 const DIR_KEY = { past: "filter.quick.dir.past", future: "filter.quick.dir.future", both: "filter.quick.dir.both" } as const;
 
-// Gemeinsamer "Anzeigen"-Button: unter sm nur Icon.
-export function ApplyButton() {
+// Gemeinsamer "Anzeigen"-Button: unter sm nur Icon (full: immer mit Label, z. B. im Popup).
+export function ApplyButton({ full = false }: { full?: boolean }) {
   return (
-    <button type="submit" class="btn" aria-label={t("common.show")} title={t("common.show")}>
-      <Icon name="check" class="w-5 h-5 sm:hidden" />
-      <span class="hidden sm:inline">{t("common.show")}</span>
+    <button type="submit" class={`btn ${full ? "btn-primary" : ""}`} aria-label={t("common.show")} title={t("common.show")}>
+      {!full && <Icon name="check" class="w-5 h-5 sm:hidden" />}
+      <span class={full ? "" : "hidden sm:inline"}>{t("common.show")}</span>
     </button>
   );
 }
@@ -42,6 +42,14 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const mark = (on: boolean) => <span class="w-4">{on ? "✓" : ""}</span>;
   const on = (b: boolean) => (b ? " font-semibold text-primary" : "");
   const Wrap = bare ? "div" : "form";
+  const eid = `${uid}-editor`;
+  const initialLabel = label;
+  const dirIcon = (d: (typeof REL_DIRS)[number]) => (
+    <label class="btn join-item flex-1 min-h-11 has-[:checked]:btn-primary has-[:focus-visible]:outline">
+      <input type="radio" name="dir" value={d} checked={d === rel.dir} disabled={!showRel} class="sr-only" />
+      {t(DIR_KEY[d])}
+    </label>
+  );
   return (
     <Wrap {...(bare ? {} : { method: "get", action })} id={uid} class={bare ? "contents" : "filter-bar flex flex-wrap gap-2 items-center"}>
       {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
@@ -49,7 +57,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
       <div class="inline-block">
         <button type="button" class="btn btn-ghost m-0" popovertarget={id}><span data-qrf-label>{label}</span> ▾</button>
-        <div id={id} popover="auto" class="bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
+        <div id={id} popover="auto" class="qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
           <ul class="space-y-0.5">
             {presets.map((p) => (
               <li key={p.id}>
@@ -63,51 +71,78 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           </ul>
         </div>
       </div>
-      {(range.mode === "preset" || range.mode === "rel") && (
+      {range.mode !== "default" && (
         <span class="text-sm opacity-70 whitespace-nowrap" data-qrf-readonly>{formatDate(range.start)} – {formatDate(range.end)}</span>
       )}
-      <div data-qrf-fields="rel" class={`flex flex-wrap gap-2 items-center${showRel ? "" : " hidden"}`}>
-        <input type="number" data-qrf-n min="1" max="999" value={rel.n} class="input input-bordered w-20" aria-label={t("filter.quick.amount")} disabled={!showRel} />
-        <select data-qrf-unit class="select select-bordered" aria-label={t("filter.quick.unit")} disabled={!showRel}>
-          {REL_UNITS.map((u) => <option value={u} selected={u === rel.unit}>{t(UNIT_KEY[u])}</option>)}
-        </select>
-        <select name="dir" class="select select-bordered" aria-label={t("filter.quick.direction")} disabled={!showRel}>
-          {REL_DIRS.map((d) => <option value={d} selected={d === rel.dir}>{t(DIR_KEY[d])}</option>)}
-        </select>
+      {/* Editor: Popup am Button (Desktop), Bottom-Sheet (< sm) */}
+      <div id={eid} popover="auto" class="qrf-popup qrf-editor bg-base-100 border border-base-300 rounded-box shadow-lg p-4 m-0 w-80 max-w-full">
+        <h3 class="font-bold mb-3" data-qrf-title>{showCustom ? t("filter.quick.custom") : t("filter.quick.relative")}</h3>
+        <div data-qrf-fields="rel" class={`space-y-3${showRel ? "" : " hidden"}`}>
+          <div class="join w-full" role="radiogroup" aria-label={t("filter.quick.direction")}>
+            {REL_DIRS.map(dirIcon)}
+          </div>
+          <div class="flex gap-2">
+            <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input input-bordered w-24 min-h-11 text-base" aria-label={t("filter.quick.amount")} disabled={!showRel} />
+            <select data-qrf-unit class="select select-bordered flex-1 min-h-11 text-base" aria-label={t("filter.quick.unit")} disabled={!showRel}>
+              {REL_UNITS.map((u) => <option value={u} selected={u === rel.unit}>{t(UNIT_KEY[u])}</option>)}
+            </select>
+          </div>
+        </div>
+        <div data-qrf-fields="custom" class={`space-y-3${showCustom ? "" : " hidden"}`}>
+          <label class="form-control block">
+            <span class="label-text text-xs">{t("filter.quick.from")}</span>
+            <input type="date" name={names.start} value={range.start} class="input input-bordered w-full min-h-11 text-base" disabled={!showCustom} />
+          </label>
+          <label class="form-control block">
+            <span class="label-text text-xs">{t("filter.quick.to")}</span>
+            <input type="date" name={names.end} value={range.end} class="input input-bordered w-full min-h-11 text-base" disabled={!showCustom} />
+          </label>
+        </div>
+        <div class="flex gap-2 justify-end mt-4 max-sm:flex-col-reverse [&>*]:max-sm:w-full [&>*]:max-sm:min-h-11">
+          <button type="button" class="btn btn-ghost" popovertarget={eid} popovertargetaction="hide">{t("common.cancel")}</button>
+          <ApplyButton full />
+        </div>
       </div>
-      <div data-qrf-fields="custom" class={`flex flex-wrap gap-2 items-center${showCustom ? "" : " hidden"}`}>
-        <input type="date" name={names.start} value={range.start} class="input input-bordered w-36" disabled={!showCustom} />
-        <span class="text-base-content/50">–</span>
-        <input type="date" name={names.end} value={range.end} class="input input-bordered w-36" disabled={!showCustom} />
-      </div>
-      <div data-qrf-apply class={showRel || showCustom ? "" : "hidden"}><ApplyButton /></div>
       <script dangerouslySetInnerHTML={{ __html: `
         (function(){
-          var f=document.getElementById('${uid}'), pop=document.getElementById('${id}');
-          pop.addEventListener('toggle', function(e) {
-            if (e.newState !== 'open') return;
-            var r = pop.previousElementSibling.getBoundingClientRect();
-            pop.style.position = 'fixed'; pop.style.inset = 'auto';
-            pop.style.top = (r.bottom + 4) + 'px';
-            pop.style.left = Math.max(4, Math.min(r.left, window.innerWidth - pop.offsetWidth - 4)) + 'px';
+          var f=document.getElementById('${uid}'), pop=document.getElementById('${id}'), ed=document.getElementById('${eid}');
+          var init=${JSON.stringify({ mode: range.mode, label: initialLabel })};
+          function place(p){
+            if (window.innerWidth < 640) return; // Bottom-Sheet per CSS
+            var r = p.parentElement.querySelector('button[popovertarget]').getBoundingClientRect();
+            p.style.position = 'fixed'; p.style.inset = 'auto';
+            p.style.top = (r.bottom + 4) + 'px';
+            p.style.left = Math.max(4, Math.min(r.left, window.innerWidth - p.offsetWidth - 4)) + 'px';
+          }
+          var btn=f.querySelector('button[popovertarget="${id}"]');
+          pop.addEventListener('toggle', function(e){ if (e.newState==='open') place(pop); });
+          ed.addEventListener('toggle', function(e){
+            if (e.newState==='open') { place(ed); return; }
+            if (!ed.dataset.applied) apply(init.mode, init.label); // Abbrechen: Ausgangszustand
           });
-          function setMode(m){
+          function qs(s){return f.querySelector(s);}
+          function apply(m,label){
             ['rel','custom'].forEach(function(k){
-              var g=f.querySelector('[data-qrf-fields='+k+']'); g.classList.toggle('hidden',k!==m);
+              var g=qs('[data-qrf-fields='+k+']'); g.classList.toggle('hidden',k!==m);
               g.querySelectorAll('input,select').forEach(function(i){i.disabled=k!==m;});
             });
-            f.querySelector('[data-qrf-apply]').classList.remove('hidden');
-            var ro=f.querySelector('[data-qrf-readonly]'); if(ro) ro.classList.add('hidden');
-            f.querySelector('[data-qrf-label]').textContent=f.querySelector('[data-qrf-mode='+m+']').dataset.qrfText;
-            var r=f.querySelector('input[name=range]'); r.disabled=false; r.value=m;
-            f.querySelector('input[name=rel]').disabled=m!=='rel';
-            sync(); pop.hidePopover();
+            var r=qs('input[name=range]'); r.disabled=m!=='rel'&&m!=='custom'; r.value=m;
+            qs('input[name=rel]').disabled=m!=='rel';
+            qs('[data-qrf-label]').textContent=label;
+            var ro=qs('[data-qrf-readonly]'); if(ro) ro.classList.toggle('hidden',m==='rel'||m==='custom'?m!==init.mode:false);
+            sync();
           }
           function sync(){
-            f.querySelector('input[name=rel]').value='P'+(parseInt(f.querySelector('[data-qrf-n]').value,10)||1)+f.querySelector('[data-qrf-unit]').value;
+            qs('input[name=rel]').value='P'+(parseInt(qs('[data-qrf-n]').value,10)||1)+qs('[data-qrf-unit]').value;
           }
-          f.querySelectorAll('[data-qrf-mode]').forEach(function(b){b.addEventListener('click',function(){setMode(b.dataset.qrfMode);});});
+          f.querySelectorAll('[data-qrf-mode]').forEach(function(b){b.addEventListener('click',function(){
+            var m=b.dataset.qrfMode; apply(m,b.dataset.qrfText);
+            qs('[data-qrf-title]').textContent=b.dataset.qrfText;
+            var ro=qs('[data-qrf-readonly]'); if(ro) ro.classList.add('hidden');
+            pop.hidePopover(); ed.showPopover();
+          });});
           f.addEventListener('input',sync);
+          f.addEventListener('submit',function(){ed.dataset.applied='1';});
         })();
       ` }} />
     </Wrap>

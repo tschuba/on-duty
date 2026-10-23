@@ -559,6 +559,8 @@ export const de = {
   "filter.quick.relative": "Relativ",
   "filter.quick.custom": "Benutzerdefiniert",
   "filter.quick.amount": "Dauer",
+  "filter.quick.from": "Von",
+  "filter.quick.to": "Bis",
   "filter.quick.unit": "Einheit",
   "filter.quick.unit.D": "Tage",
   "filter.quick.unit.W": "Wochen",
