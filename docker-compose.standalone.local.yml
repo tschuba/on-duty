@@ -36,8 +36,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      # 192.168.0.0/16 bewusst nicht gesperrt: Docker Desktop löst host.docker.internal dorthin auf.
-      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,198.18.0.0/15,::/128,::1/128,fc00::/7,fe80::/10"
+      # 192.168.0.0/16 und fc00::/7 bewusst nicht gesperrt: Docker Desktop löst
+      # host.docker.internal darauf auf (IPv4 auf Linux/host-gateway, IPv6-ULA auf macOS).
+      ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,198.18.0.0/15,::/128,::1/128,fe80::/10"
 
   db:
     ports:

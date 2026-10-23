@@ -45,12 +45,14 @@ EOT
 
     echo "Baue Image für die Init-Container..."
     "${COMPOSE[@]}" --profile app build app
-    SERVICES=(db zitadel zitadel-login zitadel-init caddy zitadel-init-hooks)
+    SERVICES=(db zitadel zitadel-login zitadel-init caddy)
     [[ $WITH_ERRORS -eq 1 ]] && SERVICES+=(bugsink bugsink-init)
     "${COMPOSE[@]}" up -d "${SERVICES[@]}"
 
     echo "Warte auf zitadel-init..."
     wait_exited zitadel-init
+    # hooks braucht das Admin-Token von zitadel-init und startet deshalb erst danach (kein app-Healthcheck mehr als Bremse).
+    "${COMPOSE[@]}" up -d zitadel-init-hooks
     echo "Warte auf Caddys lokales CA-Zertifikat..."
     until "${COMPOSE[@]}" exec -T caddy test -f /data/caddy/pki/authorities/local/root.crt 2>/dev/null; do sleep 1; done
     mkdir -p "$OUT_DIR"
