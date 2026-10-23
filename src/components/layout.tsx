@@ -223,6 +223,11 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         document.addEventListener("input", (e) => toggleDiscard(e.target.form, true));
         document.addEventListener("change", (e) => toggleDiscard(e.target.form, true));
         document.addEventListener("reset", (e) => toggleDiscard(e.target, false));
+        // Höhe der Filterleiste als --filter-h (Monatszeile klebt darunter); sie bricht je nach Breite/Inhalt um
+        const filterRO = new ResizeObserver(([en]) => document.documentElement.style.setProperty("--filter-h", en.target.offsetHeight + "px"));
+        const watchFilter = () => { filterRO.disconnect(); const f = document.querySelector(".filter-bar"); if (f) filterRO.observe(f); };
+        watchFilter();
+        document.body.addEventListener("htmx:afterSettle", watchFilter);
         // HTMX spinner: add loading class to triggering element
         document.body.addEventListener("htmx:beforeRequest", (e) => e.detail.elt.classList.add("loading", "loading-spinner"));
         document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));

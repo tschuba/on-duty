@@ -170,3 +170,15 @@ describe("GET /anniversaries filters", () => {
     expect(html).toContain("Dienst + Mitgliedschaft");
   });
 });
+
+describe("GET /anniversaries month rows", () => {
+  it("renders one tbody with a sticky month-row per month", async () => {
+    findManyResult = [makeMemberRow({ firstEntryDate: "2000-01-01" })];
+    ayFixture = [{ kind: "service", year: 25, title: "Dienst25" }];
+    const html = await (await anniversaryRoutes.request("/?start=2025-01-01&end=2025-12-31")).text();
+    const bodies = html.match(/<tbody>/g)?.length ?? 0;
+    const rows = html.match(/class="month-row"/g)?.length ?? 0;
+    expect(rows).toBeGreaterThan(0);
+    expect(bodies).toBe(rows);
+  });
+});
