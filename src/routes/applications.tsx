@@ -329,7 +329,7 @@ applicationRoutes.get("/", guard, async (c) => {
           });
         })();
       ` }} />
-      <div class="mb-4">
+      <div class="filter-bar mb-4">
         <QuickRangeFilter presets={presets} range={range} dir="past" action="/applications" names={{ start: "from", end: "to" }}
           hidden={[...statusFilter.map((st): [string, string] => ["status", st]), ["sort", sort], ["sort_dir", dir]]}
           href={(p) => buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, p)} />

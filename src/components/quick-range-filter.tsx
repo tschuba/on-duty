@@ -52,7 +52,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
     </label>
   );
   return (
-    <Wrap {...(bare ? {} : { method: "get", action })} id={uid} class={bare ? "contents" : "filter-bar flex flex-wrap gap-2 items-center"}>
+    <Wrap {...(bare ? {} : { method: "get", action })} id={uid} class={bare ? "contents" : "flex flex-wrap gap-2 items-center"}>
       {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
       <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : "rel"} disabled={!showRel && !showCustom} />
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
