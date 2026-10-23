@@ -41,7 +41,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   const dateText = range.mode === "default" ? "" : formatRange(range.start, range.end, todayStr());
   const showRel = range.mode === "rel", showCustom = range.mode === "custom";
   const item = "flex w-full items-center gap-2 px-2 py-1 min-h-11 rounded hover:bg-base-200 text-left";
-  const mark = (on: boolean) => <span class="w-4">{on ? "✓" : ""}</span>;
+  const mark = (on: boolean) => <span class="w-4 shrink-0">{on ? "✓" : ""}</span>;
   const on = (b: boolean) => (b ? " font-semibold text-primary" : "");
   const Wrap = bare ? "div" : "form";
   const eid = `${uid}-editor`;
@@ -78,8 +78,8 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               const row = presets.filter((q) => q.group === p.group);
               return [
                 <li key={p.group} class="flex items-center gap-2 px-2 py-1 min-h-11">
-                  {mark(false)}<span class="flex-1">{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
-                  <span class="join">
+                  {mark(false)}<span class="flex-1 whitespace-nowrap">{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
+                  <span class="join shrink-0">
                     {row.map((q) => link(q, `btn btn-sm join-item ${range.mode === "preset" && q.id === range.id ? "btn-outline btn-primary" : "btn-outline btn-neutral"}`))}
                   </span>
                 </li>,
