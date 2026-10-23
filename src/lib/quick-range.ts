@@ -14,7 +14,9 @@ function fmt(d: Date): string {
 
 export function addMonths(dateStr: string, months: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
-  return fmt(new Date(y, m - 1 + months, d));
+  // Tag auf das Monatsende des Zielmonats kappen (31.01. + 1 Monat = 28./29.02.).
+  const last = new Date(y, m + months, 0).getDate();
+  return fmt(new Date(y, m - 1 + months, Math.min(d, last)));
 }
 
 // "future": ab heute nach vorn (Prüfungen, Jubiläen, Verleih); "past": bis heute zurück (Spenden, Anträge).

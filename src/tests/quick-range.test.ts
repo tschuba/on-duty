@@ -28,10 +28,14 @@ describe("relativeRange", () => {
     expect(relativeRange(t, 1, "Y", "past").start).toBe("2025-10-14");
   });
   it("Monatsende wird abgeschnitten, Schaltjahr", () => {
-    // addMonths nutzt Date: 31.01. + 1 Monat läuft in den März über (bekanntes Verhalten)
-    expect(relativeRange("2024-02-29", 1, "Y", "past").start).toMatch(/^2023-0[23]-/);
+    expect(relativeRange("2026-01-31", 1, "M", "future").end).toBe("2026-02-28");
+    expect(relativeRange("2028-01-31", 1, "M", "future").end).toBe("2028-02-29");
+    expect(relativeRange("2026-03-31", 1, "M", "past").start).toBe("2026-02-28");
+    expect(relativeRange("2024-02-29", 1, "Y", "past").start).toBe("2023-02-28");
     expect(relativeRange(t, 999, "Y", "future").end).toBe("3025-10-14");
+    expect(relativeRange(t, 1, "D", "both")).toEqual({ start: "2026-10-13", end: "2026-10-15" });
   });
+
 });
 
 describe("parseRange", () => {
