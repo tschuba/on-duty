@@ -86,25 +86,27 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
       : t("anniversaries.event.yearsDisplay", { years: e.years });
   const border = divider ? " border-t border-base-300" : "";
 
+  const statusBadge = <span class={STATUS_BADGE[e.status]}>{STATUS_LABEL[e.status]}</span>;
+  const kindBadge = e.kind === "birthday"
+    ? <span class="badge badge-outline badge-sm">{t("anniversaries.event.birthday")}</span>
+    : <span class="badge badge-warning badge-outline badge-sm">{anniversaryLabel(e)}</span>;
+
   return (
     <tr class={past ? "opacity-40" : ""}>
-      <td class={`whitespace-nowrap text-sm pl-6${border}`}>
+      <td class={`whitespace-nowrap text-sm pl-6 max-sm:pl-2${border}`}>
         {formatDate(e.refDate ?? e.date)}
         {e.kind === "anniversary" && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.date) })}</div>}
       </td>
-      <td class={border}>
+      <td class={`max-sm:px-2${border}`}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">
           {e.lastName}, {e.firstName}
         </a>
+        {/* unter sm: Status und Art unter dem Namen statt eigener Spalten (sonst läuft die Tabelle horizontal über) */}
+        <div class="sm:hidden mt-1 flex flex-wrap gap-1">{statusBadge}{kindBadge}</div>
       </td>
-      <td class={border}><span class={STATUS_BADGE[e.status]}>{STATUS_LABEL[e.status]}</span></td>
-      <td class={border}>
-        {e.kind === "birthday"
-          ? <span class="badge badge-outline badge-sm">{t("anniversaries.event.birthday")}</span>
-          : <span class="badge badge-warning badge-outline badge-sm">{anniversaryLabel(e)}</span>
-        }
-      </td>
-      <td class={`text-right text-sm tabular-nums${border}`}>{yearsCol}</td>
+      <td class={`max-sm:hidden${border}`}>{statusBadge}</td>
+      <td class={`max-sm:hidden${border}`}>{kindBadge}</td>
+      <td class={`text-right text-sm tabular-nums max-sm:px-2${border}`}>{yearsCol}</td>
     </tr>
   );
 }
@@ -130,7 +132,7 @@ function EventList({ events, today, filters }: { events: AnniversaryEvent[]; tod
         {[...groups.entries()].map(([month, evs], gi, all) => (
           <tbody>
             <tr class="month-row">
-              <td colspan={5} class="bg-base-200 text-lg font-bold text-base-content border-b-2 border-base-300 pt-2 pb-1">
+              <td colspan={5} class="bg-neutral text-lg font-bold text-neutral-content border-l-4 border-gold pt-2 pb-1">
                 {formatMonth(month)}
               </td>
             </tr>
