@@ -109,3 +109,15 @@ describe("relLabel", () => {
     expect(relLabel(1, "Y", "future")).toBe("+1 Jahr");
   });
 });
+
+describe("rangePresets with ceremony years", () => {
+  it("ceremony year spans day after cutoff to cutoff", () => {
+    const p = rangePresets("2026-10-14", "future", "01-06");
+    expect(p.find((x) => x.id === "thisCeremony")).toMatchObject({ start: "2026-01-07", end: "2027-01-06" });
+    expect(p.find((x) => x.id === "nextCeremony")).toMatchObject({ start: "2027-01-07", end: "2028-01-06" });
+    expect(rangePresets("2026-01-03", "future", "01-06").find((x) => x.id === "thisCeremony")).toMatchObject({ start: "2025-01-07", end: "2026-01-06" });
+  });
+  it("without yearStart: unchanged, no groups", () => {
+    expect(rangePresets("2026-10-14", "future").some((x) => x.group)).toBe(false);
+  });
+});

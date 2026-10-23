@@ -259,7 +259,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   };
   const modReset = () => qs({ mod: [] });
 
-  const presets = rangePresets(today, "future");
+  const presets = rangePresets(today, "future", env.ANNIVERSARY_CUTOFF);
 
   // Mobile (< md): Mehrfachauswahl als Dropdown-Formular statt join-Buttongruppe
   const kindOpts = [["service", t("anniversaries.filter.service")], ["membership", t("anniversaries.filter.membership")], ["birthdays", t("anniversaries.filter.birthdays")]] as const;
