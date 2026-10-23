@@ -125,22 +125,23 @@ function EventList({ events, today, filters }: { events: AnniversaryEvent[]; tod
   }
 
   return (
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto md:overflow-visible">
       <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
-        <tbody>
-          {[...groups.entries()].map(([month, evs], i) => (
-            <>
-              <tr>
-                <td colspan={5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
-                  {formatMonth(month)}
-                </td>
-              </tr>
-              {evs.map((e, i) => (
-                <EventRow event={e} past={e.date < today} divider={i > 0} />
-              ))}
-            </>
-          ))}
-        </tbody>
+        {[...groups.entries()].map(([month, evs], gi, all) => (
+          <tbody>
+            <tr class="month-row">
+              <td colspan={5} class="bg-base-200 text-lg font-bold text-base-content border-b-2 border-base-300 pt-2 pb-1">
+                {formatMonth(month)}
+              </td>
+            </tr>
+            {evs.map((e, i) => (
+              <EventRow event={e} past={e.date < today} divider={i > 0} />
+            ))}
+            {gi < all.length - 1 && (
+              <tr aria-hidden="true" class="!bg-transparent"><td colspan={5} class="h-8 p-0"></td></tr>
+            )}
+          </tbody>
+        ))}
       </table>
     </div>
   );

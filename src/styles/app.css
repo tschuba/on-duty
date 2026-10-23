@@ -144,6 +144,8 @@
 :root {
   --nav-h: 4rem;
   --subnav-h: 2.5rem;
+  --header-h: 4rem;
+  --filter-h: 4rem; /* geschätzt (einzeilige Filterleiste), im Browser justieren */
 }
 .subnav {
   top: var(--nav-h);
@@ -191,7 +193,6 @@ main > [data-subnav] {
 }
 /* Such-/Filterleiste klebt unter dem PageHeader. --header-h geschätzt (pt-2 + btn 2.5rem + pb-4 = min-h-16), bei Spalt/Überlappung anpassen. */
 .filter-bar {
-  --header-h: 4rem;
   position: sticky;
   z-index: 15;
   top: calc(var(--nav-h) + var(--header-h));
@@ -201,6 +202,17 @@ main > [data-subnav] {
 @media (min-width: 48rem) {
   body:has([data-subnav]) .filter-bar {
     top: calc(var(--nav-h) + var(--subnav-h) + var(--header-h));
+  }
+}
+/* Monatszeile der Jubiläumsliste klebt unter der Filterleiste (nur ab md; mobil scrollt sie mit). */
+@media (min-width: 48rem) {
+  .month-row td {
+    position: sticky;
+    z-index: 10;
+    top: calc(var(--nav-h) + var(--header-h) + var(--filter-h));
+  }
+  body:has([data-subnav]) .month-row td {
+    top: calc(var(--nav-h) + var(--subnav-h) + var(--header-h) + var(--filter-h));
   }
 }
 @media (max-width: 47.99rem) {
