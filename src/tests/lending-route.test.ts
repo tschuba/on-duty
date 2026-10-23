@@ -142,6 +142,17 @@ describe("GET /inventory/lending", () => {
     expect(html).toContain("Stehtisch #1");
   });
 
+  it("keeps range/rel/dir on member-filter links and the hidden fields", async () => {
+    lendingLoansFindManyResult = [makeLoan()];
+    const html = (await (await lendingRoutes.request("/?range=rel&rel=P1M&dir=both&member=yes")).text()).replace(/&amp;/g, "&");
+    expect(html).toMatch(/href="\/inventory\/lending\?[^"]*range=rel&rel=P1M&dir=both[^"]*member=no/);
+    expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
+    expect(html).toMatch(/<input type="hidden" name="rel" value="P1M"(?![^>]*disabled)/);
+    expect(html).toMatch(/<input type="hidden" name="dir" value="both"(?![^>]*disabled)/);
+    expect(html).toMatch(/data-qrf-dir="past" checked/);
+    expect(html).toMatch(/data-qrf-dir="future" checked/);
+  });
+
   it("shows the borrower's contact for lending:read", async () => {
     lendingLoansFindManyResult = [makeLoan({ borrower: person("Externer", { phone: "0171 123456" }) })];
     currentUser = { ...currentUser, permissions: new Set(["lending:read"]) };

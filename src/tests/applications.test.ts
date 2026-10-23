@@ -117,6 +117,21 @@ describe("GET /", () => {
     expect(html).toContain("Bauer");
   });
 
+  it("keeps range/rel/dir on sort and status filter links", async () => {
+    findManyResult = [makeApplication()];
+    const html = await (await applicationRoutes.request("/?range=rel&rel=P3M&dir=past")).text();
+    expect(html).toContain("sort=lastName");
+    expect(html).toMatch(/href="[^"]*sort=lastName[^"]*"/);
+    const sortHref = html.match(/href="([^"]*sort=lastName[^"]*)"/)![1].replace(/&amp;/g, "&");
+    expect(sortHref).toContain("range=rel");
+    expect(sortHref).toContain("rel=P3M");
+    expect(sortHref).toContain("dir=past");
+    const block = html.slice(html.indexOf("join mb-4"), html.indexOf("Zeile anklicken"));
+    const statusHrefs = [...block.matchAll(/href="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+    expect(statusHrefs).toHaveLength(4);
+    for (const h of statusHrefs) expect(h).toContain("range=rel&rel=P3M&dir=past");
+  });
+
   it("shows each form's status but hides the settings gear without applications:manage-forms", async () => {
     applicationFormsFixture.membership = { type: "membership", isActive: false, startDate: null, endDate: "2026-09-01" };
     const res = await applicationRoutes.request("/");

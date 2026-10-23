@@ -14,7 +14,7 @@ import { ChipInput } from "../components/chip-input.js";
 import { trimmed, parseTags, parseList } from "../lib/forms.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { addMonths, rangePresets } from "../lib/quick-range.js";
+import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
@@ -1302,8 +1302,8 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
 
-  const start = c.req.query("start") || today;
-  const end = c.req.query("end") || addMonths(today, 12);
+  const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) });
+  const { start, end } = range;
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
 
   const all = await fetchItems();
@@ -1317,7 +1317,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
   );
   if (categoryFilter.length > 0) due = due.filter((d) => categoryFilter.includes(d.category));
 
-  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { start, end, category: categoryFilter }, extra);
+  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { ...rangeParams(range), category: categoryFilter }, extra);
   const presets = rangePresets(today, "future");
 
   return c.html(
@@ -1331,21 +1331,8 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
       <PageHeader title={t("inventory.inspections.title")} />
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
-        <form method="get" class="flex items-end gap-2">
-          {categoryFilter.map((cat) => <input type="hidden" name="category" value={cat} />)}
-          <div class="form-control">
-            <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.from")}</span></label>
-            <input type="date" name="start" value={start} class="input input-bordered" />
-          </div>
-          <div class="form-control">
-            <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.to")}</span></label>
-            <input type="date" name="end" value={end} class="input input-bordered" />
-          </div>
-          <button type="submit" class="btn">{t("common.show")}</button>
-        </form>
-        <div class="self-end">
-          <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
-        </div>
+        <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/inspections"
+          hidden={categoryFilter.map((cat): [string, string] => ["category", cat])} href={(p) => qs(p)} />
         <div class="self-end">
           <MultiSelectFilter
             param="category"

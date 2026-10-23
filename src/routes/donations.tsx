@@ -12,7 +12,7 @@ import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, canReadOrgTab, ORG_TABS, type OrgTab } from "../lib/org-config.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { rangePresets, todayStr } from "../lib/quick-range.js";
+import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { countOpenReceipts, nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
@@ -248,8 +248,8 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const user = c.get("user");
   const q = c.req.query();
   const search = q.search ?? "";
-  const from = q.from ?? "";
-  const to = q.to ?? "";
+  const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" });
+  const { start: from, end: to } = range;
 
   const all = await fetchDonations();
   const needle = search.toLowerCase();
@@ -279,16 +279,8 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
         <div class="form-control w-full md:w-auto">
           <label class="input input-bordered flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
-        <QuickRangeFilter presets={presets} start={from} end={to} href={(p) => buildListUrl("/donations", { search }, { from: p.start, to: p.end })} />
-        <div class="form-control">
-          <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.from")}</span></label>
-          <input type="date" name="from" value={from} class="input input-bordered" />
-        </div>
-        <div class="form-control">
-          <label class="label py-0"><span class="label-text text-xs">{t("donations.filter.to")}</span></label>
-          <input type="date" name="to" value={to} class="input input-bordered" />
-        </div>
-        <button type="submit" class="btn">{t("common.show")}</button>
+        <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
+          href={(p) => buildListUrl("/donations", { search }, p)} />
       </form>
 
       <ClickToEditHint />

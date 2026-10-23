@@ -29,6 +29,7 @@ const ICONS = {
   "chart-bar": "24/outline/chart-bar.svg",
   "arrow-down-tray": "24/outline/arrow-down-tray.svg",
   "arrow-up-tray": "24/outline/arrow-up-tray.svg",
+  "arrow-uturn-left": "24/outline/arrow-uturn-left.svg",
   "arrow-left": "24/outline/arrow-left.svg",
   "pencil": "24/outline/pencil.svg",
   "no-symbol": "24/outline/no-symbol.svg",
