@@ -28,7 +28,7 @@ export function Pager(props: {
 }) {
   const { countLabel, page, totalPages, pageUrl, pageSize, pageSizeOptions, pageSizeStorageKey } = props;
   const picker = (p: number, mobileOnly: boolean) => (
-          <div key={`pick${p}`} class={`dropdown dropdown-top join-item${mobileOnly ? " sm:hidden" : ""}`}
+          <div key={`pick${p}`} class={`dropdown dropdown-top join-item${mobileOnly ? " md:hidden" : ""}`}
             onfocusin={`
               const c = this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
               const r = this.getBoundingClientRect(), m = 8;
@@ -81,11 +81,11 @@ export function Pager(props: {
           </div>
   );
   return (
-    <div class="sticky bottom-6 z-10 focus-within:z-30 bg-base-100 border-t border-base-300 py-2 mt-auto flex flex-nowrap sm:flex-wrap items-center justify-end gap-2 sm:gap-4">
+    <div class="sticky bottom-6 z-10 focus-within:z-30 bg-base-100 border-t border-base-300 py-2 mt-auto flex flex-nowrap md:flex-wrap items-center justify-end gap-2 md:gap-4">
       <span class="text-sm opacity-70 mr-auto whitespace-nowrap">{countLabel}</span>
       {pageSizeOptions && (
         <div class="flex items-center gap-2 text-sm opacity-70">
-          <span class="whitespace-nowrap hidden sm:inline">{t("members.table.pageSize")}</span>
+          <span class="whitespace-nowrap hidden md:inline">{t("members.table.pageSize")}</span>
           <select
             class="select select-bordered"
             aria-label={t("members.table.pageSize")}
@@ -106,16 +106,16 @@ export function Pager(props: {
       )}
       <div class="join">
         {pageWindow(page, totalPages).map((p, i) => {
-          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled px-2 min-w-0 hidden sm:inline-flex" aria-disabled="true">…</span>;
+          if (p === "…") return <span key={`gap${i}`} class="join-item btn btn-disabled px-2 min-w-0 hidden md:inline-flex" aria-disabled="true">…</span>;
           if (p === page) {
             if (totalPages > WINDOW_ALL) return picker(p, false);
             if (totalPages === 1) return <span key={p} class="join-item btn btn-primary" aria-current="page">{p}</span>;
             return [
               picker(p, true),
-              <span key={p} class="join-item btn btn-primary hidden sm:inline-flex" aria-current="page">{p}</span>,
+              <span key={p} class="join-item btn btn-primary hidden md:inline-flex" aria-current="page">{p}</span>,
             ];
           }
-          return <a key={p} href={pageUrl(p)} class="join-item btn hidden sm:inline-flex">{p}</a>;
+          return <a key={p} href={pageUrl(p)} class="join-item btn hidden md:inline-flex">{p}</a>;
         })}
       </div>
     </div>
