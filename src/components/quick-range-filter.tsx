@@ -64,7 +64,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           <span class="font-semibold text-sm"><span data-qrf-label>{label}</span> ▾</span>
           <span data-qrf-date class={`text-[11px] leading-none opacity-70${dateText ? "" : " hidden"}`}>{dateText}</span>
         </button>
-        <div id={id} popover="auto" class={`qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg ${presets.some((p) => p.group) ? "w-72" : "w-56"} p-2 m-0`}>
+        <div id={id} popover="auto" class={`qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg ${presets.some((p) => p.group) ? "w-80" : "w-56"} p-2 m-0`}>
           <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100" aria-hidden="true" />
           <ul class="space-y-0.5">
             {presets.flatMap((p, i) => {
@@ -77,10 +77,10 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               if (presets[i - 1]?.group === p.group) return [];
               const row = presets.filter((q) => q.group === p.group);
               return [
-                <li key={p.group} class="flex items-center justify-between gap-2 px-2 py-1 min-h-11">
-                  <span>{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
+                <li key={p.group} class="flex items-center gap-2 px-2 py-1 min-h-11">
+                  {mark(false)}<span class="flex-1">{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
                   <span class="join">
-                    {row.map((q) => link(q, `btn btn-sm join-item ${range.mode === "preset" && q.id === range.id ? "btn-outline btn-primary" : "btn-ghost"}`))}
+                    {row.map((q) => link(q, `btn btn-sm join-item ${range.mode === "preset" && q.id === range.id ? "btn-outline btn-primary" : "btn-outline btn-neutral"}`))}
                   </span>
                 </li>,
               ];
