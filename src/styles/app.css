@@ -231,3 +231,8 @@ details:not([open]) > summary .section-actions {
 }
 /* daisyUI-Display-Regeln dürfen das geschlossene Popup nicht aufdecken. */
 .qrf-popup:not(:popover-open) { display: none; }
+/* [popover] hat UA-seitig overflow:auto und würde den Zeiger (data-arrow) abschneiden. */
+.qrf-popup[popover] { overflow: visible; }
+@media (max-width: 39.99rem) {
+  .qrf-editor[popover] { overflow-y: auto; max-height: 90dvh; }
+}
