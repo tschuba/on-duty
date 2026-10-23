@@ -94,7 +94,16 @@ EOT
 
 Stack läuft. App starten: pnpm dev  →  https://$(env_get SERVICE_FQDN_APP)
 Admin-Login: /admin/login, Passwort: $(env_get SERVICE_PASSWORD_ADMIN)
+
 Zitadel-Console: https://$(env_get SERVICE_FQDN_ZITADEL)
+  Login-Name: $(zitadel_login_name)
+  Passwort:   $(env_get SERVICE_PASSWORDWITHSYMBOLS_ZITADELADMIN)Aa1! (nach der erzwungenen Änderung beim ersten Login gilt dein neues Passwort)
+$(if [[ $WITH_ERRORS -eq 1 ]]; then cat <<BUGSINK
+
+Bugsink: https://$(env_get SERVICE_FQDN_BUGSINK)
+  Login: admin@bugsink.local / $(env_get SERVICE_PASSWORD_BUGSINK)
+BUGSINK
+fi)
 Stoppen: pnpm stack:down — alles löschen: pnpm stack:reset
 EOT
     ;;
