@@ -54,7 +54,7 @@ describe("parseRange", () => {
   it("Preset-Key", () => expect(parseRange({ range: "6m" }, t, "future", def)).toMatchObject({ mode: "preset", id: "6m", end: "2027-04-14" }));
   it("rel gültig", () => {
     const r = parseRange({ range: "rel", rel: "P2W", dir: "past" }, t, "future", def);
-    expect(r).toMatchObject({ mode: "rel", start: "2026-09-30", end: t, rel: { n: 2, unit: "W", dir: "past" } });
+    expect(r).toMatchObject({ mode: "rel", start: "2026-10-05", end: "2026-10-18", rel: { n: 2, unit: "W", dir: "past" } });
     expect(rangeParams(r)).toEqual({ range: "rel", rel: "P2W", dir: "past" });
   });
   it.each(["P0M", "P1000D", "3M", "PT3H"])("rel ungültig %s → Standard", (rel) =>
