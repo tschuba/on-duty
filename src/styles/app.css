@@ -264,8 +264,8 @@ details:not([open]) > summary .section-actions {
   .btn-circle {
     min-width: 2.75rem;
   }
-  .table input[type="checkbox"],
-  .filter-bar input[type="checkbox"] {
+  .table input[type="checkbox"]:not(.toggle),
+  .filter-bar input[type="checkbox"]:not(.toggle) {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }
