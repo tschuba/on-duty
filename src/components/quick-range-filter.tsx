@@ -78,7 +78,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               const row = presets.filter((q) => q.group === p.group);
               return [
                 <li key={p.group} class="flex items-center gap-2 px-2 py-1 min-h-11">
-                  {mark(false)}<span class="flex-1 whitespace-nowrap">{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
+                  {mark(false)}<span class="w-[4.5rem] shrink-0">{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
                   <span class="join shrink-0">
                     {row.map((q) => link(q, `btn btn-sm join-item ${range.mode === "preset" && q.id === range.id ? "btn-outline btn-primary" : "btn-outline btn-neutral"}`))}
                   </span>
