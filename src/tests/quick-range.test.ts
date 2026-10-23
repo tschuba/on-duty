@@ -37,6 +37,18 @@ describe("relativeRange (whole units)", () => {
     expect(relativeRange(t, 2, "Y", "future", "01-06")).toEqual({ start: "2026-01-07", end: "2028-01-06" });
     expect(relativeRange("2026-01-06", 1, "Y", "future", "01-06")).toEqual({ start: "2025-01-07", end: "2026-01-06" });
   });
+  it("edge cases: year/week boundaries, ref, cutoff 02-29, both/past ceremony", () => {
+    expect(relativeRange("2026-12-31", 1, "M", "future")).toEqual({ start: "2026-12-01", end: "2026-12-31" });
+    expect(relativeRange("2026-12-31", 1, "M", "both")).toEqual({ start: "2026-11-01", end: "2027-01-31" });
+    expect(relativeRange("2026-10-12", 1, "W", "future")).toEqual({ start: "2026-10-12", end: "2026-10-18" }); // Monday
+    expect(relativeRange("2026-10-18", 1, "W", "future")).toEqual({ start: "2026-10-12", end: "2026-10-18" }); // Sunday
+    expect(relativeRange("2027-01-01", 2, "W", "past")).toEqual({ start: "2026-12-21", end: "2027-01-03" });
+    expect(relativeRange("2026-10-14", 1, "Y", "both", "01-06")).toEqual({ start: "2025-01-07", end: "2028-01-06" });
+    expect(relativeRange("2026-10-14", 2, "Y", "past", "01-06")).toEqual({ start: "2025-01-07", end: "2027-01-06" });
+    expect(relativeRange("2026-02-10", 1, "Y", "future", "02-29")).toEqual({ start: "2025-03-01", end: "2026-02-28" });
+    expect(relativeRange("2026-03-01", 1, "Y", "future", "02-29")).toEqual({ start: "2026-03-01", end: "2027-02-28" });
+    expect(relativeRange("2028-03-01", 1, "Y", "future", "02-29")).toEqual({ start: "2028-03-01", end: "2029-02-28" });
+  });
   it("yr=ceremony only with cutoff and unit Y", () => {
     const q = { range: "rel", rel: "P2Y", dir: "future", yr: "ceremony" };
     const def = { start: t, end: t };
