@@ -1,5 +1,6 @@
 import { t } from "../i18n/index.js";
 import { Icon } from "./icon.js";
+import { formatDate } from "../lib/format.js";
 import { REL_DIRS, REL_UNITS, type ParsedRange, type RangePreset } from "../lib/quick-range.js";
 
 const UNIT_KEY = { D: "filter.quick.unit.D", W: "filter.quick.unit.W", M: "filter.quick.unit.M", Y: "filter.quick.unit.Y" } as const;
@@ -47,7 +48,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : "rel"} disabled={!showRel && !showCustom} />
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
       <div class="inline-block">
-        <button type="button" class="btn btn-ghost m-0" popovertarget={id}>{label} ▾</button>
+        <button type="button" class="btn btn-ghost m-0" popovertarget={id}><span data-qrf-label>{label}</span> ▾</button>
         <div id={id} popover="auto" class="bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
           <ul class="space-y-0.5">
             {presets.map((p) => (
@@ -57,11 +58,14 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
                 </a>
               </li>
             ))}
-            <li><button type="button" data-qrf-mode="rel" class={`${item}${on(showRel)}`}>{mark(showRel)}{t("filter.quick.relative")}</button></li>
-            <li><button type="button" data-qrf-mode="custom" class={`${item}${on(showCustom)}`}>{mark(showCustom)}{t("filter.quick.custom")}</button></li>
+            <li><button type="button" data-qrf-mode="rel" data-qrf-text={t("filter.quick.relative")} class={`${item}${on(showRel)}`}>{mark(showRel)}{t("filter.quick.relative")}</button></li>
+            <li><button type="button" data-qrf-mode="custom" data-qrf-text={t("filter.quick.custom")} class={`${item}${on(showCustom)}`}>{mark(showCustom)}{t("filter.quick.custom")}</button></li>
           </ul>
         </div>
       </div>
+      {(range.mode === "preset" || range.mode === "rel") && (
+        <span class="text-sm opacity-70 whitespace-nowrap" data-qrf-readonly>{formatDate(range.start)} – {formatDate(range.end)}</span>
+      )}
       <div data-qrf-fields="rel" class={`flex flex-wrap gap-2 items-center${showRel ? "" : " hidden"}`}>
         <input type="number" data-qrf-n min="1" max="999" value={rel.n} class="input input-bordered w-20" aria-label={t("filter.quick.amount")} disabled={!showRel} />
         <select data-qrf-unit class="select select-bordered" aria-label={t("filter.quick.unit")} disabled={!showRel}>
@@ -93,6 +97,8 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               g.querySelectorAll('input,select').forEach(function(i){i.disabled=k!==m;});
             });
             f.querySelector('[data-qrf-apply]').classList.remove('hidden');
+            var ro=f.querySelector('[data-qrf-readonly]'); if(ro) ro.classList.add('hidden');
+            f.querySelector('[data-qrf-label]').textContent=f.querySelector('[data-qrf-mode='+m+']').dataset.qrfText;
             var r=f.querySelector('input[name=range]'); r.disabled=false; r.value=m;
             f.querySelector('input[name=rel]').disabled=m!=='rel';
             sync(); pop.hidePopover();
