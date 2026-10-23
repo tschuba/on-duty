@@ -11,7 +11,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { rangePresets, todayStr } from "../lib/quick-range.js";
+import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
 import { sendMail } from "../lib/mail.js";
@@ -149,8 +149,9 @@ applicationRoutes.get("/", guard, async (c) => {
   const sort = ((c.req.query("sort") as SortKey) || "submittedAt");
   const dir = ((c.req.query("sort_dir") as "asc" | "desc") || "desc");
 
-  const from = c.req.query("from") ?? "";
-  const to = c.req.query("to") ?? "";
+  const range = parseRange({ ...c.req.query(), start: c.req.query("from"), end: c.req.query("to") }, todayStr(), "past", { start: "", end: "" });
+  const { start: from, end: to } = range;
+  const rp = rangeParams(range, { start: "from", end: "to" });
   const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const inRange = (a: { submittedAt: Date }) => {
     const day = dayOf(a.submittedAt);
@@ -162,13 +163,13 @@ applicationRoutes.get("/", guard, async (c) => {
   const canManageForms = user.permissions.has("applications:manage-forms");
 
   function filterUrl(next: ApplicationStatus[]) {
-    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, from, to }, { status: next });
+    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, ...rp }, { status: next });
   }
 
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
     const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, from, to }, { sort: col, sort_dir: newDir });
+    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, ...rp }, { sort: col, sort_dir: newDir });
   }
 
   return c.html(
@@ -328,16 +329,11 @@ applicationRoutes.get("/", guard, async (c) => {
           });
         })();
       ` }} />
-      <form method="get" action="/applications" class="filter-bar flex flex-wrap gap-2 items-center mb-4">
-        {statusFilter.map((st) => <input type="hidden" name="status" value={st} />)}
-        <input type="hidden" name="sort" value={sort} />
-        <input type="hidden" name="sort_dir" value={dir} />
-        <QuickRangeFilter presets={presets} start={from} end={to} href={(p) => buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, { from: p.start, to: p.end })} />
-        <input type="date" name="from" value={from} class="input input-bordered w-36" />
-        <span class="text-base-content/50">–</span>
-        <input type="date" name="to" value={to} class="input input-bordered w-36" />
-        <button type="submit" class="btn">{t("common.show")}</button>
-      </form>
+      <div class="mb-4">
+        <QuickRangeFilter presets={presets} range={range} dir="past" action="/applications" names={{ start: "from", end: "to" }}
+          hidden={[...statusFilter.map((st): [string, string] => ["status", st]), ["sort", sort], ["sort_dir", dir]]}
+          href={(p) => buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, p)} />
+      </div>
       <div class="join mb-4">
         {ALL_STATUSES.map((s) => (
           <a

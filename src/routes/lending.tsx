@@ -7,7 +7,7 @@ import { FormActions, HeaderAction, PageHeader } from "../components/page-header
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { rangePresets, todayStr } from "../lib/quick-range.js";
+import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
@@ -139,8 +139,9 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const statusFilter = parseMulti(c.req.queries("status"), Object.keys(LOAN_STATUS_LABEL)) as LoanStatus[];
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   // Ohne start/end in der URL gilt das Standardfenster; leere Felder heben es auf.
-  const start = c.req.query("start") ?? addDays(today, -14);
-  const end = c.req.query("end") ?? addDays(today, 30);
+  const range = parseRange(c.req.query(), today, "future", { start: addDays(today, -14), end: addDays(today, 30) });
+  const { start, end } = range;
+  const rp = rangeParams(range);
   const itemFilter = c.req.query("item") ?? "";
   const member = c.req.query("member") === "yes" || c.req.query("member") === "no" ? c.req.query("member")! : "";
   const canLink = user.permissions.has("members:read");
@@ -215,17 +216,14 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         />
         <input type="hidden" name="member" value={member} />
         <input type="hidden" name="item" value={itemFilter} />
-        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member, start, end })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
+        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member, ...rp })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
         <MemberFilter
           value={member}
           options={[{ value: "", label: t("common.filter.all") }, { value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }]}
-          href={(m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, start, end }, { member: m })}
+          href={(m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, ...rp }, { member: m })}
         />
-        <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, member }, { start: p.start, end: p.end })} />
-        <input type="date" name="start" value={start} class="input input-bordered w-36" placeholder={t("lending.overview.rangeStart")} />
-        <span class="text-base-content/50">–</span>
-        <input type="date" name="end" value={end} class="input input-bordered w-36" placeholder={t("lending.overview.rangeEnd")} />
-        <button type="submit" class="btn btn-outline">{t("lending.overview.rangeApply")}</button>
+        <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
+          href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, member }, p)} />
         {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
       </form>
 

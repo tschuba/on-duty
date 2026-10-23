@@ -10,7 +10,7 @@ import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { addMonths, rangePresets, todayStr } from "../lib/quick-range.js";
+import { addMonths, parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
@@ -183,10 +183,8 @@ function AnniversariesExportModal() {
           });
           document.getElementById('ann-export-download').addEventListener('click',function(){
             var url=new URL(window.location.href);
-            var p=new URLSearchParams({
-              start:url.searchParams.get('start')||'',
-              end:url.searchParams.get('end')||'',
-            });
+            var p=new URLSearchParams();
+            ['range','rel','dir','start','end'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
             url.searchParams.getAll('filter').forEach(function(f){p.append('filter',f)});
             var gte=url.searchParams.get('gte');if(gte)p.set('gte',gte);
             url.searchParams.getAll('mod').forEach(function(m){p.append('mod',m)});
@@ -207,8 +205,9 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user")!;
   const today = todayStr();
 
-  const start = c.req.query("start") || today;
-  const end = c.req.query("end") || addMonths(today, 12);
+  const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) });
+  const { start, end } = range;
+  const rp = rangeParams(range);
   const filters = parseKindFilters(c.req.queries("filter"));
   const gteRaw = c.req.query("gte") || "";
   const gte = parseInt(gteRaw, 10) || 0;
@@ -239,7 +238,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   }
 
   const qs = (extra: Record<string, string | string[]>) =>
-    buildListUrl("/anniversaries", { start, end, filter: filters, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
+    buildListUrl("/anniversaries", { ...rp, filter: filters, gte: gte > 0 ? gte : undefined, mod: mods }, extra);
 
   const allKindsActive = filters.length === KIND_FILTERS.length;
   const filterAll = () => qs({ filter: [...KIND_FILTERS] });
@@ -282,7 +281,8 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
       </form>
     </div>
   );
-  const commonHidden = (): [string, string][] => [["start", start], ["end", end], ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])];
+  const rpHidden = Object.entries(rp).filter(([, v]) => v !== undefined) as [string, string][];
+  const commonHidden = (): [string, string][] => [...rpHidden, ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])];
 
   return c.html(
     <Layout title={t("anniversaries.title")} user={user} activeNav="members">
@@ -293,18 +293,9 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
         {/* Controls */}
         <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-          <QuickRangeFilter presets={presets} start={start} end={end} href={(p) => qs({ start: p.start, end: p.end })} />
-
-          {/* Manual date range */}
-          <form method="get" action="/anniversaries" class="flex gap-2 items-center w-full md:w-auto">
-            <input type="date" name="start" value={start} class="input input-bordered min-w-0 flex-1 md:w-36 md:flex-none" />
-            <span class="text-base-content/50">–</span>
-            <input type="date" name="end" value={end} class="input input-bordered min-w-0 flex-1 md:w-36 md:flex-none" />
-            {filters.map((f) => <input type="hidden" name="filter" value={f} />)}
-            {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
-            {gte > 0 && <input type="hidden" name="gte" value={String(gte)} />}
-            <button type="submit" class="btn">{t("common.show")}</button>
-          </form>
+          <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries"
+            hidden={[...filters.map((f): [string, string] => ["filter", f]), ...mods.map((m): [string, string] => ["mod", m]), ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])]}
+            href={(p) => qs(p)} />
 
           {/* Typ-Filter */}
           {mobileFilter(`${t("admin.anniversaries.table.kind")}: ${kindSummary}`, "filter", kindOpts, filters, filterAll(), [...commonHidden(), ...mods.map((m): [string, string] => ["mod", m])])}
@@ -318,8 +309,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
           {/* Jahre + Mod */}
           <div class="flex gap-3 items-center">
             <form method="get" action="/anniversaries" id="gte-form" class="flex items-center gap-2">
-              <input type="hidden" name="start" value={start} />
-              <input type="hidden" name="end" value={end} />
+              {rpHidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
               {filters.map((f) => <input type="hidden" name="filter" value={f} />)}
               {mods.map((m) => <input type="hidden" name="mod" value={m} />)}
               <label class="text-sm text-base-content/70" for="gte-input">{t("anniversaries.minYears.label")}</label>
@@ -369,8 +359,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const q = c.req.query();
   const today = todayStr();
-  const start = q.start || today;
-  const end = q.end || addMonths(today, 12);
+  const { start, end } = parseRange(q, today, "future", { start: today, end: addMonths(today, 12) });
   const filters = parseKindFilters(c.req.queries("filter"));
   const inclContact = q.contact === "1";
   const inclAddr = q.addr === "1";
