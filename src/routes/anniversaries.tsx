@@ -184,7 +184,7 @@ function AnniversariesExportModal() {
           document.getElementById('ann-export-download').addEventListener('click',function(){
             var url=new URL(window.location.href);
             var p=new URLSearchParams();
-            ['range','rel','dir','start','end'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
+            ['range','rel','dir','ref','yr','start','end'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
             url.searchParams.getAll('filter').forEach(function(f){p.append('filter',f)});
             var gte=url.searchParams.get('gte');if(gte)p.set('gte',gte);
             url.searchParams.getAll('mod').forEach(function(m){p.append('mod',m)});
