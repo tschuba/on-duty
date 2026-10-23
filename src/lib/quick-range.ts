@@ -3,7 +3,8 @@ import { formatDate } from "./format.js";
 
 type TranslationKey = Parameters<typeof t>[0];
 
-export type RangePreset = { id: string; key: TranslationKey; start: string; end: string };
+// group + short: consecutive presets with the same group render as one row of short-labelled buttons.
+export type RangePreset = { id: string; key: TranslationKey; start: string; end: string; group?: "this" | "next"; short?: TranslationKey };
 
 export function todayStr(): string {
   return fmt(new Date());
@@ -21,16 +22,21 @@ export function addMonths(dateStr: string, months: number): string {
 }
 
 // "future": ab heute nach vorn (Prüfungen, Jubiläen, Verleih); "past": bis heute zurück (Spenden, Anträge).
-export function rangePresets(today: string, dir: "future" | "past"): RangePreset[] {
+// yearStart ("MM-DD", anniversary cutoff) adds ceremony-year presets next to the calendar-year ones.
+export function rangePresets(today: string, dir: "future" | "past", yearStart?: string): RangePreset[] {
   const y = Number(today.slice(0, 4));
   const year = (n: number) => ({ start: `${n}-01-01`, end: `${n}-12-31` });
   if (dir === "future") {
+    const cal = yearStart ? { short: "filter.quick.calendar" as const } : {};
+    const cer = (k: number) => unitSpan(today, "Y", k, yearStart);
     return [
       { id: "3m", key: "filter.quick.3months", start: today, end: addMonths(today, 3) },
       { id: "6m", key: "filter.quick.6months", start: today, end: addMonths(today, 6) },
       { id: "12m", key: "filter.quick.12months", start: today, end: addMonths(today, 12) },
-      { id: "thisYear", key: "filter.quick.thisYear", ...year(y) },
-      { id: "nextYear", key: "filter.quick.nextYear", ...year(y + 1) },
+      { id: "thisYear", key: "filter.quick.thisYear", ...year(y), ...cal, ...(yearStart && { group: "this" as const }) },
+      ...(yearStart ? [{ id: "thisCeremony", key: "filter.quick.thisCeremony" as const, ...cer(0), group: "this" as const, short: "filter.quick.ceremony" as const }] : []),
+      { id: "nextYear", key: "filter.quick.nextYear", ...year(y + 1), ...cal, ...(yearStart && { group: "next" as const }) },
+      ...(yearStart ? [{ id: "nextCeremony", key: "filter.quick.nextCeremony" as const, ...cer(1), group: "next" as const, short: "filter.quick.ceremony" as const }] : []),
     ];
   }
   return [
@@ -99,7 +105,7 @@ export function parseRange(q: RangeQuery, today: string, dir: "future" | "past",
   const fallback: ParsedRange = { mode: "default", ...defaults };
   const hasDates = q.start !== undefined || q.end !== undefined;
   const custom: ParsedRange = { mode: "custom", start: q.start ?? defaults.start, end: q.end ?? defaults.end };
-  const presets = rangePresets(today, dir);
+  const presets = rangePresets(today, dir, cutoff);
   if (q.range === "custom") return custom;
   if (q.range === "rel") {
     const m = REL_RE.exec(q.rel ?? "");

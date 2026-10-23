@@ -64,16 +64,27 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           <span class="font-semibold text-sm"><span data-qrf-label>{label}</span> ▾</span>
           <span data-qrf-date class={`text-[11px] leading-none opacity-70${dateText ? "" : " hidden"}`}>{dateText}</span>
         </button>
-        <div id={id} popover="auto" class="qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg w-56 p-2 m-0">
+        <div id={id} popover="auto" class={`qrf-popup bg-base-100 border border-base-300 rounded-box shadow-lg ${presets.some((p) => p.group) ? "w-72" : "w-56"} p-2 m-0`}>
           <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100" aria-hidden="true" />
           <ul class="space-y-0.5">
-            {presets.map((p) => (
-              <li key={p.id}>
-                <a href={href({ range: p.id, rel: "", dir: "", ref: "", start: "", end: "", from: "", to: "" })} class={`${item}${on(range.mode === "preset" && p.id === range.id)}`}>
-                  {mark(range.mode === "preset" && p.id === range.id)}{t(p.key)}
+            {presets.flatMap((p, i) => {
+              const link = (q: RangePreset, cls: string) => (
+                <a href={href({ range: q.id, rel: "", dir: "", ref: "", start: "", end: "", from: "", to: "" })} title={formatRange(q.start, q.end, todayStr())} class={cls}>
+                  {q.short ? t(q.short) : <>{mark(range.mode === "preset" && q.id === range.id)}{t(q.key)}</>}
                 </a>
-              </li>
-            ))}
+              );
+              if (!p.group) return [<li key={p.id}>{link(p, `${item}${on(range.mode === "preset" && p.id === range.id)}`)}</li>];
+              if (presets[i - 1]?.group === p.group) return [];
+              const row = presets.filter((q) => q.group === p.group);
+              return [
+                <li key={p.group} class="flex items-center gap-2 px-2 py-1">
+                  <span class="w-20">{t(p.group === "this" ? "filter.quick.this" : "filter.quick.next")}</span>
+                  <span class="join">
+                    {row.map((q) => link(q, `btn btn-sm join-item${range.mode === "preset" && q.id === range.id ? " btn-primary" : ""}`))}
+                  </span>
+                </li>,
+              ];
+            })}
             <li><button type="button" data-qrf-mode="rel" data-qrf-text={t("filter.quick.relative")} class={`${item}${on(showRel)}`}>{mark(showRel)}{t("filter.quick.relative")}<span class="ml-auto opacity-60" aria-hidden="true">›</span></button></li>
             <li><button type="button" data-qrf-mode="custom" data-qrf-text={t("filter.quick.custom")} class={`${item}${on(showCustom)}`}>{mark(showCustom)}{t("filter.quick.custom")}<span class="ml-auto opacity-60" aria-hidden="true">›</span></button></li>
           </ul>
