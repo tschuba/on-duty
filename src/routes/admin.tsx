@@ -1,3 +1,4 @@
+import { RowAction } from "../components/row-action.js";
 import { Hono, type Context } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -203,20 +204,9 @@ adminRoutes.get("/users", guard, async (c) => {
                         {u.disabled ? (
                           <>
                             <form method="post" action={`/admin/users/${u.id}/activate`}>
-                              <button
-                                type="submit"
-                                class="btn btn-ghost btn-xs text-success"
-                                onclick="event.stopPropagation()"
-                              >
-                                {t("admin.users.activate")}
-                              </button>
+                              <RowAction icon="check" label={t("admin.users.activate")} class="btn-ghost text-success" type="submit" onclick="event.stopPropagation()" />
                             </form>
-                            <button
-                              class="btn btn-outline btn-error btn-xs"
-                              onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`}
-                            >
-                              {t("common.delete")}
-                            </button>
+                            <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`} />
                             <dialog id={`delete-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
                                 <h3 class="font-bold text-lg">{t("admin.users.confirmDelete.title")}</h3>
@@ -243,12 +233,7 @@ adminRoutes.get("/users", guard, async (c) => {
                           <>
                             {isPending(u) && u.id !== user.id && (
                               <>
-                                <button
-                                  class="btn btn-outline btn-error btn-xs"
-                                  onclick={`event.stopPropagation(); document.getElementById('reject-${u.id}').showModal()`}
-                                >
-                                  {t("admin.users.reject")}
-                                </button>
+                                <RowAction icon="x-mark" label={t("admin.users.reject")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('reject-${u.id}').showModal()`} />
                                 <dialog id={`reject-${u.id}`} class="modal" onclick="event.stopPropagation()">
                                   <div class="modal-box">
                                     <h3 class="font-bold text-lg">{t("admin.users.confirmReject.title")}</h3>
@@ -270,14 +255,7 @@ adminRoutes.get("/users", guard, async (c) => {
                                 </dialog>
                               </>
                             )}
-                            <button
-                              class={`btn btn-ghost btn-xs ${u.id === user.id ? "text-base-content/30" : "text-error"}`}
-                              onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`}
-                              disabled={u.id === user.id}
-                              title={u.id === user.id ? t("admin.users.cannotDeactivateSelf") : undefined}
-                            >
-                              {t("admin.users.deactivate")}
-                            </button>
+                            <RowAction icon="no-symbol" label={t("admin.users.deactivate")} class={`btn-ghost ${u.id === user.id ? "text-base-content/30" : "text-error"}`} onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`} disabled={u.id === user.id} title={u.id === user.id ? t("admin.users.cannotDeactivateSelf") : undefined} />
                             <dialog id={`deactivate-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
                                 <h3 class="font-bold text-lg">{t("admin.users.confirmDeactivate.title")}</h3>
@@ -666,15 +644,10 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end">
-                      <a href={`/admin/permissions/new?copyFrom=${r.id}`} class="btn btn-outline btn-primary btn-xs" onclick="event.stopPropagation()">{t("common.copy")}</a>
+                      <RowAction icon="document-duplicate" label={t("common.copy")} class="btn-outline btn-primary" href={`/admin/permissions/new?copyFrom=${r.id}`} onclick="event.stopPropagation()" />
                       {canDelete ? (
                         <>
-                          <button
-                            class="btn btn-outline btn-error btn-xs"
-                            onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`}
-                          >
-                            {t("common.delete")}
-                          </button>
+                          <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`} />
                           <dialog id={`delete-perm-role-${r.id}`} class="modal" onclick="event.stopPropagation()">
                             <div class="modal-box">
                               <h3 class="font-bold text-lg">{t("admin.permissions.confirmDelete.title")}</h3>
@@ -698,19 +671,13 @@ adminRoutes.get("/permissions", guard, async (c) => {
                           </dialog>
                         </>
                       ) : (
-                        <button
-                          class="btn btn-ghost btn-xs text-base-content/30"
-                          disabled
-                          title={
+                        <RowAction icon="trash" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={
                             r.isProtected
                               ? t("admin.permissions.cannotDelete.protected")
                               : assignmentCount === 1
                                 ? t("admin.permissions.cannotDelete.usedBySingle", { count: assignmentCount })
                                 : t("admin.permissions.cannotDelete.usedByMultiple", { count: assignmentCount })
-                          }
-                        >
-                          {t("common.delete")}
-                        </button>
+                          } />
                       )}
                     </div>
                   </td>

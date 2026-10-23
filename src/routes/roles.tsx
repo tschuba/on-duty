@@ -5,6 +5,7 @@ import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schem
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { RowAction } from "../components/row-action.js";
 import { ModalScaffold } from "./admin.js";
 import { flagAllowed, isPermutation, moveId } from "../lib/role-types.js";
 import { setFlash } from "../lib/flash.js";
@@ -88,8 +89,8 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
   return (
     <form method="post" action={action} class="join" onclick="event.stopPropagation()">
       <input type="hidden" name="id" value={id} />
-      <button name="dir" value="up" class="btn btn-ghost btn-xs join-item" disabled={disabled} aria-label={t("admin.roles.moveUp")} title={t("admin.roles.moveUp")}>↑</button>
-      <button name="dir" value="down" class="btn btn-ghost btn-xs join-item" disabled={disabled} aria-label={t("admin.roles.moveDown")} title={t("admin.roles.moveDown")}>↓</button>
+      <RowAction icon="arrow-up" label={t("admin.roles.moveUp")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "up" }} />
+      <RowAction icon="arrow-down" label={t("admin.roles.moveDown")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "down" }} />
     </form>
   );
 }
@@ -97,12 +98,7 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
 function DeleteDialog({ id, action, title, body }: { id: string; action: string; title: string; body: string }) {
   return (
     <>
-      <button
-        class="btn btn-outline btn-error btn-xs"
-        onclick={`event.stopPropagation(); document.getElementById('delete-${id}').showModal()`}
-      >
-        {t("common.delete")}
-      </button>
+      <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-${id}').showModal()`} />
       <dialog id={`delete-${id}`} class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{title}</h3>
@@ -244,19 +240,13 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                             body={t("admin.roles.confirmDelete.body", { title: r.title })}
                           />
                         ) : canDeletePerm && (
-                          <button
-                            class="btn btn-ghost btn-xs text-base-content/30"
-                            disabled
-                            title={
+                          <RowAction icon="trash" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={
                               r.isProtected
                                 ? t("admin.roles.cannotDelete.protected")
                                 : r.assignmentCount === 1
                                   ? t("admin.roles.cannotDelete.usedBySingle", { count: r.assignmentCount })
                                   : t("admin.roles.cannotDelete.usedByMultiple", { count: r.assignmentCount })
-                            }
-                          >
-                            {t("common.delete")}
-                          </button>
+                            } />
                         )}
                       </div>
                     </td>
@@ -315,13 +305,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                           body={t("admin.roleTypes.confirmDelete.body", { name: ty.name })}
                         />
                       ) : canDeleteTypes && (
-                        <button
-                          class="btn btn-ghost btn-xs text-base-content/30"
-                          disabled
-                          title={ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: n })}
-                        >
-                          {t("common.delete")}
-                        </button>
+                        <RowAction icon="trash" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: n })} />
                       )}
                     </div>
                   </td>

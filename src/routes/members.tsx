@@ -1,3 +1,4 @@
+import { RowAction } from "../components/row-action.js";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -387,18 +388,12 @@ function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData;
         <td class="text-right whitespace-nowrap">
           {!readOnly && memberId && (
             <>
-              <button type="button" class="btn btn-ghost btn-xs" hx-get={`/members/${memberId}/assignments/${r.id}/edit`} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>{t("common.edit")}</button>
-              <button type="button" class="btn btn-outline btn-error btn-xs" hx-post={`/members/${memberId}/assignments/${r.id}/delete`} hx-confirm={t("members.assignment.confirmDelete")} hx-target="#assignments-box" hx-swap="outerHTML">{t("common.delete")}</button>
+              <RowAction icon="pencil" label={t("common.edit")} attrs={{ "hx-get": `/members/${memberId}/assignments/${r.id}/edit`, "hx-target": "#assignment-modal-body", "hx-swap": "innerHTML", "hx-on::after-request": ADD_CLICK }} />
+              <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/members/${memberId}/assignments/${r.id}/delete`, "hx-confirm": t("members.assignment.confirmDelete"), "hx-target": "#assignments-box", "hx-swap": "outerHTML" }} />
             </>
           )}
           {!readOnly && !memberId && (
-            <button
-              type="button"
-              class="btn btn-outline btn-error btn-xs"
-              onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))"
-            >
-              {t("common.delete")}
-            </button>
+            <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))" />
           )}
         </td>
       </tr>
