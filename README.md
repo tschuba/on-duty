@@ -68,11 +68,14 @@ pnpm install
 # 2. Dev-Stack starten (DB, Zitadel, Caddy; erzeugt .env.dev-stack, migriert die DB)
 pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors
 
-# 3. Entwicklungsserver starten (lädt .env.dev-stack automatisch)
-pnpm dev
-# → https://app.localhost (Zertifikatswarnung akzeptieren)
+# 3. Einmalig pro Rechner: lokale CA im System vertrauen (fragt nach dem Admin-Passwort), Browser neu starten
+pnpm stack:trust
 
-# Aufräumen: pnpm stack:down · alles löschen inkl. Volumes: pnpm stack:reset
+# 4. Entwicklungsserver starten (lädt .env.dev-stack automatisch)
+pnpm dev
+# → https://app.localhost
+
+# Aufräumen: pnpm stack:down · alles löschen inkl. Volumes: pnpm stack:reset (CA bleibt; `stack:reset --ca` entfernt auch sie)
 ```
 
 ## Scripts
@@ -84,7 +87,7 @@ pnpm dev
 | `pnpm db:generate` | Drizzle-Migration aus Schema generieren |
 | `pnpm db:migrate` | Migrationen ausführen |
 | `pnpm db:seed` | Admin-Account anlegen (idempotent) |
-| `pnpm stack:up` / `stack:down` / `stack:reset` | Dev-Stack (Docker) starten / stoppen / komplett löschen — Details: [docs/standalone-deployment.md](docs/standalone-deployment.md#dev-stack-im-host-modus) |
+| `pnpm stack:up` / `stack:down` / `stack:reset` / `stack:trust` | Dev-Stack (Docker) starten / stoppen / komplett löschen / lokale CA im System vertrauen — Details: [docs/standalone-deployment.md](docs/standalone-deployment.md#dev-stack-im-host-modus) |
 | `pnpm db:setup` | Migrate + Seed (Ersteinrichtung) |
 | `pnpm db:studio` | Drizzle Studio öffnen |
 

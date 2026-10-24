@@ -12,7 +12,7 @@ services:
       # OIDC-Discovery/Token-Call in src/auth.ts an Zitadel fehlschlagen.
       NODE_EXTRA_CA_CERTS: /caddy-ca/caddy/pki/authorities/local/root.crt
     volumes:
-      - caddy_data:/caddy-ca:ro
+      - ${CADDY_DATA:-caddy_data}:/caddy-ca:ro
 
   zitadel-init:
     image: on-duty-standalone-local:latest
@@ -61,7 +61,7 @@ services:
       BUGSINK_DOMAIN: ${SERVICE_FQDN_BUGSINK:-errors.localhost}
     volumes:
       - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
+      - ${CADDY_DATA:-caddy_data}:/data
       - caddy_config:/config
     networks:
       default:
