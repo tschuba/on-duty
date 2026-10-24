@@ -14,6 +14,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
+import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
 import { t } from "../i18n/index.js";
 
 export const anniversaryRoutes = new Hono<{ Variables: Variables }>();
@@ -44,17 +45,6 @@ function formatMonth(yyyymm: string): string {
   const [y, m] = yyyymm.split("-");
   return `${t(MONTH_KEYS[parseInt(m, 10) - 1])} ${y}`;
 }
-
-const STATUS_BADGE: Partial<Record<MemberStatus, string>> = {
-  aktiv: "badge badge-success badge-sm",
-  kinder: "badge badge-warning badge-sm",
-  jugend: "badge badge-info badge-sm",
-  passiv: "badge badge-ghost badge-sm",
-};
-// Ausgeschiedene werden nie aufgelistet, daher kein Eintrag für ausgetreten/verstorben.
-const STATUS_LABEL: Partial<Record<MemberStatus, string>> = {
-  aktiv: t("status.aktiv"), kinder: t("status.kinder"), jugend: t("status.jugend"), passiv: t("status.passiv"),
-};
 
 // ── Components ────────────────────────────────────────────────────────────────
 
@@ -87,7 +77,8 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
       : t("anniversaries.event.yearsDisplay", { years: e.years });
   const border = divider ? " border-t border-base-300" : "";
 
-  const statusBadge = <span class={STATUS_BADGE[e.status]}>{STATUS_LABEL[e.status]}</span>;
+  // Fördernde bekommen in der Liste kein Status-Badge.
+  const statusBadge = e.status === "foerdernd" ? null : <StatusBadge status={e.status} compact />;
   const kindBadge = e.kind === "birthday"
     ? <span class="badge badge-outline badge-sm">{t("anniversaries.event.birthday")}</span>
     : <span class="badge badge-warning badge-outline badge-sm">{anniversaryLabel(e)}</span>;
@@ -295,10 +286,6 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
 
   const memberMap = new Map(flatMembers.map((m) => [m.id, m]));
 
-  const STATUS_LABEL: Record<string, string> = {
-    aktiv: t("status.aktiv"), passiv: t("status.passiv"), kinder: t("status.kinder"), jugend: t("status.jugend"),
-  };
-
   const header: string[] = [
     t("anniversaries.export.colDate"), t("members.form.lastName"), t("members.form.firstName"),
     t("members.table.status"), t("anniversaries.export.colEventType"), t("anniversaries.export.colYears"), t("anniversaries.export.colTitle"),
@@ -311,7 +298,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
       new Date(e.date + "T00:00:00"),
       e.lastName,
       e.firstName,
-      STATUS_LABEL[e.status] ?? e.status,
+      STATUS_LABELS[e.status],
       e.kind === "birthday" ? t("anniversaries.event.birthday") : anniversaryLabel(e),
       e.years,
       e.title ?? "",

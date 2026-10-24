@@ -196,3 +196,32 @@ describe("mod filter with multiple values", () => {
     expect(rows.map((r) => r[6]).filter(Boolean)).toEqual(["T5", "T10"]); // birthdays have no title
   });
 });
+
+describe("status badge", () => {
+  // Geboren 1940 → über der Aktiv-Altersgrenze: mit aktiver Rolle zum Stichtag passiv, ohne fördernd.
+  const old = (grantsActiveStatus: boolean) =>
+    makeMemberRow({
+      firstEntryDate: "2000-01-01",
+      person: { ...makeMemberRow().person, birthDate: "1940-05-01" },
+      assignments: [{ id: "a1", memberId: "m1", memberRoleId: "r1", from: "2000-01-01", to: null, autoClosed: false, role: { id: "r1", title: "R", grantsActiveStatus, isProtected: false } }],
+    });
+  const q = "start=2025-01-01&end=2025-12-31&filter=membership"; // Mitgliedsjubiläum: Eintritt 2010 + 15 = 2025, für jeden Status
+  const fixture = () => { ayFixture = [{ kind: "membership", year: 15, title: "Mitglied15" }]; };
+
+  it("passive member gets the shared badge-neutral badge", async () => {
+    findManyResult = [old(true)]; fixture();
+    const html = await (await anniversaryRoutes.request(`/?${q}`)).text();
+    expect(html).toContain("badge badge-sm badge-neutral");
+    expect(html).toContain("Passiv");
+  });
+
+  it("supporting member gets no status badge in the list but a label in the export", async () => {
+    findManyResult = [old(false)]; fixture();
+    const html = await (await anniversaryRoutes.request(`/?${q}`)).text();
+    expect(html).not.toContain("Fördernd");
+    const res = await anniversaryRoutes.request(`/export?${q}`);
+    const wb = XLSX.read(Buffer.from(await res.arrayBuffer()));
+    const rows = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 }).slice(1);
+    expect(rows[0][3]).toBe("Fördernd");
+  });
+});
