@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getCeremonyYear, generateEvents } from "../lib/anniversaries.js";
+import { getCeremonyYear, generateEvents, anniversaryFilterLabel, filterByYears } from "../lib/anniversaries.js";
 
 const CUTOFF = "01-06"; // January 6
 
@@ -151,4 +151,31 @@ describe("generateEvents refDate", () => {
     expect([e.date, e.refDate]).toEqual(["2026-01-06", "2026-07-01"]);
     expect(e.date).toBe("2026-01-06");
   });
+});
+
+describe("anniversaryFilterLabel", () => {
+  const ALL = ["service", "membership", "birthdays"];
+  it.each([
+    [ALL, [], 0, "Jubiläen & Geburtstage", "Alle Jubiläen und Geburtstage"],
+    [ALL, ["10"], 0, "Runde Jubiläen & Geburtstage", "Alle runden Jubiläen und Geburtstage"],
+    [["birthdays"], ["10"], 66, "Runde Geburtstage ab 66 J.", "Runde Geburtstage ab 66 Jahren"],
+    [["service", "membership"], ["5"], 64, "Halbrunde Dienst-/Mitgliedsjubiläen ab 64 J.", "Halbrunde Dienst- und Mitgliedsjubiläen ab 64 Jahren"],
+    [ALL, ["5", "10"], 64, "(Halb-)Runde Jubiläen & Geburtstage ab 64 J.", "Halbrunde und runde Jubiläen und Geburtstage ab 64 Jahren"],
+    [["service"], [], 0, "Dienstjubiläen", "Alle Dienstjubiläen"],
+    [["membership"], ["5", "10"], 0, "(Halb-)Runde Mitgliedsjubiläen", "Alle halbrunden und runden Mitgliedsjubiläen"],
+    [["service", "birthdays"], [], 20, "Dienstjubiläen & Geburtstage ab 20 J.", "Dienstjubiläen und Geburtstage ab 20 Jahren"],
+    [["membership", "birthdays"], ["5"], 0, "Halbrunde Mitgliedsjubiläen & Geburtstage", "Alle halbrunden Mitgliedsjubiläen und Geburtstage"],
+  ])("%j %j %i", (kinds, mods, gte, short, long) => {
+    expect(anniversaryFilterLabel(kinds, mods, gte)).toEqual({ short, long });
+  });
+});
+
+describe("filterByYears", () => {
+  const ev = [5, 7, 10, 15].map((years) => ({ years }) as any);
+  const ys = (gte: number, mods: string[]) => filterByYears(ev, gte, mods).map((e) => e.years);
+  it("no filter keeps all", () => expect(ys(0, [])).toEqual([5, 7, 10, 15]));
+  it("half round excludes multiples of 10", () => expect(ys(0, ["5"])).toEqual([5, 15]));
+  it("round", () => expect(ys(0, ["10"])).toEqual([10]));
+  it("both mods combine", () => expect(ys(0, ["5", "10"])).toEqual([5, 10, 15]));
+  it("gte applies on top", () => expect(ys(10, ["5", "10"])).toEqual([10, 15]));
 });

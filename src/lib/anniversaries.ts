@@ -1,4 +1,5 @@
 import { isFormer, type MemberStatus } from "./status.js";
+import { t } from "../i18n/index.js";
 
 export type EventKind = "birthday" | "anniversary";
 export type AnniversaryType = "service" | "membership";
@@ -89,4 +90,34 @@ export function generateEvents(
 
   events.sort((a, b) => a.date.localeCompare(b.date) || a.lastName.localeCompare(b.lastName, "de"));
   return events;
+}
+
+// Mindestjahre und Halbrund/Rund (OR über die gewählten Werte, leer = keine Einschränkung).
+// Von Seite und Export gemeinsam genutzt.
+export function filterByYears(events: AnniversaryEvent[], gte: number, mods: string[]): AnniversaryEvent[] {
+  const want5 = mods.includes("5"), want10 = mods.includes("10");
+  return events.filter((e) =>
+    (gte <= 0 || e.years >= gte) &&
+    (!want5 && !want10 || (want10 && e.years % 10 === 0) || (want5 && e.years % 5 === 0 && e.years % 10 !== 0)),
+  );
+}
+
+// Beschriftung des Filter-Buttons: short im Button, long als Tooltip/Überschrift.
+// kinds = aktive Arten (alle drei, wenn nichts gewählt ist).
+export function anniversaryFilterLabel(kinds: string[], mods: string[], gte: number): { short: string; long: string } {
+  const order = ["service", "membership", "birthdays"].filter((k) => kinds.includes(k));
+  const kindId = order.length === 3 || order.length === 0 ? "all" : order.join("+");
+  const modId = mods.includes("5") && mods.includes("10") ? "both" : mods.includes("5") ? "5" : mods.includes("10") ? "10" : "";
+  const hasGte = gte > 0;
+  // "all": Adjektiv nach "Alle" (kleingeschrieben, dekliniert)
+  const build = (v: "short" | "long", modForm: "short" | "long" | "all" = v) => {
+    const noun = t(`anniversaries.label.kind.${kindId}.${v}` as "anniversaries.label.kind.all.short");
+    const mod = modId ? t(`anniversaries.label.mod.${modId}.${modForm}` as "anniversaries.label.mod.5.short") + " " : "";
+    const suffix = hasGte ? t(`anniversaries.label.gte.${v}`, { n: gte }) : "";
+    return mod + noun + suffix;
+  };
+  return {
+    short: build("short"),
+    long: hasGte ? build("long") : t("anniversaries.label.allPrefix") + build("long", "all"),
+  };
 }

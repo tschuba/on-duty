@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import * as XLSX from "xlsx";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -75,11 +76,10 @@ describe("GET /anniversaries", () => {
 });
 
 describe("GET /anniversaries range persistence", () => {
-  it("keeps range/rel/dir on type filter links and the min-years form", async () => {
+  it("keeps range/rel/dir on preset links and the filter popup form", async () => {
     findManyResult = [makeMemberRow()];
     const html = (await (await anniversaryRoutes.request("/?range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
-    expect(html).toMatch(/href="\/anniversaries\?[^"]*range=rel&rel=P6M&dir=future[^"]*filter=/);
-    expect(html).toMatch(/<form[^>]*id="gte-form"[^>]*>\s*<input type="hidden" name="range" value="rel"/);
+    expect(html).toMatch(/<form[^>]*id="af"[^>]*>\s*<input type="hidden" name="range" value="rel"/);
     expect(html).toContain("'range','rel','dir','ref','yr','start','end'");
   });
 
@@ -139,28 +139,17 @@ describe("GET /anniversaries filters", () => {
     expect(html).toContain("Mitglied15");
   });
 
-  const hrefOf = (html: string, label: string) =>
-    html.match(new RegExp(`<a href="([^"]*)"[^>]*>${label}</a>`))![1].replace(/&amp;/g, "&");
-
-  it("toggle link adds an inactive filter and removes an active one", async () => {
+  it("renders the reset button disabled at the default and enabled with an active filter", async () => {
     setup();
-    let html = await get("service");
-    expect(new URL(hrefOf(html, "Mitgliedsjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service", "membership"]);
-    html = await get("service&filter=membership");
-    expect(new URL(hrefOf(html, "Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["membership"]);
+    const btn = async (q: string) => (await (await anniversaryRoutes.request(`/?${q}`)).text()).match(/<button[^>]*data-reset[^>]*>/)![0];
+    expect(await btn("start=2025-01-01&end=2025-12-31")).toContain("disabled");
+    expect(await btn("start=2025-01-01&end=2025-12-31&mod=10")).not.toContain("disabled");
   });
 
-  it("last active filter cannot be removed", async () => {
+  it("shows the filter label in the popup button", async () => {
     setup();
-    const html = await get("service");
-    expect(html).toContain("pointer-events-none");
-    expect(new URL(hrefOf(html, "Dienstjubiläen"), "http://x").searchParams.getAll("filter")).toEqual(["service"]);
-  });
-
-  it("All button activates every filter", async () => {
-    setup();
-    const html = await get("service");
-    expect(new URL(hrefOf(html, "Alle"), "http://x").searchParams.getAll("filter")).toEqual(["service", "membership", "birthdays"]);
+    const html = await (await anniversaryRoutes.request("/?filter=birthdays&mod=10&gte=66")).text();
+    expect(html).toContain("Runde Geburtstage ab 66 J.");
   });
 
   it("merges identical service and membership rows", async () => {
@@ -180,5 +169,30 @@ describe("GET /anniversaries month rows", () => {
     const rows = html.match(/class="month-row"/g)?.length ?? 0;
     expect(rows).toBeGreaterThan(0);
     expect(bodies).toBe(rows);
+  });
+});
+
+describe("mod filter with multiple values", () => {
+  // Entry 2010-01-01 → service years 5 (2015), 7 (2017), 10 (2020).
+  const setup = () => {
+    findManyResult = [makeMemberRow({ entryDate: "2010-01-01" })];
+    ayFixture = [5, 7, 10].map((year) => ({ kind: "service", year, title: `T${year}` }));
+  };
+  const query = "start=2015-01-01&end=2020-12-31&mod=5&mod=10";
+
+  it("page keeps rows matching either mod", async () => {
+    setup();
+    const html = await (await anniversaryRoutes.request(`/?${query}`)).text();
+    expect(html).toContain("T5");
+    expect(html).toContain("T10");
+    expect(html).not.toContain("T7");
+  });
+
+  it("export returns the same rows as the page", async () => {
+    setup();
+    const res = await anniversaryRoutes.request(`/export?${query}`);
+    const wb = XLSX.read(Buffer.from(await res.arrayBuffer()));
+    const rows = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 }).slice(1);
+    expect(rows.map((r) => r[6]).filter(Boolean)).toEqual(["T5", "T10"]); // birthdays have no title
   });
 });
