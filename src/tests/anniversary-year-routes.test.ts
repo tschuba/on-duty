@@ -359,3 +359,26 @@ describe("anniversary-year permissions", () => {
     expect(rw).toContain("delete-year-");
   });
 });
+
+describe("GET /anniversary-years toggle filter", () => {
+  const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
+  it("both toggles on without a parameter, no \"Alle\" entry", async () => {
+    const html = await (await yearRoutes.request("/")).text();
+    const inputs = toggleInputs(html);
+    expect(inputs).toHaveLength(2);
+    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(2);
+    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
+    expect(html).not.toContain(">Alle<");
+  });
+
+  it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
+    for (const [qs, idx] of [["?kind=service", 0], ["?kind=membership", 1]] as const) {
+      const inputs = toggleInputs(await (await yearRoutes.request(`/${qs}`)).text());
+      expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
+      expect(inputs[idx]).toContain("checked");
+      expect(inputs[idx]).not.toContain("disabled");
+      expect(inputs[idx]).toContain(["kind=service", "kind=membership"][1 - idx]);
+      expect(inputs[1 - idx]).not.toContain("checked");
+    }
+  });
+});

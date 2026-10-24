@@ -1,3 +1,4 @@
+import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
 import { Hono } from "hono";
 import { eq, and, asc } from "drizzle-orm";
@@ -56,11 +57,10 @@ yearRoutes.get("/", yearsRead, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.anniversaries.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
 
-      <div class="filter-bar join mb-4">
-        <a href={`/anniversary-years?sort=${sort}&dir=${dir}`} class={`join-item btn${!kindFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("anniversaries.filter.all")}</a>
-        {ANNIVERSARY_KINDS.map((k) => (
-          <a href={`/anniversary-years?kind=${k}&sort=${sort}&dir=${dir}`} class={`join-item btn${kindFilter === k ? " btn-primary btn-outline" : " btn-ghost"}`}>{t(`admin.anniversaries.kind.${k}`)}</a>
-        ))}
+      <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
+        <ToggleFilter items={pairToggles(kindFilter ?? "",
+          [{ value: "service", label: t("admin.anniversaries.kind.service") }, { value: "membership", label: t("admin.anniversaries.kind.membership") }],
+          (v) => `/anniversary-years?${v ? `kind=${v}&` : ""}sort=${sort}&dir=${dir}`)} />
       </div>
 
       {canWrite && <ClickToEditHint />}

@@ -5,7 +5,8 @@ import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { countOpenReceipts, recipientName } from "../lib/donations.js";
 import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
-import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
+import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
+import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { Icon } from "../components/icon.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
@@ -346,11 +347,9 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
           <input type="hidden" name="member" value={member} />
           <button type="submit" class="btn">{t("common.show")}</button>
         </form>
-        <MemberFilter
-          value={member}
-          options={[{ value: "", label: t("common.filter.all") }, { value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.nonMembers") }]}
-          href={(m) => donorListUrl({ search, sort, sort_dir: dir, pageSize, member: m })}
-        />
+        <ToggleFilter items={pairToggles(member,
+          [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.nonMembers") }],
+          (m) => donorListUrl({ search, sort, sort_dir: dir, pageSize, member: m }))} />
       </div>
 
       <ClickToEditHint />
