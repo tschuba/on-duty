@@ -277,8 +277,8 @@ describe("buildExportSheets", () => {
   const m1 = makeMember({ id: "m1", lastName: "Bauer", firstName: "Anna", gender: "female", street: "Hauptstr.", houseNumber: "1", zip: "12345", city: "Altenhammer", phone: "123", mobile: "0170", email: "a@b.de" });
   const m2 = makeMember({ id: "m2", lastName: "Adler", firstName: "Ben", gender: "male" });
 
-  it("always includes lastName/firstName in the members sheet, sorted by lastName", () => {
-    const sheets = buildExportSheets([m1, m2], [], { addr: false, contact: false, dates: false, gender: false, assignments: false });
+  it("always includes lastName/firstName in the members sheet, keeping the given order", () => {
+    const sheets = buildExportSheets([m2, m1], [], { addr: false, contact: false, dates: false, gender: false, assignments: false });
     expect(sheets).toHaveLength(1);
     expect(sheets[0].header).toEqual(["Nachname", "Vorname"]);
     expect(sheets[0].rows.map((r) => r[0])).toEqual(["Adler", "Bauer"]);
@@ -829,7 +829,7 @@ describe("POST /new", () => {
 
 describe("GET /export", () => {
   it("returns a single-sheet workbook by default", async () => {
-    findManyResult = [makeMember()];
+    findManyResult = [memberWithAssignments()];
     const res = await memberRoutes.request("/export");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("spreadsheetml");
@@ -841,7 +841,7 @@ describe("GET /export", () => {
   });
 
   it("adds the assignments sheet only when requested, and only then queries it", async () => {
-    findManyResult = [makeMember()];
+    findManyResult = [memberWithAssignments()];
     assignmentRowsFixture = [{ memberId: "m1", roleTitle: "Vorstand", from: "2020-01-01", to: null }];
 
     const withoutAsg = await memberRoutes.request("/export");
@@ -850,6 +850,35 @@ describe("GET /export", () => {
 
     const withAsg = await memberRoutes.request("/export?assignments=1");
     expect(XLSX.read(await withAsg.arrayBuffer(), { type: "array" }).SheetNames).toHaveLength(2);
+  });
+
+  it("applies search to the export", async () => {
+    findManyResult = [memberWithAssignments()];
+    const res = await memberRoutes.request("/export?search=Bauer");
+    expect(res.status).toBe(200);
+  });
+
+  it("redirects with a flash and no xlsx when nothing matches", async () => {
+    findManyResult = [memberWithAssignments()];
+    const res = await memberRoutes.request("/export?search=zzz&addr=1");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members?search=zzz");
+    expect(res.headers.get("set-cookie")).toContain("flash");
+  });
+});
+
+describe("export button on empty result", () => {
+  it("is disabled when no member matches", async () => {
+    findManyResult = [memberWithAssignments()];
+    const html = await (await memberRoutes.request("/?search=zzz")).text();
+    expect(html).toMatch(/id="members-export-btn"[\s\S]*?disabled/);
+  });
+
+  it("is sent as hx-swap-oob on HTMX requests", async () => {
+    findManyResult = [memberWithAssignments()];
+    const html = await (await memberRoutes.request("/?search=zzz", { headers: { "HX-Request": "true" } })).text();
+    expect(html).toContain('id="members-export-btn"');
+    expect(html).toContain("hx-swap-oob");
   });
 });
 

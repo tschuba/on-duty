@@ -97,6 +97,20 @@ describe("GET /anniversaries/export", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("spreadsheetml");
   });
+
+  it("redirects with a flash and no xlsx when there are no events", async () => {
+    findManyResult = [];
+    const res = await anniversaryRoutes.request("/export?filter=service&contact=1");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/anniversaries?filter=service");
+    expect(res.headers.get("set-cookie")).toContain("flash");
+  });
+
+  it("disables the export button on the page when there are no events", async () => {
+    findManyResult = [];
+    const html = await (await anniversaryRoutes.request("/")).text();
+    expect(html).toMatch(/title="Keine Einträge zum Exportieren"[\s\S]*?disabled/);
+  });
 });
 
 describe("GET /anniversaries filters", () => {
