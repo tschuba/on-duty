@@ -30,7 +30,8 @@ export function Pager(props: {
   const picker = (p: number, mobileOnly: boolean) => (
           <div key={`pick${p}`} class={`dropdown dropdown-top join-item${mobileOnly ? " md:hidden" : ""}`}
             onfocusin={`
-              const c = this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
+              if (this.contains(event.relatedTarget)) return;
+              const c =this.querySelector('.dropdown-content'), a = c.querySelector('[data-arrow]');
               const r = this.getBoundingClientRect(), m = 8;
               let left = r.width / 2 - c.offsetWidth / 2;
               const place = () => { c.style.left = left + 'px'; a.style.left = (r.width / 2 - left - 6) + 'px'; };
