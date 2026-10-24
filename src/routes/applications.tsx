@@ -328,27 +328,25 @@ applicationRoutes.get("/", guard, async (c) => {
           });
         })();
       ` }} />
-      <div class="filter-bar mb-4">
+      <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <QuickRangeFilter presets={presets} range={range} dir="past" action="/applications" names={{ start: "from", end: "to" }}
           hidden={[...statusFilter.map((st): [string, string] => ["status", st]), ["sort", sort], ["sort_dir", dir]]}
           href={(p) => buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, p)} />
-        <div class="flex flex-wrap items-center gap-x-4">
-          {ALL_STATUSES.map((s) => {
-            const on = statusFilter.includes(s);
-            return (
-              <label key={s} class="label cursor-pointer gap-2">
-                <input
-                  type="checkbox"
-                  class="toggle toggle-primary"
-                  checked={on}
-                  disabled={on && statusFilter.length === 1}
-                  data-href={filterUrl(on ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
-                />
-                <span class="label-text">{STATUS_LABELS[s]}</span>
-              </label>
-            );
-          })}
-        </div>
+        {ALL_STATUSES.map((s) => {
+          const on = statusFilter.includes(s);
+          return (
+            <label key={s} class="flex items-center gap-2 min-h-11 cursor-pointer">
+              <input
+                type="checkbox"
+                class="toggle toggle-primary"
+                checked={on}
+                disabled={on && statusFilter.length === 1}
+                data-href={filterUrl(on ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
+              />
+              <span class="label-text">{STATUS_LABELS[s]}</span>
+            </label>
+          );
+        })}
         <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('change',function(e){var h=e.target.dataset&&e.target.dataset.href;if(h)location.href=h;});" }} />
       </div>
       <ClickToEditHint />
