@@ -896,6 +896,9 @@ function MembersExportModal() {
           document.getElementById('members-export-download').addEventListener('click',function(){
             var p=new URLSearchParams();
             fields.forEach(function(f){if(document.getElementById('exp-'+f).checked)p.set(f,'1');});
+            var url=new URL(window.location.href);
+            ['search','sort','sort_dir'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
+            ['status','role'].forEach(function(k){url.searchParams.getAll(k).forEach(function(v){p.append(k,v)});});
             window.location='/members/export?'+p;
             document.getElementById('members-export-modal').close();
           });
@@ -979,6 +982,21 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
+export function filterMembers(all: MemberWithStatus[], statusFilter: MemberStatus[], roleFilter: string[]): MemberWithStatus[] {
+  return all
+    .filter((m) => statusFilter.includes(m.status))
+    .filter((m) => roleFilter.length === 0 || m.assignments.some((a) => !a.to && roleFilter.includes(a.memberRoleId)));
+}
+
+// Export-Button der Mitgliederliste; bei leerer Trefferliste deaktiviert. oob: per HTMX nachführen.
+function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) {
+  return (
+    <span id="members-export-btn" class="contents" {...(oob ? { "hx-swap-oob": "true" } : {})}>
+      <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" disabled={empty ? t("common.exportEmpty") : undefined} />
+    </span>
+  );
+}
+
 // GET /members — list
 memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
@@ -994,9 +1012,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   ]);
   // Unabhängig von Suche/Statusfilter, damit "ungenutzt" stabil bleibt.
   const activeRoleIds = new Set(activeRoleRows.map((r) => r.id));
-  const filtered = all
-    .filter((m) => statusFilter.includes(m.status))
-    .filter((m) => roleFilter.length === 0 || m.assignments.some((a) => !a.to && roleFilter.includes(a.memberRoleId)));
+  const filtered = filterMembers(all, statusFilter, roleFilter);
   const sorted = sortMembers(filtered, sort, dir);
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -1020,7 +1036,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
     />
   );
 
-  if (isHtmx) return c.html(tableEl);
+  if (isHtmx) return c.html(<>{tableEl}<MembersExportButton empty={sorted.length === 0} oob /></>);
 
   return c.html(
     <Layout title={t("members.title")} user={user} activeNav="members">
@@ -1032,7 +1048,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
           <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
         </label>
         {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=members" />}
-        <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" />
+        <MembersExportButton empty={sorted.length === 0} />
         {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />
 
@@ -1577,10 +1593,7 @@ export function buildExportSheets(
   rawAssignments: ExportAssignmentRow[],
   opts: ExportOptions
 ): ExportSheet[] {
-  const allMembers = [...rawMembers].sort((a, b) => {
-    const cmp = a.lastName.localeCompare(b.lastName, "de");
-    return cmp !== 0 ? cmp : a.firstName.localeCompare(b.firstName, "de");
-  });
+  const allMembers = rawMembers; // Reihenfolge wie übergeben (Sortierung der Liste)
 
   const header: string[] = [t("members.table.lastName"), t("members.table.firstName")];
   if (opts.gender) header.push(t("members.export.genderCol"));
@@ -1604,7 +1617,7 @@ export function buildExportSheets(
 
   if (opts.assignments) {
     const nameMap = new Map(allMembers.map((m) => [m.id, m]));
-    const asgns = [...rawAssignments].sort((a, b) => {
+    const asgns = rawAssignments.filter((a) => nameMap.has(a.memberId)).sort((a, b) => {
       const ma = nameMap.get(a.memberId)!, mb = nameMap.get(b.memberId)!;
       const cmp = ma.lastName.localeCompare(mb.lastName, "de");
       if (cmp !== 0) return cmp;
@@ -1634,8 +1647,15 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
     assignments: q.assignments === "1",
   };
 
-  const memberRows = await db.query.members.findMany({ with: { person: true } });
-  const allMembers: Member[] = memberRows.map(({ person, ...m }) => ({ ...(person as Person), ...m } as Member));
+  const { search, sort, dir, statusFilter, roleFilter } = parseListQuery(q, c.req.queries("status") ?? [], c.req.queries("role") ?? []);
+  const exported = sortMembers(filterMembers(await fetchMembersWithStatus(search || undefined), statusFilter, roleFilter), sort, dir);
+  if (exported.length === 0) {
+    setFlash(c, t("common.exportEmpty"), "error");
+    const back = new URLSearchParams();
+    for (const [k, v] of new URL(c.req.url).searchParams) if (k === "search" || k === "status" || k === "role" || k === "sort" || k === "sort_dir") back.append(k, v);
+    return c.redirect(`/members?${back}`, 302);
+  }
+  const allMembers: Member[] = exported;
   const rawAssignments: ExportAssignmentRow[] = opts.assignments
     ? await db.select({
         memberId: memberRoleAssignments.memberId,

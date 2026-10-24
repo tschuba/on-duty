@@ -27,6 +27,7 @@ export const de = {
   "common.backToList": "← Zurück zur Liste",
   "common.rowClickHint": "Zeile anklicken zum Bearbeiten",
   "common.export": "Export",
+  "common.exportEmpty": "Keine Einträge zum Exportieren",
   "common.apply": "Anwenden",
   "common.reset": "Zurücksetzen",
 "common.today": "Heute",

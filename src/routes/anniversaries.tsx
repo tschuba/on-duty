@@ -6,6 +6,7 @@ import { members, persons, memberRoles, memberRoleAssignments, anniversaryYears 
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout, MemberTabs } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { setFlash } from "../lib/flash.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { filterByYears, generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
@@ -222,6 +223,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   });
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
+  events = filterEvents(events, filters);
   events = filterByYears(events, gte, mods);
 
   // alle Arten aktiv = keine Einschränkung, nicht in der URL
@@ -238,7 +240,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
       <div class="max-w-4xl mx-auto">
       <MemberTabs active="anniversaries" user={user} />
       <div class="contents">
-        <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" />} />
+        <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
 
         {/* Controls */}
         <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
@@ -283,6 +285,13 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   events = filterEvents(events, filters);
   events = filterByYears(events, gte, mods);
+
+  if (events.length === 0) {
+    setFlash(c, t("common.exportEmpty"), "error");
+    const back = new URLSearchParams();
+    for (const [k, v] of new URL(c.req.url).searchParams) if (k !== "contact" && k !== "addr") back.append(k, v);
+    return c.redirect(`/anniversaries?${back}`, 302);
+  }
 
   const memberMap = new Map(flatMembers.map((m) => [m.id, m]));
 
