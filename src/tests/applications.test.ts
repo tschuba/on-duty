@@ -126,10 +126,25 @@ describe("GET /", () => {
     expect(sortHref).toContain("range=rel");
     expect(sortHref).toContain("rel=P3M");
     expect(sortHref).toContain("dir=past");
-    const block = html.slice(html.indexOf("join mb-4"), html.indexOf("Zeile anklicken"));
-    const statusHrefs = [...block.matchAll(/href="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
-    expect(statusHrefs).toHaveLength(4);
-    for (const h of statusHrefs) expect(h).toContain("range=rel&rel=P3M&dir=past");
+    const hrefs = [...html.matchAll(/data-href="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+    expect(hrefs).toHaveLength(3);
+    for (const h of hrefs) expect(h).toContain("range=rel&rel=P3M&dir=past");
+  });
+
+  it("renders status toggles; the last active one is disabled", async () => {
+    const html = await (await applicationRoutes.request("/")).text();
+    const inputs = html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g)!;
+    expect(inputs).toHaveLength(3);
+    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
+    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(1);
+    expect(html).not.toContain(">Alle<");
+  });
+
+  it("status=all activates all three toggles, none disabled", async () => {
+    const html = await (await applicationRoutes.request("/?status=all")).text();
+    const inputs = html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g)!;
+    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(3);
+    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
   });
 
   it("shows each form's status but hides the settings gear without applications:manage-forms", async () => {

@@ -689,7 +689,6 @@ export const de = {
 
   // ── Applications (Antrags-Review) ─────────────────────────────────────────────
   "applications.title": "Anträge",
-  "applications.filter.all": "Alle",
   "applications.table.lastName": "Nachname",
   "applications.table.firstName": "Vorname",
   "applications.table.type": "Art",
