@@ -144,7 +144,6 @@ applicationRoutes.get("/", guard, async (c) => {
   const statusFilter: ApplicationStatus[] = statusRaw[0] === "all"
     ? ALL_STATUSES
     : statusRaw.length > 0 ? (statusRaw as ApplicationStatus[]) : ["open"];
-  const allSelected = ALL_STATUSES.every((s) => statusFilter.includes(s));
 
   const sort = ((c.req.query("sort") as SortKey) || "submittedAt");
   const dir = ((c.req.query("sort_dir") as "asc" | "desc") || "desc");
@@ -329,24 +328,26 @@ applicationRoutes.get("/", guard, async (c) => {
           });
         })();
       ` }} />
-      <div class="filter-bar mb-4">
+      <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <QuickRangeFilter presets={presets} range={range} dir="past" action="/applications" names={{ start: "from", end: "to" }}
           hidden={[...statusFilter.map((st): [string, string] => ["status", st]), ["sort", sort], ["sort_dir", dir]]}
           href={(p) => buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, p)} />
-      </div>
-      <div class="join mb-4">
-        {ALL_STATUSES.map((s) => (
-          <a
-            key={s}
-            href={filterUrl(statusFilter.includes(s) ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
-            class={`btn join-item${statusFilter.includes(s) ? " btn-primary btn-outline" : " btn-ghost"}`}
-          >
-            {STATUS_LABELS[s]}
-          </a>
-        ))}
-        <a key="all" href={filterUrl(ALL_STATUSES)} class={`btn join-item${allSelected ? " btn-primary btn-outline" : " btn-ghost"}`}>
-          {t("applications.filter.all")}
-        </a>
+        {ALL_STATUSES.map((s) => {
+          const on = statusFilter.includes(s);
+          return (
+            <label key={s} class="flex items-center gap-2 min-h-11 cursor-pointer">
+              <input
+                type="checkbox"
+                class="toggle toggle-primary"
+                checked={on}
+                disabled={on && statusFilter.length === 1}
+                data-href={filterUrl(on ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
+              />
+              <span class="label-text">{STATUS_LABELS[s]}</span>
+            </label>
+          );
+        })}
+        <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('change',function(e){var h=e.target.dataset&&e.target.dataset.href;if(h)location.href=h;});" }} />
       </div>
       <ClickToEditHint />
       <div class="overflow-x-auto">
