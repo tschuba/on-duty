@@ -426,6 +426,12 @@ describe("role types (Spec 47)", () => {
     expect(types).not.toContain(t("admin.roles.newRole"));
   });
 
+  it("shows short active-allowed header with full text as title", async () => {
+    const types = await (await roleRoutes.request("/role-types")).text();
+    expect(types).toContain(`title="${t("admin.roleTypes.table.allowsActiveLong")}"`);
+    expect(types).toContain(`>${t("admin.roleTypes.table.allowsActive")}</th>`);
+  });
+
   it("renders one collapsible section per type", async () => {
     typesFixture = [makeType(), makeType({ id: "t2", name: "Verein", sortOrder: 2 })];
     rolesFixture = [makeRoleRow()];
