@@ -47,6 +47,8 @@ app.route("/", healthRoutes);
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
 app.use("/js/*", serveStatic({ root: "./public" }));
+app.use("/favicon.svg", serveStatic({ root: "./public" }));
+app.use("/apple-touch-icon.png", serveStatic({ root: "./public" }));
 
 if (readDsn()) app.route("/", sentryTunnelRoutes);
 

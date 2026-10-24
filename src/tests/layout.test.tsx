@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { applications, donations } from "../db/schema/index.js";
@@ -152,5 +153,16 @@ describe("separate tabs for roles and role types", () => {
     const types = await render("member-role-types:read");
     expect(types).toContain("/role-types");
     expect(types).not.toContain('href="/roles"');
+  });
+});
+
+describe("favicons", () => {
+  it("links the icons served from public/", async () => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout>x</Layout>));
+    const html = await (await app.request("/")).text();
+    expect(html).toContain('<link rel="icon" href="/favicon.svg"');
+    expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png"');
+    for (const f of ["favicon.svg", "apple-touch-icon.png"]) expect(existsSync(`public/${f}`)).toBe(true);
   });
 });
