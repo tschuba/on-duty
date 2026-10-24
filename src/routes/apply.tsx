@@ -216,7 +216,7 @@ function YouthPage({
             <GuardianRow index={-1} />
           </template>
           <div class="form-control">
-            <label class="label cursor-pointer justify-start gap-3">
+            <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
               <input type="checkbox" name="consent" class="checkbox" />
               <span class="label-text">{t("apply.youth.consent")}</span>
             </label>

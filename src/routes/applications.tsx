@@ -503,7 +503,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
             {ageWarning && (
               <>
                 <p class="text-warning text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
-                <label class="label cursor-pointer justify-start gap-3">
+                <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                   <input type="checkbox" name="confirmAge" class="checkbox" />
                   <span class="label-text">{t("applications.ageWarning.confirm")}</span>
                 </label>
@@ -545,7 +545,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
                   <label class="label"><span class="label-text">{t("applications.reject.reasonLabel")}</span></label>
                   <textarea name="rejectedReason" class="textarea textarea-bordered w-full" rows={2}></textarea>
                 </div>
-                <label class="label cursor-pointer justify-start gap-3">
+                <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                   <input type="checkbox" name="notifyApplicant" class="checkbox" />
                   <span class="label-text">{t("applications.reject.notifyLabel")}</span>
                 </label>
