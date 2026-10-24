@@ -780,7 +780,7 @@ export const de = {
   "inventory.filter.categoryCount": "{count} Kategorien",
   "inventory.filter.tagCount": "{count} Tags",
   "inventory.filter.noTags": "Keine Tags vorhanden",
-  "inventory.filter.showArchived": "Ausgemusterte anzeigen",
+  "inventory.filter.showArchived": "Ausgemustert",
   "inventory.category.vehicle": "Fahrzeuge",
   "inventory.category.scba": "Atemschutz",
   "inventory.category.equipment": "Einsatzgerät",
