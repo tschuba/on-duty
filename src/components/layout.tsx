@@ -65,6 +65,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>{title ? `${title} · on-duty` : "on-duty"}</title>
       <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}` }} />
+      <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       <link rel="stylesheet" href="/css/app.css" />
       <script src="/js/htmx.min.js" />
       {user && readDsn() && <script src="/js/sentry.min.js" />}

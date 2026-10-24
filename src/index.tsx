@@ -47,6 +47,10 @@ app.route("/", healthRoutes);
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
 app.use("/js/*", serveStatic({ root: "./public" }));
+/* v8 ignore start -- static mounts like the ones above; index.tsx boots the server and is never imported by tests */
+app.use("/favicon.svg", serveStatic({ root: "./public" }));
+app.use("/apple-touch-icon.png", serveStatic({ root: "./public" }));
+/* v8 ignore stop */
 
 if (readDsn()) app.route("/", sentryTunnelRoutes);
 
