@@ -5,6 +5,7 @@ import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schem
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
 import { ModalScaffold } from "./admin.js";
 import { flagAllowed, isPermutation, moveId } from "../lib/role-types.js";
@@ -161,11 +162,11 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>
       <PageHeader title={t("admin.roles.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
-      <div class="filter-bar mb-4"><div class="join">
-            <a href="/roles" class={`btn join-item${!activeFilter ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterAll")}</a>
-            <a href="/roles?active=1" class={`btn join-item${activeFilter === "1" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterActive")}</a>
-            <a href="/roles?active=0" class={`btn join-item${activeFilter === "0" ? " btn-primary btn-outline" : " btn-ghost"}`}>{t("admin.roles.filterPassive")}</a>
-          </div></div>
+      <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
+        <ToggleFilter items={pairToggles(activeFilter === "1" || activeFilter === "0" ? activeFilter : "",
+          [{ value: "1", label: t("admin.roles.filterActive") }, { value: "0", label: t("admin.roles.filterPassive") }],
+          (v) => (v ? `/roles?active=${v}` : "/roles"))} />
+      </div>
 
       {canWrite && <ClickToEditHint />}
       {types.map((ty) => {

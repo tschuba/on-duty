@@ -8,7 +8,8 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
-import { MemberMark, MemberLink, MemberFilter } from "../components/member-mark.js";
+import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
+import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
@@ -217,11 +218,9 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         <input type="hidden" name="member" value={member} />
         <input type="hidden" name="item" value={itemFilter} />
         {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member, ...rp })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
-        <MemberFilter
-          value={member}
-          options={[{ value: "", label: t("common.filter.all") }, { value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }]}
-          href={(m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, ...rp }, { member: m })}
-        />
+        <ToggleFilter items={pairToggles(member,
+          [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }],
+          (m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, ...rp }, { member: m }))} />
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
           href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, member }, p)} />
         {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}

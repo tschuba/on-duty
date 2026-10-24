@@ -498,3 +498,27 @@ describe("role types (Spec 47)", () => {
     expect(rw).toContain(t("admin.roleTypes.new"));
   });
 });
+
+describe("GET /roles toggle filter", () => {
+  const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
+  it("both toggles on without a parameter, no \"Alle\" entry", async () => {
+    rolesFixture = [makeRoleRow()];
+    const html = await (await roleRoutes.request("/roles")).text();
+    const inputs = toggleInputs(html);
+    expect(inputs).toHaveLength(2);
+    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(2);
+    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
+    expect(html).not.toContain(">Alle<");
+  });
+
+  it("a single active toggle (old link) is checked and disabled", async () => {
+    rolesFixture = [makeRoleRow()];
+    for (const [qs, idx] of [["?active=1", 0], ["?active=0", 1]] as const) {
+      const inputs = toggleInputs(await (await roleRoutes.request(`/roles${qs}`)).text());
+      expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
+      expect(inputs[idx]).toContain("checked");
+      expect(inputs[idx]).toContain("disabled");
+      expect(inputs[1 - idx]).not.toContain("checked");
+    }
+  });
+});

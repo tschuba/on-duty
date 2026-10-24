@@ -21,7 +21,6 @@ export const de = {
   "common.required": "Pflichtfeld",
   "common.requiredLegend": "* Pflichtfeld",
   "common.member": "Mitglied",
-  "common.filter.all": "Alle",
   "common.filter.members": "Mitglieder",
   "common.filter.nonMembers": "Nicht-Mitglieder",
   "common.filter.external": "Extern",
@@ -397,7 +396,6 @@ export const de = {
   // ── Admin – Roles ─────────────────────────────────────────────────────────────
   "admin.roles.title": "Funktionen",
   "admin.roles.newRole": "Neue Funktion",
-  "admin.roles.filterAll": "Alle",
   "admin.roles.filterActive": "Aktiv",
   "admin.roles.filterPassive": "Passiv",
   "admin.roles.table.name": "Anzeigename",
@@ -546,7 +544,6 @@ export const de = {
   "month.december": "Dezember",
   // ── Anniversaries ─────────────────────────────────────────────────────────────
   "anniversaries.title": "Jubiläen & Geburtstage",
-  "anniversaries.filter.all": "Alle",
   "anniversaries.filter.service": "Dienstjubiläen",
   "anniversaries.filter.membership": "Mitgliedsjubiläen",
   "anniversaries.event.service": "Dienst",

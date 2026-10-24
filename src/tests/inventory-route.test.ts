@@ -661,3 +661,23 @@ describe("race on unique number", () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe("GET / inventory toggles", () => {
+  const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
+
+  it("archived toggle is off without a parameter and on with archived=1", async () => {
+    expect(toggleInputs(await (await inventoryRoutes.request("/")).text())[0]).not.toContain("checked");
+    const on = toggleInputs(await (await inventoryRoutes.request("/?archived=1")).text())[0];
+    expect(on).toContain("checked");
+    expect(on).not.toContain("disabled");
+  });
+
+  it("lendable toggle only with lending:read", async () => {
+    expect(toggleInputs(await (await inventoryRoutes.request("/")).text())).toHaveLength(1);
+    currentUser = lendingManager();
+    const inputs = toggleInputs(await (await inventoryRoutes.request("/?lendable=1")).text());
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0]).not.toContain("checked");
+    expect(inputs[1]).toContain("checked");
+  });
+});

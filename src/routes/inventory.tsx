@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { ToggleFilter } from "../components/toggle-filter.js";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
@@ -785,14 +786,10 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           emptyLabel={t("inventory.filter.noTags")}
         />
 
-        <a href={qs({ archived: showArchived ? undefined : "1" })} class={`btn ${showArchived ? "btn-outline btn-primary" : "btn-ghost"}`}>
-          {t("inventory.filter.showArchived")}
-        </a>
-        {canSeeLending && (
-          <a href={qs({ lendable: lendableOnly ? undefined : "1" })} class={`btn ${lendableOnly ? "btn-outline btn-primary" : "btn-ghost"}`}>
-            {t("inventory.filter.lendable")}
-          </a>
-        )}
+        <ToggleFilter items={[
+          { label: t("inventory.filter.showArchived"), checked: showArchived, href: qs({ archived: showArchived ? undefined : "1" }) },
+          ...(canSeeLending ? [{ label: t("inventory.filter.lendable"), checked: lendableOnly, href: qs({ lendable: lendableOnly ? undefined : "1" }) }] : []),
+        ]} />
       </div>
 
       <div id="inventory-results">
