@@ -1617,7 +1617,7 @@ export function buildExportSheets(
 
   if (opts.assignments) {
     const nameMap = new Map(allMembers.map((m) => [m.id, m]));
-    const asgns = [...rawAssignments].sort((a, b) => {
+    const asgns = rawAssignments.filter((a) => nameMap.has(a.memberId)).sort((a, b) => {
       const ma = nameMap.get(a.memberId)!, mb = nameMap.get(b.memberId)!;
       const cmp = ma.lastName.localeCompare(mb.lastName, "de");
       if (cmp !== 0) return cmp;

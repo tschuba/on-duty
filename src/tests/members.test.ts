@@ -852,6 +852,13 @@ describe("GET /export", () => {
     expect(XLSX.read(await withAsg.arrayBuffer(), { type: "array" }).SheetNames).toHaveLength(2);
   });
 
+  it("exports only assignments of the filtered members", async () => {
+    findManyResult = [memberWithAssignments()];
+    assignmentRowsFixture = [{ memberId: "other", roleTitle: "Vorstand", from: "2020-01-01", to: null }];
+    const res = await memberRoutes.request("/export?assignments=1");
+    expect(res.status).toBe(200);
+  });
+
   it("applies search to the export", async () => {
     findManyResult = [memberWithAssignments()];
     const res = await memberRoutes.request("/export?search=Bauer");
