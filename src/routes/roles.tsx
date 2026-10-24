@@ -214,7 +214,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     <td>
                       <form method="post" action={`/roles/${r.id}/active`} onclick="event.stopPropagation()">
                         {activeFilter && <input type="hidden" name="active" value={activeFilter} />}
-                        <label class="flex justify-center cursor-pointer">
+                        <label class="flex items-center gap-3 cursor-pointer w-fit">
                           <input
                             type="checkbox"
                             name="grantsActiveStatus"
