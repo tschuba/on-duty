@@ -113,6 +113,14 @@ describe("GET /anniversaries/export", () => {
   });
 });
 
+describe("export button vs. kind filter", () => {
+  it("is disabled when the kind filter hides all events", async () => {
+    findManyResult = [makeMemberRow({ person: { ...makeMemberRow().person, birthDate: "1985-06-15" } })];
+    const html = await (await anniversaryRoutes.request("/?range=abs&start=2025-06-01&end=2025-06-30&filter=service")).text();
+    expect(html).toMatch(/title="Keine Einträge zum Exportieren"[\s\S]*?disabled/);
+  });
+});
+
 describe("GET /anniversaries filters", () => {
   // Entry 2010-01-01, firstEntry 2000-01-01 → service 25 in 2025, membership 15 in 2025 (cutoff 01-06).
   const setup = () => {

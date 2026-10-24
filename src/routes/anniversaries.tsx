@@ -223,6 +223,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   });
 
   let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
+  events = filterEvents(events, filters);
   events = filterByYears(events, gte, mods);
 
   // alle Arten aktiv = keine Einschränkung, nicht in der URL
