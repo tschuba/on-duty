@@ -16,3 +16,4 @@ coverage/
 .vitest/
 public/js/sentry.min.js
 .dev-stack/
+.dev-stack-ca/

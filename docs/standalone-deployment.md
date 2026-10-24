@@ -205,7 +205,8 @@ Basis sind dieselben Compose-Dateien wie oben, nur ohne das Compose-Profil
 
 ```bash
 pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors
-pnpm dev               # → https://app.localhost (Zertifikatswarnung akzeptieren)
+pnpm stack:trust       # einmalig pro Rechner, danach Browser neu starten
+pnpm dev               # → https://app.localhost
 ```
 
 `pnpm stack:up`:
@@ -215,7 +216,8 @@ pnpm dev               # → https://app.localhost (Zertifikatswarnung akzeptier
   `zitadel-login`, `caddy`, `zitadel-init`, `zitadel-init-hooks` (mit
   `--with-errors` zusätzlich `bugsink`/`bugsink-init`) — **ohne** `app`
 - exportiert Caddys lokales CA-Zertifikat und das Zitadel-Webhook-Secret
-  nach `.dev-stack/` (gitignored)
+  nach `.dev-stack/` (gitignored). Caddys `/data` liegt als Bind-Mount in
+  `.dev-stack-ca/` (gitignored), damit die CA `stack:reset` übersteht
 - schreibt `.env.dev-stack`: `DATABASE_URL` (Postgres auf
   `127.0.0.1:5433`), `OIDC_*`, `BETTER_AUTH_SECRET`, `ADMIN_PASSWORD`,
   `NODE_EXTRA_CA_CERTS` (zeigt auf die exportierte CA — nötig für
@@ -233,7 +235,18 @@ oben).
 
 Aufräumen: `pnpm stack:down` (Container stoppen, Volumes bleiben) bzw.
 `pnpm stack:reset` (alles löschen, inkl. `.env.standalone.dev`,
-`.env.dev-stack`, `.dev-stack/`).
+`.env.dev-stack`, `.dev-stack/`; `.dev-stack-ca/` und damit die CA bleiben).
+`pnpm stack:reset --ca` löscht zusätzlich `.dev-stack-ca/` und entfernt die
+alte CA aus dem System-Trust-Store (unter Linux gehört `.dev-stack-ca/` root,
+das Löschen braucht `sudo`).
+
+**Browser-Vertrauen:** `pnpm stack:trust` installiert die CA einmalig im
+System-Trust-Store (macOS: Keychain, Linux: `update-ca-certificates` bzw.
+`trust anchor`; Windows/WSL nicht unterstützt) und braucht Admin-Rechte.
+`stack:up` installiert nichts selbst und weist nur darauf hin. Firefox nutzt
+einen eigenen Store: `security.enterprise_roots.enabled` in `about:config` auf
+`true` setzen. Wer den Stack vor dieser Umstellung gestartet hat, bekommt beim
+nächsten `stack:up` einmalig eine neue CA.
 
 **Achtung:** `test-standalone-local.sh` und `dev-stack.sh` nutzen
 unterschiedliche Compose-Projekte, belegen aber dasselbe Docker-Subnetz und
