@@ -38,6 +38,11 @@ const ICONS = {
   "no-symbol": "24/outline/no-symbol.svg",
   "arrow-right-start-on-rectangle": "24/outline/arrow-right-start-on-rectangle.svg",
   "arrow-top-right-on-square": "24/outline/arrow-top-right-on-square.svg",
+  truck: "24/outline/truck.svg",
+  "shield-check": "24/outline/shield-check.svg",
+  "wrench-screwdriver": "24/outline/wrench-screwdriver.svg",
+  user: "24/outline/user.svg",
+  "squares-2x2": "24/outline/squares-2x2.svg",
 };
 
 function attr(str, name) {

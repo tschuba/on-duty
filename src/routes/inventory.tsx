@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import type { IconName } from "../components/icons.generated.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -39,12 +40,12 @@ type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]
 // Which categories may be entered as a batch ("30 Helme" instead of one item per
 // piece). A plain list, not scattered if/category checks, so a future category
 // opts in with one line here.
-const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean }[] = [
-  { category: "vehicle", batchCapable: false },
-  { category: "scba", batchCapable: false },
-  { category: "equipment", batchCapable: true },
-  { category: "ppe", batchCapable: true },
-  { category: "other", batchCapable: true },
+const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean; icon: IconName }[] = [
+  { category: "vehicle", batchCapable: false, icon: "truck" },
+  { category: "scba", batchCapable: false, icon: "shield-check" },
+  { category: "equipment", batchCapable: true, icon: "wrench-screwdriver" },
+  { category: "ppe", batchCapable: true, icon: "user" },
+  { category: "other", batchCapable: true, icon: "squares-2x2" },
 ];
 export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
 const BATCH_CAPABLE_CATEGORIES = new Set(CATEGORY_CONFIG.filter((c) => c.batchCapable).map((c) => c.category));
@@ -501,20 +502,38 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <div class="form-control">
         <label class="label"><span class="label-text">{t("inventory.form.category")}<span class="text-error ml-1">*</span></span></label>
-        <div class="join">
-          {CATEGORIES.map((cat) => (
-            <label class="join-item btn has-[:checked]:btn-outline has-[:checked]:btn-primary">
-              <input
-                type="radio"
-                name="category"
-                value={cat}
-                checked={v.category === cat}
-                class="hidden"
-                onchange="updateInventoryFormVisibility()"
-              />
-              {CATEGORY_LABELS[cat]}
-            </label>
-          ))}
+        {/* Radios stay the only submitted source; the nameless <select> mirrors them on narrow containers. */}
+        <div class="@container">
+          <select
+            id="inventory-category-select"
+            class="select select-bordered w-full @sm:hidden"
+            onchange="document.querySelector('input[name=category][value=' + this.value + ']').checked = true; updateInventoryFormVisibility()"
+          >
+            <button type="button"><selectedcontent></selectedcontent></button>
+            <option value="" disabled selected={!v.category} hidden></option>
+            {CATEGORY_CONFIG.map(({ category, icon }) => (
+              <option value={category} selected={v.category === category}>
+                <Icon name={icon} class="size-5" />
+                {CATEGORY_LABELS[category]}
+              </option>
+            ))}
+          </select>
+          <div class="join hidden @sm:inline-flex">
+            {CATEGORY_CONFIG.map(({ category, icon }) => (
+              <label class="join-item btn has-[:checked]:btn-outline has-[:checked]:btn-primary" title={CATEGORY_LABELS[category]}>
+                <input
+                  type="radio"
+                  name="category"
+                  value={category}
+                  checked={v.category === category}
+                  class="hidden"
+                  onchange="document.getElementById('inventory-category-select').value = this.value; updateInventoryFormVisibility()"
+                />
+                <Icon name={icon} class="size-5" />
+                <span class="sr-only @xl:not-sr-only">{CATEGORY_LABELS[category]}</span>
+              </label>
+            ))}
+          </div>
         </div>
         {errors?.category && <span class="text-error text-sm mt-1">{errors.category}</span>}
       </div>

@@ -468,6 +468,14 @@ describe("GET /new", () => {
     const html = await res.text();
     expect(html).toContain("Neuer Gegenstand");
   });
+
+  it("renders five category radios and a nameless mirror select", async () => {
+    const html = await (await inventoryRoutes.request("/new")).text();
+    expect(html.match(/<input[^>]*name="category"/g)).toHaveLength(5);
+    const select = html.match(/<select[^>]*id="inventory-category-select"[^>]*>([\s\S]*?)<\/select>/)!;
+    expect(select[0]).not.toMatch(/\sname="/);
+    expect(select[1].match(/<option value="[a-z]+"/g)).toHaveLength(5);
+  });
 });
 
 describe("GET /:id/edit", () => {

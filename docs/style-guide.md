@@ -115,7 +115,7 @@ Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, 
 ## Responsive Schwellen
 
 - **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische Filterleiste und Untermenü. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.
-- **Ausnahmen:** `sm:` für Formular-Grids (`sm:grid-cols-`, `sm:col-span-`); Spalten-Ausblendung (`md:`/`lg:`/`xl:table-cell`); Container-Queries im Seitenkopf (`HeaderAction`); PageHeader und Monatszeilen der Jubiläumsliste bleiben auch unter `md` sticky.
+- **Ausnahmen:** `sm:` für Formular-Grids (`sm:grid-cols-`, `sm:col-span-`); Spalten-Ausblendung (`md:`/`lg:`/`xl:table-cell`); Container-Queries im Seitenkopf (`HeaderAction`) und in der Kategorie-Auswahl des Inventar-Formulars (`@container`: `<select>` unter `@sm`, nur Icons bis `@xl`, darüber Icon + Text; Radios bleiben die einzige submittete Quelle, das `<select>` hat keinen `name`); PageHeader und Monatszeilen der Jubiläumsliste bleiben auch unter `md` sticky.
 
 ## Touch-Ziele
 
