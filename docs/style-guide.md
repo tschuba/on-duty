@@ -119,4 +119,4 @@ Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, 
 
 ## Touch-Ziele
 
-Bei `pointer: coarse` (Handy, Tablet) sind interaktive Elemente mindestens 44×44 px. Das regelt zentral `src/styles/app.css` (`min-height: 2.75rem` für `.btn`, `.join-item`, Menü-Einträge; `min-width` nur für icon-only Buttons und Checkboxen in Tabellen/Filtern). Einzelne Buttons bekommen dafür keine eigenen Klassen; mit Maus bleibt die kompakte Größe.
+Bei `pointer: coarse` (Handy, Tablet) sind interaktive Elemente mindestens 44×44 px. Das regelt zentral `src/styles/app.css` (`min-height: 2.75rem` für `.btn`, `.join-item`, Menü-Einträge; `min-width` nur für icon-only Buttons). Checkboxen bleiben klein (daisyUI-Größe); die Trefferfläche entsteht über das umgebende `<label>` mit `pointer-coarse:min-h-11`. Einzelne Buttons bekommen dafür keine eigenen Klassen; mit Maus bleibt die kompakte Größe.

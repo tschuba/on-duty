@@ -901,7 +901,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
           <div class="form-control">
-            <label class="label cursor-pointer justify-start gap-2 w-fit">
+            <label class="label cursor-pointer justify-start gap-2 w-fit pointer-coarse:min-h-11">
               <input
                 type="checkbox"
                 name="lendable"

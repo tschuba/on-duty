@@ -319,7 +319,7 @@ function RoleCheckboxes({
           <label
             key={r.id}
             data-role-item={`${r.name} ${r.description ?? ""} ${permissionSearchText(permsByRole.get(r.id) ?? [])}`.toLowerCase()}
-            class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-1.5 cursor-pointer has-[:checked]:border-primary"
+            class="flex items-start gap-3 border border-base-300 rounded-lg px-3 py-1.5 cursor-pointer pointer-coarse:min-h-11 has-[:checked]:border-primary"
           >
             <input type="checkbox" name="roles" value={r.id} class="checkbox checkbox-sm mt-1" checked={checkedIds.has(r.id)} />
             <div class="flex flex-col min-w-0">
@@ -718,7 +718,7 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
           </div>
           <div class="grid grid-cols-1 gap-1">
             {perms.map((p) => (
-              <label key={p} class="label cursor-pointer justify-start gap-3">
+              <label key={p} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                 <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
                 <span class="label-text">{PERMISSION_LABELS[p]}</span>
               </label>

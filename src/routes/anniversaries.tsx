@@ -160,11 +160,11 @@ function AnniversariesExportModal() {
           <h3 class="font-bold text-lg mb-4">{t("common.excelExport")}</h3>
           <p class="text-sm opacity-60 mb-4">{t("anniversaries.export.subtitle")}</p>
           <div class="space-y-3">
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-ann-contact" class="checkbox checkbox-sm" />
               <span>{t("anniversaries.export.contact")} <span class="opacity-50 text-xs">{t("anniversaries.export.contactHint")}</span></span>
             </label>
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-ann-addr" class="checkbox checkbox-sm" />
               <span>{t("anniversaries.export.address")} <span class="opacity-50 text-xs">{t("anniversaries.export.addressHint")}</span></span>
             </label>

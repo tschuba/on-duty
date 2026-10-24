@@ -170,7 +170,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
           <div class="alert alert-warning">
             <div>
               <p>{errors.duplicate}</p>
-              <label class="label cursor-pointer justify-start gap-2">
+              <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
                 <input type="checkbox" name="confirmDuplicate" value="1" class="checkbox checkbox-sm" />
                 <span class="label-text">{t("donations.form.duplicateConfirm")}</span>
               </label>

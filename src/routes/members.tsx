@@ -887,23 +887,23 @@ function MembersExportModal() {
           <h3 class="font-bold text-lg mb-4">{t("common.excelExport")}</h3>
           <p class="text-sm opacity-60 mb-4">{t("members.export.subtitle")}</p>
           <div class="space-y-3">
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-addr" class="checkbox checkbox-sm" />
               <span>{t("members.export.address")} <span class="opacity-50 text-xs">{t("members.export.addressHint")}</span></span>
             </label>
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-contact" class="checkbox checkbox-sm" />
               <span>{t("members.export.contact")} <span class="opacity-50 text-xs">{t("members.export.contactHint")}</span></span>
             </label>
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-dates" class="checkbox checkbox-sm" />
               <span>{t("members.export.dates")} <span class="opacity-50 text-xs">{t("members.export.datesHint")}</span></span>
             </label>
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-gender" class="checkbox checkbox-sm" />
               <span>{t("members.export.genderCol")}</span>
             </label>
-            <label class="flex items-center gap-2 cursor-pointer">
+            <label class="flex items-center gap-2 cursor-pointer pointer-coarse:min-h-11">
               <input type="checkbox" id="exp-assignments" class="checkbox checkbox-sm" />
               <span>{t("members.export.assignments")} <span class="opacity-50 text-xs">{t("members.export.assignmentsHint")}</span></span>
             </label>
@@ -1183,7 +1183,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         <MemberFormFields m={prefill} />
         {canWriteBank && !linkMemberId && <BankDataSection m={prefill ?? {}} editable />}
         {applicationId && (
-          <label class="label cursor-pointer justify-start gap-3">
+          <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
             <input type="checkbox" name="notifyApplicant" class="checkbox" />
             <span class="label-text">{t("members.form.notifyApplicant")}</span>
           </label>
@@ -1500,7 +1500,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && !linkMemberId && <BankDataSection m={m} editable errors={errors} />}
           {applicationId && (
-            <label class="label cursor-pointer justify-start gap-3">
+            <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
               <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
               <span class="label-text">{t("members.form.notifyApplicant")}</span>
             </label>

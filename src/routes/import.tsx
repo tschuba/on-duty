@@ -179,7 +179,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                   <td>
                     <RoleCombo name={`map_${i}`} value={d.choice.kind === "new" ? "new" : (d.choice as { roleId: string }).roleId} roles={roles} disabled={d.ignored} />
                   </td>
-                  <td>{d.choice.kind === "new" && !d.ignored ? <input type="checkbox" name={`grants_${i}`} value="1" class="checkbox checkbox-sm" checked={d.grants} /> : "–"}</td>
+                  <td>{d.choice.kind === "new" && !d.ignored ? <label class="flex w-full items-center pointer-coarse:min-h-11"><input type="checkbox" name={`grants_${i}`} value="1" class="checkbox checkbox-sm" checked={d.grants} /></label> : "–"}</td>
                   <td><input type="checkbox" name={`use_${i}`} value="1" class="toggle toggle-sm" checked={!d.ignored} /></td>
                 </tr>
               ))}
@@ -190,7 +190,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
       </Section>
 
       <Section title={t("import.members.title")} badge={plan.rows.length} open={problems > 0}>
-        <label class="label cursor-pointer justify-start gap-2 mb-2">
+        <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
           <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
           <span>{t("import.members.onlyProblems", { count: problems })}</span>
         </label>
@@ -222,7 +222,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
 
       <Section id="assignments" title={t("import.assignments.heading")} badge={plan.rows.reduce((n, r) => n + r.assignments.length, 0)} badge2={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : undefined} open={plan.assumedCount > 0 && !confirmed}>
         {plan.assumedCount > 0 && (
-          <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold">
+          <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold pointer-coarse:min-h-11">
             <input type="checkbox" name="assumed_ok" value="1" class="checkbox checkbox-sm" checked={confirmed} />
             <span>{t("import.assignments.confirm", { count: plan.assumedCount })}</span>
           </label>
@@ -282,7 +282,7 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
         </table>
       </Section>
       <Section title={t("import.positions.title")} badge={plan.rowCount} tone={existing ? "warning" : undefined} open={existing > 0}>
-        <label class="label cursor-pointer justify-start gap-2 mb-2">
+        <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
           <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
           <span>{t("import.positions.onlyExisting", { count: existing })}</span>
         </label>
