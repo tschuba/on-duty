@@ -214,7 +214,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     <td>
                       <form method="post" action={`/roles/${r.id}/active`} onclick="event.stopPropagation()">
                         {activeFilter && <input type="hidden" name="active" value={activeFilter} />}
-                        <label class="flex items-center gap-3 cursor-pointer w-fit">
+                        <label class="flex justify-center cursor-pointer">
                           <input
                             type="checkbox"
                             name="grantsActiveStatus"
@@ -269,7 +269,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
           <thead>
             <tr>
               <th>{t("admin.roleTypes.table.name")}</th>
-              <th>{t("admin.roleTypes.table.allowsActive")}</th>
+              <th class="w-px whitespace-nowrap text-center" title={t("admin.roleTypes.table.allowsActiveLong")}>{t("admin.roleTypes.table.allowsActive")}</th>
               <th />
             </tr>
           </thead>
@@ -288,10 +288,10 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                   })}
                 >
                   <td class="font-medium">{ty.isProtected && <span class="mr-1" title={t("admin.roles.systemRole")}>🔒</span>}{ty.name}</td>
-                  <td>
+                  <td class="w-px whitespace-nowrap text-center">
                     <form method="post" action={`/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
-                      <label class="flex items-center gap-3 cursor-pointer w-fit">
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} disabled={!canWriteTypes} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActive")} />
+                      <label class="flex justify-center cursor-pointer">
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} disabled={!canWriteTypes} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActiveLong")} />
                       </label>
                     </form>
                   </td>
@@ -596,7 +596,7 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
       </div>
       <label class="label cursor-pointer justify-start gap-3">
         <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(type?.allowsActiveStatus ? { checked: true } : {})} />
-        <span class="label-text">{t("admin.roleTypes.table.allowsActive")}</span>
+        <span class="label-text">{t("admin.roleTypes.table.allowsActiveLong")}</span>
       </label>
     </>
   );
