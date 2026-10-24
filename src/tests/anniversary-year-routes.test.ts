@@ -371,12 +371,13 @@ describe("GET /anniversary-years toggle filter", () => {
     expect(html).not.toContain(">Alle<");
   });
 
-  it("a single active toggle (old link) is checked and disabled", async () => {
+  it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
     for (const [qs, idx] of [["?kind=service", 0], ["?kind=membership", 1]] as const) {
       const inputs = toggleInputs(await (await yearRoutes.request(`/${qs}`)).text());
       expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
       expect(inputs[idx]).toContain("checked");
-      expect(inputs[idx]).toContain("disabled");
+      expect(inputs[idx]).not.toContain("disabled");
+      expect(inputs[idx]).toContain(["kind=service", "kind=membership"][1 - idx]);
       expect(inputs[1 - idx]).not.toContain("checked");
     }
   });

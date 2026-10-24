@@ -511,13 +511,14 @@ describe("GET /roles toggle filter", () => {
     expect(html).not.toContain(">Alle<");
   });
 
-  it("a single active toggle (old link) is checked and disabled", async () => {
+  it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
     rolesFixture = [makeRoleRow()];
     for (const [qs, idx] of [["?active=1", 0], ["?active=0", 1]] as const) {
       const inputs = toggleInputs(await (await roleRoutes.request(`/roles${qs}`)).text());
       expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
       expect(inputs[idx]).toContain("checked");
-      expect(inputs[idx]).toContain("disabled");
+      expect(inputs[idx]).not.toContain("disabled");
+      expect(inputs[idx]).toContain(["active=1", "active=0"][1 - idx]);
       expect(inputs[1 - idx]).not.toContain("checked");
     }
   });

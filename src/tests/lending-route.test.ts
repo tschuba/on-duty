@@ -701,12 +701,13 @@ describe("GET /lending toggle filter", () => {
     expect(html).not.toContain(">Alle<");
   });
 
-  it("a single active toggle (old link) is checked and disabled", async () => {
+  it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
     for (const [qs, idx] of [["?member=yes", 0], ["?member=no", 1]] as const) {
       const inputs = toggleInputs(await (await lendingRoutes.request(`/${qs}`)).text());
       expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
       expect(inputs[idx]).toContain("checked");
-      expect(inputs[idx]).toContain("disabled");
+      expect(inputs[idx]).not.toContain("disabled");
+      expect(inputs[idx]).toContain(["member=yes", "member=no"][1 - idx]);
       expect(inputs[1 - idx]).not.toContain("checked");
     }
   });

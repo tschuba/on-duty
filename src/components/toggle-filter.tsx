@@ -1,6 +1,6 @@
 export type ToggleItem = { label: string; checked: boolean; disabled?: boolean; href: string };
 
-/** Two independent toggles over one value: "" = both on, otherwise the single active value. */
+/** Two toggles over one value: "" = both on, otherwise the single active value. Switching off the last one switches on the other. */
 export function pairToggles(
   value: string,
   [a, b]: [{ value: string; label: string }, { value: string; label: string }],
@@ -10,7 +10,6 @@ export function pairToggles(
   const item = (x: typeof a, other: typeof a): ToggleItem => ({
     label: x.label,
     checked: on[x.value],
-    disabled: on[x.value] && !on[other.value],
     href: href(on[x.value] ? other.value : on[other.value] ? "" : x.value),
   });
   return [item(a, b), item(b, a)];
