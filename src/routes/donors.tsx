@@ -125,12 +125,12 @@ export function DonorPersonFields({ values, errors }: { values?: PersonFieldInpu
         {personField("lastName", t("donors.form.lastName"), values, errors, true)}
         {personField("firstName", t("donors.form.firstName"), values, errors, true)}
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {personField("street", t("donors.form.street"), values, errors)}
-        {personField("houseNumber", t("donors.form.houseNumber"), values, errors)}
-        {personField("zip", t("donors.form.zip"), values, errors)}
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="sm:col-span-3">{personField("street", t("donors.form.street"), values, errors)}</div>
+        <div class="sm:col-span-1">{personField("houseNumber", t("donors.form.houseNumber"), values, errors)}</div>
+        <div class="sm:col-span-1">{personField("zip", t("donors.form.zip"), values, errors)}</div>
+        <div class="sm:col-span-3">{personField("city", t("donors.form.city"), values, errors)}</div>
       </div>
-      {personField("city", t("donors.form.city"), values, errors)}
     </>
   );
 }

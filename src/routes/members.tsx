@@ -725,13 +725,11 @@ function MemberFormFields({
       </div>
       <Section title={t("members.contact.title")} open>
       <div class="space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("street", t("members.form.street"))}
-        {field("houseNumber", t("members.form.houseNumber"))}
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("zip", t("members.form.zip"))}
-        {field("city", t("members.form.city"))}
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="sm:col-span-3">{field("street", t("members.form.street"))}</div>
+        <div class="sm:col-span-1">{field("houseNumber", t("members.form.houseNumber"))}</div>
+        <div class="sm:col-span-1">{field("zip", t("members.form.zip"))}</div>
+        <div class="sm:col-span-3">{field("city", t("members.form.city"))}</div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("phone", t("members.form.phone"))}
