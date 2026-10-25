@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
-import { EmailField, Field, FieldGroup } from "../components/field.js";
+import { EmailField, Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -240,18 +240,10 @@ applicationRoutes.get("/", guard, async (c) => {
             <div class="modal-box">
               <h3 class="font-bold text-lg mb-4">{t("applications.formSettings.title", { type: TYPE_LABELS[type] })}</h3>
               <form method="post" action={`/applications/forms/${type}`} class="space-y-4 form-settings-form">
-                <FieldGroup legend={t("applications.formSettings.statusLabel")}>
-                  <div class="join w-full">
-                    <label class="join-item btn flex-1 has-[:checked]:btn-primary">
-                      <input type="radio" name="status" value="active" class="hidden" checked={form?.isActive === true} />
-                      {t("applications.formSettings.active")}
-                    </label>
-                    <label class="join-item btn flex-1 has-[:checked]:btn-primary">
-                      <input type="radio" name="status" value="inactive" class="hidden" checked={form?.isActive !== true} />
-                      {t("applications.formSettings.inactive")}
-                    </label>
-                  </div>
-                </FieldGroup>
+                <label class="label cursor-pointer justify-start gap-3">
+                  <input type="checkbox" name="status" value="active" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content" checked={form?.isActive === true} />
+                  <span class="text-sm">{t("applications.formSettings.active")}</span>
+                </label>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label={t("applications.formSettings.startDate")} class="form-start">
                     <input type="date" name="startDate" value={form?.startDate ?? ""} class="input w-full" />
@@ -309,7 +301,7 @@ applicationRoutes.get("/", guard, async (c) => {
             var endLabel = form.querySelector('.form-end label > span');
             var preview = form.querySelector('.form-status-preview');
             function update() {
-              var mode = form.querySelector('input[name="status"]:checked').value;
+              var mode = form.querySelector('input[name="status"]').checked ? 'active' : 'inactive';
               startLabel.textContent = labels[mode].start;
               endLabel.textContent = labels[mode].end;
               var start = startInput.value, end = endInput.value;
@@ -318,7 +310,7 @@ applicationRoutes.get("/", guard, async (c) => {
               else if (!start && end) preview.textContent = statusText[mode + 'Until'].replace('{date}', fmt(end));
               else preview.textContent = statusText[mode + 'Range'].replace('{start}', fmt(start)).replace('{end}', fmt(end));
             }
-            form.querySelectorAll('input[name="status"]').forEach(function(r) { r.addEventListener('change', update); });
+            form.querySelector('input[name="status"]').addEventListener('change', update);
             startInput.addEventListener('input', update);
             endInput.addEventListener('input', update);
             form.closest('dialog').addEventListener('close', function() { form.reset(); update(); });
