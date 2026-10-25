@@ -1,5 +1,5 @@
 import { RowAction } from "../components/row-action.js";
-import { Field, FieldGroup } from "../components/field.js";
+import { EmailField, Field, FieldGroup } from "../components/field.js";
 import { Hono, type Context } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -401,13 +401,9 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
           <input type="text" name="name" value={f.name} placeholder={t("admin.users.modal.nameLabel")} class="input w-full" required />
         </Field>
         {f.oidcLinked ? (
-          <Field label={t("admin.users.modal.emailLabel")} hint={t("admin.users.modal.emailOidcLocked")}>
-            <input type="email" value={f.email} placeholder={t("admin.users.modal.emailLabel")} class="input w-full" disabled />
-          </Field>
+          <EmailField label={t("admin.users.modal.emailLabel")} hint={t("admin.users.modal.emailOidcLocked")} value={f.email} disabled />
         ) : (
-          <Field label={t("admin.users.modal.emailLabel")} required>
-            <input type="email" name="email" value={f.email} placeholder={t("admin.users.modal.emailLabel")} class="input w-full" required />
-          </Field>
+          <EmailField label={t("admin.users.modal.emailLabel")} name="email" value={f.email} required />
         )}
         <FieldGroup legend={t("admin.users.modal.roleLabel")}>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />

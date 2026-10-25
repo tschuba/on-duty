@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { Field } from "../components/field.js";
+import { EmailField, EmailInput, Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, applications, applicationGuardians } from "../db/schema/index.js";
 import { Layout } from "../components/layout.js";
@@ -49,6 +49,7 @@ function textField(
   error: string | undefined,
   opts: { type?: string; required?: boolean; hideErrorText?: boolean } = {},
 ) {
+  if (opts.type === "email") return <EmailField label={label} name={name} value={value} error={!!error} />;
   const date = opts.type === "date";
   return (
     <Field label={label} required={opts.required} floating={!date}>
@@ -137,7 +138,7 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input w-full${nameError ? " input-error" : ""}`} />
         <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input w-full${nameError ? " input-error" : ""}`} />
-        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input w-full${contactError ? " input-error" : ""}`} />
+        <EmailInput name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} error={!!contactError} />
         <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input w-full${contactError ? " input-error" : ""}`} />
       </div>
       {nameError && <p class="text-error text-sm mt-1">{nameError}</p>}

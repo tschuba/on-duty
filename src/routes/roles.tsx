@@ -339,12 +339,10 @@ function RoleForm({ types, role, hasAssignments, affected }: {
   return (
     <>
       {hasAssignments && role ? (
-        <div class="flex flex-col gap-1">
-          <span class="text-sm">{t("admin.roles.modal.nameLabel")}</span>
-          <input type="text" value={role.title} class="input w-full opacity-50" disabled />
-          <span class="text-xs opacity-60">{t("admin.roles.modal.nameLocked")}</span>
+        <Field label={t("admin.roles.modal.nameLabel")} hint={t("admin.roles.modal.nameLocked")}>
+          <input type="text" value={role.title} placeholder={t("admin.roles.modal.nameLabel")} class="input w-full opacity-50" disabled />
           <input type="hidden" name="title" value={role.title} />
-        </div>
+        </Field>
       ) : (
         <Field label={t("admin.roles.modal.nameLabel")} required>
           <input type="text" name="title" value={role?.title ?? ""} placeholder={t("admin.roles.modal.nameLabel")} class="input w-full" required />

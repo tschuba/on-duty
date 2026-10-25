@@ -33,6 +33,7 @@ export const de = {
 "common.today": "Heute",
   "common.show": "Anzeigen",
   "common.searchPlaceholder": "Suchen…",
+  "common.emailInvalid": "Bitte eine gültige E-Mail-Adresse eingeben",
   "common.excelExport": "Excel-Export",
   "common.saveAndNew": "Speichern & Neu",
   "common.nav.members": "Mitglieder",

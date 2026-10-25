@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
-import { Field } from "../components/field.js";
+import { EmailField, Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -447,9 +447,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
             <input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} />
           </Field>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={t("apply.form.email")}>
-              <input type="email" name="email" value={app.person.email ?? ""} class="input w-full" placeholder={t("apply.form.email")} />
-            </Field>
+            <EmailField label={t("apply.form.email")} name="email" value={app.person.email ?? ""} />
             <Field label={t("apply.form.phone")}>
               <input type="tel" name="phone" value={app.person.phone ?? ""} class="input w-full" placeholder={t("apply.form.phone")} />
             </Field>
