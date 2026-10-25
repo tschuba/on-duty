@@ -35,9 +35,9 @@ function OrgSection({ tab, values, editable, missing }: { tab: OrgTab; values: R
         <div class="card-body grid grid-cols-1 sm:grid-cols-4 gap-4">
           {TAB_FIELDS[tab].map(({ key, type, span, placeholder, hint, attrs }) => (
             <>
-            <div class={`form-control ${SPAN_CLASS[span ?? 4]}`}>
+            <div class={`flex flex-col ${SPAN_CLASS[span ?? 4]}`}>
               <label class="label">
-                <span class="label-text">
+                <span class="text-sm">
                   {t(`admin.orgConfig.field.${key}` as never)}
                   {(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key) && <span class="text-error" title={t("organisation.receiptRequired")}> *</span>}
                 </span>
@@ -45,7 +45,7 @@ function OrgSection({ tab, values, editable, missing }: { tab: OrgTab; values: R
               <input
                 type={type}
                 name={key}
-                class="input input-bordered w-full"
+                class="input input w-full"
                 value={values[key] ?? ""}
                 disabled={!editable}
                 placeholder={editable && placeholder ? t(placeholder as never) : undefined}

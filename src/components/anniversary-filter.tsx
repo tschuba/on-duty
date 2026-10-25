@@ -36,16 +36,16 @@ export function AnniversaryFilter({ kinds, mods, gte, action, hidden = [] }: {
           <h3 class="font-bold mb-3">{label.long}</h3>
           <div class="space-y-3">
             <fieldset>
-              <legend class="label-text text-xs">{t("anniversaries.filter.kind")}</legend>
+              <legend class="text-sm text-xs">{t("anniversaries.filter.kind")}</legend>
               {KINDS.map(([v, k]) => toggle("filter", v, t(k), kinds.includes(v)))}
             </fieldset>
             <fieldset>
-              <legend class="label-text text-xs">{t("anniversaries.filter.roundness")}</legend>
+              <legend class="text-sm text-xs">{t("anniversaries.filter.roundness")}</legend>
               {MODS.map(([v, k]) => toggle("mod", v, t(k), mods.includes(v)))}
             </fieldset>
-            <label class="form-control block">
-              <span class="label-text text-xs">{t("anniversaries.minYears.label")}</span>
-              <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input input-bordered w-24 min-h-11 text-base" placeholder="–" />
+            <label class="block">
+              <span class="text-sm text-xs">{t("anniversaries.minYears.label")}</span>
+              <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input input w-24 min-h-11 text-base" placeholder="–" />
             </label>
           </div>
           <div class="flex gap-2 justify-end mt-4 [&>*]:min-h-11">

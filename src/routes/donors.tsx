@@ -100,16 +100,16 @@ type PersonFieldInput = Partial<Record<keyof PersonFieldValues, string | null>>;
 function personField(name: keyof PersonFieldValues, label: string, values: PersonFieldInput | undefined, errors: Record<string, string> | undefined, optional = false) {
   const err = errors?.[name];
   return (
-    <div class="form-control">
+    <div class="flex flex-col">
       <label class="label">
-        <span class="label-text">{label}{!optional && <span class="text-error ml-1">*</span>}</span>
+        <span class="text-sm">{label}{!optional && <span class="text-error ml-1">*</span>}</span>
       </label>
       <input
         type="text"
         id={`donor-${name}`}
         name={name}
         value={values?.[name] ?? ""}
-        class={`input input-bordered w-full${err ? " input-error" : ""}`}
+        class={`input input w-full${err ? " input-error" : ""}`}
       />
       {err && <span class="text-error text-sm mt-1">{err}</span>}
     </div>
@@ -147,9 +147,9 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
     <div class="space-y-3">
       <div id="donor-picker-search" class={showFields ? "hidden" : ""}>
         <label class="label">
-          <span class="label-text">{t("donations.form.donor")}</span>
+          <span class="text-sm">{t("donations.form.donor")}</span>
         </label>
-        <label class="input input-bordered flex items-center gap-2 w-full">
+        <label class="input input flex items-center gap-2 w-full">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="text"
@@ -173,7 +173,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
               <p>{errors.duplicate}</p>
               <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
                 <input type="checkbox" name="confirmDuplicate" value="1" class="checkbox checkbox-sm" />
-                <span class="label-text">{t("donations.form.duplicateConfirm")}</span>
+                <span class="text-sm">{t("donations.form.duplicateConfirm")}</span>
               </label>
             </div>
           </div>
@@ -331,7 +331,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
 
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
         <form method="get" class="flex gap-2 w-full md:w-auto">
-          <label class="input input-bordered flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
+          <label class="input input flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input
               type="search"

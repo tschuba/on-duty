@@ -58,7 +58,7 @@ export function Pager(props: {
                   <span>{t("pager.goToPage")}</span>
                   <input
                     type="number"
-                    class="input input-bordered w-16 text-base"
+                    class="input input w-16 text-base"
                     min={1}
                     max={totalPages}
                     value={page}
@@ -88,7 +88,7 @@ export function Pager(props: {
         <div class="flex items-center gap-2 text-sm opacity-70">
           <span class="whitespace-nowrap hidden md:inline">{t("members.table.pageSize")}</span>
           <select
-            class="select select-bordered"
+            class="select select"
             aria-label={t("members.table.pageSize")}
             onchange={`
               const v = this.value;

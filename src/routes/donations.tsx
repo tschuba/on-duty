@@ -184,25 +184,25 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
   return (
     <>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("donations.form.amount")}<span class="text-error ml-1">*</span></span></label>
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("donations.form.amount")}<span class="text-error ml-1">*</span></span></label>
           <input
             type="text"
             inputmode="decimal"
             name="amount"
             value={values?.amount ?? ""}
-            class={`input input-bordered w-full${errors?.amount ? " input-error" : ""}`}
+            class={`input input w-full${errors?.amount ? " input-error" : ""}`}
           />
           {errors?.amount && <span class="text-error text-sm mt-1">{errors.amount}</span>}
         </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("donations.form.date")}<span class="text-error ml-1">*</span></span></label>
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("donations.form.date")}<span class="text-error ml-1">*</span></span></label>
           <div class="join w-full">
             <input
               type="date"
               name="date"
               value={values?.date ?? ""}
-              class={`input input-bordered join-item w-full${errors?.date ? " input-error" : ""}`}
+              class={`input input join-item w-full${errors?.date ? " input-error" : ""}`}
             />
             {showTodayButton && (
               <button
@@ -217,8 +217,8 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
           {errors?.date && <span class="text-error text-sm mt-1">{errors.date}</span>}
         </div>
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("donations.form.type")}<span class="text-error ml-1">*</span></span></label>
+      <div class="flex flex-col">
+        <label class="label"><span class="text-sm">{t("donations.form.type")}<span class="text-error ml-1">*</span></span></label>
         <div class={`join w-full${errors?.type ? " border border-error rounded-lg" : ""}`}>
           <label class="join-item btn flex-1 has-[:checked]:btn-primary">
             <input type="radio" name="type" value="cash" checked={values?.type === "cash"} class="hidden" />
@@ -231,9 +231,9 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
         </div>
         {errors?.type && <span class="text-error text-sm mt-1">{errors.type}</span>}
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("donations.form.purpose")}</span></label>
-        <input type="text" name="purpose" value={values?.purpose ?? ""} class="input input-bordered w-full" />
+      <div class="flex flex-col">
+        <label class="label"><span class="text-sm">{t("donations.form.purpose")}</span></label>
+        <input type="text" name="purpose" value={values?.purpose ?? ""} class="input input w-full" />
       </div>
     </>
   );
@@ -276,8 +276,8 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
       <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
-        <div class="form-control w-full md:w-auto">
-          <label class="input input-bordered flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+        <div class="flex flex-col w-full md:w-auto">
+          <label class="input input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
         <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
           href={(p) => buildListUrl("/donations", { search }, p)} />

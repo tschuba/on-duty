@@ -304,7 +304,7 @@ function RoleCheckboxes({
 }) {
   return (
     <div class="role-picker flex flex-col gap-2">
-      <label class="input input-bordered input-sm flex items-center gap-2 w-full">
+      <label class="input input input-sm flex items-center gap-2 w-full">
         <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
         <input
           type="text"
@@ -397,28 +397,28 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
-          <input type="text" name="name" value={f.name} class="input input-bordered w-full" required />
+          <span class="text-sm text-right">{t("admin.users.modal.nameLabel")} <span class="text-error">*</span></span>
+          <input type="text" name="name" value={f.name} class="input input w-full" required />
         </div>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
+          <span class="text-sm text-right pt-2">{t("admin.users.modal.emailLabel")} <span class="text-error">*</span></span>
           <div class="flex flex-col gap-1">
             {f.oidcLinked ? (
               <>
                 <span class="py-2">{f.email}</span>
-                <span class="label-text-alt text-sm opacity-60">{t("admin.users.modal.emailOidcLocked")}</span>
+                <span class="text-xs text-sm opacity-60">{t("admin.users.modal.emailOidcLocked")}</span>
               </>
             ) : (
-              <input type="email" name="email" value={f.email} class="input input-bordered w-full" required />
+              <input type="email" name="email" value={f.email} class="input input w-full" required />
             )}
           </div>
         </div>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
-          <span class="label-text text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
+          <span class="text-sm text-right pt-3">{t("admin.users.modal.roleLabel")}</span>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </div>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
-          <span class="label-text text-right pt-1">{t("admin.users.modal.effectivePermissions")}</span>
+          <span class="text-sm text-right pt-1">{t("admin.users.modal.effectivePermissions")}</span>
           <EffectivePermissions permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </div>
       </form>
@@ -598,7 +598,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
-      <label class="filter-bar input input-bordered input-sm flex items-center gap-2 mb-3 max-w-xs">
+      <label class="filter-bar input input input-sm flex items-center gap-2 mb-3 max-w-xs">
         <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
         <input
           type="search"
@@ -705,7 +705,7 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
       {[...groups].map(([resource, perms]) => (
         <div key={resource} class="perm-group">
           <div class="flex items-center justify-between mb-1">
-            <span class="label-text font-semibold">{RESOURCE_LABELS[resource] ?? resource}</span>
+            <span class="text-sm font-semibold">{RESOURCE_LABELS[resource] ?? resource}</span>
             {perms.length > 1 && (
               <button
                 type="button"
@@ -720,7 +720,7 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
             {perms.map((p) => (
               <label key={p} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                 <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
-                <span class="label-text">{PERMISSION_LABELS[p]}</span>
+                <span class="text-sm">{PERMISSION_LABELS[p]}</span>
               </label>
             ))}
           </div>
@@ -743,23 +743,23 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
       <form id="admin-permissions-form" method="post" action={f.id ? `/admin/permissions/${f.id}` : "/admin/permissions"} class="flex flex-col gap-3 max-w-2xl">
         <fieldset disabled={f.readOnly} class="contents">
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-baseline gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
+          <span class="text-sm text-right pt-2">{t("admin.permissions.modal.nameLabel")} <span class="text-error">*</span></span>
           {f.nameLocked ? (
             <div class="flex flex-col gap-1">
-              <input type="text" value={f.name} class="input input-bordered w-full opacity-50" disabled />
-              <span class="label-text-alt text-sm opacity-60">{t("admin.permissions.modal.nameLocked")}</span>
+              <input type="text" value={f.name} class="input input w-full opacity-50" disabled />
+              <span class="text-xs text-sm opacity-60">{t("admin.permissions.modal.nameLocked")}</span>
               <input type="hidden" name="name" value={f.name} />
             </div>
           ) : (
-            <input type="text" name="name" value={f.name} class="input input-bordered w-full" required />
+            <input type="text" name="name" value={f.name} class="input input w-full" required />
           )}
         </div>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
-          <span class="label-text text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
-          <textarea name="description" rows={2} class="textarea textarea-bordered w-full">{f.description}</textarea>
+          <span class="text-sm text-right pt-2">{t("admin.permissions.modal.descriptionLabel")}</span>
+          <textarea name="description" rows={2} class="textarea textarea w-full">{f.description}</textarea>
         </div>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
-          <span class="label-text text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
+          <span class="text-sm text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>
           <PermissionCheckboxes checked={f.checked} />
         </div>
         </fieldset>
@@ -901,10 +901,10 @@ adminRoutes.get("/config", guard, async (c) => {
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
         <div class="filter-bar flex flex-wrap items-center gap-2 mb-4">
-          <label class="input input-bordered input-sm flex items-center gap-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
+          <label class="input input input-sm flex items-center gap-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
           <label class="label cursor-pointer gap-2">
             <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
-            <span class="label-text">{t("admin.config.filter.writable")}</span>
+            <span class="text-sm">{t("admin.config.filter.writable")}</span>
           </label>
         </div>
         <div class="overflow-x-auto">
@@ -934,7 +934,7 @@ adminRoutes.get("/config", guard, async (c) => {
                     ) : r.type === "boolean" ? (
                       <input type="checkbox" class="toggle" name={r.key} value="1" checked={r.value === "true"} />
                     ) : (
-                      <select name={r.key} class="select select-bordered select-sm">
+                      <select name={r.key} class="select select select-sm">
                         <option value="">{t("admin.config.noRole")}</option>
                         {roles.map((role) => (
                           <option value={role.id} selected={role.id === r.value}>{role.name}</option>

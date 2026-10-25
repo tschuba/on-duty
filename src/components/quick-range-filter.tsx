@@ -99,8 +99,8 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             {toggle("past")}{toggle("future")}
           </div>
           <div class="flex gap-2">
-            <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input input-bordered w-24 min-h-11 text-base" aria-label={t("filter.quick.amount")} disabled={!showRel} />
-            <select data-qrf-unit class="select select-bordered flex-1 min-h-11 text-base" aria-label={t("filter.quick.unit")} disabled={!showRel}>
+            <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input input w-24 min-h-11 text-base" aria-label={t("filter.quick.amount")} disabled={!showRel} />
+            <select data-qrf-unit class="select select flex-1 min-h-11 text-base" aria-label={t("filter.quick.unit")} disabled={!showRel}>
               {REL_UNITS.flatMap((u) => u === "Y" && cutoff
                 ? [<option value="Y" selected={u === rel.unit && !rel.ceremony}>{t("filter.quick.unit.Ycal")}</option>,
                    <option value="YC" selected={u === rel.unit && !!rel.ceremony}>{t("filter.quick.unit.YC")}</option>]
@@ -108,10 +108,10 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             </select>
           </div>
           <p class="text-xs opacity-70">{t("filter.quick.relHint")}</p>
-          <label class="form-control block">
-            <span class="label-text text-xs">{t("filter.quick.ref")}</span>
+          <label class="block">
+            <span class="text-sm text-xs">{t("filter.quick.ref")}</span>
             <div class="join w-full">
-              <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input input-bordered join-item w-full min-h-11 text-base" disabled={!showRel} />
+              <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input input join-item w-full min-h-11 text-base" disabled={!showRel} />
               <button type="button" data-qrf-today class="btn join-item min-h-11" aria-label={t("filter.quick.todayBtn")} title={t("filter.quick.todayBtn")} disabled={!rel.ref}>
                 <Icon name="arrow-uturn-left" class="w-5 h-5 sm:hidden" />
                 <span class="hidden sm:inline">{t("filter.quick.todayBtn")}</span>
@@ -120,13 +120,13 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
           </label>
         </div>
         <div data-qrf-fields="custom" class={`space-y-3${showCustom ? "" : " hidden"}`}>
-          <label class="form-control block">
-            <span class="label-text text-xs">{t("filter.quick.from")}</span>
-            <input type="date" name={names.start} value={range.start} class="input input-bordered w-full min-h-11 text-base" disabled={!showCustom} />
+          <label class="block">
+            <span class="text-sm text-xs">{t("filter.quick.from")}</span>
+            <input type="date" name={names.start} value={range.start} class="input input w-full min-h-11 text-base" disabled={!showCustom} />
           </label>
-          <label class="form-control block">
-            <span class="label-text text-xs">{t("filter.quick.to")}</span>
-            <input type="date" name={names.end} value={range.end} class="input input-bordered w-full min-h-11 text-base" disabled={!showCustom} />
+          <label class="block">
+            <span class="text-sm text-xs">{t("filter.quick.to")}</span>
+            <input type="date" name={names.end} value={range.end} class="input input w-full min-h-11 text-base" disabled={!showCustom} />
           </label>
         </div>
         <div class="flex gap-2 justify-end mt-4 max-sm:flex-col-reverse [&>*]:max-sm:w-full [&>*]:max-sm:min-h-11">

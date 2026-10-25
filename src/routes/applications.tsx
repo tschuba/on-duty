@@ -239,8 +239,8 @@ applicationRoutes.get("/", guard, async (c) => {
             <div class="modal-box">
               <h3 class="font-bold text-lg mb-4">{t("applications.formSettings.title", { type: TYPE_LABELS[type] })}</h3>
               <form method="post" action={`/applications/forms/${type}`} class="space-y-4 form-settings-form">
-                <div class="form-control">
-                  <span class="label-text">{t("applications.formSettings.statusLabel")}</span>
+                <div class="flex flex-col">
+                  <span class="text-sm">{t("applications.formSettings.statusLabel")}</span>
                   <div class="join w-full mt-1">
                     <label class="join-item btn flex-1 has-[:checked]:btn-primary">
                       <input type="radio" name="status" value="active" class="hidden" checked={form?.isActive === true} />
@@ -253,13 +253,13 @@ applicationRoutes.get("/", guard, async (c) => {
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div class="form-control">
-                    <label class="label"><span class="label-text form-start-label">{t("applications.formSettings.startDate")}</span></label>
-                    <input type="date" name="startDate" value={form?.startDate ?? ""} class="input input-bordered w-full" />
+                  <div class="flex flex-col">
+                    <label class="label"><span class="text-sm form-start-label">{t("applications.formSettings.startDate")}</span></label>
+                    <input type="date" name="startDate" value={form?.startDate ?? ""} class="input input w-full" />
                   </div>
-                  <div class="form-control">
-                    <label class="label"><span class="label-text form-end-label">{t("applications.formSettings.endDate")}</span></label>
-                    <input type="date" name="endDate" value={form?.endDate ?? ""} class="input input-bordered w-full" />
+                  <div class="flex flex-col">
+                    <label class="label"><span class="text-sm form-end-label">{t("applications.formSettings.endDate")}</span></label>
+                    <input type="date" name="endDate" value={form?.endDate ?? ""} class="input input w-full" />
                   </div>
                 </div>
                 <p class="text-sm form-status-preview"></p>
@@ -343,7 +343,7 @@ applicationRoutes.get("/", guard, async (c) => {
                 disabled={on && statusFilter.length === 1}
                 data-href={filterUrl(on ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
               />
-              <span class="label-text">{STATUS_LABELS[s]}</span>
+              <span class="text-sm">{STATUS_LABELS[s]}</span>
             </label>
           );
         })}
@@ -421,50 +421,50 @@ applicationRoutes.get("/:id", guard, async (c) => {
         <form id="application-edit-form" method="post" action={`/applications/${app.id}`} class="space-y-4">
           <fieldset disabled={!canEdit} class="space-y-4 border-0 p-0 m-0 min-w-0">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.lastName")}</span></label>
-              <input type="text" name="lastName" value={app.person.lastName} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.lastName")}</span></label>
+              <input type="text" name="lastName" value={app.person.lastName} class="input input w-full" />
             </div>
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.firstName")}</span></label>
-              <input type="text" name="firstName" value={app.person.firstName} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.firstName")}</span></label>
+              <input type="text" name="firstName" value={app.person.firstName} class="input input w-full" />
             </div>
           </div>
-          <div class="form-control">
-            <label class="label"><span class="label-text">{t("apply.form.birthDate")}</span></label>
-            <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input input-bordered w-full" />
+          <div class="flex flex-col">
+            <label class="label"><span class="text-sm">{t("apply.form.birthDate")}</span></label>
+            <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input input w-full" />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.street")}</span></label>
-              <input type="text" name="street" value={app.person.street ?? ""} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.street")}</span></label>
+              <input type="text" name="street" value={app.person.street ?? ""} class="input input w-full" />
             </div>
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.houseNumber")}</span></label>
-              <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.houseNumber")}</span></label>
+              <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input input w-full" />
             </div>
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.zip")}</span></label>
-              <input type="text" name="zip" value={app.person.zip ?? ""} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.zip")}</span></label>
+              <input type="text" name="zip" value={app.person.zip ?? ""} class="input input w-full" />
             </div>
           </div>
-          <div class="form-control">
-            <label class="label"><span class="label-text">{t("apply.form.city")}</span></label>
-            <input type="text" name="city" value={app.person.city ?? ""} class="input input-bordered w-full" />
+          <div class="flex flex-col">
+            <label class="label"><span class="text-sm">{t("apply.form.city")}</span></label>
+            <input type="text" name="city" value={app.person.city ?? ""} class="input input w-full" />
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.email")}</span></label>
-              <input type="email" name="email" value={app.person.email ?? ""} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.email")}</span></label>
+              <input type="email" name="email" value={app.person.email ?? ""} class="input input w-full" />
             </div>
-            <div class="form-control">
-              <label class="label"><span class="label-text">{t("apply.form.phone")}</span></label>
-              <input type="tel" name="phone" value={app.person.phone ?? ""} class="input input-bordered w-full" />
+            <div class="flex flex-col">
+              <label class="label"><span class="text-sm">{t("apply.form.phone")}</span></label>
+              <input type="tel" name="phone" value={app.person.phone ?? ""} class="input input w-full" />
             </div>
           </div>
-          <div class="form-control">
-            <label class="label"><span class="label-text">{t("applications.detail.message")}</span></label>
-            <textarea name="message" class="textarea textarea-bordered w-full" rows={3}>{app.message ?? ""}</textarea>
+          <div class="flex flex-col">
+            <label class="label"><span class="text-sm">{t("applications.detail.message")}</span></label>
+            <textarea name="message" class="textarea textarea w-full" rows={3}>{app.message ?? ""}</textarea>
           </div>
           </fieldset>
         </form>
@@ -506,7 +506,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
                 <p class="text-warning text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
                 <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                   <input type="checkbox" name="confirmAge" class="checkbox" />
-                  <span class="label-text">{t("applications.ageWarning.confirm")}</span>
+                  <span class="text-sm">{t("applications.ageWarning.confirm")}</span>
                 </label>
               </>
             )}
@@ -542,13 +542,13 @@ applicationRoutes.get("/:id", guard, async (c) => {
             <div class="modal-box">
               <h3 class="font-bold text-lg">{t("applications.reject.confirm")}</h3>
               <form id="application-reject-form" method="post" action={`/applications/${app.id}/reject`} class="space-y-3 mt-4">
-                <div class="form-control">
-                  <label class="label"><span class="label-text">{t("applications.reject.reasonLabel")}</span></label>
-                  <textarea name="rejectedReason" class="textarea textarea-bordered w-full" rows={2}></textarea>
+                <div class="flex flex-col">
+                  <label class="label"><span class="text-sm">{t("applications.reject.reasonLabel")}</span></label>
+                  <textarea name="rejectedReason" class="textarea textarea w-full" rows={2}></textarea>
                 </div>
                 <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                   <input type="checkbox" name="notifyApplicant" class="checkbox" />
-                  <span class="label-text">{t("applications.reject.notifyLabel")}</span>
+                  <span class="text-sm">{t("applications.reject.notifyLabel")}</span>
                 </label>
               </form>
               <div class="modal-action">

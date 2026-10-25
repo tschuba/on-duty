@@ -145,18 +145,18 @@ yearRoutes.get("/new", yearsWrite, (c) => {
       <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.create")}</h3>
       <form method="post" action="/anniversary-years" class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.kindLabel")} <span class="text-error">*</span></span>
-          <select name="kind" class="select select-bordered w-full" required>
+          <span class="text-sm text-right">{t("admin.anniversaries.modal.kindLabel")} <span class="text-error">*</span></span>
+          <select name="kind" class="select select w-full" required>
             {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
           </select>
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
-          <input type="number" name="year" min="1" max="200" class="input input-bordered w-full" required placeholder={t("admin.anniversaries.modal.yearPlaceholder")} />
+          <span class="text-sm text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
+          <input type="number" name="year" min="1" max="200" class="input input w-full" required placeholder={t("admin.anniversaries.modal.yearPlaceholder")} />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
-          <input type="text" name="title" class="input input-bordered w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
+          <span class="text-sm text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
+          <input type="text" name="title" class="input input w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
         </div>
         <div class="modal-action mt-2">
           <button
@@ -188,18 +188,18 @@ yearRoutes.get("/:kind/:year/edit", yearsWrite, async (c) => {
       <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.edit")}</h3>
       <form method="post" action={`/anniversary-years/${kind}/${year}`} class="flex flex-col gap-3">
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.kindLabel")} <span class="text-error">*</span></span>
-          <select name="kind" class="select select-bordered w-full" required>
+          <span class="text-sm text-right">{t("admin.anniversaries.modal.kindLabel")} <span class="text-error">*</span></span>
+          <select name="kind" class="select select w-full" required>
             {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
           </select>
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
-          <input type="number" name="year" value={y.year} min="1" max="200" class="input input-bordered w-full" required />
+          <span class="text-sm text-right">{t("admin.anniversaries.modal.yearLabel")} <span class="text-error">*</span></span>
+          <input type="number" name="year" value={y.year} min="1" max="200" class="input input w-full" required />
         </div>
         <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-          <span class="label-text text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
-          <input type="text" name="title" value={y.title ?? ""} class="input input-bordered w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
+          <span class="text-sm text-right">{t("admin.anniversaries.modal.titleLabel")}</span>
+          <input type="text" name="title" value={y.title ?? ""} class="input input w-full" placeholder={t("admin.anniversaries.modal.titlePlaceholder")} />
         </div>
         <div class="modal-action mt-2">
           <button

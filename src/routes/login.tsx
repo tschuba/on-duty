@@ -110,23 +110,23 @@ function adminLoginPage(error?: string) {
               </div>
             )}
             <form action="/admin/login" method="post" class="flex flex-col gap-3">
-              <label class="form-control">
-                <span class="label-text mb-1">{t("login.admin.username")}</span>
+              <label class="flex flex-col">
+                <span class="text-sm mb-1">{t("login.admin.username")}</span>
                 <input
                   type="text"
                   name="username"
-                  class="input input-bordered"
+                  class="input input"
                   autocomplete="username"
                   autofocus
                   required
                 />
               </label>
-              <label class="form-control">
-                <span class="label-text mb-1">{t("login.admin.password")}</span>
+              <label class="flex flex-col">
+                <span class="text-sm mb-1">{t("login.admin.password")}</span>
                 <input
                   type="password"
                   name="password"
-                  class="input input-bordered"
+                  class="input input"
                   autocomplete="current-password"
                   required
                 />

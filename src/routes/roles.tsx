@@ -338,30 +338,30 @@ function RoleForm({ types, role, hasAssignments, affected }: {
   return (
     <>
       <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-        <span class="label-text text-right pt-2">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
+        <span class="text-sm text-right pt-2">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
         {hasAssignments && role ? (
           <div class="flex flex-col gap-1">
-            <input type="text" value={role.title} class="input input-bordered w-full opacity-50" disabled />
-            <span class="label-text-alt text-sm opacity-60">{t("admin.roles.modal.nameLocked")}</span>
+            <input type="text" value={role.title} class="input input w-full opacity-50" disabled />
+            <span class="text-xs text-sm opacity-60">{t("admin.roles.modal.nameLocked")}</span>
             <input type="hidden" name="title" value={role.title} />
           </div>
         ) : (
-          <input type="text" name="title" value={role?.title ?? ""} class="input input-bordered w-full" required />
+          <input type="text" name="title" value={role?.title ?? ""} class="input input w-full" required />
         )}
       </div>
       <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-        <span class="label-text text-right">{t("admin.roles.type.label")}</span>
-        <select name="typeId" id="role-type-select" class="select select-bordered w-full" data-allows={typesJson}>
+        <span class="text-sm text-right">{t("admin.roles.type.label")}</span>
+        <select name="typeId" id="role-type-select" class="select select w-full" data-allows={typesJson}>
           {types.map((ty) => <option value={ty.id} selected={ty.id === typeId}>{ty.name}</option>)}
         </select>
       </div>
       <label class="label cursor-pointer justify-start gap-3">
         <input id="role-grants-active" type="checkbox" name="grantsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(role?.grantsActiveStatus ? { checked: true } : {})} />
-        <span class="label-text">{t("admin.roles.modal.grantsActive")}</span>
+        <span class="text-sm">{t("admin.roles.modal.grantsActive")}</span>
       </label>
-      <span id="role-grants-hint" class="label-text-alt text-sm opacity-60 hidden">{t("admin.roles.type.flagNotAllowed")}</span>
+      <span id="role-grants-hint" class="text-xs text-sm opacity-60 hidden">{t("admin.roles.type.flagNotAllowed")}</span>
       {role && (affected ?? 0) > 0 && (
-        <span class="label-text-alt text-sm opacity-60">{t("admin.roles.modal.affected", { count: affected ?? 0 })}</span>
+        <span class="text-xs text-sm opacity-60">{t("admin.roles.modal.affected", { count: affected ?? 0 })}</span>
       )}
       <script dangerouslySetInnerHTML={{ __html: `
         (function () {
@@ -588,16 +588,16 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
   return (
     <>
       <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-        <span class="label-text text-right">{t("admin.roleTypes.table.name")} <span class="text-error">*</span></span>
-        <input type="text" name="name" value={type?.name ?? ""} class="input input-bordered w-full" required />
+        <span class="text-sm text-right">{t("admin.roleTypes.table.name")} <span class="text-error">*</span></span>
+        <input type="text" name="name" value={type?.name ?? ""} class="input input w-full" required />
       </div>
       <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-        <span class="label-text text-right pt-2">{t("admin.roleTypes.table.description")}</span>
-        <textarea name="description" rows={2} maxlength={300} class="textarea textarea-bordered w-full">{type?.description ?? ""}</textarea>
+        <span class="text-sm text-right pt-2">{t("admin.roleTypes.table.description")}</span>
+        <textarea name="description" rows={2} maxlength={300} class="textarea textarea w-full">{type?.description ?? ""}</textarea>
       </div>
       <label class="label cursor-pointer justify-start gap-3">
         <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(type?.allowsActiveStatus ? { checked: true } : {})} />
-        <span class="label-text">{t("admin.roleTypes.table.allowsActiveLong")}</span>
+        <span class="text-sm">{t("admin.roleTypes.table.allowsActiveLong")}</span>
       </label>
     </>
   );

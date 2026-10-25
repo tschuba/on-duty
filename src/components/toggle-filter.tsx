@@ -21,7 +21,7 @@ export function ToggleFilter({ items }: { items: ToggleItem[] }) {
       {items.map((i) => (
         <label key={i.label} class="flex items-center gap-2 min-h-11 cursor-pointer">
           <input type="checkbox" class="toggle toggle-primary" checked={i.checked} disabled={i.disabled} data-href={i.href} />
-          <span class="label-text">{i.label}</span>
+          <span class="text-sm">{i.label}</span>
         </label>
       ))}
       <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('change',function(e){var h=e.target.dataset&&e.target.dataset.href;if(h)location.href=h;});" }} />

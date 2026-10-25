@@ -437,11 +437,11 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
     <form hx-post={action} hx-target="#assignments-box" hx-swap="outerHTML" hx-include={collect ? "#assignments-box" : undefined} class="space-y-4">
       <h3 class="font-bold text-lg">{title}</h3>
       {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.form.role")}<span class="text-error ml-1">*</span></span></label>
+      <div class="flex flex-col">
+        <label class="label"><span class="text-sm">{t("members.form.role")}<span class="text-error ml-1">*</span></span></label>
         <div class="role-picker" data-selected={selectedId ?? ""}>
           <input type="hidden" name="role" class="role-picker-value" value={selectedId ?? ""} />
-          <label class="input input-bordered flex items-center gap-2 w-full mb-1">
+          <label class="input input flex items-center gap-2 w-full mb-1">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
             <button type="button" class="role-picker-clear btn btn-ghost btn-xs btn-circle hidden" aria-label={t("common.reset")}><Icon name="x-mark" class="w-4 h-4" /></button>
@@ -464,18 +464,18 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.form.from")}<span class="text-error ml-1">*</span></span></label>
-          <input type="date" name="from" class="input input-bordered w-full" value={values.from ?? ""} required />
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("members.form.from")}<span class="text-error ml-1">*</span></span></label>
+          <input type="date" name="from" class="input input w-full" value={values.from ?? ""} required />
         </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.form.to")}</span></label>
-          <input type="date" name="to" class="input input-bordered w-full" value={values.to ?? ""} />
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("members.form.to")}</span></label>
+          <input type="date" name="to" class="input input w-full" value={values.to ?? ""} />
         </div>
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.form.note")}</span></label>
-        <textarea name="note" rows={3} class="note-input textarea textarea-bordered w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH}>{values.note ?? ""}</textarea>
+      <div class="flex flex-col">
+        <label class="label"><span class="text-sm">{t("members.form.note")}</span></label>
+        <textarea name="note" rows={3} class="note-input textarea textarea w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH}>{values.note ?? ""}</textarea>
         <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
       </div>
       <div class="modal-action @container">
@@ -565,19 +565,19 @@ function BankDataSection({
   const body = editable ? (
     <>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
-          <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("members.bank.iban")}</span></label>
+          <input type="text" name="iban" value={iban} class={`input input w-full${errors?.iban ? " input-error" : ""}`} />
           {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
         </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
-          <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("members.bank.bic")}</span></label>
+          <input type="text" name="bic" value={m.bic ?? ""} class="input input w-full" />
         </div>
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
-        <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input-bordered w-full" />
+      <div class="flex flex-col">
+        <label class="label"><span class="text-sm">{t("members.bank.accountHolder")}</span></label>
+        <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input w-full" />
         <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
       </div>
     </>
@@ -686,15 +686,15 @@ function MemberFormFields({
     const value = m?.[name] ?? "";
     const err = errors?.[name as string];
     return (
-      <div class="form-control">
+      <div class="flex flex-col">
         <label class="label">
-          <span class="label-text">{label}{required && <span class="text-error ml-1">*</span>}</span>
+          <span class="text-sm">{label}{required && <span class="text-error ml-1">*</span>}</span>
         </label>
         <input
           type={type}
           name={name as string}
           value={value as string}
-          class={`input input-bordered w-full${err ? " input-error" : ""}`}
+          class={`input input w-full${err ? " input-error" : ""}`}
           {...(required ? { required: true } : {})}
         />
         {err && <span class="text-error text-sm mt-1">{err}</span>}
@@ -710,8 +710,8 @@ function MemberFormFields({
         {field("firstName", t("members.form.firstName"), "text", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
+        <div class="flex flex-col">
+          <label class="label"><span class="text-sm">{t("members.form.gender")}</span></label>
           <div class="flex flex-wrap gap-x-6 gap-y-2 min-h-12 items-center">
             {([["", "genderNone"], ["male", "genderMale"], ["female", "genderFemale"]] as const).map(([v, k]) => (
               <label class="flex items-center gap-2 cursor-pointer">
@@ -1056,7 +1056,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
       {/* Toolbar */}
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
-        <label class="input input-bordered flex items-center gap-2 w-64">
+        <label class="input input flex items-center gap-2 w-64">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="search"
@@ -1170,7 +1170,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && (
           <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
             <input type="checkbox" name="notifyApplicant" class="checkbox" />
-            <span class="label-text">{t("members.form.notifyApplicant")}</span>
+            <span class="text-sm">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
         <div id="assignments-wrap"><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
@@ -1487,7 +1487,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           {applicationId && (
             <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
               <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
-              <span class="label-text">{t("members.form.notifyApplicant")}</span>
+              <span class="text-sm">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
           <div id="assignments-wrap" hidden={startStatus === "foerdernd"}><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
