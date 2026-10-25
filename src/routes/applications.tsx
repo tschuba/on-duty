@@ -424,48 +424,38 @@ applicationRoutes.get("/:id", guard, async (c) => {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t("apply.form.lastName")}>
               <input type="text" name="lastName" value={app.person.lastName} class="input w-full" placeholder={t("apply.form.lastName")} />
-            
             </Field>
             <Field label={t("apply.form.firstName")}>
               <input type="text" name="firstName" value={app.person.firstName} class="input w-full" placeholder={t("apply.form.firstName")} />
-            
             </Field>
           </div>
           <Field label={t("apply.form.birthDate")} floating={false}>
             <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input w-full" />
-          
           </Field>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label={t("apply.form.street")}>
               <input type="text" name="street" value={app.person.street ?? ""} class="input w-full" placeholder={t("apply.form.street")} />
-            
             </Field>
             <Field label={t("apply.form.houseNumber")}>
               <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input w-full" placeholder={t("apply.form.houseNumber")} />
-            
             </Field>
             <Field label={t("apply.form.zip")}>
               <input type="text" name="zip" value={app.person.zip ?? ""} class="input w-full" placeholder={t("apply.form.zip")} />
-            
             </Field>
           </div>
           <Field label={t("apply.form.city")}>
             <input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} />
-          
           </Field>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t("apply.form.email")}>
               <input type="email" name="email" value={app.person.email ?? ""} class="input w-full" placeholder={t("apply.form.email")} />
-            
             </Field>
             <Field label={t("apply.form.phone")}>
               <input type="tel" name="phone" value={app.person.phone ?? ""} class="input w-full" placeholder={t("apply.form.phone")} />
-            
             </Field>
           </div>
           <Field label={t("applications.detail.message")}>
             <textarea name="message" class="textarea w-full" rows={3} placeholder={t("applications.detail.message")}>{app.message ?? ""}</textarea>
-          
           </Field>
           </fieldset>
         </form>
@@ -545,7 +535,6 @@ applicationRoutes.get("/:id", guard, async (c) => {
               <form id="application-reject-form" method="post" action={`/applications/${app.id}/reject`} class="space-y-3 mt-4">
                 <Field label={t("applications.reject.reasonLabel")}>
                   <textarea name="rejectedReason" class="textarea w-full" rows={2} placeholder={t("applications.reject.reasonLabel")}></textarea>
-                
                 </Field>
                 <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                   <input type="checkbox" name="notifyApplicant" class="checkbox" />

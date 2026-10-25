@@ -87,7 +87,6 @@ function ApplicantFormFields({ values, errors }: { values: ApplicantValues; erro
         : <p class="text-sm opacity-60">{t("apply.error.contactRequired")}</p>}
       <Field label={t("apply.form.message")}>
         <textarea name="message" class="textarea w-full" rows={3} placeholder={t("apply.form.message")}>{values.message}</textarea>
-      
       </Field>
     </>
   );

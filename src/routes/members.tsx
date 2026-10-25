@@ -438,7 +438,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
     <form hx-post={action} hx-target="#assignments-box" hx-swap="outerHTML" hx-include={collect ? "#assignments-box" : undefined} class="space-y-4">
       <h3 class="font-bold text-lg">{title}</h3>
       {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
-      <Field label={t("members.form.role")} required>
+      <Field label={t("members.form.role")} required floating={false}>
         <div class="role-picker" data-selected={selectedId ?? ""}>
           <input type="hidden" name="role" class="role-picker-value" value={selectedId ?? ""} />
           <label class="input flex items-center gap-2 w-full mb-1">
@@ -462,22 +462,18 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
             <li class="role-picker-no-match hidden"><a class="disabled pointer-events-none opacity-50">{t("members.form.roleNoMatch")}</a></li>
           </ul>
         </div>
-      
       </Field>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("members.form.from")} required floating={false}>
           <input type="date" name="from" class="input w-full" value={values.from ?? ""} required />
-        
         </Field>
         <Field label={t("members.form.to")} floating={false}>
           <input type="date" name="to" class="input w-full" value={values.to ?? ""} />
-        
         </Field>
       </div>
       <Field label={t("members.form.note")}>
         <textarea name="note" rows={3} class="note-input textarea w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} placeholder={t("members.form.note")}>{values.note ?? ""}</textarea>
         <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
-      
       </Field>
       <div class="modal-action @container">
         <div class="flex w-full justify-end gap-2">
@@ -569,17 +565,14 @@ function BankDataSection({
         <Field label={t("members.bank.iban")}>
           <input type="text" name="iban" value={iban} class={`input w-full${errors?.iban ? " input-error" : ""}`} placeholder={t("members.bank.iban")} />
           {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
-        
         </Field>
         <Field label={t("members.bank.bic")}>
           <input type="text" name="bic" value={m.bic ?? ""} class="input w-full" placeholder={t("members.bank.bic")} />
-        
         </Field>
       </div>
       <Field label={t("members.bank.accountHolder")}>
         <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input w-full" placeholder={t("members.bank.accountHolder")} />
         <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
-      
       </Field>
     </>
   ) : (
@@ -709,7 +702,7 @@ function MemberFormFields({
         {field("firstName", t("members.form.firstName"), "text", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("members.form.gender")}>
+        <Field label={t("members.form.gender")} floating={false}>
           <div class="flex flex-wrap gap-x-6 gap-y-2 min-h-12 items-center">
             {([["", "genderNone"], ["male", "genderMale"], ["female", "genderFemale"]] as const).map(([v, k]) => (
               <label class="flex items-center gap-2 cursor-pointer">
@@ -719,7 +712,6 @@ function MemberFormFields({
             ))}
           </div>
           {genderErr && <span class="text-error text-sm mt-1">{genderErr}</span>}
-        
         </Field>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

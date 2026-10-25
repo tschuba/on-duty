@@ -116,6 +116,7 @@ function adminLoginPage(error?: string) {
                   type="text"
                   name="username"
                   placeholder={t("login.admin.username")}
+                  class="input w-full"
                   autocomplete="username"
                   autofocus
                   required
@@ -126,6 +127,7 @@ function adminLoginPage(error?: string) {
                   type="password"
                   name="password"
                   placeholder={t("login.admin.password")}
+                  class="input w-full"
                   autocomplete="current-password"
                   required
                 />

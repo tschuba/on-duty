@@ -398,7 +398,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
         <Field label={t("admin.users.modal.nameLabel")} required>
-          <input type="text" name="name" value={f.name} placeholder={t("admin.users.modal.nameLabel")} required />
+          <input type="text" name="name" value={f.name} placeholder={t("admin.users.modal.nameLabel")} class="input w-full" required />
         </Field>
         {f.oidcLinked ? (
           <div class="flex flex-col gap-1">
@@ -408,7 +408,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
           </div>
         ) : (
           <Field label={t("admin.users.modal.emailLabel")} required>
-            <input type="email" name="email" value={f.email} placeholder={t("admin.users.modal.emailLabel")} required />
+            <input type="email" name="email" value={f.email} placeholder={t("admin.users.modal.emailLabel")} class="input w-full" required />
           </Field>
         )}
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
@@ -749,11 +749,11 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
           </div>
         ) : (
           <Field label={t("admin.permissions.modal.nameLabel")} required>
-            <input type="text" name="name" value={f.name} placeholder={t("admin.permissions.modal.nameLabel")} required />
+            <input type="text" name="name" value={f.name} placeholder={t("admin.permissions.modal.nameLabel")} class="input w-full" required />
           </Field>
         )}
         <Field label={t("admin.permissions.modal.descriptionLabel")}>
-          <textarea name="description" rows={2} placeholder={t("admin.permissions.modal.descriptionLabel")}>{f.description}</textarea>
+          <textarea name="description" rows={2} placeholder={t("admin.permissions.modal.descriptionLabel")} class="textarea w-full">{f.description}</textarea>
         </Field>
         <div class="grid grid-cols-[8rem_minmax(0,1fr)] items-start gap-x-3">
           <span class="text-sm text-right pt-1">{t("admin.permissions.modal.permissionsLabel")}</span>

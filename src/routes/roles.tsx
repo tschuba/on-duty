@@ -347,7 +347,7 @@ function RoleForm({ types, role, hasAssignments, affected }: {
         </div>
       ) : (
         <Field label={t("admin.roles.modal.nameLabel")} required>
-          <input type="text" name="title" value={role?.title ?? ""} placeholder={t("admin.roles.modal.nameLabel")} required />
+          <input type="text" name="title" value={role?.title ?? ""} placeholder={t("admin.roles.modal.nameLabel")} class="input w-full" required />
         </Field>
       )}
       <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
@@ -589,10 +589,10 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
   return (
     <>
       <Field label={t("admin.roleTypes.table.name")} required>
-        <input type="text" name="name" value={type?.name ?? ""} placeholder={t("admin.roleTypes.table.name")} required />
+        <input type="text" name="name" value={type?.name ?? ""} placeholder={t("admin.roleTypes.table.name")} class="input w-full" required />
       </Field>
       <Field label={t("admin.roleTypes.table.description")}>
-        <textarea name="description" rows={2} maxlength={300} placeholder={t("admin.roleTypes.table.description")}>{type?.description ?? ""}</textarea>
+        <textarea name="description" rows={2} maxlength={300} placeholder={t("admin.roleTypes.table.description")} class="textarea w-full">{type?.description ?? ""}</textarea>
       </Field>
       <label class="label cursor-pointer justify-start gap-3">
         <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(type?.allowsActiveStatus ? { checked: true } : {})} />

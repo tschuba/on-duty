@@ -47,6 +47,7 @@ function OrgSection({ tab, values, editable, missing }: { tab: OrgTab; values: R
                 name={key}
                 value={values[key] ?? ""}
                 disabled={!editable}
+                class="input w-full"
                 placeholder={editable && placeholder ? t(placeholder as never) : t(`admin.orgConfig.field.${key}` as never)}
                 {...(editable ? attrs : {})}
               />

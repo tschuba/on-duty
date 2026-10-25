@@ -194,7 +194,6 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
             class={`input w-full${errors?.amount ? " input-error" : ""}`} placeholder={t("donations.form.amount")}
           />
           {errors?.amount && <span class="text-error text-sm mt-1">{errors.amount}</span>}
-        
         </Field>
         <Field label={t("donations.form.date")} required floating={false}>
           <div class="join w-full">
@@ -215,10 +214,9 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
             )}
           </div>
           {errors?.date && <span class="text-error text-sm mt-1">{errors.date}</span>}
-        
         </Field>
       </div>
-      <Field label={t("donations.form.type")} required>
+      <Field label={t("donations.form.type")} required floating={false}>
         <div class={`join w-full${errors?.type ? " border border-error rounded-lg" : ""}`}>
           <label class="join-item btn flex-1 has-[:checked]:btn-primary">
             <input type="radio" name="type" value="cash" checked={values?.type === "cash"} class="hidden" />
@@ -230,11 +228,9 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
           </label>
         </div>
         {errors?.type && <span class="text-error text-sm mt-1">{errors.type}</span>}
-      
       </Field>
       <Field label={t("donations.form.purpose")}>
         <input type="text" name="purpose" value={values?.purpose ?? ""} class="input w-full" placeholder={t("donations.form.purpose")} />
-      
       </Field>
     </>
   );

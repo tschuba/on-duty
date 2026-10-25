@@ -146,15 +146,15 @@ yearRoutes.get("/new", yearsWrite, (c) => {
       <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.create")}</h3>
       <form method="post" action="/anniversary-years" class="flex flex-col gap-3">
         <Field label={t("admin.anniversaries.modal.kindLabel")} required>
-          <select name="kind" required>
+          <select name="kind" class="select w-full" required>
             {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
           </select>
         </Field>
         <Field label={t("admin.anniversaries.modal.yearLabel")} required hint={t("admin.anniversaries.modal.yearPlaceholder")}>
-          <input type="number" name="year" min="1" max="200" required />
+          <input type="number" name="year" min="1" max="200" class="input w-full" required />
         </Field>
         <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
-          <input type="text" name="title" />
+          <input type="text" name="title" class="input w-full" />
         </Field>
         <div class="modal-action mt-2">
           <button
@@ -186,15 +186,15 @@ yearRoutes.get("/:kind/:year/edit", yearsWrite, async (c) => {
       <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.edit")}</h3>
       <form method="post" action={`/anniversary-years/${kind}/${year}`} class="flex flex-col gap-3">
         <Field label={t("admin.anniversaries.modal.kindLabel")} required>
-          <select name="kind" required>
+          <select name="kind" class="select w-full" required>
             {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
           </select>
         </Field>
         <Field label={t("admin.anniversaries.modal.yearLabel")} required>
-          <input type="number" name="year" value={y.year} min="1" max="200" required />
+          <input type="number" name="year" value={y.year} min="1" max="200" class="input w-full" required />
         </Field>
         <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
-          <input type="text" name="title" value={y.title ?? ""} />
+          <input type="text" name="title" value={y.title ?? ""} class="input w-full" />
         </Field>
         <div class="modal-action mt-2">
           <button

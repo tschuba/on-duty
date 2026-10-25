@@ -275,7 +275,6 @@ function NumberListField({ name, label, labelSingle, placeholder, placeholderSin
         <Field label={labelSingle}>
           <input type="text" name={name} value={list[0] ?? ""} placeholder={placeholderSingle} disabled={multi} maxlength={NUMBER_MAX_LENGTH}
             class={`input w-full${error ? " input-error" : ""}`} />
-        
         </Field>
       </div>
       <div data-numlist-multi class={multi ? "" : "hidden"}>
@@ -499,10 +498,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       <Field label={t("inventory.form.name")} required>
         <input type="text" name="name" value={v.name ?? ""} class={`input w-full${errors?.name ? " input-error" : ""}`} placeholder={t("inventory.form.name")} />
         {errors?.name && <span class="text-error text-sm mt-1">{errors.name}</span>}
-      
       </Field>
 
-      <Field label={t("inventory.form.category")} required>
+      <Field label={t("inventory.form.category")} required floating={false}>
         {/* Radios stay the only submitted source; the nameless <select> mirrors them on narrow containers. */}
         <div class="@container">
           <select
@@ -537,25 +535,21 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           </div>
         </div>
         {errors?.category && <span class="text-error text-sm mt-1">{errors.category}</span>}
-      
       </Field>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("inventory.form.commissionedAt")} floating={false}>
           <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
-        
         </Field>
         <Field label={t("inventory.form.purchasePrice")}>
           <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input w-full${errors?.purchasePrice ? " input-error" : ""}`} placeholder={t("inventory.form.purchasePrice")} />
           {errors?.purchasePrice && <span class="text-error text-sm mt-1">{errors.purchasePrice}</span>}
           <span class="text-xs opacity-60 mt-1" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>
-        
         </Field>
       </div>
 
       <Field label={t("inventory.form.notes")}>
         <textarea name="notes" class="textarea w-full" rows={3} placeholder={t("inventory.form.notes")}>{v.notes ?? ""}</textarea>
-      
       </Field>
 
       <TagInput tags={v.tagsList} />
@@ -565,16 +559,13 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label={t("inventory.form.licensePlate")}>
             <input type="text" name="licensePlate" value={v.licensePlate ?? ""} class="input w-full" placeholder={t("inventory.form.licensePlate")} />
-          
           </Field>
           <Field label={t("inventory.form.yearOfManufacture")}>
             <input type="text" inputmode="numeric" name="yearOfManufacture" value={v.yearOfManufacture ?? ""} class={`input w-full${errors?.yearOfManufacture ? " input-error" : ""}`} placeholder={t("inventory.form.yearOfManufacture")} />
             {errors?.yearOfManufacture && <span class="text-error text-sm mt-1">{errors.yearOfManufacture}</span>}
-          
           </Field>
           <Field label={t("inventory.form.vehicleInspectionDue")} floating={false}>
             <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input w-full" />
-          
           </Field>
         </div>
       </div>
@@ -584,11 +575,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label={t("inventory.form.lastInspectionDate")} floating={false}>
             <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input w-full" />
-          
           </Field>
           <Field label={t("inventory.form.nextInspectionDue")} floating={false}>
             <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input w-full" />
-          
           </Field>
         </div>
       </div>
@@ -609,7 +598,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("inventory.form.quantity")}
           />
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
-        
         </Field>
       </div>
 
@@ -1136,11 +1124,10 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
               <Field label={t("inventory.retire.quantityLabel")}>
                 <input type="number" name="retireQuantity" min="1" max={Math.max(1, availableToRetire)} value={Math.max(1, availableToRetire)} class="input w-full" placeholder={t("inventory.retire.quantityLabel")} />
                 <span class="text-xs opacity-60 mt-1">{t("inventory.retire.quantityHint", { available: availableToRetire, quantity: item.quantity })}</span>
-              
               </Field>
             )}
             <Field label={t("inventory.retire.reasonLabel")}>
-              <input type="text" name="retiredReason" placeholder={t("inventory.retire.reasonLabel")} />
+              <input type="text" name="retiredReason" placeholder={t("inventory.retire.reasonLabel")} class="input w-full" />
             </Field>
             <div class="modal-action">
               <button type="button" class="btn" onclick="document.getElementById('retire-modal').close()">{t("common.cancel")}</button>

@@ -303,7 +303,6 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
           {!item.individualTracking && (
             <Field label={t("lending.loans.form.quantity")} class="max-w-32">
               <input type="number" name="quantity" min="1" max={maxQuantity} value={String(loan.quantity)} class="input w-full" placeholder={t("lending.loans.form.quantity")} />
-            
             </Field>
           )}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -352,7 +351,6 @@ function BorrowerPickerFields({ personId, values, errors }: {
     <Field label={label} required={required}>
       <input type={type} id={`borrower-${name}`} name={name} value={v[name] ?? ""} class={`input w-full${errors?.[name] ? " input-error" : ""}`} placeholder={label} />
       {errors?.[name] && <span class="text-error text-sm mt-1">{errors[name]}</span>}
-    
     </Field>
   );
   return (
@@ -439,7 +437,6 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
             ))}
           </select>
           {errors?.item && <span class="text-error text-sm mt-1">{errors.item}</span>}
-        
         </Field>
       )}
       <BorrowerPickerFields personId={v.borrowerPersonId} values={v} errors={errors} />
@@ -448,7 +445,6 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
         <Field label={t("lending.loans.form.quantity")} class="max-w-32">
           <input type="number" name="quantity" min="1" max={maxQuantity} value={v.quantity ?? "1"} class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("lending.loans.form.quantity")} />
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
-        
         </Field>
       )}
 
@@ -456,26 +452,22 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
         <Field label={t("lending.loans.form.plannedFrom")} required floating={false}>
           <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} required class={`input w-full${errors?.plannedFrom ? " input-error" : ""}`} />
           {errors?.plannedFrom && <span class="text-error text-sm mt-1">{errors.plannedFrom}</span>}
-        
         </Field>
         <Field label={t("lending.loans.form.plannedTo")} required floating={false}>
           <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} required class={`input w-full${errors?.plannedTo ? " input-error" : ""}`} />
           {errors?.plannedTo && <span class="text-error text-sm mt-1">{errors.plannedTo}</span>}
-        
         </Field>
         <Field label={t("lending.loans.form.pickedUpAt")} floating={false}>
           <input type="date" id="loan-pickedUpAt" name="pickedUpAt" value={v.pickedUpAt ?? ""} class="input w-full" />
           <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
             {t("lending.loans.form.takeOverFrom")}
           </button>
-        
         </Field>
         <Field label={t("lending.loans.form.returnedAt")} floating={false}>
           <input type="date" id="loan-returnedAt" name="returnedAt" value={v.returnedAt ?? ""} class="input w-full" />
           <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-returnedAt').value=document.getElementById('loan-plannedTo').value">
             {t("lending.loans.form.takeOverTo")}
           </button>
-        
         </Field>
       </div>
       {errors?.dates && <p class="text-error text-sm" role="alert">{errors.dates}</p>}
