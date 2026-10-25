@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { eq, or, ilike, asc, and, exists, sql } from "drizzle-orm";
+import { Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -100,19 +101,16 @@ type PersonFieldInput = Partial<Record<keyof PersonFieldValues, string | null>>;
 function personField(name: keyof PersonFieldValues, label: string, values: PersonFieldInput | undefined, errors: Record<string, string> | undefined, optional = false) {
   const err = errors?.[name];
   return (
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text">{label}{!optional && <span class="text-error ml-1">*</span>}</span>
-      </label>
+    <Field label={label} required={!optional} after={err && <span class="text-error text-sm mt-1 block">{err}</span>}>
       <input
         type="text"
         id={`donor-${name}`}
         name={name}
         value={values?.[name] ?? ""}
-        class={`input input-bordered w-full${err ? " input-error" : ""}`}
+        placeholder={label}
+        class={`input w-full${err ? " input-error" : ""}`}
       />
-      {err && <span class="text-error text-sm mt-1">{err}</span>}
-    </div>
+    </Field>
   );
 }
 
@@ -127,12 +125,12 @@ export function DonorPersonFields({ values, errors }: { values?: PersonFieldInpu
         {personField("lastName", t("donors.form.lastName"), values, errors, true)}
         {personField("firstName", t("donors.form.firstName"), values, errors, true)}
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {personField("street", t("donors.form.street"), values, errors)}
-        {personField("houseNumber", t("donors.form.houseNumber"), values, errors)}
-        {personField("zip", t("donors.form.zip"), values, errors)}
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="sm:col-span-3">{personField("street", t("donors.form.street"), values, errors)}</div>
+        <div class="sm:col-span-1">{personField("houseNumber", t("donors.form.houseNumber"), values, errors)}</div>
+        <div class="sm:col-span-1">{personField("zip", t("donors.form.zip"), values, errors)}</div>
+        <div class="sm:col-span-3">{personField("city", t("donors.form.city"), values, errors)}</div>
       </div>
-      {personField("city", t("donors.form.city"), values, errors)}
     </>
   );
 }
@@ -146,10 +144,8 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
   return (
     <div class="space-y-3">
       <div id="donor-picker-search" class={showFields ? "hidden" : ""}>
-        <label class="label">
-          <span class="label-text">{t("donations.form.donor")}</span>
-        </label>
-        <label class="input input-bordered flex items-center gap-2 w-full">
+        <p class="fieldset-legend">{t("donations.form.donor")}</p>
+        <label class="input flex items-center gap-2 w-full">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="text"
@@ -173,7 +169,7 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
               <p>{errors.duplicate}</p>
               <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
                 <input type="checkbox" name="confirmDuplicate" value="1" class="checkbox checkbox-sm" />
-                <span class="label-text">{t("donations.form.duplicateConfirm")}</span>
+                <span class="text-sm">{t("donations.form.duplicateConfirm")}</span>
               </label>
             </div>
           </div>
@@ -331,7 +327,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
 
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
         <form method="get" class="flex gap-2 w-full md:w-auto">
-          <label class="input input-bordered flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
+          <label class="input flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input
               type="search"

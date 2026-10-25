@@ -102,7 +102,7 @@ function UploadPage({ user, error, kind: only }: { user: any; error?: string; ki
 
         <form method="post" action="/import/preview" enctype="multipart/form-data" class="card bg-base-200 shadow">
           <div class="card-body gap-3">
-            <input id="file" type="file" name="file" accept=".xlsx" required class="file-input file-input-bordered w-full" />
+            <input id="file" type="file" name="file" accept=".xlsx" required class="file-input w-full" />
             <input id="fp" type="hidden" name="fp" value="" />
             {only && <input type="hidden" name="kind" value={only} />}
             <p class="text-sm opacity-60">{t("import.draftHint")}</p>
@@ -147,7 +147,7 @@ function RoleCombo({ name, value, roles, disabled, suggested }: { name: string; 
   return (
     <>
       <input type="text" list="role-options" data-combo value={label} disabled={disabled} autocomplete="off" placeholder={t("import.option.search")}
-        class={`input input-bordered input-sm w-56 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
+        class={`input-sm w-56 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
         title={suggested ? t("import.role.suggestedHint") : undefined} />
       <input type="hidden" name={name} value={value} disabled={disabled} />
     </>
@@ -200,8 +200,8 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
             {plan.rows.map(({ m, included, duplicate, errors, warnings, assignments }) => (
               <tr data-problem={errors.length || warnings.length ? "1" : undefined} class={duplicate ? "opacity-50 italic" : undefined}>
                                 <td>{m.lastName}, {m.firstName}</td>
-                <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input input-bordered input-sm" />}</td>
-                <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input input-bordered input-sm" />}</td>
+                <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input-sm" />}</td>
+                <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input-sm" />}</td>
                 <td class="text-sm">
                   {[[m.street, m.houseNumber].filter(Boolean).join(" "), [m.zip, m.city].filter(Boolean).join(" ")].filter(Boolean).map((v) => <div>{v}</div>)}
                 </td>
@@ -238,9 +238,9 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                 <td>
                   <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} suggested={a.suggested} />
                 </td>
-                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input input-bordered input-sm" disabled={a.skipped} /></td>
+                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input-sm" disabled={a.skipped} /></td>
                 <td>
-                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from} class="input input-bordered input-sm" disabled={a.skipped} />
+                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from} class="input-sm" disabled={a.skipped} />
                   {a.assumed && <span class="badge badge-warning badge-sm ml-1">{t("import.badge.assumed")}</span>}
                 </td>
                 <td><input type="checkbox" name={`ause_${m.mid}_${a.key}`} value="1" class="toggle toggle-sm" checked={!a.skipped} /></td>
@@ -255,7 +255,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
 
 function CategorySelect({ name, value, check, blank }: { name: string; value: InventoryCategory | ""; check: boolean; blank: string }) {
   return (
-    <select name={name} style="min-width:11rem" class={`select select-bordered select-sm pr-8 ${check ? "select-warning" : ""}`} title={t("import.categories.selectHelp")}>
+    <select name={name} style="min-width:11rem" class={`select-sm pr-8 ${check ? "select-warning" : ""}`} title={t("import.categories.selectHelp")}>
       <option value="" selected={value === ""}>{blank}</option>
       {CATEGORY_OPTIONS.map((c) => <option value={c} selected={c === value}>{CATEGORY_LABEL[c]}</option>)}
     </select>

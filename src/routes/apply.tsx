@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { EmailField, EmailInput, Field, PhoneField, PhoneInput } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, applications, applicationGuardians } from "../db/schema/index.js";
 import { Layout } from "../components/layout.js";
@@ -48,19 +49,20 @@ function textField(
   error: string | undefined,
   opts: { type?: string; required?: boolean; hideErrorText?: boolean } = {},
 ) {
+  if (opts.type === "email") return <EmailField label={label} name={name} value={value} error={!!error} />;
+  if (opts.type === "tel") return <PhoneField label={label} name={name} value={value} error={!!error} />;
+  const date = opts.type === "date";
   return (
-    <div class="form-control">
-      <label class="label">
-        <span class="label-text">{label}{opts.required && <span class="text-error ml-1">*</span>}</span>
-      </label>
+    <Field label={label} required={opts.required} floating={!date}>
       <input
         type={opts.type ?? "text"}
         name={name}
         value={value}
-        class={`input input-bordered w-full${error ? " input-error" : ""}`}
+        placeholder={label}
+        class={`input w-full${error ? " input-error" : ""}`}
       />
       {error && !opts.hideErrorText && <span class="text-error text-sm mt-1">{error}</span>}
-    </div>
+    </Field>
   );
 }
 
@@ -85,10 +87,9 @@ function ApplicantFormFields({ values, errors }: { values: ApplicantValues; erro
       {errors.contact
         ? <p class="text-error text-sm">{errors.contact}</p>
         : <p class="text-sm opacity-60">{t("apply.error.contactRequired")}</p>}
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("apply.form.message")}</span></label>
-        <textarea name="message" class="textarea textarea-bordered w-full" rows={3}>{values.message}</textarea>
-      </div>
+      <Field label={t("apply.form.message")}>
+        <textarea name="message" class="textarea w-full" rows={3} placeholder={t("apply.form.message")}>{values.message}</textarea>
+      </Field>
     </>
   );
 }
@@ -136,10 +137,10 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
         </button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input input-bordered w-full${nameError ? " input-error" : ""}`} />
-        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input input-bordered w-full${nameError ? " input-error" : ""}`} />
-        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input input-bordered w-full${contactError ? " input-error" : ""}`} />
-        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input input-bordered w-full${contactError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input w-full${nameError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input w-full${nameError ? " input-error" : ""}`} />
+        <EmailInput name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} error={!!contactError} />
+        <PhoneInput name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} error={!!contactError} />
       </div>
       {nameError && <p class="text-error text-sm mt-1">{nameError}</p>}
       {contactError
@@ -215,10 +216,10 @@ function YouthPage({
           <template id="guardian-template">
             <GuardianRow index={-1} />
           </template>
-          <div class="form-control">
+          <div class="flex flex-col">
             <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
               <input type="checkbox" name="consent" class="checkbox" />
-              <span class="label-text">{t("apply.youth.consent")}</span>
+              <span class="text-sm">{t("apply.youth.consent")}</span>
             </label>
             {consentError && <span class="text-error text-sm">{consentError}</span>}
           </div>

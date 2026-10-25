@@ -1,6 +1,7 @@
 import { hashPassword } from "better-auth/crypto";
 import { eq, and } from "drizzle-orm";
 import { Hono } from "hono";
+import { Field } from "../components/field.js";
 import { getCookie, deleteCookie } from "hono/cookie";
 import { auth } from "../auth.js";
 import { db } from "../db/index.js";
@@ -110,27 +111,27 @@ function adminLoginPage(error?: string) {
               </div>
             )}
             <form action="/admin/login" method="post" class="flex flex-col gap-3">
-              <label class="form-control">
-                <span class="label-text mb-1">{t("login.admin.username")}</span>
+              <Field label={t("login.admin.username")}>
                 <input
                   type="text"
                   name="username"
-                  class="input input-bordered"
+                  placeholder={t("login.admin.username")}
+                  class="input w-full"
                   autocomplete="username"
                   autofocus
                   required
                 />
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">{t("login.admin.password")}</span>
+              </Field>
+              <Field label={t("login.admin.password")}>
                 <input
                   type="password"
                   name="password"
-                  class="input input-bordered"
+                  placeholder={t("login.admin.password")}
+                  class="input w-full"
                   autocomplete="current-password"
                   required
                 />
-              </label>
+              </Field>
               <button type="submit" class="btn btn-primary mt-2">
                 {t("login.admin.submit")}
               </button>

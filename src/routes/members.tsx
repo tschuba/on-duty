@@ -1,5 +1,6 @@
 import { RowAction } from "../components/row-action.js";
 import type { Context } from "hono";
+import { EmailField, Field, PhoneField } from "../components/field.js";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { eq, and, asc, isNull, getTableColumns } from "drizzle-orm";
@@ -437,11 +438,10 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
     <form hx-post={action} hx-target="#assignments-box" hx-swap="outerHTML" hx-include={collect ? "#assignments-box" : undefined} class="space-y-4">
       <h3 class="font-bold text-lg">{title}</h3>
       {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.form.role")}<span class="text-error ml-1">*</span></span></label>
+      <Field label={t("members.form.role")} required floating={false}>
         <div class="role-picker" data-selected={selectedId ?? ""}>
           <input type="hidden" name="role" class="role-picker-value" value={selectedId ?? ""} />
-          <label class="input input-bordered flex items-center gap-2 w-full mb-1">
+          <label class="input flex items-center gap-2 w-full mb-1">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
             <button type="button" class="role-picker-clear btn btn-ghost btn-xs btn-circle hidden" aria-label={t("common.reset")}><Icon name="x-mark" class="w-4 h-4" /></button>
@@ -462,22 +462,18 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
             <li class="role-picker-no-match hidden"><a class="disabled pointer-events-none opacity-50">{t("members.form.roleNoMatch")}</a></li>
           </ul>
         </div>
-      </div>
+      </Field>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.form.from")}<span class="text-error ml-1">*</span></span></label>
-          <input type="date" name="from" class="input input-bordered w-full" value={values.from ?? ""} required />
-        </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.form.to")}</span></label>
-          <input type="date" name="to" class="input input-bordered w-full" value={values.to ?? ""} />
-        </div>
+        <Field label={t("members.form.from")} required>
+          <input type="date" name="from" class="input w-full" value={values.from ?? ""} required />
+        </Field>
+        <Field label={t("members.form.to")}>
+          <input type="date" name="to" class="input w-full" value={values.to ?? ""} />
+        </Field>
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.form.note")}</span></label>
-        <textarea name="note" rows={3} class="note-input textarea textarea-bordered w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH}>{values.note ?? ""}</textarea>
-        <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
-      </div>
+      <Field label={t("members.form.note")} after={<span class="text-xs block text-right mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>}>
+        <textarea name="note" rows={3} class="note-input textarea w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} placeholder={t("members.form.note")}>{values.note ?? ""}</textarea>
+      </Field>
       <div class="modal-action @container">
         <div class="flex w-full justify-end gap-2">
           <button type="button" class="btn" aria-label={t("common.cancel")} title={t("common.cancel")} onclick="this.closest('dialog').close()"><ActionContent icon="x-mark" label={t("common.cancel")} variant="primary" /></button>
@@ -565,21 +561,17 @@ function BankDataSection({
   const body = editable ? (
     <>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.bank.iban")}</span></label>
-          <input type="text" name="iban" value={iban} class={`input input-bordered w-full${errors?.iban ? " input-error" : ""}`} />
+        <Field label={t("members.bank.iban")}>
+          <input type="text" name="iban" value={iban} class={`input w-full${errors?.iban ? " input-error" : ""}`} placeholder={t("members.bank.iban")} />
           {errors?.iban && <span class="text-error text-sm mt-1">{errors.iban}</span>}
-        </div>
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.bank.bic")}</span></label>
-          <input type="text" name="bic" value={m.bic ?? ""} class="input input-bordered w-full" />
-        </div>
+        </Field>
+        <Field label={t("members.bank.bic")}>
+          <input type="text" name="bic" value={m.bic ?? ""} class="input w-full" placeholder={t("members.bank.bic")} />
+        </Field>
       </div>
-      <div class="form-control">
-        <label class="label"><span class="label-text">{t("members.bank.accountHolder")}</span></label>
-        <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input input-bordered w-full" />
-        <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
-      </div>
+      <Field label={t("members.bank.accountHolder")} hint={t("members.bank.accountHolderHint")}>
+        <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input w-full" placeholder={t("members.bank.accountHolder")} />
+      </Field>
     </>
   ) : (
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -685,20 +677,27 @@ function MemberFormFields({
   ) {
     const value = m?.[name] ?? "";
     const err = errors?.[name as string];
+    if (type === "email" || type === "tel") {
+      const Cmp = type === "email" ? EmailField : PhoneField;
+      return (
+        <>
+          <Cmp {...(name === "mobile" ? { mobile: true } : {})} label={label} name={name as string} value={value as string} required={required} error={!!err} />
+          {err && <span class="text-error text-sm mt-1">{err}</span>}
+        </>
+      );
+    }
     return (
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text">{label}{required && <span class="text-error ml-1">*</span>}</span>
-        </label>
+      <Field label={label} required={required}>
         <input
           type={type}
           name={name as string}
           value={value as string}
-          class={`input input-bordered w-full${err ? " input-error" : ""}`}
+          placeholder={label}
+          class={`input w-full${err ? " input-error" : ""}`}
           {...(required ? { required: true } : {})}
         />
         {err && <span class="text-error text-sm mt-1">{err}</span>}
-      </div>
+      </Field>
     );
   }
 
@@ -710,8 +709,7 @@ function MemberFormFields({
         {field("firstName", t("members.form.firstName"), "text", true)}
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="form-control">
-          <label class="label"><span class="label-text">{t("members.form.gender")}</span></label>
+        <Field label={t("members.form.gender")} floating={false}>
           <div class="flex flex-wrap gap-x-6 gap-y-2 min-h-12 items-center">
             {([["", "genderNone"], ["male", "genderMale"], ["female", "genderFemale"]] as const).map(([v, k]) => (
               <label class="flex items-center gap-2 cursor-pointer">
@@ -721,7 +719,7 @@ function MemberFormFields({
             ))}
           </div>
           {genderErr && <span class="text-error text-sm mt-1">{genderErr}</span>}
-        </div>
+        </Field>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("birthDate", t("members.form.birthDate"), "date", true)}
@@ -735,18 +733,18 @@ function MemberFormFields({
         {field("exitDate", t("members.form.exitDate"), "date")}
       </div>
       <Section title={t("members.contact.title")} open>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("street", t("members.form.street"))}
-        {field("houseNumber", t("members.form.houseNumber"))}
+      <div class="space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="sm:col-span-3">{field("street", t("members.form.street"))}</div>
+        <div class="sm:col-span-1">{field("houseNumber", t("members.form.houseNumber"))}</div>
+        <div class="sm:col-span-1">{field("zip", t("members.form.zip"))}</div>
+        <div class="sm:col-span-3">{field("city", t("members.form.city"))}</div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("zip", t("members.form.zip"))}
-        {field("city", t("members.form.city"))}
-      </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("phone", t("members.form.phone"))}
+        {field("phone", t("members.form.phone"), "tel")}
         {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
+      </div>
       </div>
       </Section>
     </>
@@ -1056,7 +1054,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
 
       {/* Toolbar */}
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
-        <label class="input input-bordered flex items-center gap-2 w-64">
+        <label class="input flex items-center gap-2 w-64">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="search"
@@ -1170,7 +1168,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
         {applicationId && (
           <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
             <input type="checkbox" name="notifyApplicant" class="checkbox" />
-            <span class="label-text">{t("members.form.notifyApplicant")}</span>
+            <span class="text-sm">{t("members.form.notifyApplicant")}</span>
           </label>
         )}
         <div id="assignments-wrap"><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
@@ -1487,7 +1485,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
           {applicationId && (
             <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
               <input type="checkbox" name="notifyApplicant" class="checkbox" checked={notifyApplicant} />
-              <span class="label-text">{t("members.form.notifyApplicant")}</span>
+              <span class="text-sm">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
           <div id="assignments-wrap" hidden={startStatus === "foerdernd"}><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>

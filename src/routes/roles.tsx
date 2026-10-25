@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { Field } from "../components/field.js";
 import { eq, and, count, countDistinct, asc, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schema/index.js";
@@ -337,31 +338,28 @@ function RoleForm({ types, role, hasAssignments, affected }: {
   const typesJson = JSON.stringify(Object.fromEntries(types.map((ty) => [ty.id, ty.allowsActiveStatus])));
   return (
     <>
-      <div class="grid grid-cols-[8rem_1fr] items-baseline gap-x-3">
-        <span class="label-text text-right pt-2">{t("admin.roles.modal.nameLabel")} <span class="text-error">*</span></span>
-        {hasAssignments && role ? (
-          <div class="flex flex-col gap-1">
-            <input type="text" value={role.title} class="input input-bordered w-full opacity-50" disabled />
-            <span class="label-text-alt text-sm opacity-60">{t("admin.roles.modal.nameLocked")}</span>
-            <input type="hidden" name="title" value={role.title} />
-          </div>
-        ) : (
-          <input type="text" name="title" value={role?.title ?? ""} class="input input-bordered w-full" required />
-        )}
-      </div>
-      <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-        <span class="label-text text-right">{t("admin.roles.type.label")}</span>
-        <select name="typeId" id="role-type-select" class="select select-bordered w-full" data-allows={typesJson}>
+      {hasAssignments && role ? (
+        <Field label={t("admin.roles.modal.nameLabel")} hint={t("admin.roles.modal.nameLocked")}>
+          <input type="text" value={role.title} placeholder={t("admin.roles.modal.nameLabel")} class="input w-full opacity-50" disabled />
+          <input type="hidden" name="title" value={role.title} />
+        </Field>
+      ) : (
+        <Field label={t("admin.roles.modal.nameLabel")} required>
+          <input type="text" name="title" value={role?.title ?? ""} placeholder={t("admin.roles.modal.nameLabel")} class="input w-full" required />
+        </Field>
+      )}
+      <Field label={t("admin.roles.type.label")}>
+        <select name="typeId" id="role-type-select" class="select w-full" data-allows={typesJson}>
           {types.map((ty) => <option value={ty.id} selected={ty.id === typeId}>{ty.name}</option>)}
         </select>
-      </div>
+      </Field>
       <label class="label cursor-pointer justify-start gap-3">
         <input id="role-grants-active" type="checkbox" name="grantsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(role?.grantsActiveStatus ? { checked: true } : {})} />
-        <span class="label-text">{t("admin.roles.modal.grantsActive")}</span>
+        <span class="text-sm">{t("admin.roles.modal.grantsActive")}</span>
       </label>
-      <span id="role-grants-hint" class="label-text-alt text-sm opacity-60 hidden">{t("admin.roles.type.flagNotAllowed")}</span>
+      <span id="role-grants-hint" class="text-xs text-sm opacity-60 hidden">{t("admin.roles.type.flagNotAllowed")}</span>
       {role && (affected ?? 0) > 0 && (
-        <span class="label-text-alt text-sm opacity-60">{t("admin.roles.modal.affected", { count: affected ?? 0 })}</span>
+        <span class="text-xs text-sm opacity-60">{t("admin.roles.modal.affected", { count: affected ?? 0 })}</span>
       )}
       <script dangerouslySetInnerHTML={{ __html: `
         (function () {
@@ -587,17 +585,15 @@ roleRoutes.post("/roles/:id/delete", rolesDelete, async (c) => {
 function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) {
   return (
     <>
-      <div class="grid grid-cols-[8rem_1fr] items-center gap-x-3">
-        <span class="label-text text-right">{t("admin.roleTypes.table.name")} <span class="text-error">*</span></span>
-        <input type="text" name="name" value={type?.name ?? ""} class="input input-bordered w-full" required />
-      </div>
-      <div class="grid grid-cols-[8rem_1fr] items-start gap-x-3">
-        <span class="label-text text-right pt-2">{t("admin.roleTypes.table.description")}</span>
-        <textarea name="description" rows={2} maxlength={300} class="textarea textarea-bordered w-full">{type?.description ?? ""}</textarea>
-      </div>
+      <Field label={t("admin.roleTypes.table.name")} required>
+        <input type="text" name="name" value={type?.name ?? ""} placeholder={t("admin.roleTypes.table.name")} class="input w-full" required />
+      </Field>
+      <Field label={t("admin.roleTypes.table.description")}>
+        <textarea name="description" rows={2} maxlength={300} placeholder={t("admin.roleTypes.table.description")} class="textarea w-full">{type?.description ?? ""}</textarea>
+      </Field>
       <label class="label cursor-pointer justify-start gap-3">
         <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(type?.allowsActiveStatus ? { checked: true } : {})} />
-        <span class="label-text">{t("admin.roleTypes.table.allowsActiveLong")}</span>
+        <span class="text-sm">{t("admin.roleTypes.table.allowsActiveLong")}</span>
       </label>
     </>
   );

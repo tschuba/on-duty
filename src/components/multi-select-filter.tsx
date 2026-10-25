@@ -33,7 +33,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
       <button type="button" class="btn btn-ghost m-0" popovertarget={id}>{label} ▾</button>
       <div id={id} popover="auto" class="msf-panel bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 m-0">
         {searchable && (
-          <label class="input input-bordered flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
+          <label class="input flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
         )}
         {unusedToggle && (
           <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-xs opacity-60"><input type="checkbox" class="toggle toggle-xs" data-msf-unused-toggle />{unusedToggle.label}</label>

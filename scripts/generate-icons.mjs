@@ -42,6 +42,9 @@ const ICONS = {
   "shield-check": "24/outline/shield-check.svg",
   "wrench-screwdriver": "24/outline/wrench-screwdriver.svg",
   user: "24/outline/user.svg",
+  envelope: "24/outline/envelope.svg",
+  phone: "24/outline/phone.svg",
+  "device-phone-mobile": "24/outline/device-phone-mobile.svg",
   "squares-2x2": "24/outline/squares-2x2.svg",
 };
 
