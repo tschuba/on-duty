@@ -1,3 +1,4 @@
+import { Field } from "./field.js";
 import { t } from "../i18n/index.js";
 import { Icon } from "./icon.js";
 import { formatDate } from "../lib/format.js";
@@ -99,35 +100,36 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             {toggle("past")}{toggle("future")}
           </div>
           <div class="flex gap-2">
-            <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input w-24 min-h-11 text-base" aria-label={t("filter.quick.amount")} disabled={!showRel} />
-            <select data-qrf-unit class="select flex-1 min-h-11 text-base" aria-label={t("filter.quick.unit")} disabled={!showRel}>
+            <Field label={t("filter.quick.amount")} class="w-28">
+              <input type="number" inputmode="numeric" data-qrf-n min="1" max="999" value={rel.n} class="input w-full min-h-11 text-base" placeholder={t("filter.quick.amount")} disabled={!showRel} />
+            </Field>
+            <Field label={t("filter.quick.unit")} class="flex-1">
+            <select data-qrf-unit class="select w-full min-h-11 text-base" disabled={!showRel}>
               {REL_UNITS.flatMap((u) => u === "Y" && cutoff
                 ? [<option value="Y" selected={u === rel.unit && !rel.ceremony}>{t("filter.quick.unit.Ycal")}</option>,
                    <option value="YC" selected={u === rel.unit && !!rel.ceremony}>{t("filter.quick.unit.YC")}</option>]
                 : [<option value={u} selected={u === rel.unit}>{t(UNIT_KEY[u])}</option>])}
             </select>
+            </Field>
           </div>
           <p class="text-xs opacity-70">{t("filter.quick.relHint")}</p>
-          <label class="block">
-            <span class="text-sm text-xs">{t("filter.quick.ref")}</span>
-            <div class="join w-full">
-              <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input join-item w-full min-h-11 text-base" disabled={!showRel} />
-              <button type="button" data-qrf-today class="btn join-item min-h-11" aria-label={t("filter.quick.todayBtn")} title={t("filter.quick.todayBtn")} disabled={!rel.ref}>
-                <Icon name="arrow-uturn-left" class="w-5 h-5 sm:hidden" />
-                <span class="hidden sm:inline">{t("filter.quick.todayBtn")}</span>
-              </button>
-            </div>
-          </label>
+          <div class="flex gap-2">
+            <Field label={t("filter.quick.ref")} class="flex-1">
+              <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input w-full min-h-11 text-base" placeholder={t("filter.quick.ref")} disabled={!showRel} />
+            </Field>
+            <button type="button" data-qrf-today class="btn min-h-11" aria-label={t("filter.quick.todayBtn")} title={t("filter.quick.todayBtn")} disabled={!rel.ref}>
+              <Icon name="arrow-uturn-left" class="w-5 h-5 sm:hidden" />
+              <span class="hidden sm:inline">{t("filter.quick.todayBtn")}</span>
+            </button>
+          </div>
         </div>
         <div data-qrf-fields="custom" class={`space-y-3${showCustom ? "" : " hidden"}`}>
-          <label class="block">
-            <span class="text-sm text-xs">{t("filter.quick.from")}</span>
-            <input type="date" name={names.start} value={range.start} class="input w-full min-h-11 text-base" disabled={!showCustom} />
-          </label>
-          <label class="block">
-            <span class="text-sm text-xs">{t("filter.quick.to")}</span>
-            <input type="date" name={names.end} value={range.end} class="input w-full min-h-11 text-base" disabled={!showCustom} />
-          </label>
+          <Field label={t("filter.quick.from")}>
+            <input type="date" name={names.start} value={range.start} class="input w-full min-h-11 text-base" placeholder={t("filter.quick.from")} disabled={!showCustom} />
+          </Field>
+          <Field label={t("filter.quick.to")}>
+            <input type="date" name={names.end} value={range.end} class="input w-full min-h-11 text-base" placeholder={t("filter.quick.to")} disabled={!showCustom} />
+          </Field>
         </div>
         <div class="flex gap-2 justify-end mt-4 max-sm:flex-col-reverse [&>*]:max-sm:w-full [&>*]:max-sm:min-h-11">
           <button type="button" class="btn btn-ghost" popovertarget={eid} popovertargetaction="hide">{t("common.cancel")}</button>

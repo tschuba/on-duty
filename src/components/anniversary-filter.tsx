@@ -1,3 +1,4 @@
+import { Field } from "./field.js";
 import { t } from "../i18n/index.js";
 import { anniversaryFilterLabel } from "../lib/anniversaries.js";
 import { Icon } from "./icon.js";
@@ -43,10 +44,9 @@ export function AnniversaryFilter({ kinds, mods, gte, action, hidden = [] }: {
               <legend class="text-sm text-xs">{t("anniversaries.filter.roundness")}</legend>
               {MODS.map(([v, k]) => toggle("mod", v, t(k), mods.includes(v)))}
             </fieldset>
-            <label class="block">
-              <span class="text-sm text-xs">{t("anniversaries.minYears.label")}</span>
-              <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input w-24 min-h-11 text-base" placeholder="–" />
-            </label>
+            <Field label={t("anniversaries.minYears.label")}>
+              <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input w-full min-h-11 text-base" placeholder={t("anniversaries.minYears.placeholder")} />
+            </Field>
           </div>
           <div class="flex gap-2 justify-end mt-4 [&>*]:min-h-11">
             <button type="button" data-reset class="btn btn-ghost mr-auto" aria-label={t("common.reset")} title={t("common.reset")} disabled={!active}>

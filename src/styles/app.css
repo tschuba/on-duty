@@ -197,7 +197,7 @@ main > [data-subnav] {
   z-index: 15;
   top: calc(var(--nav-h) + var(--header-h));
   background: var(--color-base-100);
-  padding-block: 0.5rem;
+  padding-block: 1rem 0.5rem; /* oben Platz für hochgeschobene Floating Labels */
 }
 @media (min-width: 48rem) {
   body:has([data-subnav]) .filter-bar {
@@ -298,4 +298,9 @@ details:not([open]) > summary .section-actions {
     align-items: center;
     gap: 0.5rem;
   }
+}
+
+/* Das Floating Label ragt eine halbe Zeile über das erste Feld; der (höher gestapelte) PageHeader würde es sonst abschneiden. */
+.page-header + form {
+  padding-top: 0.75rem;
 }

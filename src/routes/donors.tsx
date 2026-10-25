@@ -101,16 +101,15 @@ type PersonFieldInput = Partial<Record<keyof PersonFieldValues, string | null>>;
 function personField(name: keyof PersonFieldValues, label: string, values: PersonFieldInput | undefined, errors: Record<string, string> | undefined, optional = false) {
   const err = errors?.[name];
   return (
-    <Field label={label} required={!optional}>
+    <Field label={label} required={!optional} after={err && <span class="text-error text-sm mt-1 block">{err}</span>}>
       <input
         type="text"
         id={`donor-${name}`}
         name={name}
         value={values?.[name] ?? ""}
         placeholder={label}
-        class={err ? "input-error" : ""}
+        class={`input w-full${err ? " input-error" : ""}`}
       />
-      {err && <span class="text-error text-sm mt-1">{err}</span>}
     </Field>
   );
 }

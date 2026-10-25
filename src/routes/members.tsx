@@ -471,9 +471,8 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
           <input type="date" name="to" class="input w-full" value={values.to ?? ""} />
         </Field>
       </div>
-      <Field label={t("members.form.note")}>
+      <Field label={t("members.form.note")} after={<span class="text-xs block text-right mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>}>
         <textarea name="note" rows={3} class="note-input textarea w-full" maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} placeholder={t("members.form.note")}>{values.note ?? ""}</textarea>
-        <span class="text-xs self-end mt-1 note-counter-wrap" aria-live="polite"><span class="note-counter opacity-60"><span class="note-count">{(values.note ?? "").length}</span> {t("members.assignment.noteCount", { max: String(ASSIGNMENT_NOTE_MAX_LENGTH) })}</span></span>
       </Field>
       <div class="modal-action @container">
         <div class="flex w-full justify-end gap-2">
