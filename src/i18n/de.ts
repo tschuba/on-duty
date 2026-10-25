@@ -34,6 +34,7 @@ export const de = {
   "common.show": "Anzeigen",
   "common.searchPlaceholder": "Suchen…",
   "common.emailInvalid": "Bitte eine gültige E-Mail-Adresse eingeben",
+  "common.phoneInvalid": "Bitte eine gültige Telefonnummer eingeben (Ziffern, + ( ) / - Leerzeichen)",
   "common.excelExport": "Excel-Export",
   "common.saveAndNew": "Speichern & Neu",
   "common.nav.members": "Mitglieder",

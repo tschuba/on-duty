@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
-import { Field } from "../components/field.js";
+import { EmailField, Field, PhoneField } from "../components/field.js";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
@@ -347,7 +347,14 @@ function BorrowerPickerFields({ personId, values, errors }: {
 }) {
   const v = values ?? {};
   const showFields = Boolean(personId) || Object.values(v).some(Boolean);
-  const field = (name: keyof BorrowerValues, label: string, type = "text", required = false) => (
+  const field = (name: keyof BorrowerValues, label: string, type = "text", required = false) => type === "email" || type === "tel" ? (
+    <>
+      {type === "email"
+        ? <EmailField label={label} name={name} value={v[name] ?? ""} required={required} error={!!errors?.[name]} />
+        : <PhoneField label={label} name={name} value={v[name] ?? ""} required={required} error={!!errors?.[name]} />}
+      {errors?.[name] && <span class="text-error text-sm mt-1">{errors[name]}</span>}
+    </>
+  ) : (
     <Field label={label} required={required}>
       <input type={type} id={`borrower-${name}`} name={name} value={v[name] ?? ""} class={`input w-full${errors?.[name] ? " input-error" : ""}`} placeholder={label} />
       {errors?.[name] && <span class="text-error text-sm mt-1">{errors[name]}</span>}

@@ -61,3 +61,30 @@ export function EmailField({ label, hint, class: cls, ...input }: {
     </Field>
   );
 }
+
+// Telefon-Eingabe mit Icon und daisyUI-Validator (Hinweis über `PhoneHint`).
+// shortcut: nur Zeichen-Whitelist, keine Nummernprüfung; bei Bedarf libphonenumber.
+export function PhoneInput({ name, value, placeholder, required, disabled, error, mobile, class: cls = "" }: {
+  name?: string; value?: string; placeholder: string; required?: boolean; disabled?: boolean; error?: boolean; mobile?: boolean; class?: string;
+}) {
+  return (
+    <label class={`input validator flex items-center gap-2 w-full${error ? " input-error" : ""} ${cls}`}>
+      <Icon name={mobile ? "device-phone-mobile" : "phone"} class="w-4 h-4 opacity-60" />
+      <input type="tel" name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} pattern="[0-9+()\/ \-]*" title={t("common.phoneInvalid")} class="grow min-w-0" />
+    </label>
+  );
+}
+
+export const PhoneHint = () => <div class="validator-hint hidden">{t("common.phoneInvalid")}</div>;
+
+// Floating-Label-Feld um PhoneInput.
+export function PhoneField({ label, hint, class: cls, ...input }: {
+  label: string; hint?: string; class?: string;
+  name?: string; value?: string; required?: boolean; disabled?: boolean; error?: boolean; mobile?: boolean;
+}) {
+  return (
+    <Field label={label} required={input.required} hint={hint} class={cls} after={<PhoneHint />}>
+      <PhoneInput {...input} placeholder={label} />
+    </Field>
+  );
+}

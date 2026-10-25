@@ -1,6 +1,6 @@
 import { RowAction } from "../components/row-action.js";
 import type { Context } from "hono";
-import { Field } from "../components/field.js";
+import { EmailField, Field, PhoneField } from "../components/field.js";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { eq, and, asc, isNull, getTableColumns } from "drizzle-orm";
@@ -677,6 +677,15 @@ function MemberFormFields({
   ) {
     const value = m?.[name] ?? "";
     const err = errors?.[name as string];
+    if (type === "email" || type === "tel") {
+      const Cmp = type === "email" ? EmailField : PhoneField;
+      return (
+        <>
+          <Cmp {...(name === "mobile" ? { mobile: true } : {})} label={label} name={name as string} value={value as string} required={required} error={!!err} />
+          {err && <span class="text-error text-sm mt-1">{err}</span>}
+        </>
+      );
+    }
     return (
       <Field label={label} required={required}>
         <input
@@ -732,7 +741,7 @@ function MemberFormFields({
         <div class="sm:col-span-3">{field("city", t("members.form.city"))}</div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {field("phone", t("members.form.phone"))}
+        {field("phone", t("members.form.phone"), "tel")}
         {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
       </div>
