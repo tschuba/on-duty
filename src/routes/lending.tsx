@@ -435,7 +435,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
 }) {
   const v = values ?? {};
   return (
-    <form method="post" action={action} class="space-y-4 max-w-xl border border-base-300 rounded-box p-4">
+    <form id="loan-new-form" method="post" action={action} class="space-y-4 max-w-md">
       {items && (
         <Field label={t("lending.loans.form.item")}>
           <select name="lendingItemId" required class={`select w-full${errors?.item ? " select-error" : ""}`}>
@@ -458,30 +458,32 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("lending.loans.form.plannedFrom")} required>
-          <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} required class={`input w-full${errors?.plannedFrom ? " input-error" : ""}`} />
+          <input type="date" id="loan-plannedFrom" name="plannedFrom" oninput="document.getElementById('loan-takeFrom').disabled=!this.value" value={v.plannedFrom ?? ""} required class={`input w-full${errors?.plannedFrom ? " input-error" : ""}`} />
           {errors?.plannedFrom && <span class="text-error text-sm mt-1">{errors.plannedFrom}</span>}
         </Field>
         <Field label={t("lending.loans.form.plannedTo")} required>
-          <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} required class={`input w-full${errors?.plannedTo ? " input-error" : ""}`} />
+          <input type="date" id="loan-plannedTo" name="plannedTo" oninput="document.getElementById('loan-takeTo').disabled=!this.value" value={v.plannedTo ?? ""} required class={`input w-full${errors?.plannedTo ? " input-error" : ""}`} />
           {errors?.plannedTo && <span class="text-error text-sm mt-1">{errors.plannedTo}</span>}
         </Field>
-        <Field label={t("lending.loans.form.pickedUpAt")}>
-          <input type="date" id="loan-pickedUpAt" name="pickedUpAt" value={v.pickedUpAt ?? ""} class="input w-full" />
-          <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
+        <Field label={t("lending.loans.form.pickedUpAt")} after={
+          <button type="button" id="loan-takeFrom" disabled={!v.plannedFrom} class="btn min-h-11 w-full mt-2" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
+            <Icon name="arrow-up" class="w-4 h-4" />
             {t("lending.loans.form.takeOverFrom")}
           </button>
+        }>
+          <input type="date" id="loan-pickedUpAt" name="pickedUpAt" value={v.pickedUpAt ?? ""} class="input w-full" />
         </Field>
-        <Field label={t("lending.loans.form.returnedAt")}>
-          <input type="date" id="loan-returnedAt" name="returnedAt" value={v.returnedAt ?? ""} class="input w-full" />
-          <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-returnedAt').value=document.getElementById('loan-plannedTo').value">
+        <Field label={t("lending.loans.form.returnedAt")} after={
+          <button type="button" id="loan-takeTo" disabled={!v.plannedTo} class="btn min-h-11 w-full mt-2" onclick="document.getElementById('loan-returnedAt').value=document.getElementById('loan-plannedTo').value">
+            <Icon name="arrow-up" class="w-4 h-4" />
             {t("lending.loans.form.takeOverTo")}
           </button>
+        }>
+          <input type="date" id="loan-returnedAt" name="returnedAt" value={v.returnedAt ?? ""} class="input w-full" />
         </Field>
       </div>
       {errors?.dates && <p class="text-error text-sm" role="alert">{errors.dates}</p>}
       {errors?.conflict && <p class="text-error text-sm" role="alert">{errors.conflict}</p>}
-
-      <button type="submit" class="btn btn-primary">{t("lending.loans.form.save")}</button>
     </form>
   );
 }
@@ -566,8 +568,10 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
     const values = { quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerPersonId, ...person };
     return c.html(
       <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
-        <NewLoanHeader />
-        <LoanForm action="/inventory/lending/loans" item={item} items={await fetchLendableItems()} values={values} errors={errors} />
+        <div class="max-w-md mx-auto">
+          <NewLoanHeader />
+          <LoanForm action="/inventory/lending/loans" item={item} items={await fetchLendableItems()} values={values} errors={errors} />
+        </div>
       </Layout>,
       422
     );
@@ -650,7 +654,7 @@ lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) =>
 
 function NewLoanHeader() {
   return (
-    <PageHeader title={t("lending.newLoan.title")} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} />
+    <PageHeader title={t("lending.newLoan.title")} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={<FormActions formId="loan-new-form" />} />
   );
 }
 
@@ -662,8 +666,10 @@ lendingRoutes.get("/loans/new", requireAuth("lending:manage"), async (c) => {
   const selected = items.find((li) => li.id === c.req.query("item"));
   return c.html(
     <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
-      <NewLoanHeader />
-      <LoanForm action="/inventory/lending/loans" item={selected} items={items} />
+      <div class="max-w-md mx-auto">
+        <NewLoanHeader />
+        <LoanForm action="/inventory/lending/loans" item={selected} items={items} />
+      </div>
     </Layout>
   );
 });
