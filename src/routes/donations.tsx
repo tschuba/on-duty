@@ -195,7 +195,7 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
           />
           {errors?.amount && <span class="text-error text-sm mt-1">{errors.amount}</span>}
         </Field>
-        <Field label={t("donations.form.date")} required floating={false}>
+        <Field label={t("donations.form.date")} required>
           <div class="join w-full">
             <input
               type="date"

@@ -538,7 +538,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       </Field>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("inventory.form.commissionedAt")} floating={false}>
+        <Field label={t("inventory.form.commissionedAt")}>
           <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
         </Field>
         <Field label={t("inventory.form.purchasePrice")}>
@@ -564,7 +564,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             <input type="text" inputmode="numeric" name="yearOfManufacture" value={v.yearOfManufacture ?? ""} class={`input w-full${errors?.yearOfManufacture ? " input-error" : ""}`} placeholder={t("inventory.form.yearOfManufacture")} />
             {errors?.yearOfManufacture && <span class="text-error text-sm mt-1">{errors.yearOfManufacture}</span>}
           </Field>
-          <Field label={t("inventory.form.vehicleInspectionDue")} floating={false}>
+          <Field label={t("inventory.form.vehicleInspectionDue")}>
             <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input w-full" />
           </Field>
         </div>
@@ -573,10 +573,10 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       <div data-show-cats="scba,equipment,ppe" class="space-y-4">
         <div class="divider">{t("inventory.form.sectionInspection")}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label={t("inventory.form.lastInspectionDate")} floating={false}>
+          <Field label={t("inventory.form.lastInspectionDate")}>
             <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input w-full" />
           </Field>
-          <Field label={t("inventory.form.nextInspectionDue")} floating={false}>
+          <Field label={t("inventory.form.nextInspectionDue")}>
             <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input w-full" />
           </Field>
         </div>

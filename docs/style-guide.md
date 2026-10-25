@@ -9,9 +9,9 @@ Soll-Zustand für Layout, Farben, Typografie, Tabellen und Buttons in on-duty. B
 daisyUI v5. Die v4-Klassen `form-control`, `label-text`, `input-bordered`, `select-bordered` sind verboten (Grep-Test `daisyui-v4-classes.test.ts`).
 
 - **Text/Select/Textarea:** `Field` (`src/components/field.tsx`) mit Floating Label; `placeholder` wiederholt den Labeltext. Pflichtstern (`text-error ml-1`) sitzt in `Field`.
-- **Datumsfelder** (`date`, `datetime-local`, `month`): `Field floating={false}` (`fieldset` + festes Label darüber), da das Browser-Format mit Floating Label kollidiert.
+- **Datumsfelder** (`date`, `datetime-local`, `month`): normales `Field` mit Floating Label; das native Browser-Format kollidiert nicht damit (geprüft in `inventory.tsx`, leer und vorbelegt, Desktop und mobil).
 - **Checkbox/Toggle/Radio:** `<label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">` um Input + Text.
-- **Gruppen** (Radio-Liste, Von/Bis): `FieldGroup` (`fieldset` + `legend.fieldset-legend`).
+- **Gruppen** (Radio-Liste, Von/Bis, Kategorie-/Rollen-Auswahl): `Field floating={false}` (`fieldset` + festes Label darüber) bzw. `FieldGroup`.
 - **Beispiele/Formatvorgaben:** als `hint` unter dem Feld, nicht als Placeholder.
 - **Sonderfälle:** `ChipInput` und Such-Inputs mit Icon bleiben ohne `Field`, nur v5-Klassen.
 

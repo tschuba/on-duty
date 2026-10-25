@@ -429,7 +429,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
               <input type="text" name="firstName" value={app.person.firstName} class="input w-full" placeholder={t("apply.form.firstName")} />
             </Field>
           </div>
-          <Field label={t("apply.form.birthDate")} floating={false}>
+          <Field label={t("apply.form.birthDate")}>
             <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input w-full" />
           </Field>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -464,10 +464,10 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         </div>
       </Field>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("members.form.from")} required floating={false}>
+        <Field label={t("members.form.from")} required>
           <input type="date" name="from" class="input w-full" value={values.from ?? ""} required />
         </Field>
-        <Field label={t("members.form.to")} floating={false}>
+        <Field label={t("members.form.to")}>
           <input type="date" name="to" class="input w-full" value={values.to ?? ""} />
         </Field>
       </div>

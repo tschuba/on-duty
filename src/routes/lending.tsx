@@ -307,7 +307,7 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
           )}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {(["plannedFrom", "plannedTo", "pickedUpAt", "returnedAt"] as const).map((f) => (
-              <Field label={t(`lending.loans.form.${f}`)} floating={false}>
+              <Field label={t(`lending.loans.form.${f}`)}>
                 <input type="date" name={f} value={loan[f] ?? ""} class="input w-full" />
               </Field>
             ))}
@@ -449,21 +449,21 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
       )}
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("lending.loans.form.plannedFrom")} required floating={false}>
+        <Field label={t("lending.loans.form.plannedFrom")} required>
           <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} required class={`input w-full${errors?.plannedFrom ? " input-error" : ""}`} />
           {errors?.plannedFrom && <span class="text-error text-sm mt-1">{errors.plannedFrom}</span>}
         </Field>
-        <Field label={t("lending.loans.form.plannedTo")} required floating={false}>
+        <Field label={t("lending.loans.form.plannedTo")} required>
           <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} required class={`input w-full${errors?.plannedTo ? " input-error" : ""}`} />
           {errors?.plannedTo && <span class="text-error text-sm mt-1">{errors.plannedTo}</span>}
         </Field>
-        <Field label={t("lending.loans.form.pickedUpAt")} floating={false}>
+        <Field label={t("lending.loans.form.pickedUpAt")}>
           <input type="date" id="loan-pickedUpAt" name="pickedUpAt" value={v.pickedUpAt ?? ""} class="input w-full" />
           <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
             {t("lending.loans.form.takeOverFrom")}
           </button>
         </Field>
-        <Field label={t("lending.loans.form.returnedAt")} floating={false}>
+        <Field label={t("lending.loans.form.returnedAt")}>
           <input type="date" id="loan-returnedAt" name="returnedAt" value={v.returnedAt ?? ""} class="input w-full" />
           <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-returnedAt').value=document.getElementById('loan-plannedTo').value">
             {t("lending.loans.form.takeOverTo")}
