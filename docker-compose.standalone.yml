@@ -254,7 +254,7 @@ services:
       - traefik.http.routers.zitadel-login-csp.priority=1000
       - traefik.http.routers.zitadel-login-csp.tls=true
       - traefik.http.routers.zitadel-login-csp.tls.certresolver=letsencrypt
-      - traefik.http.routers.zitadel-login-csp.middlewares=zitadel-login-csp
+      - traefik.http.routers.zitadel-login-csp.middlewares=gzip-sse,zitadel-login-csp
       - traefik.http.routers.zitadel-login-csp.service=zitadel-login-csp
       - traefik.http.services.zitadel-login-csp.loadbalancer.server.port=3000
     volumes:
