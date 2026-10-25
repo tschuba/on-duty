@@ -570,9 +570,8 @@ function BankDataSection({
           <input type="text" name="bic" value={m.bic ?? ""} class="input w-full" placeholder={t("members.bank.bic")} />
         </Field>
       </div>
-      <Field label={t("members.bank.accountHolder")}>
+      <Field label={t("members.bank.accountHolder")} hint={t("members.bank.accountHolderHint")}>
         <input type="text" name="accountHolder" value={m.accountHolder ?? ""} class="input w-full" placeholder={t("members.bank.accountHolder")} />
-        <span class="text-sm opacity-60 mt-1">{t("members.bank.accountHolderHint")}</span>
       </Field>
     </>
   ) : (
@@ -680,13 +679,13 @@ function MemberFormFields({
     const value = m?.[name] ?? "";
     const err = errors?.[name as string];
     return (
-      <Field label={label} required={required} floating={type !== "date"}>
+      <Field label={label} required={required}>
         <input
           type={type}
           name={name as string}
           value={value as string}
           placeholder={label}
-          class={`w-full${err ? " input-error" : ""}`}
+          class={`input w-full${err ? " input-error" : ""}`}
           {...(required ? { required: true } : {})}
         />
         {err && <span class="text-error text-sm mt-1">{err}</span>}
@@ -726,6 +725,7 @@ function MemberFormFields({
         {field("exitDate", t("members.form.exitDate"), "date")}
       </div>
       <Section title={t("members.contact.title")} open>
+      <div class="space-y-4">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("street", t("members.form.street"))}
         {field("houseNumber", t("members.form.houseNumber"))}
@@ -738,6 +738,7 @@ function MemberFormFields({
         {field("phone", t("members.form.phone"))}
         {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
+      </div>
       </div>
       </Section>
     </>

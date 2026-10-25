@@ -39,7 +39,6 @@ function OrgSection({ tab, values, editable, missing }: { tab: OrgTab; values: R
             <Field
               label={t(`admin.orgConfig.field.${key}` as never)}
               required={(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key)}
-              floating={type !== "date"}
               class={SPAN_CLASS[span ?? 4]}
             >
               <input
