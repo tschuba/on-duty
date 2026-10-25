@@ -253,10 +253,10 @@ applicationRoutes.get("/", guard, async (c) => {
                   </div>
                 </FieldGroup>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label={t("applications.formSettings.startDate")} floating={false} class="form-start">
+                  <Field label={t("applications.formSettings.startDate")} class="form-start">
                     <input type="date" name="startDate" value={form?.startDate ?? ""} class="input w-full" />
                   </Field>
-                  <Field label={t("applications.formSettings.endDate")} floating={false} class="form-end">
+                  <Field label={t("applications.formSettings.endDate")} class="form-end">
                     <input type="date" name="endDate" value={form?.endDate ?? ""} class="input w-full" />
                   </Field>
                 </div>
@@ -305,8 +305,8 @@ applicationRoutes.get("/", guard, async (c) => {
           document.querySelectorAll('.form-settings-form').forEach(function(form) {
             var startInput = form.querySelector('input[name="startDate"]');
             var endInput = form.querySelector('input[name="endDate"]');
-            var startLabel = form.querySelector('.form-start legend');
-            var endLabel = form.querySelector('.form-end legend');
+            var startLabel = form.querySelector('.form-start label > span');
+            var endLabel = form.querySelector('.form-end label > span');
             var preview = form.querySelector('.form-status-preview');
             function update() {
               var mode = form.querySelector('input[name="status"]:checked').value;
