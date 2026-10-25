@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
-import { EmailField, Field } from "../components/field.js";
+import { EmailField, Field, FieldGroup } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -240,9 +240,8 @@ applicationRoutes.get("/", guard, async (c) => {
             <div class="modal-box">
               <h3 class="font-bold text-lg mb-4">{t("applications.formSettings.title", { type: TYPE_LABELS[type] })}</h3>
               <form method="post" action={`/applications/forms/${type}`} class="space-y-4 form-settings-form">
-                <div class="flex flex-col">
-                  <span class="text-sm">{t("applications.formSettings.statusLabel")}</span>
-                  <div class="join w-full mt-1">
+                <FieldGroup legend={t("applications.formSettings.statusLabel")}>
+                  <div class="join w-full">
                     <label class="join-item btn flex-1 has-[:checked]:btn-primary">
                       <input type="radio" name="status" value="active" class="hidden" checked={form?.isActive === true} />
                       {t("applications.formSettings.active")}
@@ -252,16 +251,14 @@ applicationRoutes.get("/", guard, async (c) => {
                       {t("applications.formSettings.inactive")}
                     </label>
                   </div>
-                </div>
+                </FieldGroup>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div class="flex flex-col">
-                    <label class="label"><span class="text-sm form-start-label">{t("applications.formSettings.startDate")}</span></label>
+                  <Field label={t("applications.formSettings.startDate")} floating={false} class="form-start">
                     <input type="date" name="startDate" value={form?.startDate ?? ""} class="input w-full" />
-                  </div>
-                  <div class="flex flex-col">
-                    <label class="label"><span class="text-sm form-end-label">{t("applications.formSettings.endDate")}</span></label>
+                  </Field>
+                  <Field label={t("applications.formSettings.endDate")} floating={false} class="form-end">
                     <input type="date" name="endDate" value={form?.endDate ?? ""} class="input w-full" />
-                  </div>
+                  </Field>
                 </div>
                 <p class="text-sm form-status-preview"></p>
                 <p class="text-xs opacity-60">{t("applications.formSettings.dateHint")}</p>
@@ -308,8 +305,8 @@ applicationRoutes.get("/", guard, async (c) => {
           document.querySelectorAll('.form-settings-form').forEach(function(form) {
             var startInput = form.querySelector('input[name="startDate"]');
             var endInput = form.querySelector('input[name="endDate"]');
-            var startLabel = form.querySelector('.form-start-label');
-            var endLabel = form.querySelector('.form-end-label');
+            var startLabel = form.querySelector('.form-start legend');
+            var endLabel = form.querySelector('.form-end legend');
             var preview = form.querySelector('.form-status-preview');
             function update() {
               var mode = form.querySelector('input[name="status"]:checked').value;
