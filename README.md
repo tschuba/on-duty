@@ -78,6 +78,11 @@ pnpm dev
 # Aufräumen: pnpm stack:down · alles löschen inkl. Volumes: pnpm stack:reset (CA bleibt; `stack:reset --ca` entfernt auch sie)
 ```
 
+## Als App installieren
+
+on-duty ist eine installierbare Web-App (PWA); ohne Netz zeigt sie nur eine Offline-Seite, Daten werden nie gecacht.
+Android (Chrome): Menü → „Zum Startbildschirm hinzufügen“ · iOS (Safari): Teilen → „Zum Home-Bildschirm“.
+
 ## Scripts
 
 | Befehl | Beschreibung |

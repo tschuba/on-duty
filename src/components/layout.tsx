@@ -67,6 +67,11 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
       <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}` }} />
       <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      <link rel="manifest" href="/manifest.webmanifest" />
+      <meta name="theme-color" content="#f8f8f8" media="(prefers-color-scheme: light)" />
+      <meta name="theme-color" content="#1b222c" media="(prefers-color-scheme: dark)" />
+      <meta name="apple-mobile-web-app-title" content="on-duty" />
+      <script dangerouslySetInnerHTML={{ __html: `if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("/sw.js")})` }} />
       <link rel="stylesheet" href="/css/app.css" />
       <script src="/js/htmx.min.js" />
       {user && readDsn() && <script src="/js/sentry.min.js" />}
