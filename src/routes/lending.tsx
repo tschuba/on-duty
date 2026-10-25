@@ -350,8 +350,8 @@ function BorrowerPickerFields({ personId, values, errors }: {
   const field = (name: keyof BorrowerValues, label: string, type = "text", required = false) => type === "email" || type === "tel" ? (
     <>
       {type === "email"
-        ? <EmailField label={label} name={name} value={v[name] ?? ""} required={required} error={!!errors?.[name]} />
-        : <PhoneField label={label} name={name} value={v[name] ?? ""} required={required} error={!!errors?.[name]} />}
+        ? <EmailField label={label} id={`borrower-${name}`} name={name} value={v[name] ?? ""} required={required} error={!!errors?.[name]} />
+        : <PhoneField label={label} id={`borrower-${name}`} name={name} value={v[name] ?? ""} required={required} error={!!errors?.[name]} />}
       {errors?.[name] && <span class="text-error text-sm mt-1">{errors[name]}</span>}
     </>
   ) : (
@@ -363,7 +363,7 @@ function BorrowerPickerFields({ personId, values, errors }: {
   return (
     <div class="space-y-3">
       <div id="borrower-picker-search" class={showFields ? "hidden" : ""}>
-        <p class="fieldset-legend">{t("lending.loans.form.borrowerType")}<span class="text-error ml-1">*</span></p>
+        <p class="fieldset-legend">{t("lending.loans.form.borrowerType")}</p>
         <label class={`input flex items-center gap-2 w-full${errors?.borrower ? " input-error" : ""}`}>
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
@@ -378,6 +378,7 @@ function BorrowerPickerFields({ personId, values, errors }: {
           />
         </label>
         <div id="borrower-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+        <button type="button" class="link link-primary text-sm mt-2 borrower-create-new">{t("lending.loans.form.borrowerCreateNew")}</button>
         {errors?.borrower && <p class="text-error text-sm mt-1">{errors.borrower}</p>}
       </div>
       <input type="hidden" id="borrower-personId" name="borrowerPersonId" value={personId ?? ""} />
@@ -620,10 +621,10 @@ lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) =>
   );
   if (results.length === 0) {
     return c.html(
-      <>
-        <p class="p-2 text-sm opacity-60">{t("lending.loans.form.borrowerNoResults", { query: q })}</p>
-        {createNew}
-      </>
+      <div class="p-2">
+        <p class="text-sm opacity-60 mb-1">{t("lending.loans.form.borrowerNoResults", { query: q })}</p>
+        <button type="button" class="btn btn-ghost btn-sm borrower-create-new">{t("lending.loans.form.borrowerExternalNew")}</button>
+      </div>
     );
   }
   return c.html(

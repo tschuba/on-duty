@@ -897,6 +897,7 @@ export const de = {
   "lending.loans.table.empty": "Keine Verleihvorgänge.",
   "lending.loans.overdue": "überfällig",
   "lending.loans.form.borrowerType": "Mitglied suchen",
+  "lending.loans.form.borrowerCreateNew": "Neue Person erfassen",
   "lending.loans.form.borrowerExternalNew": "Keine Übereinstimmung? Neue Person erfassen",
   "lending.loans.form.borrowerNoResults": "Keine Treffer für „{query}“.",
   "lending.loans.form.borrowerChangeSelection": "← Andere Person wählen",

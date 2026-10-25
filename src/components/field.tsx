@@ -37,13 +37,13 @@ export function FieldGroup({ legend, children }: { legend: string; children: unk
 }
 
 // E-Mail-Eingabe mit Icon und daisyUI-Validator (Hinweis erscheint über `EmailHint`).
-export function EmailInput({ name, value, placeholder, required, disabled, error, class: cls = "" }: {
-  name?: string; value?: string; placeholder: string; required?: boolean; disabled?: boolean; error?: boolean; class?: string;
+export function EmailInput({ id, name, value, placeholder, required, disabled, error, class: cls = "" }: {
+  id?: string; name?: string; value?: string; placeholder: string; required?: boolean; disabled?: boolean; error?: boolean; class?: string;
 }) {
   return (
     <label class={`input validator flex items-center gap-2 w-full${error ? " input-error" : ""} ${cls}`}>
       <Icon name="envelope" class="w-4 h-4 opacity-60" />
-      <input type="email" name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} class="grow min-w-0" />
+      <input type="email" id={id} name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} class="grow min-w-0" />
     </label>
   );
 }
@@ -53,7 +53,7 @@ export const EmailHint = () => <div class="validator-hint hidden">{t("common.ema
 // Floating-Label-Feld um EmailInput.
 export function EmailField({ label, hint, class: cls, ...input }: {
   label: string; hint?: string; class?: string;
-  name?: string; value?: string; required?: boolean; disabled?: boolean; error?: boolean;
+  id?: string; name?: string; value?: string; required?: boolean; disabled?: boolean; error?: boolean;
 }) {
   return (
     <Field label={label} required={input.required} hint={hint} class={cls} after={<EmailHint />}>
@@ -64,13 +64,13 @@ export function EmailField({ label, hint, class: cls, ...input }: {
 
 // Telefon-Eingabe mit Icon und daisyUI-Validator (Hinweis über `PhoneHint`).
 // shortcut: nur Zeichen-Whitelist, keine Nummernprüfung; bei Bedarf libphonenumber.
-export function PhoneInput({ name, value, placeholder, required, disabled, error, mobile, class: cls = "" }: {
-  name?: string; value?: string; placeholder: string; required?: boolean; disabled?: boolean; error?: boolean; mobile?: boolean; class?: string;
+export function PhoneInput({ id, name, value, placeholder, required, disabled, error, mobile, class: cls = "" }: {
+  id?: string; name?: string; value?: string; placeholder: string; required?: boolean; disabled?: boolean; error?: boolean; mobile?: boolean; class?: string;
 }) {
   return (
     <label class={`input validator flex items-center gap-2 w-full${error ? " input-error" : ""} ${cls}`}>
       <Icon name={mobile ? "device-phone-mobile" : "phone"} class="w-4 h-4 opacity-60" />
-      <input type="tel" name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} pattern="[0-9+()\/ \-]*" title={t("common.phoneInvalid")} class="grow min-w-0" />
+      <input type="tel" id={id} name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} pattern="[0-9+()\/ \-]*" title={t("common.phoneInvalid")} class="grow min-w-0" />
     </label>
   );
 }
@@ -80,7 +80,7 @@ export const PhoneHint = () => <div class="validator-hint hidden">{t("common.pho
 // Floating-Label-Feld um PhoneInput.
 export function PhoneField({ label, hint, class: cls, ...input }: {
   label: string; hint?: string; class?: string;
-  name?: string; value?: string; required?: boolean; disabled?: boolean; error?: boolean; mobile?: boolean;
+  id?: string; name?: string; value?: string; required?: boolean; disabled?: boolean; error?: boolean; mobile?: boolean;
 }) {
   return (
     <Field label={label} required={input.required} hint={hint} class={cls} after={<PhoneHint />}>
