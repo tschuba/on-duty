@@ -30,6 +30,7 @@ import { requireAuth, type Variables } from "./middleware/auth.js";
 import { sentryTunnelRoutes } from "./routes/sentry-tunnel.js";
 import { readDsn } from "./lib/sentry.js";
 import { healthRoutes } from "./routes/health.js";
+import { pwaRoutes } from "./routes/pwa.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
@@ -42,6 +43,7 @@ const app = new Hono<{ Variables: Variables & LogVariables }>();
 app.use("*", requestLog());
 
 app.route("/", healthRoutes);
+app.route("/", pwaRoutes);
 
 // Static assets
 app.use("/css/*", serveStatic({ root: "./public" }));
@@ -50,6 +52,7 @@ app.use("/js/*", serveStatic({ root: "./public" }));
 /* v8 ignore start -- static mounts like the ones above; index.tsx boots the server and is never imported by tests */
 app.use("/favicon.svg", serveStatic({ root: "./public" }));
 app.use("/apple-touch-icon.png", serveStatic({ root: "./public" }));
+for (const f of ["manifest.webmanifest", "offline.html", "icon-192.png", "icon-512.png", "icon-maskable-512.png"]) app.use(`/${f}`, serveStatic({ root: "./public" }));
 /* v8 ignore stop */
 
 if (readDsn()) app.route("/", sentryTunnelRoutes);

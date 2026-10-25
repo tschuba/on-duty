@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { applications, donations } from "../db/schema/index.js";
@@ -164,5 +164,30 @@ describe("favicons", () => {
     expect(html).toContain('<link rel="icon" href="/favicon.svg"');
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png"');
     for (const f of ["favicon.svg", "apple-touch-icon.png"]) expect(existsSync(`public/${f}`)).toBe(true);
+  });
+});
+
+describe("pwa", () => {
+  it("links manifest and both theme colors, and ships the files it references", async () => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout>x</Layout>));
+    const html = await (await app.request("/")).text();
+    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest"');
+    expect(html).toContain('media="(prefers-color-scheme: light)"');
+    expect(html).toContain('media="(prefers-color-scheme: dark)"');
+    expect(html).toContain('register("/sw.js")');
+    const manifest = JSON.parse(readFileSync("public/manifest.webmanifest", "utf8"));
+    expect(manifest).toMatchObject({ name: "on-duty", display: "standalone", start_url: "/" });
+    for (const icon of manifest.icons) expect(existsSync(`public${icon.src}`)).toBe(true);
+    expect(existsSync("public/offline.html")).toBe(true);
+  });
+
+  it("serves the service worker revalidated and versioned", async () => {
+    const { pwaRoutes } = await import("../routes/pwa.js");
+    const res = await pwaRoutes.request("/sw.js");
+    const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect(res.headers.get("content-type")).toContain("text/javascript");
+    expect(await res.text()).toContain(`on-duty-${version}`);
   });
 });
