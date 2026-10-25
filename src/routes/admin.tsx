@@ -305,7 +305,7 @@ function RoleCheckboxes({
 }) {
   return (
     <div class="role-picker flex flex-col gap-2">
-      <label class="input-sm flex items-center gap-2 w-full">
+      <label class="input input-sm flex items-center gap-2 w-full">
         <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
         <input
           type="text"
@@ -592,14 +592,15 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
-      <Field label={t("admin.permissions.searchLabel")} class="filter-bar mb-3 max-w-xs">
+      <div class="filter-bar mb-3"><label class="input flex items-center gap-2 w-full max-w-xs">
+        <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
         <input
           type="search"
-          class="input w-full"
+          class="grow min-w-0"
           placeholder={t("admin.permissions.searchPlaceholder")}
           oninput="const q=this.value.toLowerCase();document.querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)})"
         />
-      </Field>
+      </label></div>
       <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
@@ -890,7 +891,7 @@ adminRoutes.get("/config", guard, async (c) => {
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
         <div class="filter-bar flex flex-wrap items-center gap-2 mb-4">
-          <Field label={t("admin.config.searchLabel")} class="w-full md:w-64"><input type="search" id="config-search" class="input w-full" placeholder={t("admin.config.search")} /></Field>
+          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
           <label class="label cursor-pointer gap-2">
             <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
             <span class="text-sm">{t("admin.config.filter.writable")}</span>
