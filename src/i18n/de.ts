@@ -457,7 +457,6 @@ export const de = {
   "admin.anniversaries.modal.edit": "Jubiläumsjahr bearbeiten",
   "admin.anniversaries.modal.yearLabel": "Jahr",
   "admin.anniversaries.modal.titleLabel": "Titel (optional)",
-  "admin.anniversaries.modal.yearPlaceholder": "z.B. 30",
   "admin.anniversaries.modal.titlePlaceholder": "z.B. 30 Jahre Treue",
   "admin.anniversaries.confirmDelete.body": "Jubiläumsjahr {kind} {year} löschen?",
   "admin.anniversaries.confirmDelete.bodyWithTitle": "Jubiläumsjahr {kind} {year} ({title}) löschen?",

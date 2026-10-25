@@ -18,7 +18,7 @@ export function Field({ label, required, hint, floating = true, after, class: cl
         </fieldset>
       )}
       {after as never}
-      {hint && <p class="label">{hint}</p>}
+      {hint && <p class="label text-xs opacity-70">{hint}</p>}
     </div>
   );
 }

@@ -150,11 +150,11 @@ yearRoutes.get("/new", yearsWrite, (c) => {
             {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
           </select>
         </Field>
-        <Field label={t("admin.anniversaries.modal.yearLabel")} required hint={t("admin.anniversaries.modal.yearPlaceholder")}>
-          <input type="number" name="year" min="1" max="200" class="input w-full" required />
+        <Field label={t("admin.anniversaries.modal.yearLabel")} required>
+          <input type="number" name="year" placeholder={t("admin.anniversaries.modal.yearLabel")} min="1" max="200" class="input w-full" required />
         </Field>
         <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
-          <input type="text" name="title" class="input w-full" />
+          <input type="text" name="title" placeholder={t("admin.anniversaries.modal.titleLabel")} class="input w-full" />
         </Field>
         <div class="modal-action mt-2">
           <button
@@ -191,10 +191,10 @@ yearRoutes.get("/:kind/:year/edit", yearsWrite, async (c) => {
           </select>
         </Field>
         <Field label={t("admin.anniversaries.modal.yearLabel")} required>
-          <input type="number" name="year" value={y.year} min="1" max="200" class="input w-full" required />
+          <input type="number" name="year" placeholder={t("admin.anniversaries.modal.yearLabel")} value={y.year} min="1" max="200" class="input w-full" required />
         </Field>
         <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
-          <input type="text" name="title" value={y.title ?? ""} class="input w-full" />
+          <input type="text" name="title" placeholder={t("admin.anniversaries.modal.titleLabel")} value={y.title ?? ""} class="input w-full" />
         </Field>
         <div class="modal-action mt-2">
           <button
