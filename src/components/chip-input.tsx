@@ -21,7 +21,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
     <div class="flex flex-col" data-chip-input data-name={name} data-split={splitOnComma ? "1" : ""} data-case={caseSensitive ? "1" : ""}
       data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-label={label} data-placeholder={placeholder ?? ""} data-remove-label={t("common.remove")}>
       <label class="label"><span class="text-sm chip-label">{label}</span></label>
-      <div class="chip-box cursor-text input input w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
+      <div class="chip-box cursor-text input w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
         {list.map((v) => (
           <span class="badge badge-outline gap-1 pr-1" data-chip={v}>
             {v}

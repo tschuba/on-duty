@@ -1,5 +1,6 @@
 import { Hono, type Context } from "hono";
 import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
+import { Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
@@ -196,7 +197,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
       <PageHeader title={t("lending.title")} actions={user.permissions.has("lending:manage") && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />} />
 
       <form method="get" action="/inventory/lending" class="filter-bar flex gap-2 items-center flex-wrap mb-4">
-        <label class="input input flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
+        <label class="input flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
         <MultiSelectFilter
           param="status"
           options={(Object.keys(LOAN_STATUS_LABEL) as LoanStatus[]).map((s) => ({ value: s, label: LOAN_STATUS_LABEL[s] }))}
@@ -300,17 +301,16 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
       <div class="space-y-4 max-w-xl">
         <form id="loan-form" method="post" action={base} class="space-y-4 border border-base-300 rounded-box p-4">
           {!item.individualTracking && (
-            <div class="flex flex-col max-w-32">
-              <label class="label"><span class="text-sm">{t("lending.loans.form.quantity")}</span></label>
-              <input type="number" name="quantity" min="1" max={maxQuantity} value={String(loan.quantity)} class="input input w-full" />
-            </div>
+            <Field label={t("lending.loans.form.quantity")} class="max-w-32">
+              <input type="number" name="quantity" min="1" max={maxQuantity} value={String(loan.quantity)} class="input w-full" placeholder={t("lending.loans.form.quantity")} />
+            
+            </Field>
           )}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {(["plannedFrom", "plannedTo", "pickedUpAt", "returnedAt"] as const).map((f) => (
-              <div class="flex flex-col">
-                <label class="label"><span class="text-sm">{t(`lending.loans.form.${f}`)}</span></label>
-                <input type="date" name={f} value={loan[f] ?? ""} class="input input w-full" />
-              </div>
+              <Field label={t(`lending.loans.form.${f}`)} floating={false}>
+                <input type="date" name={f} value={loan[f] ?? ""} class="input w-full" />
+              </Field>
             ))}
           </div>
           <div class="flex gap-2 pt-2">
@@ -349,19 +349,17 @@ function BorrowerPickerFields({ personId, values, errors }: {
   const v = values ?? {};
   const showFields = Boolean(personId) || Object.values(v).some(Boolean);
   const field = (name: keyof BorrowerValues, label: string, type = "text", required = false) => (
-    <div class="flex flex-col">
-      <label class="label"><span class="text-sm">{label}{required && <span class="text-error ml-1">*</span>}</span></label>
-      <input type={type} id={`borrower-${name}`} name={name} value={v[name] ?? ""} class={`input input w-full${errors?.[name] ? " input-error" : ""}`} />
+    <Field label={label} required={required}>
+      <input type={type} id={`borrower-${name}`} name={name} value={v[name] ?? ""} class={`input w-full${errors?.[name] ? " input-error" : ""}`} placeholder={label} />
       {errors?.[name] && <span class="text-error text-sm mt-1">{errors[name]}</span>}
-    </div>
+    
+    </Field>
   );
   return (
     <div class="space-y-3">
       <div id="borrower-picker-search" class={showFields ? "hidden" : ""}>
-        <label class="label">
-          <span class="text-sm">{t("lending.loans.form.borrowerType")}<span class="text-error ml-1">*</span></span>
-        </label>
-        <label class={`input input flex items-center gap-2 w-full${errors?.borrower ? " input-error" : ""}`}>
+        <p class="fieldset-legend">{t("lending.loans.form.borrowerType")}<span class="text-error ml-1">*</span></p>
+        <label class={`input flex items-center gap-2 w-full${errors?.borrower ? " input-error" : ""}`}>
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="text"
@@ -433,52 +431,52 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
   return (
     <form method="post" action={action} class="space-y-4 max-w-xl border border-base-300 rounded-box p-4">
       {items && (
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("lending.loans.form.item")}</span></label>
-          <select name="lendingItemId" required class={`select select w-full${errors?.item ? " select-error" : ""}`}>
+        <Field label={t("lending.loans.form.item")}>
+          <select name="lendingItemId" required class={`select w-full${errors?.item ? " select-error" : ""}`}>
             <option value="">{t("lending.loans.form.itemPlaceholder")}</option>
             {items.map((li) => (
               <option value={li.id} selected={item?.id === li.id}>{li.inventoryItem.name}</option>
             ))}
           </select>
           {errors?.item && <span class="text-error text-sm mt-1">{errors.item}</span>}
-        </div>
+        
+        </Field>
       )}
       <BorrowerPickerFields personId={v.borrowerPersonId} values={v} errors={errors} />
 
       {(items || !item?.individualTracking) && (
-        <div class="flex flex-col max-w-32">
-          <label class="label"><span class="text-sm">{t("lending.loans.form.quantity")}</span></label>
-          <input type="number" name="quantity" min="1" max={maxQuantity} value={v.quantity ?? "1"} class={`input input w-full${errors?.quantity ? " input-error" : ""}`} />
+        <Field label={t("lending.loans.form.quantity")} class="max-w-32">
+          <input type="number" name="quantity" min="1" max={maxQuantity} value={v.quantity ?? "1"} class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("lending.loans.form.quantity")} />
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
-        </div>
+        
+        </Field>
       )}
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("lending.loans.form.plannedFrom")}<span class="text-error ml-1">*</span></span></label>
-          <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} required class={`input input w-full${errors?.plannedFrom ? " input-error" : ""}`} />
+        <Field label={t("lending.loans.form.plannedFrom")} required floating={false}>
+          <input type="date" id="loan-plannedFrom" name="plannedFrom" value={v.plannedFrom ?? ""} required class={`input w-full${errors?.plannedFrom ? " input-error" : ""}`} />
           {errors?.plannedFrom && <span class="text-error text-sm mt-1">{errors.plannedFrom}</span>}
-        </div>
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("lending.loans.form.plannedTo")}<span class="text-error ml-1">*</span></span></label>
-          <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} required class={`input input w-full${errors?.plannedTo ? " input-error" : ""}`} />
+        
+        </Field>
+        <Field label={t("lending.loans.form.plannedTo")} required floating={false}>
+          <input type="date" id="loan-plannedTo" name="plannedTo" value={v.plannedTo ?? ""} required class={`input w-full${errors?.plannedTo ? " input-error" : ""}`} />
           {errors?.plannedTo && <span class="text-error text-sm mt-1">{errors.plannedTo}</span>}
-        </div>
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("lending.loans.form.pickedUpAt")}</span></label>
-          <input type="date" id="loan-pickedUpAt" name="pickedUpAt" value={v.pickedUpAt ?? ""} class="input input w-full" />
+        
+        </Field>
+        <Field label={t("lending.loans.form.pickedUpAt")} floating={false}>
+          <input type="date" id="loan-pickedUpAt" name="pickedUpAt" value={v.pickedUpAt ?? ""} class="input w-full" />
           <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
             {t("lending.loans.form.takeOverFrom")}
           </button>
-        </div>
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("lending.loans.form.returnedAt")}</span></label>
-          <input type="date" id="loan-returnedAt" name="returnedAt" value={v.returnedAt ?? ""} class="input input w-full" />
+        
+        </Field>
+        <Field label={t("lending.loans.form.returnedAt")} floating={false}>
+          <input type="date" id="loan-returnedAt" name="returnedAt" value={v.returnedAt ?? ""} class="input w-full" />
           <button type="button" class="btn btn-ghost btn-xs mt-1 w-fit" onclick="document.getElementById('loan-returnedAt').value=document.getElementById('loan-plannedTo').value">
             {t("lending.loans.form.takeOverTo")}
           </button>
-        </div>
+        
+        </Field>
       </div>
       {errors?.dates && <p class="text-error text-sm" role="alert">{errors.dates}</p>}
       {errors?.conflict && <p class="text-error text-sm" role="alert">{errors.conflict}</p>}

@@ -1,7 +1,7 @@
 // Einheitliches Formularfeld (daisyUI v5): Floating Label für Text/Select/Textarea,
 // feste Label-Zeile für Datumsfelder (floating=false). Der Pflichtstern sitzt hier.
-export function Field({ label, required, hint, floating = true, class: cls = "", children }: {
-  label: string; required?: boolean; hint?: string; floating?: boolean; class?: string; children: unknown;
+export function Field({ label, required, hint, floating = true, after, class: cls = "", children }: {
+  label: string; required?: boolean; hint?: string; floating?: boolean; after?: unknown; class?: string; children: unknown;
 }) {
   const text = <>{label}{required && <span class="text-error ml-1">*</span>}</>;
   return (
@@ -17,6 +17,7 @@ export function Field({ label, required, hint, floating = true, class: cls = "",
           {children as never}
         </fieldset>
       )}
+      {after as never}
       {hint && <p class="label">{hint}</p>}
     </div>
   );

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
+import { Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { orgConfig } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -35,23 +36,21 @@ function OrgSection({ tab, values, editable, missing }: { tab: OrgTab; values: R
         <div class="card-body grid grid-cols-1 sm:grid-cols-4 gap-4">
           {TAB_FIELDS[tab].map(({ key, type, span, placeholder, hint, attrs }) => (
             <>
-            <div class={`flex flex-col ${SPAN_CLASS[span ?? 4]}`}>
-              <label class="label">
-                <span class="text-sm">
-                  {t(`admin.orgConfig.field.${key}` as never)}
-                  {(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key) && <span class="text-error" title={t("organisation.receiptRequired")}> *</span>}
-                </span>
-              </label>
+            <Field
+              label={t(`admin.orgConfig.field.${key}` as never)}
+              required={(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key)}
+              floating={type !== "date"}
+              class={SPAN_CLASS[span ?? 4]}
+            >
               <input
                 type={type}
                 name={key}
-                class="input input w-full"
                 value={values[key] ?? ""}
                 disabled={!editable}
-                placeholder={editable && placeholder ? t(placeholder as never) : undefined}
+                placeholder={editable && placeholder ? t(placeholder as never) : t(`admin.orgConfig.field.${key}` as never)}
                 {...(editable ? attrs : {})}
               />
-            </div>
+            </Field>
             {editable && hint && <p class="text-sm text-base-content/70 sm:col-span-4 -mt-2">{t(hint as never)}</p>}
             </>
           ))}

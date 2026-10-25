@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
+import { Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -255,11 +256,11 @@ applicationRoutes.get("/", guard, async (c) => {
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div class="flex flex-col">
                     <label class="label"><span class="text-sm form-start-label">{t("applications.formSettings.startDate")}</span></label>
-                    <input type="date" name="startDate" value={form?.startDate ?? ""} class="input input w-full" />
+                    <input type="date" name="startDate" value={form?.startDate ?? ""} class="input w-full" />
                   </div>
                   <div class="flex flex-col">
                     <label class="label"><span class="text-sm form-end-label">{t("applications.formSettings.endDate")}</span></label>
-                    <input type="date" name="endDate" value={form?.endDate ?? ""} class="input input w-full" />
+                    <input type="date" name="endDate" value={form?.endDate ?? ""} class="input w-full" />
                   </div>
                 </div>
                 <p class="text-sm form-status-preview"></p>
@@ -421,51 +422,51 @@ applicationRoutes.get("/:id", guard, async (c) => {
         <form id="application-edit-form" method="post" action={`/applications/${app.id}`} class="space-y-4">
           <fieldset disabled={!canEdit} class="space-y-4 border-0 p-0 m-0 min-w-0">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.lastName")}</span></label>
-              <input type="text" name="lastName" value={app.person.lastName} class="input input w-full" />
-            </div>
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.firstName")}</span></label>
-              <input type="text" name="firstName" value={app.person.firstName} class="input input w-full" />
-            </div>
+            <Field label={t("apply.form.lastName")}>
+              <input type="text" name="lastName" value={app.person.lastName} class="input w-full" placeholder={t("apply.form.lastName")} />
+            
+            </Field>
+            <Field label={t("apply.form.firstName")}>
+              <input type="text" name="firstName" value={app.person.firstName} class="input w-full" placeholder={t("apply.form.firstName")} />
+            
+            </Field>
           </div>
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("apply.form.birthDate")}</span></label>
-            <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input input w-full" />
-          </div>
+          <Field label={t("apply.form.birthDate")} floating={false}>
+            <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input w-full" />
+          
+          </Field>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.street")}</span></label>
-              <input type="text" name="street" value={app.person.street ?? ""} class="input input w-full" />
-            </div>
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.houseNumber")}</span></label>
-              <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input input w-full" />
-            </div>
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.zip")}</span></label>
-              <input type="text" name="zip" value={app.person.zip ?? ""} class="input input w-full" />
-            </div>
+            <Field label={t("apply.form.street")}>
+              <input type="text" name="street" value={app.person.street ?? ""} class="input w-full" placeholder={t("apply.form.street")} />
+            
+            </Field>
+            <Field label={t("apply.form.houseNumber")}>
+              <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input w-full" placeholder={t("apply.form.houseNumber")} />
+            
+            </Field>
+            <Field label={t("apply.form.zip")}>
+              <input type="text" name="zip" value={app.person.zip ?? ""} class="input w-full" placeholder={t("apply.form.zip")} />
+            
+            </Field>
           </div>
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("apply.form.city")}</span></label>
-            <input type="text" name="city" value={app.person.city ?? ""} class="input input w-full" />
-          </div>
+          <Field label={t("apply.form.city")}>
+            <input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} />
+          
+          </Field>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.email")}</span></label>
-              <input type="email" name="email" value={app.person.email ?? ""} class="input input w-full" />
-            </div>
-            <div class="flex flex-col">
-              <label class="label"><span class="text-sm">{t("apply.form.phone")}</span></label>
-              <input type="tel" name="phone" value={app.person.phone ?? ""} class="input input w-full" />
-            </div>
+            <Field label={t("apply.form.email")}>
+              <input type="email" name="email" value={app.person.email ?? ""} class="input w-full" placeholder={t("apply.form.email")} />
+            
+            </Field>
+            <Field label={t("apply.form.phone")}>
+              <input type="tel" name="phone" value={app.person.phone ?? ""} class="input w-full" placeholder={t("apply.form.phone")} />
+            
+            </Field>
           </div>
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("applications.detail.message")}</span></label>
-            <textarea name="message" class="textarea textarea w-full" rows={3}>{app.message ?? ""}</textarea>
-          </div>
+          <Field label={t("applications.detail.message")}>
+            <textarea name="message" class="textarea w-full" rows={3} placeholder={t("applications.detail.message")}>{app.message ?? ""}</textarea>
+          
+          </Field>
           </fieldset>
         </form>
         {app.guardians.length > 0 && (
@@ -542,10 +543,10 @@ applicationRoutes.get("/:id", guard, async (c) => {
             <div class="modal-box">
               <h3 class="font-bold text-lg">{t("applications.reject.confirm")}</h3>
               <form id="application-reject-form" method="post" action={`/applications/${app.id}/reject`} class="space-y-3 mt-4">
-                <div class="flex flex-col">
-                  <label class="label"><span class="text-sm">{t("applications.reject.reasonLabel")}</span></label>
-                  <textarea name="rejectedReason" class="textarea textarea w-full" rows={2}></textarea>
-                </div>
+                <Field label={t("applications.reject.reasonLabel")}>
+                  <textarea name="rejectedReason" class="textarea w-full" rows={2} placeholder={t("applications.reject.reasonLabel")}></textarea>
+                
+                </Field>
                 <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
                   <input type="checkbox" name="notifyApplicant" class="checkbox" />
                   <span class="text-sm">{t("applications.reject.notifyLabel")}</span>

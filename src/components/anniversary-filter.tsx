@@ -45,7 +45,7 @@ export function AnniversaryFilter({ kinds, mods, gte, action, hidden = [] }: {
             </fieldset>
             <label class="block">
               <span class="text-sm text-xs">{t("anniversaries.minYears.label")}</span>
-              <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input input w-24 min-h-11 text-base" placeholder="–" />
+              <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input w-24 min-h-11 text-base" placeholder="–" />
             </label>
           </div>
           <div class="flex gap-2 justify-end mt-4 [&>*]:min-h-11">

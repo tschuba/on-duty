@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { ToggleFilter } from "../components/toggle-filter.js";
+import { Field } from "../components/field.js";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
@@ -271,11 +272,11 @@ function NumberListField({ name, label, labelSingle, placeholder, placeholderSin
   return (
     <div data-numlist>
       <div data-numlist-single class={multi ? "hidden" : ""}>
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{labelSingle}</span></label>
+        <Field label={labelSingle}>
           <input type="text" name={name} value={list[0] ?? ""} placeholder={placeholderSingle} disabled={multi} maxlength={NUMBER_MAX_LENGTH}
-            class={`input input w-full${error ? " input-error" : ""}`} />
-        </div>
+            class={`input w-full${error ? " input-error" : ""}`} />
+        
+        </Field>
       </div>
       <div data-numlist-multi class={multi ? "" : "hidden"}>
         <ChipInput name={name} label={label} placeholder={placeholder} values={multi ? list : []} maxFrom="#inventory-quantity" max={quantity}
@@ -327,9 +328,9 @@ function MemberPickerFields({ memberId, memberName }: { memberId?: string; membe
   const showSelected = Boolean(memberId);
   return (
     <div class="flex flex-col" data-show-cats="ppe" data-show-batch="false">
-      <label class="label"><span class="text-sm">{t("inventory.form.assignedMember")}</span></label>
+      <p class="fieldset-legend">{t("inventory.form.assignedMember")}</p>
       <div id="member-picker-search" class={showSelected ? "hidden" : ""}>
-        <label class="input input flex items-center gap-2 w-full">
+        <label class="input flex items-center gap-2 w-full">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="text"
@@ -380,18 +381,18 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
   const serialized = JSON.stringify(assignments.map(({ memberId, quantity }) => ({ memberId, quantity })));
   return (
     <div class="flex flex-col" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
-      <label class="label"><span class="text-sm">{t("inventory.form.assignedMembers")}</span></label>
+      <p class="fieldset-legend">{t("inventory.form.assignedMembers")}</p>
       <div id="batch-assign-list" class="space-y-1 mb-2 empty:mb-0">
         {assignments.map((a) => (
           <div class="flex items-center gap-2 border border-base-300 rounded-box px-2 py-1" data-assignment data-member-id={a.memberId} data-member-name={a.name}>
             <span class="flex-1 text-sm">{a.name}</span>
-            <input type="number" min="1" value={a.quantity} class="input input input-sm w-20 assignment-qty" />
+            <input type="number" min="1" value={a.quantity} class="input-sm w-20 assignment-qty" />
             <button type="button" class="btn btn-ghost btn-sm assignment-remove" aria-label={t("common.remove")}>×</button>
           </div>
         ))}
       </div>
       <div id="batch-assign-search">
-        <label class="input input flex items-center gap-2 w-full">
+        <label class="input flex items-center gap-2 w-full">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="text"
@@ -428,7 +429,7 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
               row.dataset.memberId = resEl.dataset.id;
               row.dataset.memberName = resEl.dataset.name;
               row.innerHTML = '<span class="flex-1 text-sm"></span>' +
-                '<input type="number" min="1" value="1" class="input input input-sm w-20 assignment-qty" />' +
+                '<input type="number" min="1" value="1" class="input-sm w-20 assignment-qty" />' +
                 '<button type="button" class="btn btn-ghost btn-sm assignment-remove" aria-label="${t("common.remove")}">×</button>';
               row.querySelector('span').textContent = resEl.dataset.name;
               list.appendChild(row);
@@ -495,19 +496,18 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
   const isBatch = quantity > 1;
   return (
     <>
-      <div class="flex flex-col">
-        <label class="label"><span class="text-sm">{t("inventory.form.name")}<span class="text-error ml-1">*</span></span></label>
-        <input type="text" name="name" value={v.name ?? ""} class={`input input w-full${errors?.name ? " input-error" : ""}`} />
+      <Field label={t("inventory.form.name")} required>
+        <input type="text" name="name" value={v.name ?? ""} class={`input w-full${errors?.name ? " input-error" : ""}`} placeholder={t("inventory.form.name")} />
         {errors?.name && <span class="text-error text-sm mt-1">{errors.name}</span>}
-      </div>
+      
+      </Field>
 
-      <div class="flex flex-col">
-        <label class="label"><span class="text-sm">{t("inventory.form.category")}<span class="text-error ml-1">*</span></span></label>
+      <Field label={t("inventory.form.category")} required>
         {/* Radios stay the only submitted source; the nameless <select> mirrors them on narrow containers. */}
         <div class="@container">
           <select
             id="inventory-category-select"
-            class="select select w-full @sm:hidden"
+            class="select w-full @sm:hidden"
             onchange="document.querySelector('input[name=category][value=' + this.value + ']').checked = true; updateInventoryFormVisibility()"
           >
             <button type="button"><selectedcontent></selectedcontent></button>
@@ -537,58 +537,59 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           </div>
         </div>
         {errors?.category && <span class="text-error text-sm mt-1">{errors.category}</span>}
-      </div>
+      
+      </Field>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("inventory.form.commissionedAt")}</span></label>
-          <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input input w-full" />
-        </div>
-        <div class="flex flex-col">
-          <label class="label"><span class="text-sm">{t("inventory.form.purchasePrice")}</span></label>
-          <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input input w-full${errors?.purchasePrice ? " input-error" : ""}`} />
+        <Field label={t("inventory.form.commissionedAt")} floating={false}>
+          <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
+        
+        </Field>
+        <Field label={t("inventory.form.purchasePrice")}>
+          <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input w-full${errors?.purchasePrice ? " input-error" : ""}`} placeholder={t("inventory.form.purchasePrice")} />
           {errors?.purchasePrice && <span class="text-error text-sm mt-1">{errors.purchasePrice}</span>}
           <span class="text-xs opacity-60 mt-1" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>
-        </div>
+        
+        </Field>
       </div>
 
-      <div class="flex flex-col">
-        <label class="label"><span class="text-sm">{t("inventory.form.notes")}</span></label>
-        <textarea name="notes" class="textarea textarea w-full" rows={3}>{v.notes ?? ""}</textarea>
-      </div>
+      <Field label={t("inventory.form.notes")}>
+        <textarea name="notes" class="textarea w-full" rows={3} placeholder={t("inventory.form.notes")}>{v.notes ?? ""}</textarea>
+      
+      </Field>
 
       <TagInput tags={v.tagsList} />
 
       <div data-show-cats="vehicle" class="space-y-4">
         <div class="divider">{CATEGORY_LABELS.vehicle}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("inventory.form.licensePlate")}</span></label>
-            <input type="text" name="licensePlate" value={v.licensePlate ?? ""} class="input input w-full" />
-          </div>
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("inventory.form.yearOfManufacture")}</span></label>
-            <input type="text" inputmode="numeric" name="yearOfManufacture" value={v.yearOfManufacture ?? ""} class={`input input w-full${errors?.yearOfManufacture ? " input-error" : ""}`} />
+          <Field label={t("inventory.form.licensePlate")}>
+            <input type="text" name="licensePlate" value={v.licensePlate ?? ""} class="input w-full" placeholder={t("inventory.form.licensePlate")} />
+          
+          </Field>
+          <Field label={t("inventory.form.yearOfManufacture")}>
+            <input type="text" inputmode="numeric" name="yearOfManufacture" value={v.yearOfManufacture ?? ""} class={`input w-full${errors?.yearOfManufacture ? " input-error" : ""}`} placeholder={t("inventory.form.yearOfManufacture")} />
             {errors?.yearOfManufacture && <span class="text-error text-sm mt-1">{errors.yearOfManufacture}</span>}
-          </div>
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("inventory.form.vehicleInspectionDue")}</span></label>
-            <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input input w-full" />
-          </div>
+          
+          </Field>
+          <Field label={t("inventory.form.vehicleInspectionDue")} floating={false}>
+            <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input w-full" />
+          
+          </Field>
         </div>
       </div>
 
       <div data-show-cats="scba,equipment,ppe" class="space-y-4">
         <div class="divider">{t("inventory.form.sectionInspection")}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div class="flex flex-col" data-show-cats="scba">
-            <label class="label"><span class="text-sm">{t("inventory.form.lastInspectionDate")}</span></label>
-            <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input input w-full" />
-          </div>
-          <div class="flex flex-col">
-            <label class="label"><span class="text-sm">{t("inventory.form.nextInspectionDue")}</span></label>
-            <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input input w-full" />
-          </div>
+          <Field label={t("inventory.form.lastInspectionDate")} floating={false}>
+            <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input w-full" />
+          
+          </Field>
+          <Field label={t("inventory.form.nextInspectionDue")} floating={false}>
+            <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input w-full" />
+          
+          </Field>
         </div>
       </div>
 
@@ -598,18 +599,18 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           <input type="checkbox" id="inventory-batch-toggle" checked={isBatch} class="checkbox" onchange="updateInventoryFormVisibility()" />
           <span class="text-sm">{t("inventory.form.batchToggle")}</span>
         </label>
-        <div class="flex flex-col max-w-40" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
-          <label class="label"><span class="text-sm">{t("inventory.form.quantity")}</span></label>
+        <Field label={t("inventory.form.quantity")} class="max-w-40">
           <input
             type="number"
             id="inventory-quantity"
             name="quantity"
             min="1"
             value={v.quantity ?? "1"}
-            class={`input input w-full${errors?.quantity ? " input-error" : ""}`}
+            class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("inventory.form.quantity")}
           />
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
-        </div>
+        
+        </Field>
       </div>
 
       <NumberListField
@@ -739,7 +740,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <form method="get" action="/inventory" class="contents">
-          <label class="input input flex items-center gap-2 w-72">
+          <label class="input flex items-center gap-2 w-72">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input
               type="search"
@@ -1132,14 +1133,15 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
           <p class="py-2 opacity-70">{t("inventory.retire.confirmBody", { name: item.name })}</p>
           <form method="post" action={`/inventory/${item.id}/retire`} class="space-y-2">
             {isBatch && (
-              <div class="flex flex-col">
-                <label class="label"><span class="text-sm">{t("inventory.retire.quantityLabel")}</span></label>
-                <input type="number" name="retireQuantity" min="1" max={Math.max(1, availableToRetire)} value={Math.max(1, availableToRetire)} class="input input w-full" />
+              <Field label={t("inventory.retire.quantityLabel")}>
+                <input type="number" name="retireQuantity" min="1" max={Math.max(1, availableToRetire)} value={Math.max(1, availableToRetire)} class="input w-full" placeholder={t("inventory.retire.quantityLabel")} />
                 <span class="text-xs opacity-60 mt-1">{t("inventory.retire.quantityHint", { available: availableToRetire, quantity: item.quantity })}</span>
-              </div>
+              
+              </Field>
             )}
-            <label class="label"><span class="text-sm">{t("inventory.retire.reasonLabel")}</span></label>
-            <input type="text" name="retiredReason" class="input input w-full" />
+            <Field label={t("inventory.retire.reasonLabel")}>
+              <input type="text" name="retiredReason" placeholder={t("inventory.retire.reasonLabel")} />
+            </Field>
             <div class="modal-action">
               <button type="button" class="btn" onclick="document.getElementById('retire-modal').close()">{t("common.cancel")}</button>
               <button type="submit" class="btn btn-warning">{t("inventory.retire.button")}</button>

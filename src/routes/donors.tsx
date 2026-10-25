@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { eq, or, ilike, asc, and, exists, sql } from "drizzle-orm";
+import { Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -100,19 +101,17 @@ type PersonFieldInput = Partial<Record<keyof PersonFieldValues, string | null>>;
 function personField(name: keyof PersonFieldValues, label: string, values: PersonFieldInput | undefined, errors: Record<string, string> | undefined, optional = false) {
   const err = errors?.[name];
   return (
-    <div class="flex flex-col">
-      <label class="label">
-        <span class="text-sm">{label}{!optional && <span class="text-error ml-1">*</span>}</span>
-      </label>
+    <Field label={label} required={!optional}>
       <input
         type="text"
         id={`donor-${name}`}
         name={name}
         value={values?.[name] ?? ""}
-        class={`input input w-full${err ? " input-error" : ""}`}
+        placeholder={label}
+        class={err ? "input-error" : ""}
       />
       {err && <span class="text-error text-sm mt-1">{err}</span>}
-    </div>
+    </Field>
   );
 }
 
@@ -146,10 +145,8 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
   return (
     <div class="space-y-3">
       <div id="donor-picker-search" class={showFields ? "hidden" : ""}>
-        <label class="label">
-          <span class="text-sm">{t("donations.form.donor")}</span>
-        </label>
-        <label class="input input flex items-center gap-2 w-full">
+        <p class="fieldset-legend">{t("donations.form.donor")}</p>
+        <label class="input flex items-center gap-2 w-full">
           <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
           <input
             type="text"
@@ -331,7 +328,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
 
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
         <form method="get" class="flex gap-2 w-full md:w-auto">
-          <label class="input input flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
+          <label class="input flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
             <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
             <input
               type="search"

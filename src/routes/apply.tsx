@@ -85,10 +85,10 @@ function ApplicantFormFields({ values, errors }: { values: ApplicantValues; erro
       {errors.contact
         ? <p class="text-error text-sm">{errors.contact}</p>
         : <p class="text-sm opacity-60">{t("apply.error.contactRequired")}</p>}
-      <div class="flex flex-col">
-        <label class="label"><span class="text-sm">{t("apply.form.message")}</span></label>
-        <textarea name="message" class="textarea textarea w-full" rows={3}>{values.message}</textarea>
-      </div>
+      <Field label={t("apply.form.message")}>
+        <textarea name="message" class="textarea w-full" rows={3} placeholder={t("apply.form.message")}>{values.message}</textarea>
+      
+      </Field>
     </>
   );
 }
@@ -136,10 +136,10 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
         </button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input input w-full${nameError ? " input-error" : ""}`} />
-        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input input w-full${nameError ? " input-error" : ""}`} />
-        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input input w-full${contactError ? " input-error" : ""}`} />
-        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input input w-full${contactError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_firstName[]" placeholder={t("apply.youth.guardian.firstName")} value={values?.firstName ?? ""} class={`input w-full${nameError ? " input-error" : ""}`} />
+        <input type="text" name="guardian_lastName[]" placeholder={t("apply.youth.guardian.lastName")} value={values?.lastName ?? ""} class={`input w-full${nameError ? " input-error" : ""}`} />
+        <input type="email" name="guardian_email[]" placeholder={t("apply.youth.guardian.email")} value={values?.email ?? ""} class={`input w-full${contactError ? " input-error" : ""}`} />
+        <input type="tel" name="guardian_phone[]" placeholder={t("apply.youth.guardian.phone")} value={values?.phone ?? ""} class={`input w-full${contactError ? " input-error" : ""}`} />
       </div>
       {nameError && <p class="text-error text-sm mt-1">{nameError}</p>}
       {contactError
