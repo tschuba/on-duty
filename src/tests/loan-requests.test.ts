@@ -52,6 +52,7 @@ vi.mock("../db/index.js", () => ({
     },
     select: vi.fn(() => chainOf(personPoolFixture)),
     update,
+    delete: vi.fn(() => ({ where: vi.fn(() => Promise.resolve(undefined)) })),
     transaction: vi.fn(async (cb: any) => cb({ insert: txInsert, update: txUpdate })),
   },
 }));
@@ -67,6 +68,10 @@ vi.mock("../middleware/auth.js", () => ({
 let orgConfigFixture: Record<string, string> = {};
 vi.mock("../lib/org-config.js", () => ({
   loadOrgConfig: vi.fn(() => Promise.resolve(orgConfigFixture)),
+}));
+
+vi.mock("../lib/settings.js", () => ({
+  getSettings: vi.fn(() => Promise.resolve({ loanRequestRetentionDays: "90" })),
 }));
 
 const sendMail = vi.fn(() => Promise.resolve({ sent: true }));

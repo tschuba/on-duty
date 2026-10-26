@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { loanRequests } from "../db/schema/index.js";
+import { donors, lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
 import { normalizePhone } from "./contact.js";
 
 // "Überfällig" = geplantBis in der Vergangenheit und zurückgegebenAm leer —
@@ -10,6 +10,37 @@ import { normalizePhone } from "./contact.js";
 export async function countOpenLoanRequests(): Promise<number> {
   const rows = await db.select({ id: loanRequests.id }).from(loanRequests).where(eq(loanRequests.status, "open"));
   return rows.length;
+}
+
+// Löscht abgelehnte Anfragen älter als retentionDays; die Person nur, wenn sie sonst nirgends
+// vorkommt (Verleih, Mitglied, andere Anfrage, Spender). Genehmigte/offene bleiben unberührt.
+export async function cleanupRejectedLoanRequests(retentionDays: number): Promise<number> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+
+  const stale = await db.query.loanRequests.findMany({
+    where: and(eq(loanRequests.status, "rejected"), lt(loanRequests.reviewedAt, cutoff)),
+    columns: { id: true, personId: true },
+  });
+  if (stale.length === 0) return 0;
+
+  for (const r of stale) {
+    await db.delete(loanRequests).where(eq(loanRequests.id, r.id));
+    const stillUsed = await personUsedElsewhere(r.personId);
+    if (!stillUsed) await db.delete(persons).where(eq(persons.id, r.personId));
+  }
+  return stale.length;
+}
+
+async function personUsedElsewhere(personId: string): Promise<boolean> {
+  const [member] = await db.select({ id: members.id }).from(members).where(eq(members.personId, personId));
+  if (member) return true;
+  const [donor] = await db.select({ id: donors.id }).from(donors).where(eq(donors.personId, personId));
+  if (donor) return true;
+  const [loan] = await db.select({ id: lendingLoans.id }).from(lendingLoans).where(eq(lendingLoans.borrowerPersonId, personId));
+  if (loan) return true;
+  const [request] = await db.select({ id: loanRequests.id }).from(loanRequests).where(eq(loanRequests.personId, personId));
+  return Boolean(request);
 }
 
 export async function countOverdueLoans(): Promise<number> {

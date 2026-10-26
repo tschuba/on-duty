@@ -1036,10 +1036,12 @@ export const de = {
   "admin.config.flash.unknownRole": "Die gewählte Standardrolle existiert nicht.",
   "admin.config.flash.roleWithoutPermissions": "Die Standardrolle hat keine Rechte.",
   "admin.config.flash.autoApproveNeedsRole": "Auto-Freigabe benötigt eine Standardrolle.",
+  "admin.config.flash.invalidRetentionDays": "Aufbewahrungsfrist muss eine ganze Zahl ≥ 1 sein.",
   "admin.config.noRole": "– keine Rolle –",
   "admin.config.desc.registrationEnabled": "Selbstregistrierung über den OIDC-Provider erlauben. Der Provider muss die E-Mail als bestätigt melden.",
   "admin.config.desc.registrationAutoApprove": "Neue Registrierungen ohne Admin-Freigabe sofort mit der Standardrolle ausstatten.",
   "admin.config.desc.registrationDefaultRoleId": "Rolle für automatisch freigegebene Registrierungen (muss mindestens ein Recht haben).",
+  "admin.config.desc.loanRequestRetentionDays": "Tage, nach denen abgelehnte Verleih-Anfragen gelöscht werden.",
   // ── Import (fwportal) ───────────────────────────────────────────────────────
   "import.assignments.assumedHint": "fwportal liefert keinen Funktionsbeginn. Die Daten mit Badge „angenommen“ sind eine Annahme (Vorbelegung = Importdatum bzw. Eintritt) und sollten geprüft werden.",
   "import.assignments.confirm": "Funktionsbeginn geprüft ({count} angenommene Werte)",

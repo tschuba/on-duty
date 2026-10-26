@@ -4,11 +4,12 @@ import { appSettings, appRoles, appRolePermissions } from "../db/schema/index.js
 
 // Writable runtime settings (/admin/config). Env values stay read-only there.
 // Add a new setting by adding one entry here — the UI and the POST handler are generic.
-export type SettingType = "boolean" | "role";
+export type SettingType = "boolean" | "role" | "number";
 export const SETTINGS = [
   { key: "registrationEnabled", type: "boolean", default: "false" },
   { key: "registrationAutoApprove", type: "boolean", default: "false" },
   { key: "registrationDefaultRoleId", type: "role", default: "" },
+  { key: "loanRequestRetentionDays", type: "number", default: "90" },
 ] as const satisfies readonly { key: string; type: SettingType; default: string }[];
 export type SettingKey = (typeof SETTINGS)[number]["key"];
 
@@ -27,7 +28,7 @@ export async function roleHasPermissions(roleId: string): Promise<boolean> {
   return cnt > 0;
 }
 
-export type SettingsError = "unknownRole" | "roleWithoutPermissions" | "autoApproveNeedsRole";
+export type SettingsError = "unknownRole" | "roleWithoutPermissions" | "autoApproveNeedsRole" | "invalidRetentionDays";
 
 // Pure parsing/validation of the submitted form; role existence/permissions are injected so it stays unit-testable.
 export async function parseSettingsForm(
@@ -37,7 +38,7 @@ export async function parseSettingsForm(
   const values = {} as Record<SettingKey, string>;
   for (const s of SETTINGS) {
     const raw = body[s.key];
-    values[s.key] = s.type === "boolean" ? (raw === "1" ? "true" : "false") : String(raw ?? "").trim();
+    values[s.key] = s.type === "boolean" ? (raw === "1" ? "true" : "false") : String(raw ?? "").trim() || s.default;
   }
   if (values.registrationDefaultRoleId) {
     const r = await roleOk(values.registrationDefaultRoleId);
@@ -46,6 +47,8 @@ export async function parseSettingsForm(
   if (values.registrationAutoApprove === "true" && !values.registrationDefaultRoleId) {
     return { error: "autoApproveNeedsRole" };
   }
+  const retentionDays = Number(values.loanRequestRetentionDays);
+  if (!Number.isInteger(retentionDays) || retentionDays < 1) return { error: "invalidRetentionDays" };
   return { values };
 }
 

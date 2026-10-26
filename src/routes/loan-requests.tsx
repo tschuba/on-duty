@@ -12,9 +12,10 @@ import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
-import { checkAvailability, countOpenLoanRequests, countOverdueLoans, matchCandidates } from "../lib/lending.js";
+import { checkAvailability, cleanupRejectedLoanRequests, countOpenLoanRequests, countOverdueLoans, matchCandidates } from "../lib/lending.js";
 import { sendMail } from "../lib/mail.js";
 import { loadOrgConfig } from "../lib/org-config.js";
+import { getSettings } from "../lib/settings.js";
 
 export const loanRequestRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("lending:manage");
@@ -55,6 +56,10 @@ loanRequestRoutes.get("/", guard, async (c) => {
   const user = c.get("user");
   const statusRaw = c.req.queries("status") ?? [];
   const statusFilter: RequestStatus[] = statusRaw.length > 0 ? (statusRaw as RequestStatus[]) : ["open"];
+
+  // Lazy statt Scheduler, siehe Backlog-Doc "Aufbewahrung" — die App führt keinen eigenen Cron.
+  const { loanRequestRetentionDays } = await getSettings();
+  await cleanupRejectedLoanRequests(Number(loanRequestRetentionDays));
 
   const all = await fetchRequests();
   const rows = all
