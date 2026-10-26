@@ -8,6 +8,7 @@ import { countOpenReceipts } from "../lib/donations.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
+import { SOURCE_REPO_URL } from "../lib/constants.js";
 import { Icon } from "./icon.js";
 import { SubNav } from "./sub-nav.js";
 
@@ -203,7 +204,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         )}
       </nav>
       <main class="container mx-auto px-4 py-6 flex-1 flex flex-col">{children}</main>
-      <footer class="sticky bottom-0 mt-auto h-6 shrink-0 px-4 flex items-center justify-end text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={`https://github.com/tschuba/on-duty/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
+      <footer class="sticky bottom-0 mt-auto h-6 shrink-0 px-4 flex items-center justify-end gap-3 text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={SOURCE_REPO_URL} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">{t("common.footer.source")}</a><a href={`${SOURCE_REPO_URL}/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
 
       {/* Toast handler + flash cookie reader */}
       <script dangerouslySetInnerHTML={{ __html: `

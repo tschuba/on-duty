@@ -13,6 +13,7 @@ export const de = {
   "common.add": "Hinzufügen",
   "common.download": "Herunterladen",
   "common.logout": "Abmelden",
+  "common.footer.source": "Lizenz (AGPL-3.0)",
   "common.nav.account": "Mein Konto",
   "common.theme": "Darstellung",
   "common.theme.auto": "Automatisch",

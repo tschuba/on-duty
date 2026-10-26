@@ -135,3 +135,12 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 > S3-Backup ist aktiv wenn `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` und `S3_SECRET_KEY` alle gesetzt sind.
 > Lokales Backup ist aktiv wenn `BACKUP_LOCAL_PATH` gesetzt ist.
 > E-Mail-Versand ist aktiv wenn `SMTP_HOST` und `SMTP_FROM` gesetzt sind — ohne SMTP-Konfiguration (oder falls der Server nicht erreichbar ist) wird die Benachrichtigung übersprungen, der jeweilige Workflow (Antrag einreichen/annehmen/ablehnen) schlägt dadurch nie fehl.
+
+## Lizenz
+
+on-duty steht unter der [GNU Affero General Public License v3.0 oder später](LICENSE) (`AGPL-3.0-or-later`).
+Copyright (C) 2026 Thomas Schulte-Bahrenberg.
+
+Logo, Icons und Wortmarke „on-duty“ (`branding/`, Icons in `public/`) sind von der AGPL ausgenommen, siehe [branding/README.md](branding/README.md).
+
+Forks, die öffentlich betrieben werden, müssen den Quelltext anbieten: Dafür `SOURCE_REPO_URL` in `src/lib/constants.ts` auf das eigene Repository ändern (Footer-Link).

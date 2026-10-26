@@ -131,3 +131,7 @@ Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit
 Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, Build-Configs, `scripts/zitadel-init.mjs`, `scripts/copy-*.mjs`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
 
 Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft**. Das Veröffentlichen des Drafts baut die Docker-Tags `latest`, `X.Y.Z`, `X.Y`, `X`; `edge` kommt bei jedem Push auf `master`.
+
+## Lizenz
+
+Beiträge stehen unter der [AGPL-3.0-or-later](LICENSE) (inbound = outbound). Es gibt kein Contributor License Agreement (CLA): Du unterschreibst nichts Zusätzliches, und deine Beiträge stehen unter derselben Lizenz wie das Projekt.

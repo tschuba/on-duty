@@ -1,7 +1,10 @@
 {
   "name": "on-duty",
-  "version": "0.58.2",
+  "version": "0.59.0",
   "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "repository": "github:tschuba/on-duty",
+  "homepage": "https://github.com/tschuba/on-duty",
   "packageManager": "pnpm@12.5.1",
   "engines": {
     "node": ">=24"
