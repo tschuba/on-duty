@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lendingItems, lendingLoans, loanRequests, persons } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader, HeaderAction } from "../components/page-header.js";
 import { Field, EmailInput, PhoneInput } from "../components/field.js";
@@ -184,29 +185,72 @@ async function fetchRequestDetail(token: string) {
   });
 }
 
+const fmtDate = (iso: string) => iso.split("-").reverse().join(".");
+
+// Zeitraum und Dauer wie die Zusammenfassung im Antragsformular (siehe updateSummary).
+function formatPeriod(r: RequestWithItem): string {
+  const part = (d: string, time: string | null) => fmtDate(d) + (time ? `, ${time.slice(0, 5)} Uhr` : "");
+  const from = part(r.plannedFrom, r.plannedFromTime), to = part(r.plannedTo, r.plannedToTime);
+  const d0 = Date.parse(r.plannedFrom), d1 = Date.parse(r.plannedTo);
+  const mins = r.plannedFromTime && r.plannedToTime
+    ? (d1 - d0) / 60000 + (Number(r.plannedToTime.slice(0, 2)) - Number(r.plannedFromTime.slice(0, 2))) * 60 + (Number(r.plannedToTime.slice(3, 5)) - Number(r.plannedFromTime.slice(3, 5)))
+    : ((d1 - d0) / 86400000 + 1) * 1440;
+  const units: [number, string, string][] = [[10080, "Woche", "Wochen"], [1440, "Tag", "Tage"], [60, "Std.", "Std."], [1, "Min.", "Min."]];
+  let rest = Math.max(0, Math.round(mins));
+  const parts: string[] = [];
+  for (const [size, one, many] of units) {
+    const n = Math.floor(rest / size);
+    rest -= n * size;
+    if (n) parts.push(`${n} ${n === 1 ? one : many}`);
+  }
+  return (from === to ? from : `${from} – ${to}`) + (parts.length ? ` (${parts.join(", ")})` : "");
+}
+
+const STATUS_BADGE = { open: "badge-info", approved: "badge-success", rejected: "badge-error" } as const;
+
 function StatusPage({ request, justSubmitted }: { request: RequestWithItem; justSubmitted: boolean }) {
-  const period = request.plannedFrom === request.plannedTo ? request.plannedFrom : `${request.plannedFrom} – ${request.plannedTo}`;
+  const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`;
+  const date = (d: Date) => d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   return (
     <Layout title={t("lend.status.title")}>
-      <div class="max-w-xl mx-auto">
+      <div class="max-w-xl mx-auto space-y-4">
         <PageHeader title={t("lend.status.title")} />
-        {justSubmitted && <div class="alert alert-success mb-4">{t("lend.success.body")}</div>}
-        <div class="alert alert-info mb-4">{t("lend.status.notYetConfirmed")}</div>
-        <NoWithdrawNotice />
-        <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm mb-4">
-          <dt class="opacity-60">{t("lending.loans.form.item")}</dt><dd>{request.lendingItem.inventoryItem.name}</dd>
-          <dt class="opacity-60">{t("lend.form.plannedFrom")}</dt><dd>{period}</dd>
-          {request.quantity > 1 && <><dt class="opacity-60">{t("lending.loans.form.quantity")}</dt><dd>{request.quantity}</dd></>}
-          <dt class="opacity-60">{t("lend.status.submittedAt")}</dt><dd>{request.submittedAt.toLocaleDateString("de-DE")}</dd>
-          <dt class="opacity-60">{t("lend.status.status")}</dt><dd>{REQUEST_STATUS_LABEL[request.status]}</dd>
-          {request.reviewedAt && <><dt class="opacity-60">{t("lend.status.reviewedAt")}</dt><dd>{request.reviewedAt.toLocaleDateString("de-DE")}</dd></>}
-        </dl>
-        {!request.lendingItem.inventoryItem && null}
-        <div class="flex items-center gap-2 mt-2">
-          <input type="text" readonly value={`${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`} class="input input-sm flex-1" />
-          <button type="button" class="btn btn-sm" onclick={`navigator.clipboard.writeText(this.previousElementSibling.value)`}>{t("common.copy")}</button>
-        </div>
+        {justSubmitted && <div role="alert" class="alert alert-success">{t("lend.success.body")}</div>}
+
+        <section class="card bg-base-100 border border-base-300">
+          <div class="card-body gap-2">
+            <span class={`badge ${STATUS_BADGE[request.status]}`}>{REQUEST_STATUS_LABEL[request.status]}</span>
+            <p>{t(`lend.status.text.${request.status}`)}</p>
+          </div>
+        </section>
+        {request.status === "open" && <NoWithdrawNotice />}
+
+        <section class="card bg-base-100 border border-base-300">
+          <dl class="card-body grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt class="opacity-60">{t("lending.loans.form.item")}</dt><dd>{request.lendingItem.inventoryItem.name}</dd>
+            {request.quantity > 1 && <><dt class="opacity-60">{t("lending.loans.form.quantity")}</dt><dd>{request.quantity}</dd></>}
+            <dt class="opacity-60">{t("lend.form.summary")}</dt><dd>{formatPeriod(request)}</dd>
+            <dt class="opacity-60">{t("lend.status.submittedAt")}</dt><dd>{date(request.submittedAt)}</dd>
+            {request.reviewedAt && <><dt class="opacity-60">{t("lend.status.reviewedAt")}</dt><dd>{date(request.reviewedAt)}</dd></>}
+          </dl>
+        </section>
+
+        <section class="card bg-base-200">
+          <div class="card-body gap-2">
+            <h2 class="font-semibold">{t("lend.status.link.title")}</h2>
+            <p class="text-sm opacity-70">{t("lend.status.link.hint")}</p>
+            <div class="flex items-center gap-2">
+              <code class="flex-1 text-xs break-all select-all">{statusUrl}</code>
+              <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={statusUrl} onclick="navigator.clipboard.writeText(this.dataset.url)">
+                <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                <span class="max-sm:hidden">{t("common.copy")}</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
         <ContactFooter />
+        <PrivacyNotice />
       </div>
     </Layout>
   );

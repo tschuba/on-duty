@@ -974,7 +974,10 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
             {lendable.publicRequestable && lendable.requestLink && (
               <div class="flex items-center gap-2">
                 <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
-                <button type="button" class="btn btn-sm" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">{t("common.copy")}</button>
+                <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">
+                  <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                  <span class="max-sm:hidden">{t("common.copy")}</span>
+                </button>
               </div>
             )}
           </div>
