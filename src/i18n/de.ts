@@ -685,6 +685,7 @@ export const de = {
   "apply.youth.consent": "Ich bin damit einverstanden, dass die Daten meines Kindes zur Bearbeitung dieses Antrags gespeichert werden.",
   "apply.youth.error.guardianContactRequired": "Bitte E-Mail oder Telefon der/des Erziehungsberechtigten angeben.",
   "apply.youth.error.consentRequired": "Einverständnis ist erforderlich.",
+  "contact.title": "Kontakt zum Verein",
   "apply.success.title": "Antrag eingegangen",
   "apply.success.body": "Vielen Dank für Ihren Antrag. Wir melden uns bei Ihnen.",
   "apply.inactive.title": "Formular nicht verfügbar",
