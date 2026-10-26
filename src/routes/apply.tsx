@@ -276,6 +276,7 @@ async function notifySubmission(name: string) {
     config.applicationNotifyEmail,
     t("applications.mail.submitNotifySubject", { name }),
     `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
+    { "X-On-Duty-Type": "membership-application" },
   );
 }
 

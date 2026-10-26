@@ -4,8 +4,8 @@ import { effectiveRange, rangesOverlap, loanStatus, availableQuantity, itemStatu
 describe("effectiveRange", () => {
   it("prefers the actual date over the planned date per edge", () => {
     expect(effectiveRange({ plannedFrom: "2026-01-01", plannedTo: "2026-01-10", pickedUpAt: "2026-01-02", returnedAt: null })).toEqual({
-      from: "2026-01-02",
-      to: "2026-01-10",
+      from: "2026-01-02T00:00",
+      to: "2026-01-10T23:59",
     });
   });
 
@@ -15,15 +15,15 @@ describe("effectiveRange", () => {
 
   it("uses a min sentinel when only the end date is known", () => {
     expect(effectiveRange({ plannedFrom: null, plannedTo: "2026-01-10", pickedUpAt: null, returnedAt: null })).toEqual({
-      from: "0000-01-01",
-      to: "2026-01-10",
+      from: "0000-01-01T00:00",
+      to: "2026-01-10T23:59",
     });
   });
 
   it("uses returnedAt as the closing edge once set", () => {
     expect(effectiveRange({ plannedFrom: "2026-01-01", plannedTo: "2026-01-10", pickedUpAt: "2026-01-01", returnedAt: "2026-01-05" })).toEqual({
-      from: "2026-01-01",
-      to: "2026-01-05",
+      from: "2026-01-01T00:00",
+      to: "2026-01-05T23:59",
     });
   });
 });

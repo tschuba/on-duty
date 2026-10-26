@@ -156,8 +156,8 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
       // Überlappung mit dem Filterzeitraum; Vorgänge ganz ohne Datum fallen raus.
       // Überfällige sind noch draußen: offenes Ende statt plannedTo.
       const r = effectiveRange(l);
-      if (r && loanStatus(l, today) === "overdue") r.to = "9999-12-31";
-      if (!r || !rangesOverlap(r, { from: start || "0000-01-01", to: end || "9999-12-31" })) return false;
+      if (r && loanStatus(l, today) === "overdue") r.to = "9999-12-31T23:59";
+      if (!r || !rangesOverlap(r, { from: `${start || "0000-01-01"}T00:00`, to: `${end || "9999-12-31"}T23:59` })) return false;
     }
     if (itemFilter && l.lendingItem.id !== itemFilter) return false;
     if (statusFilter.length > 0 && !statusFilter.includes(loanStatus(l, today))) return false;

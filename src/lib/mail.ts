@@ -9,7 +9,7 @@ export function isSmtpConfigured(): boolean {
 // Log-and-skip by design (see backlog "Digitale Anträge"): the submit/approve/reject
 // workflow must never fail just because notifications aren't configured or the SMTP
 // server is unreachable. Callers surface `sent: false` to the user as an inline hint.
-export async function sendMail(to: string, subject: string, text: string): Promise<{ sent: boolean }> {
+export async function sendMail(to: string, subject: string, text: string, headers?: Record<string, string>): Promise<{ sent: boolean }> {
   if (!isSmtpConfigured()) {
     logger.warn({ subject }, "[mail] SMTP not configured, email not sent");
     return { sent: false };
@@ -21,7 +21,7 @@ export async function sendMail(to: string, subject: string, text: string): Promi
       port: env.SMTP_PORT ? Number(env.SMTP_PORT) : 587,
       auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
     });
-    await transport.sendMail({ from: env.SMTP_FROM, to, subject, text });
+    await transport.sendMail({ from: env.SMTP_FROM, to, subject, text, headers });
     return { sent: true };
   } catch (err) {
     logger.error({ err, subject }, "[mail] sending failed");

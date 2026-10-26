@@ -11,7 +11,11 @@ export async function countOverdueLoans(): Promise<number> {
   return loans.filter((l) => l.plannedTo && l.plannedTo < today && !l.returnedAt).length;
 }
 
-export type LoanRange = { plannedFrom: string | null; plannedTo: string | null; pickedUpAt: string | null; returnedAt: string | null };
+// Zeiten optional ("HH:MM" oder "HH:MM:SS" aus der DB) — fehlend = ganzer Tag.
+export type LoanRange = {
+  plannedFrom: string | null; plannedTo: string | null; pickedUpAt: string | null; returnedAt: string | null;
+  plannedFromTime?: string | null; plannedToTime?: string | null;
+};
 
 // Tatsächliches Datum hat Vorrang pro Rand — siehe Backlog-Doc "Überlappungs-
 // Zeitraum pro Vorgang". Ein Vorgang ganz ohne Datum geht nicht in die Prüfung ein.
@@ -19,9 +23,15 @@ export function effectiveRange(loan: LoanRange): { from: string; to: string } | 
   const from = loan.pickedUpAt ?? loan.plannedFrom;
   const to = loan.returnedAt ?? loan.plannedTo;
   if (!from && !to) return null;
+  // Zeiten gelten nur für den geplanten Rand; Abhol-/Rückgabetag ist tagesgenau.
+  const fromTime = !loan.pickedUpAt && loan.plannedFrom ? loan.plannedFromTime?.slice(0, 5) : undefined;
+  const toTime = !loan.returnedAt && loan.plannedTo ? loan.plannedToTime?.slice(0, 5) : undefined;
   // Ein offenes Ende (nur von oder nur bis gesetzt) blockiert alles vor/nach
   // dem bekannten Rand — min/max-Sentinel statt Sonderfall-Vergleichslogik.
-  return { from: from ?? "0000-01-01", to: to ?? "9999-12-31" };
+  return {
+    from: from ? `${from}T${fromTime || "00:00"}` : "0000-01-01T00:00",
+    to: to ? `${to}T${toTime || "23:59"}` : "9999-12-31T23:59",
+  };
 }
 
 export function rangesOverlap(a: { from: string; to: string }, b: { from: string; to: string }): boolean {
@@ -45,7 +55,7 @@ export function availableQuantity(
   loans: (LoanRange & { quantity: number })[],
   today: string,
 ): number {
-  const day = { from: today, to: today };
+  const day = { from: `${today}T00:00`, to: `${today}T23:59` };
   const used = loans.reduce((sum, l) => {
     const range = effectiveRange(l);
     return range && rangesOverlap(range, day) ? sum + l.quantity : sum;
@@ -62,13 +72,16 @@ export function itemStatus(item: { retiredAt: unknown }, lendable: boolean): Ite
   return lendable ? "lendable" : "active";
 }
 
-export type LoanDateError = "noDates" | "plannedToBeforeFrom" | "returnedWithoutPickup" | "returnedBeforePickup";
+export type LoanDateError = "noDates" | "plannedToBeforeFrom" | "returnedWithoutPickup" | "returnedBeforePickup" | "timesIncomplete" | "plannedToTimeBeforeFrom";
 
 // Tatsachen müssen zueinander passen: Rückgabe setzt Abholung voraus und liegt
 // nicht davor; geplantes Ende nicht vor geplantem Start; mindestens ein Datum ist Pflicht.
 export function validateLoanDates(l: LoanRange): LoanDateError | null {
   if (!l.plannedFrom && !l.plannedTo && !l.pickedUpAt && !l.returnedAt) return "noDates";
   if (l.plannedFrom && l.plannedTo && l.plannedTo < l.plannedFrom) return "plannedToBeforeFrom";
+  const ft = l.plannedFromTime?.slice(0, 5), tt = l.plannedToTime?.slice(0, 5);
+  if (Boolean(ft) !== Boolean(tt)) return "timesIncomplete";
+  if (ft && tt && l.plannedFrom && l.plannedFrom === l.plannedTo && tt <= ft) return "plannedToTimeBeforeFrom";
   if (!l.returnedAt) return null;
   if (!l.pickedUpAt) return "returnedWithoutPickup";
   return l.returnedAt < l.pickedUpAt ? "returnedBeforePickup" : null;
