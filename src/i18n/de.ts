@@ -713,6 +713,8 @@ export const de = {
   "lend.status.open": "Offen",
   "lend.status.approved": "Genehmigt",
   "lend.status.rejected": "Abgelehnt",
+  "lend.error.conflict": "Im gewählten Zeitraum nicht verfügbar.",
+  "lend.error.conflictFreeFrom": "Im gewählten Zeitraum nicht verfügbar (frei ab {time} Uhr).",
   "lend.mail.notifySubject": "Neue Verleih-Anfrage: {name}",
   "lend.mail.notifyBody": "Neue Anfrage für {name}. Details: {url}",
   "contact.title": "Kontakt zum Verein",

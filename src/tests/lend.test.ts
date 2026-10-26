@@ -136,6 +136,18 @@ describe("POST /lend/:itemId", () => {
     expect(insertCalls.length).toBe(0);
   });
 
+  it("rejects a conflicting period for an individually tracked item", async () => {
+    lendingItemFixture = requestableItem();
+    lendingLoansFixture = [{ plannedFrom: FUTURE_FROM, plannedTo: FUTURE_TO, pickedUpAt: null, returnedAt: null, plannedFromTime: null, plannedToTime: null, quantity: 1 }];
+    const res = await lendRoutes.request("/item-1", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
+      body: formBody(validBody()),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.length).toBe(0);
+  });
+
   it("creates a person and a loan request, then redirects to the status page", async () => {
     lendingItemFixture = requestableItem();
     const res = await lendRoutes.request("/item-1", {

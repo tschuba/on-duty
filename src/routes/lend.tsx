@@ -12,7 +12,7 @@ import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
 import { sendMail } from "../lib/mail.js";
 import { parseRequestValues, validateRequest, type RequestValues } from "../lib/loan-request.js";
-import { blockedDays } from "../lib/lending.js";
+import { blockedDays, checkAvailability } from "../lib/lending.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 export const lendRoutes = new Hono();
@@ -229,6 +229,19 @@ lendRoutes.post("/:itemId", async (c) => {
 
   const values = parseRequestValues(body);
   const { errors, quantity } = validateRequest(values, { individualTracking: item.individualTracking, timesRequired: item.timesRequired, maxQuantity });
+  if (Object.keys(errors).length === 0) {
+    const stock = item.inventoryItem.quantity - item.inventoryItem.retiredQuantity;
+    const existingLoans = await db.query.lendingLoans.findMany({ where: eq(lendingLoans.lendingItemId, item.id) });
+    const candidate = {
+      plannedFrom: values.plannedFrom, plannedTo: values.plannedTo,
+      plannedFromTime: values.plannedFromTime || null, plannedToTime: values.plannedToTime || null,
+      pickedUpAt: null, returnedAt: null, quantity,
+    };
+    const availability = checkAvailability({ individualTracking: item.individualTracking, stock }, existingLoans, candidate);
+    if (availability.conflict) {
+      errors.dates = availability.freeFrom ? t("lend.error.conflictFreeFrom", { time: availability.freeFrom }) : t("lend.error.conflict");
+    }
+  }
   if (Object.keys(errors).length > 0) {
     return c.html(<RequestPage item={item} orgName={config.orgName} values={values} errors={errors} maxQuantity={maxQuantity} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
   }

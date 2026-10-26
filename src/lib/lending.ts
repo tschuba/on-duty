@@ -129,3 +129,35 @@ export function freeFromTime(loans: LoanRange[], date: string): string | null {
   }
   return latest;
 }
+
+export type AvailabilityCandidate = LoanRange & { quantity: number; id?: string };
+
+// Verfügbarkeitsprüfung — gemeinsam für das Backend-Formular (routes/lending.tsx)
+// und die öffentliche Anfrage (routes/lend.tsx). Nur Verleihe zählen, nie offene Anfragen.
+export function checkAvailability(
+  item: { individualTracking: boolean; stock: number },
+  existingLoans: AvailabilityCandidate[],
+  candidate: AvailabilityCandidate,
+  excludeLoanId?: string,
+): { conflict: boolean; freeFrom?: string } {
+  if (!item.individualTracking && item.stock > 0 && candidate.quantity > item.stock) return { conflict: true };
+
+  const candidateRange = effectiveRange(candidate);
+  if (!candidateRange) return { conflict: false };
+
+  const overlapping = existingLoans.filter((l) => {
+    if (excludeLoanId && l.id === excludeLoanId) return false;
+    const range = effectiveRange(l);
+    return range && rangesOverlap(range, candidateRange);
+  });
+
+  if (item.individualTracking) {
+    if (overlapping.length === 0) return { conflict: false };
+    const freeFrom = candidate.plannedFrom ? freeFromTime(existingLoans, candidate.plannedFrom) ?? undefined : undefined;
+    return { conflict: true, freeFrom };
+  }
+
+  if (item.stock <= 0) return { conflict: false }; // kein brauchbarer Bestand gepflegt — Prüfung entfällt
+  const used = overlapping.reduce((sum, l) => sum + l.quantity, 0);
+  return { conflict: used + candidate.quantity > item.stock };
+}
