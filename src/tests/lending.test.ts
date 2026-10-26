@@ -129,3 +129,30 @@ describe("blockedDays / freeFromTime", () => {
     expect(freeFromTime(loans, "2026-06-01")).toBeNull();
   });
 });
+
+import { matchCandidates } from "../lib/lending.js";
+
+describe("matchCandidates", () => {
+  const pool = [
+    { id: "p1", firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null },
+    { id: "p2", firstName: "Max", lastName: "Muster", email: "other@example.com", phone: "0928112345" },
+    { id: "p3", firstName: "Anna", lastName: "Muster", email: null, phone: null },
+  ];
+  const request = { firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null };
+
+  it("ranks strong matches (email) before weak name-only matches", () => {
+    const result = matchCandidates(request, pool);
+    expect(result.map((r) => r.id)).toEqual(["p1", "p2"]);
+    expect(result[0].strength).toBe("strong");
+    expect(result[1].strength).toBe("weak");
+  });
+
+  it("matches by normalized phone", () => {
+    const result = matchCandidates({ firstName: "x", lastName: "y", email: null, phone: "0928-112345" }, pool);
+    expect(result).toEqual([{ ...pool[1], strength: "strong" }]);
+  });
+
+  it("returns nothing for no overlap", () => {
+    expect(matchCandidates({ firstName: "Nobody", lastName: "Here", email: null, phone: null }, pool)).toEqual([]);
+  });
+});

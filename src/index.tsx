@@ -26,6 +26,7 @@ import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
 import { inventoryRoutes } from "./routes/inventory.js";
 import { lendingRoutes } from "./routes/lending.js";
+import { loanRequestRoutes } from "./routes/loan-requests.js";
 import { importRoutes } from "./routes/import.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { sentryTunnelRoutes } from "./routes/sentry-tunnel.js";
@@ -125,6 +126,7 @@ app.route("/donors", donorRoutes);
 
 // Inventory routes — lending mounted first: more specific prefix before /inventory's own :id routes.
 app.route("/inventory/lending", lendingRoutes);
+app.route("/inventory/requests", loanRequestRoutes);
 app.route("/inventory", inventoryRoutes);
 
 // Admin routes

@@ -1,8 +1,17 @@
+import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
+import { loanRequests } from "../db/schema/index.js";
+import { normalizePhone } from "./contact.js";
 
 // "Überfällig" = geplantBis in der Vergangenheit und zurückgegebenAm leer —
 // analog zum Prüffristen-Pattern in lib/inventory.ts, für die rote Badge-Zahl
 // am Verleih-Tab (siehe InventoryTabs in routes/inventory.tsx).
+// Analog countOpenApplications (lib/applications.ts) für den Inventar-Tab/Nav-Badge.
+export async function countOpenLoanRequests(): Promise<number> {
+  const rows = await db.select({ id: loanRequests.id }).from(loanRequests).where(eq(loanRequests.status, "open"));
+  return rows.length;
+}
+
 export async function countOverdueLoans(): Promise<number> {
   const today = new Date().toISOString().slice(0, 10);
   const loans = await db.query.lendingLoans.findMany({
@@ -160,4 +169,21 @@ export function checkAvailability(
   if (item.stock <= 0) return { conflict: false }; // kein brauchbarer Bestand gepflegt — Prüfung entfällt
   const used = overlapping.reduce((sum, l) => sum + l.quantity, 0);
   return { conflict: used + candidate.quantity > item.stock };
+}
+
+export type CandidatePerson = { id: string; firstName: string; lastName: string; email: string | null; phone: string | null };
+
+// Kandidaten für die Personenzuordnung beim Genehmigen (Mitglied oder früherer
+// Entleiher): stark = gleiche E-Mail oder normalisierte Telefonnummer, sonst
+// schwach = gleicher Vor-/Nachname (case-insensitiv). Starke vor schwachen Treffern.
+export function matchCandidates(
+  request: { firstName: string; lastName: string; email: string | null; phone: string | null },
+  pool: CandidatePerson[],
+): (CandidatePerson & { strength: "strong" | "weak" })[] {
+  const email = request.email?.toLowerCase();
+  const phone = request.phone ? normalizePhone(request.phone) : null;
+  const name = (p: CandidatePerson) => p.firstName.toLowerCase() === request.firstName.toLowerCase() && p.lastName.toLowerCase() === request.lastName.toLowerCase();
+  const strong = pool.filter((p) => (email && p.email?.toLowerCase() === email) || (phone && p.phone && normalizePhone(p.phone) === phone));
+  const weak = pool.filter((p) => !strong.includes(p) && name(p));
+  return [...strong.map((p) => ({ ...p, strength: "strong" as const })), ...weak.map((p) => ({ ...p, strength: "weak" as const }))];
 }

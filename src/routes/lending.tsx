@@ -17,7 +17,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { effectiveRange, rangesOverlap, countOverdueLoans, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
+import { effectiveRange, rangesOverlap, countOverdueLoans, countOpenLoanRequests, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
 import { InventoryTabs, CATEGORIES, CATEGORY_LABELS } from "./inventory.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -192,7 +192,9 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         active="lending"
         overdueCount={await countOverdueInspectionItems()}
         overdueLoanCount={await countOverdueLoans()}
+        openRequestCount={user.permissions.has("lending:manage") ? await countOpenLoanRequests() : 0}
         showLending
+        showRequests={user.permissions.has("lending:manage")}
       />
       <PageHeader title={t("lending.title")} actions={user.permissions.has("lending:manage") && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />} />
 

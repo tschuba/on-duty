@@ -21,7 +21,7 @@ import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-r
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
-import { countOverdueLoans, availableQuantity, itemStatus } from "../lib/lending.js";
+import { countOverdueLoans, countOpenLoanRequests, availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -73,11 +73,13 @@ const CATEGORY_BADGE: Record<InventoryCategory, string> = {
 // Only members who can actually carry PSA get offered in the assignment picker.
 const ASSIGNABLE_MEMBER_STATUSES = new Set(["aktiv", "jugend"]);
 
-export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLending }: {
-  active: "stock" | "inspections" | "lending";
+export function InventoryTabs({ active, overdueCount, overdueLoanCount, openRequestCount, showLending, showRequests }: {
+  active: "stock" | "inspections" | "lending" | "requests";
   overdueCount: number;
   overdueLoanCount?: number;
+  openRequestCount?: number;
   showLending?: boolean;
+  showRequests?: boolean;
 }) {
   return (
     <SubNav items={[
@@ -86,6 +88,8 @@ export function InventoryTabs({ active, overdueCount, overdueLoanCount, showLend
         badge: overdueCount > 0 ? <span class="badge badge-sm badge-primary ml-1">{overdueCount}</span> : null },
       ...(showLending ? [{ href: "/inventory/lending", active: active === "lending", label: t("inventory.tabs.lending"),
         badge: (overdueLoanCount ?? 0) > 0 ? <span class="badge badge-sm badge-primary ml-1">{overdueLoanCount}</span> : null }] : []),
+      ...(showRequests ? [{ href: "/inventory/requests", active: active === "requests", label: t("lend.requests.title"),
+        badge: (openRequestCount ?? 0) > 0 ? <span class="badge badge-sm badge-warning ml-1">{openRequestCount}</span> : null }] : []),
     ]} />
   );
 }
@@ -719,7 +723,9 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         active="stock"
         overdueCount={await countOverdueInspectionItems()}
         overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
+        openRequestCount={user.permissions.has("lending:manage") ? await countOpenLoanRequests() : 0}
         showLending={user.permissions.has("lending:read")}
+        showRequests={user.permissions.has("lending:manage")}
       />
       <PageHeader title={t("inventory.title")} actions={<>
         {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
@@ -1331,7 +1337,9 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
         active="inspections"
         overdueCount={await countOverdueInspectionItems()}
         overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
+        openRequestCount={user.permissions.has("lending:manage") ? await countOpenLoanRequests() : 0}
         showLending={user.permissions.has("lending:read")}
+        showRequests={user.permissions.has("lending:manage")}
       />
       <PageHeader title={t("inventory.inspections.title")} />
 
