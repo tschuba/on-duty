@@ -5,6 +5,7 @@ import { lendingLoans, loanRequests, members, persons } from "../db/schema/index
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
+import { formatPeriod } from "./lend.js";
 import { InventoryTabs } from "./inventory.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -45,6 +46,15 @@ async function fetchRequest(id: string) {
     where: eq(loanRequests.id, id),
     with: { lendingItem: { with: { inventoryItem: true } }, person: true },
   });
+}
+
+function ReadField({ label, value, class: cls }: { label: string; value: string; class?: string }) {
+  return (
+    <div class={cls}>
+      <div class="text-sm opacity-60">{label}</div>
+      <div class="font-medium whitespace-pre-wrap">{value || "—"}</div>
+    </div>
+  );
 }
 
 function periodLabel(r: { plannedFrom: string; plannedTo: string }): string {
@@ -141,15 +151,18 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
         backHref="/inventory/requests"
       />
       <div class="max-w-2xl">
-        <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm mb-4">
-          <dt class="opacity-60">{t("apply.form.firstName")}</dt><dd>{request.person.firstName} {request.person.lastName}</dd>
-          <dt class="opacity-60">{t("lend.form.plannedFrom")}</dt><dd>{periodLabel(request)}</dd>
-          {request.quantity > 1 && <><dt class="opacity-60">{t("lending.loans.form.quantity")}</dt><dd>{request.quantity}</dd></>}
-          <dt class="opacity-60">{t("lend.status.submittedAt")}</dt><dd>{formatDate(request.submittedAt.toISOString().slice(0, 10))}</dd>
-          <dt class="opacity-60">{t("apply.form.message")}</dt><dd>{request.message}</dd>
-          {openOthers > 0 && <><dt class="opacity-60">{t("lend.requests.otherOpen")}</dt><dd>{openOthers}</dd></>}
-          {request.notifiedAt === null && <><dt class="opacity-60" /><dd class="text-warning">{t("lend.requests.notNotified")}</dd></>}
-        </dl>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <ReadField label={t("apply.form.firstName")} value={`${request.person.firstName} ${request.person.lastName}`} />
+          <ReadField label={t("lend.status.submittedAt")} value={formatDate(request.submittedAt.toISOString().slice(0, 10))} />
+          {request.person.email && <ReadField label={t("apply.form.email")} value={request.person.email} />}
+          {request.person.phone && <ReadField label={t("apply.form.phone")} value={request.person.phone} />}
+          {request.person.mobile && <ReadField label={t("members.form.mobile")} value={request.person.mobile} />}
+          <ReadField class="sm:col-span-2" label={t("lend.form.summary")} value={formatPeriod(request)} />
+          {request.quantity > 1 && <ReadField label={t("lending.loans.form.quantity")} value={String(request.quantity)} />}
+          {openOthers > 0 && <ReadField label={t("lend.requests.otherOpen")} value={String(openOthers)} />}
+          <ReadField class="sm:col-span-2" label={t("apply.form.message")} value={request.message ?? ""} />
+        </div>
+        {request.notifiedAt === null && <p class="text-warning text-sm mb-4">{t("lend.requests.notNotified")}</p>}
 
         {request.status === "open" && (
           <div class="flex items-center gap-2">

@@ -188,7 +188,7 @@ async function fetchRequestDetail(token: string) {
 const fmtDate = (iso: string) => iso.split("-").reverse().join(".");
 
 // Zeitraum und Dauer wie die Zusammenfassung im Antragsformular (siehe updateSummary).
-function formatPeriod(r: RequestWithItem): string {
+export function formatPeriod(r: Pick<RequestWithItem, "plannedFrom" | "plannedTo" | "plannedFromTime" | "plannedToTime">): string {
   const part = (d: string, time: string | null) => fmtDate(d) + (time ? `, ${time.slice(0, 5)} Uhr` : "");
   const from = part(r.plannedFrom, r.plannedFromTime), to = part(r.plannedTo, r.plannedToTime);
   const d0 = Date.parse(r.plannedFrom), d1 = Date.parse(r.plannedTo);
