@@ -14,6 +14,7 @@ import { accountRoutes, pendingRoutes } from "./routes/account.js";
 import { hookRoutes } from "./routes/hooks.js";
 import { loginRoutes } from "./routes/login.js";
 import { applyRoutes } from "./routes/apply.js";
+import { lendRoutes } from "./routes/lend.js";
 import { memberRoutes } from "./routes/members.js";
 import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -62,6 +63,9 @@ app.route("/", loginRoutes);
 
 // Public application forms — no auth guard, see backlog "Digitale Anträge"
 app.route("/apply", applyRoutes);
+
+// Public loan request form — no auth guard, see backlog "Verleih-Anfrageformular"
+app.route("/lend", lendRoutes);
 
 // Optional provider webhooks (signature-verified, inactive unless configured)
 app.route("/hooks", hookRoutes);
