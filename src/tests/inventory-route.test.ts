@@ -4,6 +4,7 @@ import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
+process.env.OIDC_APP_URL = "http://localhost:3000";
 
 let itemsFindManyResult: any[] = [];
 let itemsFindFirstResult: any = undefined;
@@ -313,7 +314,7 @@ describe("lendable flag on POST /:id", () => {
     itemsFindFirstResult = makeItem();
     const res = await post("/item1", { ...base, lendable: "1" });
     expect(res.status).toBe(302);
-    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "item1", individualTracking: true });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "item1", individualTracking: true, publicRequestable: false, maxRequestQuantity: 1, timesRequired: false });
   });
 
   it("refuses to make a retired item lendable", async () => {
@@ -350,6 +351,24 @@ describe("lendable flag on POST /:id", () => {
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === lendingItems)).toBe(false);
     expect(insertCalls.find((c) => c.table === lendingItems)).toBeUndefined();
+  });
+
+  it("saves publicRequestable/maxRequestQuantity/timesRequired for an already-lendable item", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem({ quantity: 5 });
+    lendingItemFindFirstResult = { id: "li1", individualTracking: false };
+    const res = await post("/item1", { ...base, lendable: "1", publicRequestable: "1", maxRequestQuantity: "3", timesRequired: "1" });
+    expect(res.status).toBe(302);
+    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
+  });
+
+  it("rejects an invalid maxRequestQuantity", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem({ quantity: 5 });
+    lendingItemFindFirstResult = { id: "li1", individualTracking: false };
+    const res = await post("/item1", { ...base, lendable: "1", maxRequestQuantity: "0" });
+    expect(res.status).toBe(422);
+    expect(updateCalls.find((c) => c.table === lendingItems)).toBeUndefined();
   });
 });
 
@@ -389,6 +408,18 @@ describe("GET / lending columns", () => {
     const filtered = await (await inventoryRoutes.request("/?lendable=1")).text();
     expect(filtered).toContain("Verleihbar");
     expect(filtered).not.toContain("Normal");
+  });
+
+  it("shows the public badge only for publicRequestable items", async () => {
+    currentUser = lendingManager();
+    itemsFindManyResult = [makeItem({ id: "a", name: "Oeffentlich", quantity: 3 }), makeItem({ id: "b", name: "Intern", quantity: 3 })];
+    lendingItemsFindManyResult = [
+      { id: "li1", inventoryItemId: "a", individualTracking: false, publicRequestable: true, loans: [] },
+      { id: "li2", inventoryItemId: "b", individualTracking: false, publicRequestable: false, loans: [] },
+    ];
+    const html = await (await inventoryRoutes.request("/")).text();
+    expect(html.split("Oeffentlich")[1].slice(0, 500)).toContain("öffentlich");
+    expect(html.split("Intern")[1].slice(0, 500)).not.toContain("öffentlich");
   });
 
   it("hides lending UI without lending:read", async () => {

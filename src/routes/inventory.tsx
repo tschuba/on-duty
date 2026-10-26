@@ -681,14 +681,14 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const all = await fetchItems();
 
   // Verleihstatus pro Item (nur mit lending:read): lending_items-Id + Verfügbarkeit heute.
-  const lendingByItem = new Map<string, { id: string; available: number }>();
+  const lendingByItem = new Map<string, { id: string; available: number; publicRequestable: boolean }>();
   if (canSeeLending) {
     const today = new Date().toISOString().slice(0, 10);
     const byId = new Map(all.map((item) => [item.id, item]));
     const lendingRows = await db.query.lendingItems.findMany({ with: { loans: true } });
     for (const row of lendingRows) {
       const item = byId.get(row.inventoryItemId);
-      if (item) lendingByItem.set(item.id, { id: row.id, available: availableQuantity(item, row.loans, today) });
+      if (item) lendingByItem.set(item.id, { id: row.id, available: availableQuantity(item, row.loans, today), publicRequestable: row.publicRequestable });
     }
   }
   const allTags = [...new Set(all.flatMap((item) => item.tags.map((t) => t.tag)))].sort((a, b) => a.localeCompare(b, "de"));
@@ -822,6 +822,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                   {status === "retired" && <span class="badge badge-neutral badge-sm">{t("inventory.status.retired")}</span>}
                   {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
                   {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
+                  {lending?.publicRequestable && <span class="badge badge-ghost badge-sm ml-1">{t("lend.form.publicBadge")}</span>}
                 </td>
                 <td class="hidden md:table-cell">
                   {lending
@@ -878,7 +879,13 @@ function assignmentDisplayList(item: ItemWithRelations): AssignmentInput[] {
   }));
 }
 
-type LendableField = { checked: boolean; editable: boolean; locked: boolean; error?: string };
+type LendableField = {
+  checked: boolean; editable: boolean; locked: boolean; error?: string;
+  individualTracking: boolean;
+  publicRequestable: boolean; maxRequestQuantity: number; timesRequired: boolean;
+  requestLink?: string;
+  errors?: { maxRequestQuantity?: string };
+};
 
 function ViewField({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -889,9 +896,27 @@ function ViewField({ label, value }: { label: string; value: string | null | und
   );
 }
 
-function lendableField(user: { permissions: Set<string> }, checked: boolean, opts: { editable?: boolean; locked?: boolean; error?: string } = {}): LendableField | undefined {
+function lendableField(
+  user: { permissions: Set<string> },
+  checked: boolean,
+  opts: {
+    editable?: boolean; locked?: boolean; error?: string;
+    individualTracking?: boolean;
+    publicRequestable?: boolean; maxRequestQuantity?: number; timesRequired?: boolean;
+    requestLink?: string;
+    errors?: { maxRequestQuantity?: string };
+  } = {},
+): LendableField | undefined {
   if (!user.permissions.has("lending:read")) return undefined;
-  return { checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: opts.locked ?? false, error: opts.error };
+  return {
+    checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: opts.locked ?? false, error: opts.error,
+    individualTracking: opts.individualTracking ?? false,
+    publicRequestable: opts.publicRequestable ?? false,
+    maxRequestQuantity: opts.maxRequestQuantity ?? 1,
+    timesRequired: opts.timesRequired ?? false,
+    requestLink: opts.requestLink,
+    errors: opts.errors,
+  };
 }
 
 function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable }: {
@@ -928,6 +953,30 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
             {lendable.locked && <span class="text-xs opacity-60 mt-1">{t("inventory.form.lendableLocked")}</span>}
             {!lendable.editable && <span class="text-xs opacity-60 mt-1">{t("inventory.form.lendableReadonly")}</span>}
             {lendable.error && <span class="text-error text-sm mt-1">{lendable.error}</span>}
+          </div>
+        )}
+        {lendable?.checked && lendable.editable && (
+          <div class="flex flex-col gap-2 pl-6 border-l border-base-300">
+            <label class="label cursor-pointer justify-start gap-2 w-fit pointer-coarse:min-h-11">
+              <input type="checkbox" name="publicRequestable" value="1" checked={lendable.publicRequestable} class="checkbox" />
+              <span class="text-sm">{t("lend.form.publicRequestable")}</span>
+            </label>
+            {!lendable.individualTracking && (
+              <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40">
+                <input type="number" name="maxRequestQuantity" min="1" value={String(lendable.maxRequestQuantity)} class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
+                {lendable.errors?.maxRequestQuantity && <span class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</span>}
+              </Field>
+            )}
+            <label class="label cursor-pointer justify-start gap-2 w-fit pointer-coarse:min-h-11">
+              <input type="checkbox" name="timesRequired" value="1" checked={lendable.timesRequired} class="checkbox" />
+              <span class="text-sm">{t("lend.form.timesRequired")}</span>
+            </label>
+            {lendable.publicRequestable && lendable.requestLink && (
+              <div class="flex items-center gap-2">
+                <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
+                <button type="button" class="btn btn-sm" onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">{t("common.copy")}</button>
+              </div>
+            )}
           </div>
         )}
       </form>
@@ -1166,7 +1215,12 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
         assignedMemberName={!isBatch ? assignmentList[0]?.name : undefined}
         assignments={isBatch ? assignmentList : []}
         extraActions={retireAction}
-        lendable={lendableField(user, Boolean(lendingItem), { editable: Boolean(lendingItem) || !item.retiredAt, locked: hasLoans })}
+        lendable={lendableField(user, Boolean(lendingItem), {
+          editable: Boolean(lendingItem) || !item.retiredAt, locked: hasLoans,
+          individualTracking: lendingItem?.individualTracking,
+          publicRequestable: lendingItem?.publicRequestable, maxRequestQuantity: lendingItem?.maxRequestQuantity, timesRequired: lendingItem?.timesRequired,
+          requestLink: lendingItem ? new URL(`/lend/${lendingItem.id}`, env.OIDC_APP_URL).toString() : undefined,
+        })}
       />
     </Layout>
   );
@@ -1210,7 +1264,17 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   }
   if (lendableError) errors.lendable = lendableError;
 
-  if (Object.keys(errors).length > 0) {
+  const individualTracking = lendingItem ? lendingItem.individualTracking : insertValues.quantity <= 1;
+  const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
+  const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
+  let maxRequestQuantity = 1;
+  let maxRequestQuantityError: string | undefined;
+  if (canManageLending && !individualTracking) {
+    maxRequestQuantity = Number(trimmed(body, "maxRequestQuantity") || "1");
+    if (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
+  }
+
+  if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={existing.name} user={user} activeNav="inventory">
@@ -1222,7 +1286,10 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
-          lendable={lendableField(user, wantsLendable, { error: lendableError })}
+          lendable={lendableField(user, wantsLendable, {
+            error: lendableError, individualTracking, publicRequestable, maxRequestQuantity, timesRequired,
+            errors: { maxRequestQuantity: maxRequestQuantityError },
+          })}
         />
       </Layout>,
       422
@@ -1250,9 +1317,11 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     }
     if (lendingChange === "enable") {
       // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
-      await tx.insert(lendingItems).values({ inventoryItemId: id, individualTracking: insertValues.quantity <= 1 });
+      await tx.insert(lendingItems).values({ inventoryItemId: id, individualTracking: insertValues.quantity <= 1, publicRequestable, maxRequestQuantity, timesRequired });
     } else if (lendingChange === "disable" && lendingItem) {
       await tx.delete(lendingItems).where(eq(lendingItems.id, lendingItem.id));
+    } else if (lendingItem) {
+      await tx.update(lendingItems).set({ publicRequestable, maxRequestQuantity, timesRequired }).where(eq(lendingItems.id, lendingItem.id));
     }
   });
   } catch (err) {
