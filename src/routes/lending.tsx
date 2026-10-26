@@ -313,6 +313,12 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
                 <input type="date" name={f} value={loan[f] ?? ""} class="input w-full" />
               </Field>
             ))}
+            <Field label={t("lend.form.plannedFromTime")}>
+              <input type="time" name="plannedFromTime" value={loan.plannedFromTime?.slice(0, 5) ?? ""} class="input w-full" />
+            </Field>
+            <Field label={t("lend.form.plannedToTime")}>
+              <input type="time" name="plannedToTime" value={loan.plannedToTime?.slice(0, 5) ?? ""} class="input w-full" />
+            </Field>
           </div>
           <div class="flex gap-2 pt-2">
             <button type="reset" class="btn btn-ghost">{t("common.reset")}</button>
@@ -431,7 +437,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
   item?: LendingItemWithRelations;
   // Gesetzt = Gegenstand-Auswahl im Formular (Einstieg ohne Item im Pfad).
   items?: LendingItemWithRelations[];
-  values?: Partial<{ quantity: string; plannedFrom: string; plannedTo: string; pickedUpAt: string; returnedAt: string; borrowerPersonId: string }> & BorrowerValues;
+  values?: Partial<{ quantity: string; plannedFrom: string; plannedTo: string; plannedFromTime: string; plannedToTime: string; pickedUpAt: string; returnedAt: string; borrowerPersonId: string }> & BorrowerValues;
   errors?: Record<string, string>;
   maxQuantity?: number;
 }) {
@@ -467,6 +473,13 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
           <input type="date" id="loan-plannedTo" name="plannedTo" oninput="document.getElementById('loan-takeTo').disabled=!this.value" value={v.plannedTo ?? ""} required class={`input w-full${errors?.plannedTo ? " input-error" : ""}`} />
           {errors?.plannedTo && <span class="text-error text-sm mt-1">{errors.plannedTo}</span>}
         </Field>
+        <Field label={t("lend.form.plannedFromTime")}>
+          <input type="time" name="plannedFromTime" value={v.plannedFromTime ?? ""} class={`input w-full${errors?.times ? " input-error" : ""}`} />
+        </Field>
+        <Field label={t("lend.form.plannedToTime")}>
+          <input type="time" name="plannedToTime" value={v.plannedToTime ?? ""} class={`input w-full${errors?.times ? " input-error" : ""}`} />
+        </Field>
+        {errors?.times && <p class="text-error text-sm sm:col-span-2">{errors.times}</p>}
         <Field label={t("lending.loans.form.pickedUpAt")} after={
           <button type="button" id="loan-takeFrom" disabled={!v.plannedFrom} class="btn min-h-11 w-full mt-2" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
             <Icon name="arrow-up" class="w-4 h-4" />
@@ -497,7 +510,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
 function checkAvailability(
   item: LendingItemWithRelations,
   existingLoans: LoanWithBorrower[],
-  candidate: { plannedFrom: string | null; plannedTo: string | null; pickedUpAt: string | null; returnedAt: string | null; quantity: number },
+  candidate: { plannedFrom: string | null; plannedTo: string | null; plannedFromTime?: string | null; plannedToTime?: string | null; pickedUpAt: string | null; returnedAt: string | null; quantity: number },
   excludeLoanId?: string,
 ): string | null {
   // Menge gegen den Bestand prüfen, auch ohne Datum (sonst umgeht ein Vorgang
@@ -540,6 +553,8 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
   };
   const plannedFrom = trimmed(body, "plannedFrom") || null;
   const plannedTo = trimmed(body, "plannedTo") || null;
+  const plannedFromTime = trimmed(body, "plannedFromTime") || null;
+  const plannedToTime = trimmed(body, "plannedToTime") || null;
   const pickedUpAt = trimmed(body, "pickedUpAt") || null;
   const returnedAt = trimmed(body, "returnedAt") || null;
   // Server erzwingt 1 bei Einzel-Tracking, auch falls im Formular manipuliert.
@@ -555,19 +570,22 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
   if (item && !item.individualTracking && (!Number.isInteger(quantity) || quantity < 1)) errors.quantity = t("lending.loans.error.invalidQuantity");
   if (!plannedFrom) errors.plannedFrom = t("common.required");
   if (!plannedTo) errors.plannedTo = t("common.required");
-  const dateError = validateLoanDates({ plannedFrom, plannedTo, pickedUpAt, returnedAt });
+  const dateError = validateLoanDates({ plannedFrom, plannedTo, plannedFromTime, plannedToTime, pickedUpAt, returnedAt });
   // "noDates" ist durch die Pflicht für plannedFrom/plannedTo bereits abgedeckt.
-  if (dateError && dateError !== "noDates") errors.dates = t(`lending.loans.error.${dateError}`);
+  if (dateError && dateError !== "noDates") {
+    const key = dateError === "timesIncomplete" || dateError === "plannedToTimeBeforeFrom" ? "times" : "dates";
+    errors[key] = t(`lending.loans.error.${dateError}`);
+  }
 
-  if (item) {
+  if (item && !errors.dates && !errors.times) {
     const existingLoans = await fetchLoans(item.id);
-    const conflict = checkAvailability(item, existingLoans, { plannedFrom, plannedTo, pickedUpAt, returnedAt, quantity });
+    const conflict = checkAvailability(item, existingLoans, { plannedFrom, plannedTo, plannedFromTime, plannedToTime, pickedUpAt, returnedAt, quantity });
     if (conflict) errors.conflict = conflict;
   }
 
   if (Object.keys(errors).length > 0) {
     const user = c.get("user")!;
-    const values = { quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerPersonId, ...person };
+    const values = { quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", plannedFromTime: plannedFromTime ?? "", plannedToTime: plannedToTime ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerPersonId, ...person };
     return c.html(
       <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
         <div class="max-w-md mx-auto">
@@ -591,6 +609,8 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
       borrowerPersonId: personId,
       plannedFrom,
       plannedTo,
+      plannedFromTime,
+      plannedToTime,
       pickedUpAt,
       returnedAt,
     });
@@ -705,12 +725,14 @@ async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string) {
   const { loan, item } = found;
 
   const body = await c.req.parseBody();
-  const pick = (key: "plannedFrom" | "plannedTo" | "pickedUpAt" | "returnedAt") =>
+  const pick = (key: "plannedFrom" | "plannedTo" | "plannedFromTime" | "plannedToTime" | "pickedUpAt" | "returnedAt") =>
     key in body ? trimmed(body, key) || null : loan[key];
 
   const patch = {
     plannedFrom: pick("plannedFrom"),
     plannedTo: pick("plannedTo"),
+    plannedFromTime: pick("plannedFromTime"),
+    plannedToTime: pick("plannedToTime"),
     pickedUpAt: pick("pickedUpAt"),
     returnedAt: pick("returnedAt"),
     quantity: item.individualTracking ? 1 : "quantity" in body ? Math.max(1, Math.round(Number(trimmed(body, "quantity"))) || 1) : loan.quantity,
@@ -720,7 +742,7 @@ async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string) {
   let error: string | null = null;
   const dateError = validateLoanDates(next);
   if (dateError) error = t(`lending.loans.error.${dateError}`);
-  else if (next.plannedFrom !== loan.plannedFrom || next.plannedTo !== loan.plannedTo || next.quantity !== loan.quantity) {
+  else if (next.plannedFrom !== loan.plannedFrom || next.plannedTo !== loan.plannedTo || next.plannedFromTime !== loan.plannedFromTime || next.plannedToTime !== loan.plannedToTime || next.quantity !== loan.quantity) {
     error = checkAvailability(item, await fetchLoans(item.id), next, loan.id);
   }
 
