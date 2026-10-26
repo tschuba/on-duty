@@ -106,3 +106,26 @@ describe("validateLoanDates", () => {
   });
 });
 
+
+import { blockedDays, freeFromTime } from "../lib/lending.js";
+
+describe("blockedDays / freeFromTime", () => {
+  const L = (o: Record<string, unknown>) => ({ plannedFrom: null, plannedTo: null, pickedUpAt: null, returnedAt: null, quantity: 1, ...o }) as any;
+  it("blocks only fully covered days for individual tracking", () => {
+    const loans = [L({ plannedFrom: "2026-06-02", plannedTo: "2026-06-03", plannedToTime: "12:00", plannedFromTime: "08:00" })];
+    expect(blockedDays({ individualTracking: true, stock: 1 }, loans, 1, "2026-06-01", "2026-06-04")).toEqual([]);
+    const full = [L({ plannedFrom: "2026-06-02", plannedTo: "2026-06-03" })];
+    expect(blockedDays({ individualTracking: true, stock: 1 }, full, 1, "2026-06-01", "2026-06-04")).toEqual(["2026-06-02", "2026-06-03"]);
+  });
+  it("uses remaining quantity for stock items", () => {
+    const loans = [L({ plannedFrom: "2026-06-02", plannedTo: "2026-06-02", quantity: 3 })];
+    const item = { individualTracking: false, stock: 5 };
+    expect(blockedDays(item, loans, 2, "2026-06-02", "2026-06-02")).toEqual([]);
+    expect(blockedDays(item, loans, 3, "2026-06-02", "2026-06-02")).toEqual(["2026-06-02"]);
+  });
+  it("reports free-from time", () => {
+    const loans = [L({ plannedFrom: "2026-06-01", plannedTo: "2026-06-02", plannedFromTime: "08:00", plannedToTime: "14:00" })];
+    expect(freeFromTime(loans, "2026-06-02")).toBe("14:00");
+    expect(freeFromTime(loans, "2026-06-01")).toBeNull();
+  });
+});

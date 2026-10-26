@@ -86,3 +86,46 @@ export function validateLoanDates(l: LoanRange): LoanDateError | null {
   if (!l.pickedUpAt) return "returnedWithoutPickup";
   return l.returnedAt < l.pickedUpAt ? "returnedBeforePickup" : null;
 }
+
+function addDaysStr(d: string, n: number): string {
+  const dt = new Date(`${d}T00:00:00Z`);
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Tage von `from` bis `to` (inklusive), für den öffentlichen Kalender.
+// Nur ganztägig belegte Tage: Teiltage bleiben wählbar, der Server prüft dann auf Zeit.
+// Einzel-Tracking: ein Verleih, der den ganzen Tag abdeckt. Stückzahl: Restmenge < gewünscht.
+export function blockedDays(
+  item: { individualTracking: boolean; stock: number },
+  loans: (LoanRange & { quantity: number })[],
+  wanted: number,
+  from: string,
+  to: string,
+): string[] {
+  const ranges = loans.flatMap((l) => {
+    const r = effectiveRange(l);
+    return r ? [{ r, quantity: l.quantity }] : [];
+  });
+  const out: string[] = [];
+  for (let day = from; day <= to; day = addDaysStr(day, 1)) {
+    const covering = ranges.filter(({ r }) => r.from <= `${day}T00:00` && r.to >= `${day}T23:59`);
+    const blocked = item.individualTracking
+      ? covering.length > 0
+      : item.stock > 0 && item.stock - covering.reduce((s, c) => s + c.quantity, 0) < wanted;
+    if (blocked) out.push(day);
+  }
+  return out;
+}
+
+// "frei ab HH:MM": spätestes Ende eines Verleihs, der an `date` endet und mit dem Tag überlappt.
+export function freeFromTime(loans: LoanRange[], date: string): string | null {
+  let latest: string | null = null;
+  for (const l of loans) {
+    const r = effectiveRange(l);
+    if (!r || r.from > `${date}T23:59` || r.to < `${date}T00:00` || r.to.slice(0, 10) !== date) continue;
+    const time = r.to.slice(11);
+    if (time !== "23:59" && (!latest || time > latest)) latest = time;
+  }
+  return latest;
+}
