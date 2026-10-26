@@ -4,9 +4,9 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lendingItems, lendingLoans, loanRequests, persons } from "../db/schema/index.js";
 import { Layout } from "../components/layout.js";
-import { PageHeader } from "../components/page-header.js";
+import { PageHeader, HeaderAction } from "../components/page-header.js";
 import { Field, EmailInput, PhoneInput } from "../components/field.js";
-import { ContactFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
+import { ContactFooter, NoWithdrawNotice, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
@@ -38,7 +38,7 @@ function RequestForm({ item, values, errors, maxQuantity }: {
 }) {
   if (!item) return null;
   return (
-    <form method="post" class="space-y-4">
+    <form id="lend-form" method="post" class="space-y-4">
       <Honeypot />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("apply.form.firstName")} required>
@@ -48,6 +48,7 @@ function RequestForm({ item, values, errors, maxQuantity }: {
           <input type="text" name="lastName" value={values.lastName} class={`input w-full${errors.lastName ? " input-error" : ""}`} />
         </Field>
       </div>
+      <p class="text-sm opacity-70">{t("lend.form.contactHint")}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <EmailInput name="email" placeholder={t("apply.form.email")} value={values.email} error={!!errors.contact} />
         <PhoneInput name="phone" placeholder={t("apply.form.phone")} value={values.phone} error={!!errors.contact} />
@@ -66,18 +67,17 @@ function RequestForm({ item, values, errors, maxQuantity }: {
         </Field>
       </div>
       {errors.times && <p class="text-error text-sm">{errors.times}</p>}
+      <p id="lend-summary" class="text-sm font-medium" data-label={t("lend.form.summary")} hidden></p>
       {!item.individualTracking && maxQuantity > 1 && (
         <Field label={t("lending.loans.form.quantity")} class="max-w-32" required>
           <input type="number" name="quantity" min="1" max={maxQuantity} value={values.quantity || "1"} class={`input w-full${errors.quantity ? " input-error" : ""}`} />
           {errors.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
         </Field>
       )}
-      <Field label={t("apply.form.message")} required>
+      <Field label={t("lend.form.message")} required>
         <textarea name="message" class={`textarea w-full${errors.message ? " textarea-error" : ""}`} rows={3}>{values.message}</textarea>
       </Field>
-      <p class="text-sm opacity-60">{t("lend.form.noWithdraw")}</p>
       <PrivacyNotice />
-      <button type="submit" class="btn btn-primary">{t("lend.form.submit")}</button>
     </form>
   );
 }
@@ -92,7 +92,7 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
   return (
     <Layout title={t("lend.title", { name: item.inventoryItem.name })}>
       <div class="max-w-xl mx-auto">
-        <PageHeader title={item.inventoryItem.name} subtitle={orgName} />
+        <PageHeader title={item.inventoryItem.name} subtitle={t("lend.form.subtitle", { org: orgName })} actions={<HeaderAction variant="primary" type="submit" form="lend-form" icon="check" label={t("lend.form.submit")} class="btn-primary" />} />
         {maxQuantity > 1 && !item.individualTracking && (
           <p class="text-sm opacity-70 mb-4">{t("lend.form.maxQuantityHint", { max: maxQuantity })}</p>
         )}
@@ -100,6 +100,7 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
         <ContactFooter />
       </div>
       <link rel="stylesheet" href="/css/vanilla-calendar.css" />
+      <style>{"#lend-calendar{--vc-date-weekend-bg-hover:var(--color-base-200);--vc-date-weekend-hover-edge-bg:var(--color-base-200);--vc-date-weekend-outside-bg:transparent;--vc-date-weekend-outside-bg-hover:var(--color-base-200);--vc-date-weekend-outside-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-outside-color-hover:var(--color-base-content);--vc-date-range-middle-outside-bg:color-mix(in oklab,var(--color-primary) 10%,transparent);--vc-date-selected-outside-bg:var(--color-primary);--vc-bg:var(--color-base-100);--vc-color:var(--color-base-content);--vc-header-color:var(--color-base-content);--vc-week-day-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-date-color:var(--color-base-content);--vc-date-color-hover:var(--color-base-content);--vc-date-hover-bg:var(--color-base-200);--vc-date-hover-edge-bg:var(--color-base-200);--vc-date-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-today-color:var(--color-primary);--vc-date-selected-bg:var(--color-primary);--vc-date-selected-color:var(--color-primary-content);--vc-date-range-middle-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-color:var(--color-base-content);--vc-date-weekend-color:var(--color-base-content);--vc-date-weekend-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-selected-bg:var(--color-primary);--vc-date-weekend-selected-color:var(--color-primary-content);--vc-date-weekend-hover-bg:var(--color-base-200);--vc-date-weekend-today-color:var(--color-primary);--vc-date-range-middle-weekend-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-weekend-color:var(--color-base-content);--vc-week-day-off-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-months-years-bg:var(--color-base-100);--vc-months-years-color:var(--color-base-content);--vc-months-years-bg-hover:var(--color-base-200);--vc-months-years-bg-selected:var(--color-primary);--vc-months-years-color-selected:var(--color-primary-content);--vc-title-color:var(--color-base-content);--vc-title-color-hover:var(--color-primary);--vc-focus-outline-color:var(--color-primary)}"}</style>
       <script type="module" dangerouslySetInnerHTML={{ __html: CALENDAR_SCRIPT }} />
     </Layout>
   );
@@ -115,6 +116,32 @@ const CALENDAR_SCRIPT = `
     const toInput = document.getElementById("lend-plannedTo");
     const quantityInput = document.querySelector('input[name="quantity"]');
     let calendar;
+    const timeFrom = document.querySelector('input[name="plannedFromTime"]');
+    const timeTo = document.querySelector('input[name="plannedToTime"]');
+    const summary = document.getElementById("lend-summary");
+    const fmt = (iso) => iso.split("-").reverse().join(".");
+    function updateSummary() {
+      if (!fromInput.value) { summary.hidden = true; return; }
+      const part = (d, t) => fmt(d) + (t ? ", " + t + " Uhr" : "");
+      const from = part(fromInput.value, timeFrom.value), to = part(toInput.value, timeTo.value);
+      const d0 = Date.parse(fromInput.value), d1 = Date.parse(toInput.value);
+      const hasTimes = timeFrom.value && timeTo.value;
+      const mins = hasTimes
+        ? (d1 - d0) / 60000 + (timeTo.value.slice(0, 2) - timeFrom.value.slice(0, 2)) * 60 + (timeTo.value.slice(3, 5) - timeFrom.value.slice(3, 5))
+        : ((d1 - d0) / 86400000 + 1) * 1440;
+      const units = [[10080, "Woche", "Wochen"], [1440, "Tag", "Tage"], [60, "Std.", "Std."], [1, "Min.", "Min."]];
+      let rest = Math.max(0, Math.round(mins));
+      const parts = [];
+      for (const [size, one, many] of units) {
+        const n = Math.floor(rest / size);
+        rest -= n * size;
+        if (n) parts.push(n + " " + (n === 1 ? one : many));
+      }
+      summary.textContent = summary.dataset.label + ": " + (from === to ? from : from + " – " + to) + (parts.length ? " (" + parts.join(", ") + ")" : "");
+      summary.hidden = false;
+    }
+    timeFrom.addEventListener("input", updateSummary);
+    timeTo.addEventListener("input", updateSummary);
     async function loadBlocked() {
       const quantity = quantityInput ? quantityInput.value : (root.dataset.quantity || "1");
       const res = await fetch(\`/lend/\${root.dataset.itemId}/blocked?quantity=\${quantity}\`);
@@ -122,21 +149,24 @@ const CALENDAR_SCRIPT = `
       const stillValid = fromInput.value && toInput.value &&
         !disableDates.some((d) => d >= fromInput.value && d <= toInput.value);
       if (!stillValid) { fromInput.value = ""; toInput.value = ""; }
-      if (calendar) { calendar.set({ disableDates, selectedDates: stillValid ? [fromInput.value, toInput.value] : [] }); return; }
+      if (calendar) { calendar.set({ disableDates, selectedDates: stillValid ? [fromInput.value, toInput.value] : [] }); updateSummary(); return; }
       calendar = new Calendar(root, {
         selectionDatesMode: "multiple-ranged",
         disableDates,
         disableDatesGaps: true,
         disableDatesPast: true,
+        locale: "de-DE",
         firstWeekday: 1,
         selectedDates: fromInput.value && toInput.value ? [fromInput.value, toInput.value] : [],
         onClickDate(self) {
           const sel = self.context.selectedDates;
           fromInput.value = sel[0] || "";
           toInput.value = sel[sel.length - 1] || "";
+          updateSummary();
         },
       });
       calendar.init();
+      updateSummary();
     }
     quantityInput?.addEventListener("change", loadBlocked);
     loadBlocked();
@@ -162,6 +192,7 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
         <PageHeader title={t("lend.status.title")} />
         {justSubmitted && <div class="alert alert-success mb-4">{t("lend.success.body")}</div>}
         <div class="alert alert-info mb-4">{t("lend.status.notYetConfirmed")}</div>
+        <NoWithdrawNotice />
         <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm mb-4">
           <dt class="opacity-60">{t("lending.loans.form.item")}</dt><dd>{request.lendingItem.inventoryItem.name}</dd>
           <dt class="opacity-60">{t("lend.form.plannedFrom")}</dt><dd>{period}</dd>
@@ -171,7 +202,6 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
           {request.reviewedAt && <><dt class="opacity-60">{t("lend.status.reviewedAt")}</dt><dd>{request.reviewedAt.toLocaleDateString("de-DE")}</dd></>}
         </dl>
         {!request.lendingItem.inventoryItem && null}
-        <p class="text-sm opacity-60">{t("lend.form.noWithdraw")}</p>
         <div class="flex items-center gap-2 mt-2">
           <input type="text" readonly value={`${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`} class="input input-sm flex-1" />
           <button type="button" class="btn btn-sm" onclick={`navigator.clipboard.writeText(this.previousElementSibling.value)`}>{t("common.copy")}</button>

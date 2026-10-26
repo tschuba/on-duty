@@ -40,6 +40,13 @@ export async function ContactFooter() {
   );
 }
 
+export async function NoWithdrawNotice() {
+  const c = await loadOrgConfig();
+  const who = [c.orgName, c.orgContactEmail, c.orgContactPhone].filter(Boolean).join(", ");
+  if (!who) return <></>;
+  return <div class="alert alert-warning mb-4">{t("lend.form.noWithdraw", { who })}</div>;
+}
+
 export function clientIp(c: any): string {
   return c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "unknown";
 }
