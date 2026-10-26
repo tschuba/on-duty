@@ -271,9 +271,9 @@ function clientIp(c: any): string {
 
 async function notifySubmission(name: string) {
   const config = await loadOrgConfig();
-  if (!config.applicationNotifyEmail) return;
+  if (!config.notificationEmail) return;
   await sendMail(
-    config.applicationNotifyEmail,
+    config.notificationEmail,
     t("applications.mail.submitNotifySubject", { name }),
     `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
     { "X-On-Duty-Type": "membership-application" },
