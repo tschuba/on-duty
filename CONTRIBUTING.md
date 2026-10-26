@@ -134,4 +134,4 @@ Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft*
 
 ## Lizenz
 
-Beiträge stehen unter der [AGPL-3.0-or-later](LICENSE) (inbound = outbound). Es gibt kein CLA.
+Beiträge stehen unter der [AGPL-3.0-or-later](LICENSE) (inbound = outbound). Es gibt kein Contributor License Agreement (CLA): Du unterschreibst nichts Zusätzliches, und deine Beiträge stehen unter derselben Lizenz wie das Projekt.
