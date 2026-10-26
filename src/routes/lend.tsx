@@ -211,6 +211,19 @@ async function notifyManager(itemName: string, requestId: string) {
   );
 }
 
+// Eingangsbestätigung an den Antragsteller — nur mit E-Mail und SMTP; ohne Mail bleibt notifiedAt null (Admin-Hinweis auf der Detailseite).
+async function notifyApplicant(email: string | null, token: string): Promise<Date | null> {
+  if (!email) return null;
+  const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${token}`;
+  const result = await sendMail(
+    email,
+    t("lend.mail.submittedSubject"),
+    `${t("lend.mail.submittedBody")}\n\n${statusUrl}`,
+    { "X-On-Duty-Type": "lend-request" },
+  );
+  return result.sent ? new Date() : null;
+}
+
 lendRoutes.post("/:itemId", async (c) => {
   const item = await fetchRequestableItem(c.req.param("itemId"));
   if (!item) return c.notFound();
@@ -268,6 +281,8 @@ lendRoutes.post("/:itemId", async (c) => {
   });
 
   await notifyManager(item.inventoryItem.name, requestId);
+  const notifiedAt = await notifyApplicant(values.email || null, token);
+  if (notifiedAt) await db.update(loanRequests).set({ notifiedAt }).where(eq(loanRequests.id, requestId));
   return c.redirect(`/lend/status/${token}?submitted=1`);
 });
 

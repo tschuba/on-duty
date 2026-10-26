@@ -30,6 +30,7 @@ vi.mock("../db/index.js", () => ({
       lendingLoans: { findMany: vi.fn(() => Promise.resolve(lendingLoansFixture)) },
     },
     transaction: vi.fn(async (cb: any) => cb({ insert: txInsert })),
+    update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve(undefined)) })) })),
   },
 }));
 
@@ -178,6 +179,26 @@ describe("POST /lend/:itemId", () => {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validBody()),
+    });
+    expect(sendMail).not.toHaveBeenCalledWith("verwalter@example.com", expect.any(String), expect.any(String), expect.anything());
+  });
+
+  it("sends a submission confirmation to the applicant's email", async () => {
+    lendingItemFixture = requestableItem();
+    await lendRoutes.request("/item-1", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
+      body: formBody(validBody()),
+    });
+    expect(sendMail).toHaveBeenCalledWith("max@example.com", expect.any(String), expect.any(String), { "X-On-Duty-Type": "lend-request" });
+  });
+
+  it("skips the confirmation mail when no email was given", async () => {
+    lendingItemFixture = requestableItem();
+    await lendRoutes.request("/item-1", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
+      body: formBody({ ...validBody(), email: "", phone: "09281123456" }),
     });
     expect(sendMail).not.toHaveBeenCalled();
   });

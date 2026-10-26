@@ -739,6 +739,8 @@ export const de = {
   "lend.mail.approvedBody": "Deine Anfrage wurde genehmigt.",
   "lend.mail.rejectedSubject": "Deine Verleih-Anfrage wurde abgelehnt",
   "lend.mail.rejectedBody": "Deine Anfrage wurde leider abgelehnt.",
+  "lend.mail.submittedSubject": "Deine Verleih-Anfrage ist eingegangen",
+  "lend.mail.submittedBody": "Deine Anfrage ist eingegangen und wird geprüft. Das ist noch keine Zusage.",
   "lend.mail.notifySubject": "Neue Verleih-Anfrage: {name}",
   "lend.mail.notifyBody": "Neue Anfrage für {name}. Details: {url}",
   "contact.title": "Kontakt zum Verein",
