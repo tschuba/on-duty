@@ -29,7 +29,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs && node scripts/build-browser-sentry.mjs",
+    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs && node scripts/copy-calendar.mjs && node scripts/build-browser-sentry.mjs",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {

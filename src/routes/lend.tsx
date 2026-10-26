@@ -12,6 +12,7 @@ import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
 import { sendMail } from "../lib/mail.js";
 import { parseRequestValues, validateRequest, type RequestValues } from "../lib/loan-request.js";
+import { blockedDays } from "../lib/lending.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 export const lendRoutes = new Hono();
@@ -52,14 +53,9 @@ function RequestForm({ item, values, errors, maxQuantity }: {
         <PhoneInput name="phone" placeholder={t("apply.form.phone")} value={values.phone} error={!!errors.contact} />
       </div>
       {errors.contact && <p class="text-error text-sm">{errors.contact}</p>}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("lend.form.plannedFrom")} required>
-          <input type="date" name="plannedFrom" value={values.plannedFrom} class={`input w-full${errors.dates ? " input-error" : ""}`} />
-        </Field>
-        <Field label={t("lend.form.plannedTo")} required>
-          <input type="date" name="plannedTo" value={values.plannedTo} class={`input w-full${errors.dates ? " input-error" : ""}`} />
-        </Field>
-      </div>
+      <div id="lend-calendar" data-item-id={item.id} data-quantity={values.quantity || "1"}></div>
+      <input type="hidden" id="lend-plannedFrom" name="plannedFrom" value={values.plannedFrom} />
+      <input type="hidden" id="lend-plannedTo" name="plannedTo" value={values.plannedTo} />
       {errors.dates && <p class="text-error text-sm">{errors.dates}</p>}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("lend.form.plannedFromTime")} required={item.timesRequired}>
@@ -103,9 +99,49 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
         <RequestForm item={item} values={values} errors={errors} maxQuantity={maxQuantity} />
         <ContactFooter />
       </div>
+      <link rel="stylesheet" href="/css/vanilla-calendar.css" />
+      <script type="module" dangerouslySetInnerHTML={{ __html: CALENDAR_SCRIPT }} />
     </Layout>
   );
 }
+
+// Schreibt in die versteckten Felder plannedFrom/plannedTo; lädt gesperrte Tage neu,
+// wenn sich die Menge ändert, und verwirft eine nicht mehr passende Auswahl.
+const CALENDAR_SCRIPT = `
+  import { Calendar } from "/js/vanilla-calendar.min.js";
+  const root = document.getElementById("lend-calendar");
+  if (root) {
+    const fromInput = document.getElementById("lend-plannedFrom");
+    const toInput = document.getElementById("lend-plannedTo");
+    const quantityInput = document.querySelector('input[name="quantity"]');
+    let calendar;
+    async function loadBlocked() {
+      const quantity = quantityInput ? quantityInput.value : (root.dataset.quantity || "1");
+      const res = await fetch(\`/lend/\${root.dataset.itemId}/blocked?quantity=\${quantity}\`);
+      const disableDates = res.ok ? await res.json() : [];
+      const stillValid = fromInput.value && toInput.value &&
+        !disableDates.some((d) => d >= fromInput.value && d <= toInput.value);
+      if (!stillValid) { fromInput.value = ""; toInput.value = ""; }
+      if (calendar) { calendar.set({ disableDates, selectedDates: stillValid ? [fromInput.value, toInput.value] : [] }); return; }
+      calendar = new Calendar(root, {
+        selectionDatesMode: "multiple-ranged",
+        disableDates,
+        disableDatesGaps: true,
+        disableDatesPast: true,
+        firstWeekday: 1,
+        selectedDates: fromInput.value && toInput.value ? [fromInput.value, toInput.value] : [],
+        onClickDate(self) {
+          const sel = self.context.selectedDates;
+          fromInput.value = sel[0] || "";
+          toInput.value = sel[sel.length - 1] || "";
+        },
+      });
+      calendar.init();
+    }
+    quantityInput?.addEventListener("change", loadBlocked);
+    loadBlocked();
+  }
+`;
 
 const REQUEST_STATUS_LABEL = { open: t("lend.status.open"), approved: t("lend.status.approved"), rejected: t("lend.status.rejected") } as const;
 
@@ -220,6 +256,24 @@ lendRoutes.post("/:itemId", async (c) => {
 
   await notifyManager(item.inventoryItem.name, requestId);
   return c.redirect(`/lend/status/${token}?submitted=1`);
+});
+
+// GET /lend/:itemId/blocked?quantity=N — nur Verleihe zählen (offene Anfragen reservieren nichts).
+lendRoutes.get("/:itemId/blocked", async (c) => {
+  const item = await fetchRequestableItem(c.req.param("itemId"));
+  if (!item) return c.notFound();
+  const quantity = Math.max(1, Math.round(Number(c.req.query("quantity") ?? "1")) || 1);
+  const stock = item.inventoryItem.quantity - item.inventoryItem.retiredQuantity;
+
+  const loans = await db.query.lendingLoans.findMany({ where: eq(lendingLoans.lendingItemId, item.id) });
+  const today = new Date();
+  const from = today.toISOString().slice(0, 10);
+  const limit = new Date(today);
+  limit.setFullYear(limit.getFullYear() + 1);
+  const to = limit.toISOString().slice(0, 10);
+
+  const days = blockedDays({ individualTracking: item.individualTracking, stock }, loans, quantity, from, to);
+  return c.json(days);
 });
 
 // GET /lend/status/:token — zugleich Bestätigungsseite nach dem Absenden.

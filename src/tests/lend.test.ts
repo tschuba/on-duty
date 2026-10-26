@@ -11,6 +11,7 @@ const FUTURE_TO = future.toISOString().slice(0, 10);
 
 let lendingItemFixture: any = undefined;
 let loanRequestFixture: any = undefined;
+let lendingLoansFixture: any[] = [];
 let insertCalls: { table: string; values: any }[] = [];
 
 const txInsert = vi.fn((table: any) => ({
@@ -26,6 +27,7 @@ vi.mock("../db/index.js", () => ({
     query: {
       lendingItems: { findFirst: vi.fn(() => Promise.resolve(lendingItemFixture)) },
       loanRequests: { findFirst: vi.fn(() => Promise.resolve(loanRequestFixture)) },
+      lendingLoans: { findMany: vi.fn(() => Promise.resolve(lendingLoansFixture)) },
     },
     transaction: vi.fn(async (cb: any) => cb({ insert: txInsert })),
   },
@@ -64,7 +66,24 @@ const freshIp = () => `10.0.0.${++ipCounter}`;
 beforeEach(() => {
   insertCalls = [];
   loanRequestFixture = undefined;
+  lendingLoansFixture = [];
   sendMail.mockClear();
+});
+
+describe("GET /lend/:itemId/blocked", () => {
+  it("404s when the item isn't requestable", async () => {
+    lendingItemFixture = undefined;
+    const res = await lendRoutes.request("/missing/blocked");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns fully booked days for an individually tracked item", async () => {
+    lendingItemFixture = requestableItem();
+    lendingLoansFixture = [{ plannedFrom: FUTURE_FROM, plannedTo: FUTURE_FROM, pickedUpAt: null, returnedAt: null, plannedFromTime: null, plannedToTime: null, quantity: 1 }];
+    const res = await lendRoutes.request("/item-1/blocked");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([FUTURE_FROM]);
+  });
 });
 
 describe("GET /lend/:itemId", () => {
