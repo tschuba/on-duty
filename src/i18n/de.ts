@@ -705,7 +705,7 @@ export const de = {
   "lend.form.plannedToTime": "Uhrzeit bis",
   "lend.form.summary": "Leihzeit",
   "lend.form.maxQuantityHint": "Maximal {max} verfügbar.",
-  "lend.form.noWithdraw": "Um deine Anfrage zu stornieren, melde dich bei {who}.",
+  "lend.form.noWithdraw": "Um deine Anfrage zu stornieren, melde dich bei uns.",
   "lend.form.message": "Nachricht / Motivation",
   "lend.form.contactHint": "Bitte E-Mail oder Telefon angeben (mindestens eines ist Pflicht).",
   "lend.form.submit": "Anfrage senden",

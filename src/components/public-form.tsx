@@ -1,3 +1,4 @@
+import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
 import { loadOrgConfig } from "../lib/org-config.js";
 
@@ -21,30 +22,27 @@ export function PrivacyNotice() {
 }
 
 // "Kontakt zum Verein": leere Felder entfallen, ohne jede Angabe entfällt der Baustein.
-export function contactLines(config: Record<string, string>): string[] {
+// `hint` erklärt den Anlass (z. B. Stornierung) über den Kontaktdaten.
+export async function ContactFooter({ hint }: { hint?: string } = {}) {
+  const c = await loadOrgConfig();
   const address = [
-    [config.orgStreet, config.orgHouseNumber].filter(Boolean).join(" "),
-    [config.orgZip, config.orgCity].filter(Boolean).join(" "),
+    [c.orgStreet, c.orgHouseNumber].filter(Boolean).join(" "),
+    [c.orgZip, c.orgCity].filter(Boolean).join(" "),
   ].filter(Boolean).join(", ");
-  return [config.orgName, address, config.orgContactEmail, config.orgContactPhone].filter(Boolean);
-}
-
-export async function ContactFooter() {
-  const lines = contactLines(await loadOrgConfig());
-  if (lines.length <= 1) return <></>;
+  if (!c.orgContactEmail && !c.orgContactPhone && !address) return <></>;
+  const row = (icon: "map-pin" | "phone" | "envelope", content: unknown) => (
+    <p class="flex items-center gap-2 pl-4"><Icon name={icon} class="size-4 shrink-0" /><span>{content}</span></p>
+  );
   return (
-    <div class="mt-8 text-sm opacity-70">
+    <div class="mt-8 text-sm opacity-70 space-y-1">
       <p class="font-semibold">{t("contact.title")}</p>
-      {lines.map((l) => <p>{l}</p>)}
+      {hint && <p>{hint}</p>}
+      {c.orgName && <p class="pl-4">{c.orgName}</p>}
+      {address && row("map-pin", address)}
+      {c.orgContactPhone && row("phone", <a class="link" href={`tel:${c.orgContactPhone}`}>{c.orgContactPhone}</a>)}
+      {c.orgContactEmail && row("envelope", <a class="link" href={`mailto:${c.orgContactEmail}`}>{c.orgContactEmail}</a>)}
     </div>
   );
-}
-
-export async function NoWithdrawNotice() {
-  const c = await loadOrgConfig();
-  const who = [c.orgName, c.orgContactEmail, c.orgContactPhone].filter(Boolean).join(", ");
-  if (!who) return <></>;
-  return <div class="alert alert-warning mb-4">{t("lend.form.noWithdraw", { who })}</div>;
 }
 
 export function clientIp(c: any): string {

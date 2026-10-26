@@ -7,7 +7,7 @@ import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader, HeaderAction } from "../components/page-header.js";
 import { Field, EmailInput, PhoneInput } from "../components/field.js";
-import { ContactFooter, NoWithdrawNotice, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
+import { ContactFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig } from "../lib/org-config.js";
@@ -223,7 +223,6 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
             <p>{t(`lend.status.text.${request.status}`)}</p>
           </div>
         </section>
-        {request.status === "open" && <NoWithdrawNotice />}
 
         <section class="card bg-base-100 border border-base-300">
           <dl class="card-body grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
@@ -249,7 +248,7 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
           </div>
         </section>
 
-        <ContactFooter />
+        <ContactFooter hint={request.status === "open" ? t("lend.form.noWithdraw") : undefined} />
         <PrivacyNotice />
       </div>
     </Layout>
