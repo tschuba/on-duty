@@ -17,5 +17,6 @@ COPY --from=build /app/public ./public
 COPY --from=build /app/drizzle ./drizzle
 COPY scripts/zitadel-init.mjs ./scripts/zitadel-init.mjs
 COPY branding ./branding
+COPY LICENSE ./LICENSE
 EXPOSE 3000
 CMD ["node", "dist/entrypoint.js"]
