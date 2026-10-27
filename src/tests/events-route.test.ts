@@ -3,10 +3,16 @@ import { formBody } from "./test-utils.js";
 import { t } from "../i18n/index.js";
 
 process.env.ORG_NAME = "Test Feuerwehr";
+process.env.OIDC_APP_URL = "http://localhost:3000";
 process.env.APP_TIMEZONE = "Europe/Berlin";
 
 let eventsFindManyResult: any[] = [];
 let eventFindFirstResult: any = undefined;
+let publicEnabled = "true";
+vi.mock("../lib/settings.js", () => ({
+  getSettings: async () => ({ eventsPublicEnabled: publicEnabled }),
+  setSetting: vi.fn(),
+}));
 let tagRows: { tag: string }[] = [];
 let rolesRows: { id: string; name: string }[] = [];
 
@@ -152,6 +158,12 @@ describe("GET /events", () => {
 });
 
 describe("GET /events/public", () => {
+  it("is 404 when disabled", async () => {
+    publicEnabled = "false";
+    const res = await eventRoutes.request("/public");
+    publicEnabled = "true";
+    expect(res.status).toBe(404);
+  });
   it("is reachable without auth and never shows the description", async () => {
     eventsFindManyResult = [makeEvent({ visibility: "public", description: "geheim" })];
     const res = await eventRoutes.request("/public");

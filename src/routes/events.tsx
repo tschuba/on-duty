@@ -6,6 +6,7 @@ import { requireAuth, type Variables, type AuthedUser } from "../middleware/auth
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, FieldGroup } from "../components/field.js";
+import { Icon } from "../components/icon.js";
 import { RowAction } from "../components/row-action.js";
 import { ChipInput } from "../components/chip-input.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -13,6 +14,7 @@ import { addMonths, todayStr } from "../lib/quick-range.js";
 import { parseMulti } from "../lib/list-query.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
+import { getSettings, setSetting } from "../lib/settings.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
@@ -311,6 +313,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const tz = resolveTimezone(c);
   const allTags = await eventTagVocabulary(user);
   const tagFilter = parseMulti(c.req.queries("tag"), allTags);
+  const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
 
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
   let rows = await fetchEvents(user, undefined);
@@ -322,11 +325,38 @@ eventRoutes.get("/", requireAuth(), async (c) => {
     <Layout title={t("events.title")} user={user} activeNav="events">
       <div class="max-w-6xl mx-auto">
       <PageHeader title={t("events.title")} actions={<>
-        <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />
+        {canManage ? (
+          <div class="dropdown dropdown-end">
+            <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={`${t("events.publicLink")}: ${publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}`}>
+              <Icon name="link" class="h-5 w-5" />
+              <span class="hidden sm:inline">{t("events.publicLink")}</span>
+              <span class={`inline-block h-2 w-2 rounded-full ${publicEnabled ? "bg-success" : "bg-error"}`} />
+            </div>
+            <div tabindex={0} class="dropdown-content bg-base-200 rounded-box z-10 w-72 p-3 shadow space-y-2">
+              <form method="post" action="/events/public-settings">
+                <label class="label cursor-pointer justify-between gap-3">
+                  <span class="text-sm">{publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}</span>
+                  <input type="checkbox" name="enabled" value="1" class="toggle toggle-success" checked={publicEnabled} onchange="this.form.submit()" />
+                </label>
+              </form>
+              {publicEnabled ? (
+                <div class="flex items-center gap-2">
+                  <a href="/events/public" target="_blank" rel="noopener" class="btn btn-sm btn-ghost flex-1 justify-start">
+                    <Icon name="arrow-top-right-on-square" class="h-4 w-4" />{t("events.publicSettings.open")}
+                  </a>
+                  <button type="button" class="btn btn-sm btn-ghost btn-square" title={t("applications.links.copy")} aria-label={t("applications.links.copy")}
+                    data-url={new URL("/events/public", env.OIDC_APP_URL).toString()}
+                    onclick={`navigator.clipboard.writeText(this.dataset.url).then(function(){document.body.dispatchEvent(new CustomEvent('showToast',{detail:{message:${JSON.stringify(t("applications.links.copied"))},type:'info'}}))})`}>
+                    <Icon name="clipboard-document" class="h-4 w-4" />
+                  </button>
+                </div>
+              ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
+            </div>
+          </div>
+        ) : publicEnabled && <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
         {canManage && <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" />}
       </>} />
       <LocalTimes tz={tz} />
-
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: tag }))} selected={tagFilter}
           allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
@@ -344,7 +374,15 @@ eventRoutes.get("/", requireAuth(), async (c) => {
 const PUBLIC_WINDOW_MONTHS = 12;
 const PUBLIC_MAX_ROWS = 200;
 
+eventRoutes.post("/public-settings", manage, async (c) => {
+  const body = await c.req.parseBody();
+  await setSetting("eventsPublicEnabled", body.enabled === "1" ? "true" : "false");
+  setFlash(c, t("events.publicSettings.saved"), "success");
+  return c.redirect("/events");
+});
+
 eventRoutes.get("/public", async (c) => {
+  if ((await getSettings()).eventsPublicEnabled !== "true") return c.notFound();
   const tz = resolveTimezone(c);
   const today = todayStr();
   const rows = (await db.query.events.findMany({
