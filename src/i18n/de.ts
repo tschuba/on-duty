@@ -522,6 +522,7 @@ export const de = {
   "admin.orgConfig.flash.privacyUrlInvalid": "Der Link zur Datenschutzerklärung muss eine gültige Adresse mit https:// sein.",
   "admin.orgConfig.flash.privacyTextEmpty": "Bitte einen Text zur Datenschutzerklärung eingeben oder eine andere Option wählen.",
   "privacy.title": "Datenschutzerklärung",
+  "privacy.controller": "Verantwortlicher",
   "organisation.placeholder.taxExemptionNumber": "z. B. 143/123/12345",
   "organisation.placeholder.periodFrom": "z. B. 2022",
   "organisation.placeholder.periodTo": "z. B. 2024",

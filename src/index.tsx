@@ -76,7 +76,7 @@ app.get("/datenschutz", async (c) => {
   if (!text) return c.notFound();
   // orgPrivacyText ist bereits sanitizetes Trix-HTML (siehe organisation.tsx); ältere Bestände ohne Tags sind Klartext ohne erkennbare Tags, "<" übernimmt daher die HTML-Rendering-Prüfung.
   const isHtml = /<[a-z][\s\S]*>/i.test(text);
-  return c.html(<Layout title={t("privacy.title")}><div class="max-w-2xl mx-auto"><PageHeader title={t("privacy.title")} /><div class={isHtml ? "richtext-content" : "whitespace-pre-wrap"}>{isHtml ? raw(text) : text}</div></div></Layout>);
+  return c.html(<Layout title={t("privacy.title")}><div class="max-w-2xl mx-auto"><PageHeader title={t("privacy.title")} /><section class="mb-6"><h2 class="font-semibold">{t("privacy.controller")}</h2><address class="not-italic whitespace-pre-line">{[cfg.orgName, [cfg.orgStreet, cfg.orgHouseNumber].filter(Boolean).join(" "), [cfg.orgZip, cfg.orgCity].filter(Boolean).join(" "), cfg.orgContactEmail, cfg.orgContactPhone].map((l) => l?.trim()).filter(Boolean).join("\n")}</address></section><div class={isHtml ? "richtext-content" : "whitespace-pre-wrap"}>{isHtml ? raw(text) : text}</div></div></Layout>);
 });
 
 // Public loan request form — no auth guard, see backlog "Verleih-Anfrageformular"

@@ -22,7 +22,7 @@ export async function PrivacyNotice() {
   return (
     <p class="text-xs opacity-60 mt-2">
       {t("apply.form.privacyNoticeText")}
-      {href && <> <a href={href} class="link" {...(inline ? {} : { target: "_blank", rel: "noopener" })}>{t("apply.form.privacyNoticeLink")}</a></>}
+      {href && <> <a href={href} class="link" target="_blank" rel="noopener">{t("apply.form.privacyNoticeLink")}</a></>}
     </p>
   );
 }
