@@ -545,10 +545,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <Field label={t("inventory.form.commissionedAt")}>
           <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
         </Field>
-        <Field label={t("inventory.form.purchasePrice")}>
+        <Field label={t("inventory.form.purchasePrice")} after={<span class="block text-xs opacity-60 mt-1" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>}>
           <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input w-full${errors?.purchasePrice ? " input-error" : ""}`} placeholder={t("inventory.form.purchasePrice")} />
           {errors?.purchasePrice && <span class="text-error text-sm mt-1">{errors.purchasePrice}</span>}
-          <span class="text-xs opacity-60 mt-1" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>
         </Field>
       </div>
 
