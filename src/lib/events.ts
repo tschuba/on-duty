@@ -76,7 +76,7 @@ export function validateEventForm(values: EventFormValues, tz: string): { starts
   let startsAt: Date | null = null;
   let endsAt: Date | null = null;
   if (values.allDay) {
-    const bounds = values.startsAt && values.endsAt ? allDayBounds(values.startsAt, values.endsAt, tz) : null;
+    const bounds = values.startsAt ? allDayBounds(values.startsAt, values.endsAt || values.startsAt, tz) : null;
     if (!bounds) errors.dates = t("events.form.error.datesRequired");
     else ({ startsAt, endsAt } = bounds);
   } else {

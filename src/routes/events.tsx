@@ -372,9 +372,9 @@ function EventForm({ values, errors, roles, tz }: {
           <input type={values.allDay ? "date" : "datetime-local"} id="event-start" name="startsAt" value={values.startsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required />
           <p class="text-xs opacity-70 mt-1" data-local-hint="event-start" hidden></p>
         </Field>
-        <Field label={t("events.form.end")} required
+        <Field label={t("events.form.end")} required={!values.allDay}
           after={<div id="event-durations" hidden={values.allDay} class="flex gap-1 flex-wrap mt-1">{DURATION_PRESETS.map((p) => <button type="button" class="btn btn-xs" data-duration={p.key}>{p.label}</button>)}</div>}>
-          <input type={values.allDay ? "date" : "datetime-local"} id="event-end" name="endsAt" value={values.endsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required />
+          <input type={values.allDay ? "date" : "datetime-local"} id="event-end" name="endsAt" value={values.endsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required={!values.allDay} />
           <p class="text-xs opacity-70 mt-1" data-local-hint="event-end" hidden></p>
         </Field>
       </div>
@@ -425,6 +425,7 @@ function EventForm({ values, errors, roles, tz }: {
             document.getElementById('event-durations').hidden = isAllDay;
             start.type = isAllDay ? 'date' : 'datetime-local';
             end.type = isAllDay ? 'date' : 'datetime-local';
+            end.required = !isAllDay;
             if (isAllDay) { start.value = start.value.slice(0, 10); end.value = end.value.slice(0, 10); }
           }
           allDay.addEventListener('change', function() { setType(allDay.checked); });
