@@ -5,7 +5,7 @@ import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { deleteOwnAccount } from "../lib/account.js";
+import { deleteOwnAccount, resolveAccountUrl } from "../lib/account.js";
 import { auth } from "../auth.js";
 import { env } from "../env.js";
 import { db } from "../db/index.js";
@@ -85,6 +85,7 @@ accountRoutes.get("/", guard, async (c) => {
     .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId))
     .where(eq(userAppRoles.userId, user.id));
   const isLocalAdmin = user.id === LOCAL_ADMIN_ACCOUNT_ID;
+  const accountUrl = resolveAccountUrl(env.OIDC_ACCOUNT_URL, env.OIDC_PROVIDER);
   return c.html(
     <Layout title={t("account.title")} user={user}>
       <div class="max-w-xl mx-auto">
@@ -103,11 +104,11 @@ accountRoutes.get("/", guard, async (c) => {
           <dt class="opacity-60">{t("account.profile.permissions")}</dt>
           <dd>{user.permissions.size === 0 ? <span class="opacity-40">—</span> : <PermissionBadges permissions={[...user.permissions]} />}</dd>
         </dl>
-        {env.OIDC_ACCOUNT_URL && !isLocalAdmin && (
+        {accountUrl && !isLocalAdmin && (
           <section class="mb-6">
             <h2 class="text-lg font-semibold mb-1">{t("account.login.heading")}</h2>
             <p class="opacity-70 mb-3">{t("account.login.body")}</p>
-            <a class="btn btn-outline" href={env.OIDC_ACCOUNT_URL} target="_blank" rel="noopener noreferrer">
+            <a class="btn btn-outline" href={accountUrl} target="_blank" rel="noopener noreferrer">
               {t("account.manageLogin")} <span aria-hidden="true">↗</span>
             </a>
           </section>

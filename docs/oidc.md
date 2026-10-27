@@ -31,7 +31,7 @@ Beispiel: `https://on-duty.example.com/auth/callback/oidc`
 | `OIDC_CLIENT_ID` | OAuth2-Client-ID der registrierten Anwendung |
 | `OIDC_CLIENT_SECRET` | OAuth2-Client-Secret |
 | `OIDC_APP_URL` | Öffentliche URL der App (HTTPS). Wird zur Ableitung der Callback-URI verwendet. |
-| `OIDC_ACCOUNT_URL` | Optional. Link zur Kontoverwaltung beim Anmeldedienst (erscheint auf `/account` als „Anmeldedaten verwalten“). Zitadel: `<issuer>/ui/console/users/me` (gegen die Instanz prüfen). |
+| `OIDC_ACCOUNT_URL` | Optional. Link zur Kontoverwaltung beim Anmeldedienst (erscheint auf `/account` als „Anmeldedaten verwalten“). Pfad (wird gegen den Host von `OIDC_PROVIDER` aufgelöst) oder volle URL. Zitadel: `/ui/console/users/me`. |
 
 Benötigte Scopes: `openid email profile`. Der Provider muss die E-Mail-Adresse des Benutzers im ID-Token liefern — sie ist das einzige Matching-Kriterium.
 
