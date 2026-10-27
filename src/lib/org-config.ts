@@ -23,6 +23,15 @@ export function isOrgConfigCompleteForReceipts(config: Record<string, string>): 
   return REQUIRED_RECEIPT_FIELDS.every((key) => config[key]);
 }
 
+export type PrivacyMode = "none" | "url" | "text";
+
+// Gespeicherte Auswahl; Altbestand ohne orgPrivacyMode wird aus den vorhandenen Feldern abgeleitet.
+export function privacyMode(c: Record<string, string>): PrivacyMode {
+  const m = c.orgPrivacyMode;
+  if (m === "none" || m === "url" || m === "text") return m;
+  return c.orgPrivacyText?.trim() ? "text" : c.orgPrivacyUrl?.trim() ? "url" : "none";
+}
+
 export type OrgTab = "master" | "tax";
 
 // Single source of truth for tab → fields and tab → read permissions (write implies read; OR check, no implies mechanism in RBAC).
@@ -33,7 +42,7 @@ export const ORG_TABS = {
 
 // span: columns of 4 from sm up (default 4 = full width). placeholder/hint: i18n keys, shown only when editable.
 export type TabField = {
-  key: string; type: string; span?: 1 | 2 | 3;
+  key: string; type: string; span?: 1 | 2 | 3; inGroup?: boolean; // inGroup: rendered by the privacy group, only saved here
   placeholder?: string; hint?: string; attrs?: Record<string, string>;
 };
 
@@ -46,8 +55,9 @@ export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
     { key: "orgCity", type: "text", span: 3 },
     { key: "orgContactEmail", type: "email", span: 2 },
     { key: "orgContactPhone", type: "tel", span: 2 },
-    { key: "orgPrivacyUrl", type: "url", placeholder: "organisation.placeholder.orgPrivacyUrl", hint: "organisation.hint.orgPrivacy" },
-    { key: "orgPrivacyText", type: "richtext", hint: "organisation.hint.orgPrivacy" },
+    { key: "orgPrivacyMode", type: "privacy" },
+    { key: "orgPrivacyUrl", type: "url", inGroup: true },
+    { key: "orgPrivacyText", type: "richtext", inGroup: true },
     { key: "notificationEmail", type: "email" },
   ],
   tax: [

@@ -1,6 +1,6 @@
 import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
-import { loadOrgConfig } from "../lib/org-config.js";
+import { loadOrgConfig, privacyMode } from "../lib/org-config.js";
 
 export function Honeypot() {
   return (
@@ -16,8 +16,9 @@ export function Honeypot() {
 // Die Datenschutzerklärung liegt auf der Seite des Vereins (orgPrivacyUrl) oder inline (orgPrivacyText, Route /datenschutz); ohne Angabe entfällt der Link.
 export async function PrivacyNotice() {
   const c = await loadOrgConfig();
-  const inline = !!c.orgPrivacyText?.trim();
-  const href = inline ? "/datenschutz" : c.orgPrivacyUrl?.trim();
+  const mode = privacyMode(c);
+  const inline = mode === "text" && !!c.orgPrivacyText?.trim();
+  const href = inline ? "/datenschutz" : mode === "url" ? c.orgPrivacyUrl?.trim() : undefined;
   return (
     <p class="text-xs opacity-60 mt-2">
       {t("apply.form.privacyNoticeText")}

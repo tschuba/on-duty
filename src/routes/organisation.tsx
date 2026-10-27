@@ -9,7 +9,7 @@ import { FormActions, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { sanitizeRichText } from "../lib/sanitize.js";
-import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
+import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, missingReceiptFields, privacyMode, type OrgTab } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 // Full class names so Tailwind's scanner picks them up.
@@ -21,13 +21,46 @@ const TAB_ORDER = ["master", "tax"] as const;
 
 const guard = requireAuth(["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"]);
 
+// CSS-only Umschalter (has-[:checked]); beide Eingaben bleiben im Formular, damit der inaktive Wert erhalten bleibt.
+function PrivacyGroup({ values, editable }: { values: Record<string, string>; editable: boolean }) {
+  const mode = privacyMode(values);
+  const opts = ["none", "url", "text"] as const;
+  return (
+    <fieldset class="fieldset sm:col-span-4 group">
+      <legend class="fieldset-legend">{t("organisation.privacy.legend")}</legend>
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        {opts.map((o) => (
+          <label class="label cursor-pointer gap-2">
+            <input type="radio" name="orgPrivacyMode" id={`pm-${o}`} value={o} class="radio radio-sm" checked={mode === o} disabled={!editable} />
+            {t(`organisation.privacy.${o}`)}
+          </label>
+        ))}
+      </div>
+      <p class="text-sm text-base-content/70 hidden group-has-[#pm-none:checked]:block">{t("organisation.privacy.noneHint")}</p>
+      <div class="hidden group-has-[#pm-url:checked]:block">
+        <p class="text-sm text-base-content/70 mb-2">{t("organisation.privacy.urlHint")}</p>
+        <Field label={t("organisation.privacy.url")}>
+          <input type="url" name="orgPrivacyUrl" value={values.orgPrivacyUrl ?? ""} disabled={!editable} class="input w-full" placeholder={t("organisation.placeholder.orgPrivacyUrl")} />
+        </Field>
+      </div>
+      <div class="hidden group-has-[#pm-text:checked]:block">
+        <p class="text-sm text-base-content/70 mb-2">{t("organisation.privacy.textHint")}</p>
+        <RichTextField name="orgPrivacyText" value={values.orgPrivacyText ?? ""} editable={editable} />
+        {values.orgPrivacyText?.trim() && <a href="/datenschutz" target="_blank" rel="noopener" class="link text-sm mt-2 inline-block">{t("organisation.privacy.preview")}</a>}
+      </div>
+    </fieldset>
+  );
+}
+
 function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<string, string>; editable: boolean }) {
   return (
     <section id={TABS[tab].path} class="mb-8">
       <h2 class="text-xl font-semibold mb-4">{t(`organisation.tabs.${tab}`)}</h2>
       <div class="card bg-base-200 shadow">
         <div class="card-body grid grid-cols-1 sm:grid-cols-4 gap-4">
-          {TAB_FIELDS[tab].map(({ key, type, span, placeholder, hint, attrs }) => (
+          {TAB_FIELDS[tab].map(({ key, type, span, placeholder, hint, attrs, inGroup }) => inGroup ? null : type === "privacy" ? (
+            <PrivacyGroup values={values} editable={editable} />
+          ) : (
             <>
             <Field
               label={t(`admin.orgConfig.field.${key}` as never)}
@@ -107,9 +140,17 @@ organisationRoutes.post("/", requireAuth([TABS.master.write, TABS.tax.write]), a
   // Trix liefert HTML (z. B. "<div></div>" bei leerem Editor); vor der Leer-Prüfung und dem Speichern sanitizen.
   if (typeof body.orgPrivacyText === "string") body.orgPrivacyText = sanitizeRichText(body.orgPrivacyText);
 
-  if (tabs.includes("master") && String(body.orgPrivacyUrl ?? "").trim() && String(body.orgPrivacyText ?? "").trim()) {
-    setFlash(c, t("admin.orgConfig.flash.privacyEitherOr"), "error");
-    return c.redirect(`/organisation#${TABS.master.path}`);
+  if (tabs.includes("master")) {
+    const mode = String(body.orgPrivacyMode ?? "");
+    const url = String(body.orgPrivacyUrl ?? "").trim();
+    const privacyError =
+      mode === "url" && !(/^https:\/\//i.test(url) && URL.canParse(url)) ? "privacyUrlInvalid"
+      : mode === "text" && !String(body.orgPrivacyText ?? "").trim() ? "privacyTextEmpty"
+      : null;
+    if (privacyError) {
+      setFlash(c, t(`admin.orgConfig.flash.${privacyError}`), "error");
+      return c.redirect(`/organisation#${TABS.master.path}`);
+    }
   }
 
   if (tabs.includes("tax")) {

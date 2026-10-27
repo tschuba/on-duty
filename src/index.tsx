@@ -39,7 +39,7 @@ import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
 import { PageHeader } from "./components/page-header.js";
 import { t } from "./i18n/index.js";
-import { loadOrgConfig } from "./lib/org-config.js";
+import { loadOrgConfig, privacyMode } from "./lib/org-config.js";
 
 validateEnv();
 initSentry();
@@ -71,7 +71,8 @@ app.route("/apply", applyRoutes);
 
 // Inline privacy policy (only if the org stored a text instead of an external link)
 app.get("/datenschutz", async (c) => {
-  const text = (await loadOrgConfig()).orgPrivacyText?.trim();
+  const cfg = await loadOrgConfig();
+  const text = privacyMode(cfg) === "text" ? cfg.orgPrivacyText?.trim() : undefined;
   if (!text) return c.notFound();
   // orgPrivacyText ist bereits sanitizetes Trix-HTML (siehe organisation.tsx); ältere Bestände ohne Tags sind Klartext ohne erkennbare Tags, "<" übernimmt daher die HTML-Rendering-Prüfung.
   const isHtml = /<[a-z][\s\S]*>/i.test(text);
