@@ -6,7 +6,7 @@ import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
-import { loadOrgConfig } from "../lib/org-config.js";
+import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { isApplicationFormActive } from "../lib/application-forms.js";
 import { sendMail } from "../lib/mail.js";
 import { HTTP_STATUS } from "../lib/constants.js";
@@ -249,9 +249,10 @@ function SuccessPage() {
 
 async function notifySubmission(name: string) {
   const config = await loadOrgConfig();
-  if (!config.notificationEmail) return;
+  const to = notificationRecipient(config);
+  if (!to) return;
   await sendMail(
-    config.notificationEmail,
+    to,
     t("applications.mail.submitNotifySubject", { name }),
     `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
     { "X-On-Duty-Type": "membership-application" },

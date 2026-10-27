@@ -10,7 +10,7 @@ import { Field, EmailInput, PhoneInput } from "../components/field.js";
 import { ContactFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
-import { loadOrgConfig } from "../lib/org-config.js";
+import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { sendMail } from "../lib/mail.js";
 import { parseRequestValues, validateRequest, type RequestValues } from "../lib/loan-request.js";
 import { blockedDays, checkAvailability } from "../lib/lending.js";
@@ -285,9 +285,10 @@ lendRoutes.get("/:itemId", async (c) => {
 
 async function notifyManager(itemName: string, requestId: string) {
   const config = await loadOrgConfig();
-  if (!config.notificationEmail) return;
+  const to = notificationRecipient(config);
+  if (!to) return;
   await sendMail(
-    config.notificationEmail,
+    to,
     t("lend.mail.notifySubject", { name: itemName }),
     t("lend.mail.notifyBody", { name: itemName, url: `${process.env.OIDC_APP_URL ?? ""}/inventory/requests/${requestId}` }),
     { "X-On-Duty-Type": "lend-request" },

@@ -23,6 +23,9 @@ export function isOrgConfigCompleteForReceipts(config: Record<string, string>): 
   return REQUIRED_RECEIPT_FIELDS.every((key) => config[key]);
 }
 
+// Empfänger für Antrags-/Anfrage-Benachrichtigungen: eigene Adresse, sonst Kontakt-E-Mail.
+export const notificationRecipient = (c: Record<string, string>) => c.notificationEmail?.trim() || c.orgContactEmail?.trim() || "";
+
 export type PrivacyMode = "none" | "url" | "text";
 
 // Gespeicherte Auswahl; Altbestand ohne orgPrivacyMode wird aus den vorhandenen Feldern abgeleitet.
@@ -53,12 +56,12 @@ export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
     { key: "orgHouseNumber", type: "text", span: 1 },
     { key: "orgZip", type: "text", span: 1 },
     { key: "orgCity", type: "text", span: 3 },
-    { key: "orgContactEmail", type: "email", span: 2 },
     { key: "orgContactPhone", type: "tel", span: 2 },
+    { key: "orgContactEmail", type: "email", span: 2, hint: "organisation.hint.contactEmail" },
+    { key: "notificationEmail", type: "notify" },
     { key: "orgPrivacyMode", type: "privacy" },
     { key: "orgPrivacyUrl", type: "url", inGroup: true },
     { key: "orgPrivacyText", type: "richtext", inGroup: true },
-    { key: "notificationEmail", type: "email" },
   ],
   tax: [
     { key: "taxExemptionDate", type: "date", span: 2 },

@@ -36,19 +36,36 @@ function PrivacyGroup({ values, editable }: { values: Record<string, string>; ed
           </label>
         ))}
       </div>
-      <p class="text-sm text-base-content/70 hidden group-has-[#pm-none:checked]:block">{t("organisation.privacy.noneHint")}</p>
+      <p class="text-xs text-base-content/60 hidden group-has-[#pm-none:checked]:block">{t("organisation.privacy.noneHint")}</p>
       <div class="hidden group-has-[#pm-url:checked]:block">
-        <p class="text-sm text-base-content/70 mb-2">{t("organisation.privacy.urlHint")}</p>
+        <p class="text-xs text-base-content/60 mb-2">{t("organisation.privacy.urlHint")}</p>
         <Field label={t("organisation.privacy.url")}>
           <input type="url" name="orgPrivacyUrl" value={values.orgPrivacyUrl ?? ""} disabled={!editable} class="input w-full" placeholder={t("organisation.placeholder.orgPrivacyUrl")} />
         </Field>
       </div>
       <div class="hidden group-has-[#pm-text:checked]:block">
-        <p class="text-sm text-base-content/70 mb-2">{t("organisation.privacy.textHint")}</p>
+        <p class="text-xs text-base-content/60 mb-2">{t("organisation.privacy.textHint")}</p>
         <RichTextField name="orgPrivacyText" value={values.orgPrivacyText ?? ""} editable={editable} />
         {values.orgPrivacyText?.trim() && <a href="/datenschutz" target="_blank" rel="noopener" class="link text-sm mt-2 inline-block">{t("organisation.privacy.preview")}</a>}
       </div>
     </fieldset>
+  );
+}
+
+// CSS-only: Toggle blendet das eigene Adressfeld ein; ohne Toggle gilt die Kontakt-E-Mail (Server leert das Feld dann; Hinweis steht dort).
+function NotifyGroup({ values, editable }: { values: Record<string, string>; editable: boolean }) {
+  return (
+    <div class="sm:col-span-4 group">
+      <label class="label cursor-pointer justify-start gap-3 whitespace-normal">
+        <input type="checkbox" name="notifySeparate" id="notify-separate" class="toggle toggle-sm" checked={!!values.notificationEmail?.trim()} disabled={!editable} />
+        <span class="min-w-0">{t("organisation.notify.toggle")}</span>
+      </label>
+      <div class="hidden group-has-[#notify-separate:checked]:block mt-2">
+        <Field label={t("admin.orgConfig.field.notificationEmail")} floating>
+          <input type="email" name="notificationEmail" value={values.notificationEmail ?? ""} disabled={!editable} class="input w-full" placeholder={t("admin.orgConfig.field.notificationEmail")} />
+        </Field>
+      </div>
+    </div>
   );
 }
 
@@ -60,6 +77,8 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
         <div class="card-body grid grid-cols-1 sm:grid-cols-4 gap-4">
           {TAB_FIELDS[tab].map(({ key, type, span, placeholder, hint, attrs, inGroup }) => inGroup ? null : type === "privacy" ? (
             <PrivacyGroup values={values} editable={editable} />
+          ) : type === "notify" ? (
+            <NotifyGroup values={values} editable={editable} />
           ) : (
             <>
             <Field
@@ -82,7 +101,7 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
                 {...(editable ? attrs : {})}
               />}
             </Field>
-            {editable && hint && <p class="text-sm text-base-content/70 sm:col-span-4 -mt-2">{t(hint as never)}</p>}
+            {editable && hint && <p class="text-xs text-base-content/60 sm:col-span-4 -mt-2">{t(hint as never)}</p>}
             </>
           ))}
         </div>
@@ -139,6 +158,8 @@ organisationRoutes.post("/", requireAuth([TABS.master.write, TABS.tax.write]), a
 
   // Trix liefert HTML (z. B. "<div></div>" bei leerem Editor); vor der Leer-Prüfung und dem Speichern sanitizen.
   if (typeof body.orgPrivacyText === "string") body.orgPrivacyText = sanitizeRichText(body.orgPrivacyText);
+
+  if (tabs.includes("master") && body.notifySeparate !== "on") body.notificationEmail = "";
 
   if (tabs.includes("master")) {
     const mode = String(body.orgPrivacyMode ?? "");

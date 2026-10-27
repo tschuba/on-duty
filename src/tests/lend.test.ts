@@ -35,7 +35,8 @@ vi.mock("../db/index.js", () => ({
 }));
 
 let orgConfigFixture: Record<string, string> = { orgName: "Test Feuerwehr" };
-vi.mock("../lib/org-config.js", () => ({
+vi.mock("../lib/org-config.js", async (orig) => ({
+  ...(await orig<typeof import("../lib/org-config.js")>()),
   loadOrgConfig: vi.fn(() => Promise.resolve(orgConfigFixture)),
 }));
 
