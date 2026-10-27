@@ -384,6 +384,7 @@ export const de = {
   "admin.permissions.resource.member-roles": "Funktionen",
   "admin.permissions.resource.member-role-types": "Funktionstypen",
   "admin.permissions.resource.anniversary-years": "Jubiläumsjahre",
+  "admin.permissions.resource.events": "Termine",
   "admin.permissions.key.orgRead": "Organisation ansehen",
   "admin.permissions.key.orgWrite": "Organisation bearbeiten",
   "admin.permissions.key.orgTaxDataRead": "Steuerdaten ansehen",
@@ -392,6 +393,7 @@ export const de = {
   "admin.permissions.key.anniversaryYearsRead": "Jubiläumsjahre ansehen",
   "admin.permissions.key.anniversaryYearsWrite": "Jubiläumsjahre anlegen und bearbeiten",
   "admin.permissions.key.anniversaryYearsDelete": "Jubiläumsjahre löschen",
+  "admin.permissions.key.eventsManage": "Termine anlegen, bearbeiten und löschen",
   "admin.permissions.key.memberRoleTypesRead": "Funktionstypen ansehen",
   "admin.permissions.key.memberRoleTypesWrite": "Funktionstypen anlegen und bearbeiten",
   "admin.permissions.key.memberRoleTypesDelete": "Funktionstypen löschen",
@@ -479,6 +481,8 @@ export const de = {
   "admin.config.desc.ACTIVE_AGE_LIMIT": "Altersgrenze in Jahren, ab der ein Mitglied nicht mehr aktiv, sondern passiv bzw. fördernd ist.",
   "admin.config.desc.YOUTH_AGE_LIMIT": "Altersgrenze in Jahren für die Jugend-Zuordnung.",
   "admin.config.desc.ANNIVERSARY_CUTOFF": "Stichtag (MM-TT) für die Jubiläumsberechnung.",
+  "admin.config.desc.APP_TIMEZONE": "Feste Zeitzone (IANA-Name) für Termine.",
+  "admin.config.desc.EVENTS_PUBLIC_INDEXING": "Öffentliche Terminseite darf von Suchmaschinen indexiert werden.",
   "admin.config.desc.SESSION_LIFETIME": "Gültigkeitsdauer einer Anmeldung (z.B. 7d, 24h).",
   "admin.config.desc.ADMIN_PASSWORD_MIN_LENGTH": "Mindestlänge für Admin-Passwörter.",
   "admin.config.desc.BACKUP_SCHEDULE": "Cron-Ausdruck für automatische Backups.",
@@ -1196,4 +1200,13 @@ export const de = {
   "import.upload.unsupported": "Andere fwportal-Exporte (z. B. Kontaktlisten oder CSV-Dateien) werden nicht unterstützt.",
   "import.col.contact": "Kontakt",
   "import.col.address": "Adresse",
+
+  // ── Events ────────────────────────────────────────────────────────────────────────────────────────
+  "events.form.error.titleRequired": "Titel ist erforderlich.",
+  "events.form.error.titleTooLong": "Titel darf höchstens 200 Zeichen lang sein.",
+  "events.form.error.locationTooLong": "Ort darf höchstens 200 Zeichen lang sein.",
+  "events.form.error.descriptionTooLong": "Beschreibung darf höchstens 5000 Zeichen lang sein.",
+  "events.form.error.rolesRequired": "Mindestens eine Rolle auswählen.",
+  "events.form.error.datesRequired": "Start und Ende sind erforderlich.",
+  "events.form.error.endBeforeStart": "Ende darf nicht vor dem Start liegen.",
 } as const;

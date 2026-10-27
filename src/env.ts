@@ -31,6 +31,14 @@ export function validateEnv(): void {
     process.exit(1);
   }
 
+  const tz = process.env.APP_TIMEZONE ?? "Europe/Berlin";
+  try {
+    new Intl.DateTimeFormat("de-DE", { timeZone: tz });
+  } catch {
+    logger.fatal({ tz }, "APP_TIMEZONE is not a valid IANA time zone name");
+    process.exit(1);
+  }
+
   const s3Set = S3_VARS.filter((k) => process.env[k]);
   if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
     const s3Missing = S3_VARS.filter((k) => !process.env[k]);
@@ -55,6 +63,9 @@ export const env = {
   ACTIVE_AGE_LIMIT: Number(process.env.ACTIVE_AGE_LIMIT ?? "65"),
   // Ehrungstermin (MM-DD): Datum, an dem Jubiläen geehrt werden
   ANNIVERSARY_CUTOFF: process.env.ANNIVERSARY_CUTOFF ?? "01-06",
+  // Feste Zone der Wehr für Termine (IANA-Name), siehe lib/datetime.ts
+  APP_TIMEZONE: process.env.APP_TIMEZONE ?? "Europe/Berlin",
+  EVENTS_PUBLIC_INDEXING: process.env.EVENTS_PUBLIC_INDEXING === "true",
   BACKUP_SCHEDULE: process.env.BACKUP_SCHEDULE ?? "0 2 * * 0",
   BACKUP_RETENTION_COUNT: Number(process.env.BACKUP_RETENTION_COUNT ?? "4"),
   BACKUP_LOCAL_PATH: process.env.BACKUP_LOCAL_PATH,
@@ -83,6 +94,8 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "YOUTH_AGE_LIMIT",           value: env.YOUTH_AGE_LIMIT },
   { key: "ACTIVE_AGE_LIMIT",          value: env.ACTIVE_AGE_LIMIT },
   { key: "ANNIVERSARY_CUTOFF",        value: env.ANNIVERSARY_CUTOFF },
+  { key: "APP_TIMEZONE",              value: env.APP_TIMEZONE },
+  { key: "EVENTS_PUBLIC_INDEXING",    value: String(env.EVENTS_PUBLIC_INDEXING) },
   { key: "SESSION_LIFETIME",          value: env.SESSION_LIFETIME },
   { key: "ADMIN_PASSWORD_MIN_LENGTH", value: env.ADMIN_PASSWORD_MIN_LENGTH },
   { key: "BACKUP_SCHEDULE",           value: env.BACKUP_SCHEDULE },

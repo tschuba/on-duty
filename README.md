@@ -110,6 +110,8 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `OIDC_CLIENT_ID` | ✓ | — | OAuth2-Client-ID |
 | `OIDC_CLIENT_SECRET` | ✓ | — | OAuth2-Client-Secret |
 | `OIDC_APP_URL` | ✓ | — | Eigene App-URL für Redirect-URI (HTTPS) |
+| `APP_TIMEZONE` | — | `Europe/Berlin` | Feste Zeitzone für Termine (IANA-Name); Ein- und Ausgabe erfolgen immer in dieser Zone |
+| `EVENTS_PUBLIC_INDEXING` | — | `false` | `true`: öffentliche Terminseite `/events/public` darf von Suchmaschinen indexiert werden (sonst `X-Robots-Tag: noindex`) |
 | `SESSION_LIFETIME` | — | `7d` | Session-Dauer (z. B. `7d`, `8h`, `30m`) |
 | `CHILDREN_AGE_LIMIT` | — | `12` | Altersgrenze Kinderfeuerwehr (Jahre, muss < `YOUTH_AGE_LIMIT`) |
 | `REGISTRATION_ENABLED` | — | `false` | Startwert: Selbstregistrierung aktiv (`true`/`false`); wird nur einmalig übernommen, solange die Einstellung noch nie gespeichert wurde |

@@ -34,6 +34,7 @@ export const PERMISSIONS = [
   "anniversary-years:read",
   "anniversary-years:write",
   "anniversary-years:delete",
+  "events:manage",
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

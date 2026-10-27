@@ -24,7 +24,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Benutzerverwaltung, Systemkonfiguration und Antragsformulare",
     isProtected: true,
-    permissions: ["system:admin", "applications:manage-forms", "import:run", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"],
+    permissions: ["system:admin", "applications:manage-forms", "import:run", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete", "events:manage"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
@@ -59,7 +59,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Führung",
     description: "Kann das Inventar vollständig verwalten",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "inventory:read", "inventory:manage", "lending:read", "org:read", "org:write", "member-roles:read", "member-role-types:read", "anniversary-years:read"],
+    permissions: ["members:read", "members:write", "members:delete", "inventory:read", "inventory:manage", "lending:read", "org:read", "org:write", "member-roles:read", "member-role-types:read", "anniversary-years:read", "events:manage"],
   },
 ];
 

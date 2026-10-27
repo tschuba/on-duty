@@ -34,6 +34,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "anniversary-years:read": t("admin.permissions.key.anniversaryYearsRead"),
   "anniversary-years:write": t("admin.permissions.key.anniversaryYearsWrite"),
   "anniversary-years:delete": t("admin.permissions.key.anniversaryYearsDelete"),
+  "events:manage": t("admin.permissions.key.eventsManage"),
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
@@ -45,6 +46,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
   lending: t("admin.permissions.resource.lending"),
   org: t("admin.permissions.resource.org"),
   "anniversary-years": t("admin.permissions.resource.anniversary-years"),
+  events: t("admin.permissions.resource.events"),
   "member-roles": t("admin.permissions.resource.member-roles"),
   "member-role-types": t("admin.permissions.resource.member-role-types"),
 };
