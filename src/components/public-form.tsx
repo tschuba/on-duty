@@ -22,8 +22,8 @@ export function PrivacyNotice() {
 }
 
 // "Kontakt zum Verein": leere Felder entfallen, ohne jede Angabe entfällt der Baustein.
-// `hint` erklärt den Anlass (z. B. Stornierung) über den Kontaktdaten, `subject` füllt den Mail-Betreff vor.
-export async function ContactFooter({ hint, subject }: { hint?: string; subject?: string } = {}) {
+// `hint` erklärt den Anlass (z. B. Stornierung) über den Kontaktdaten, `subject`/`body` füllen Betreff und Text der Mail vor.
+export async function ContactFooter({ hint, subject, body }: { hint?: string; subject?: string; body?: string } = {}) {
   const c = await loadOrgConfig();
   const address = [
     [c.orgStreet, c.orgHouseNumber].filter(Boolean).join(" "),
@@ -40,7 +40,7 @@ export async function ContactFooter({ hint, subject }: { hint?: string; subject?
       {c.orgName && <p class="pl-4">{c.orgName}</p>}
       {address && row("map-pin", address)}
       {c.orgContactPhone && row("phone", <a class="link" href={`tel:${c.orgContactPhone}`}>{c.orgContactPhone}</a>)}
-      {c.orgContactEmail && row("envelope", <a class="link" href={`mailto:${c.orgContactEmail}${subject ? `?subject=${encodeURIComponent(subject)}` : ""}`}>{c.orgContactEmail}</a>)}
+      {c.orgContactEmail && row("envelope", <a class="link" href={`mailto:${c.orgContactEmail}${[subject && `subject=${encodeURIComponent(subject)}`, body && `body=${encodeURIComponent(body)}`].filter(Boolean).map((p, i) => (i ? "&" : "?") + p).join("")}`}>{c.orgContactEmail}</a>)}
     </div>
   );
 }

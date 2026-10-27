@@ -255,7 +255,8 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
 
         <ContactFooter
           hint={request.status === "open" ? t("lend.form.noWithdraw") : undefined}
-          subject={request.status === "open" ? `Stornierung Leih-Anfrage ${request.lendingItem.inventoryItem.name}, ${formatPeriod(request)}` : undefined}
+          subject={request.status === "open" ? `Leih-Anfrage ${request.lendingItem.inventoryItem.name}, ${formatPeriod(request)}` : undefined}
+          body={request.status === "open" ? `Zu meiner Leih-Anfrage:\n${request.lendingItem.inventoryItem.name}${request.quantity > 1 ? ` (${request.quantity}x)` : ""}\n${formatPeriod(request)}\n${statusUrl}\n\n` : undefined}
         />
         <PrivacyNotice />
       </div>
