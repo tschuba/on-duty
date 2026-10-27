@@ -6,10 +6,11 @@ import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
-import { loadOrgConfig } from "../lib/org-config.js";
+import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { isApplicationFormActive } from "../lib/application-forms.js";
 import { sendMail } from "../lib/mail.js";
 import { HTTP_STATUS } from "../lib/constants.js";
+import { ContactFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
 
 export const applyRoutes = new Hono();
 
@@ -150,27 +151,6 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
   );
 }
 
-// ── Honeypot + privacy notice ────────────────────────────────────────────────────
-
-function Honeypot() {
-  return (
-    <div style="position:absolute;left:-9999px" aria-hidden="true">
-      <label>
-        Website
-        <input type="text" name="website" tabindex={-1} autocomplete="off" />
-      </label>
-    </div>
-  );
-}
-
-function PrivacyNotice() {
-  return (
-    <p class="text-xs opacity-60 mt-2">
-      {t("apply.form.privacyNoticeText")} <a href="/datenschutz" class="link">{t("apply.form.privacyNoticeLink")}</a>
-    </p>
-  );
-}
-
 // ── Pages ────────────────────────────────────────────────────────────────────────
 
 function MembershipPage({ values, errors }: { values: ApplicantValues; errors: Record<string, string> }) {
@@ -184,6 +164,7 @@ function MembershipPage({ values, errors }: { values: ApplicantValues; errors: R
           <PrivacyNotice />
           <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
         </form>
+        <ContactFooter />
       </div>
     </Layout>
   );
@@ -226,6 +207,7 @@ function YouthPage({
           <PrivacyNotice />
           <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
         </form>
+        <ContactFooter />
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
@@ -265,17 +247,15 @@ function SuccessPage() {
 
 // ── Shared submit handling ──────────────────────────────────────────────────────
 
-function clientIp(c: any): string {
-  return c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "unknown";
-}
-
 async function notifySubmission(name: string) {
   const config = await loadOrgConfig();
-  if (!config.applicationNotifyEmail) return;
+  const to = notificationRecipient(config);
+  if (!to) return;
   await sendMail(
-    config.applicationNotifyEmail,
+    to,
     t("applications.mail.submitNotifySubject", { name }),
     `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
+    { "X-On-Duty-Type": "membership-application" },
   );
 }
 

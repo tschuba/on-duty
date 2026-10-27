@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
 import { countOpenReceipts } from "../lib/donations.js";
 import { countOverdueInspectionItems } from "../lib/inventory.js";
+import { countOpenLoanRequests } from "../lib/lending.js";
 import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
 import { SOURCE_REPO_URL } from "../lib/constants.js";
@@ -57,7 +58,8 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
   const membersNavHref = user?.permissions.has("members:read") ? "/members" : user?.permissions.has("member-roles:read") ? "/roles" : user?.permissions.has("member-role-types:read") ? "/role-types" : user?.permissions.has("anniversary-years:read") ? "/anniversary-years" : null;
   const pendingUsersCount = user?.permissions.has("system:admin") ? await countPendingUsers() : 0;
   const canReadInventory = Boolean(user?.permissions.has("inventory:read"));
-  const overdueInspectionsCount = canReadInventory ? await countOverdueInspectionItems() : 0;
+  const canManageLending = Boolean(user?.permissions.has("lending:manage"));
+  const overdueInspectionsCount = (canReadInventory ? await countOverdueInspectionItems() : 0) + (canManageLending ? await countOpenLoanRequests() : 0);
 
   return (
   <html lang="de">

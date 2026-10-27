@@ -919,6 +919,8 @@ adminRoutes.get("/config", guard, async (c) => {
                       )
                     ) : r.type === "boolean" ? (
                       <input type="checkbox" class="toggle" name={r.key} value="1" checked={r.value === "true"} />
+                    ) : r.type === "number" ? (
+                      <input type="number" min="1" class="input input-sm" name={r.key} value={r.value} />
                     ) : (
                       <select name={r.key} class="select-sm">
                         <option value="">{t("admin.config.noRole")}</option>

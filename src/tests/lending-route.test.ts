@@ -534,6 +534,39 @@ describe("POST /inventory/lending/loans", () => {
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
   });
+
+  it("saves optional planned times", async () => {
+    lendingItemsFindFirstResult = makeLendingItem();
+    const res = await lendingRoutes.request("/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "08:00", plannedToTime: "12:00" }),
+    });
+    expect(res.status).toBe(302);
+    expect(insertCalls.find((c) => c.table === lendingLoans)?.values).toMatchObject({ plannedFromTime: "08:00", plannedToTime: "12:00" });
+  });
+
+  it("rejects a lone time without its counterpart", async () => {
+    lendingItemsFindFirstResult = makeLendingItem();
+    const res = await lendingRoutes.request("/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "08:00" }),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.length).toBe(0);
+  });
+
+  it("rejects a same-day end time before the start time", async () => {
+    lendingItemsFindFirstResult = makeLendingItem();
+    const res = await lendingRoutes.request("/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "12:00", plannedToTime: "08:00" }),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.length).toBe(0);
+  });
 });
 
 // ── GET /:id/loans (detail) ──────────────────────────────────────────────────
@@ -589,6 +622,19 @@ describe("POST /inventory/lending/loans/:loanId", () => {
     });
     expect(res.status).toBe(302);
     expect(updateCalls[0].set).toMatchObject({ pickedUpAt: "2026-01-01", returnedAt: "2026-01-05" });
+  });
+
+  it("updates planned times", async () => {
+    lendingLoansFindFirstResult = { id: "loan1", lendingItemId: "li1", quantity: 1, plannedFrom: "2026-01-01", plannedTo: "2026-01-05", plannedFromTime: null, plannedToTime: null, pickedUpAt: null, returnedAt: null };
+    lendingItemsFindFirstResult = makeLendingItem();
+    lendingLoansFindManyResult = [lendingLoansFindFirstResult];
+    const res = await lendingRoutes.request("/loans/loan1", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ plannedFrom: "2026-01-01", plannedTo: "2026-01-01", plannedFromTime: "09:00", plannedToTime: "11:00" }),
+    });
+    expect(res.status).toBe(302);
+    expect(updateCalls[0].set).toMatchObject({ plannedFromTime: "09:00", plannedToTime: "11:00" });
   });
 });
 

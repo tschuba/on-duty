@@ -4,8 +4,8 @@ import { effectiveRange, rangesOverlap, loanStatus, availableQuantity, itemStatu
 describe("effectiveRange", () => {
   it("prefers the actual date over the planned date per edge", () => {
     expect(effectiveRange({ plannedFrom: "2026-01-01", plannedTo: "2026-01-10", pickedUpAt: "2026-01-02", returnedAt: null })).toEqual({
-      from: "2026-01-02",
-      to: "2026-01-10",
+      from: "2026-01-02T00:00",
+      to: "2026-01-10T23:59",
     });
   });
 
@@ -15,15 +15,15 @@ describe("effectiveRange", () => {
 
   it("uses a min sentinel when only the end date is known", () => {
     expect(effectiveRange({ plannedFrom: null, plannedTo: "2026-01-10", pickedUpAt: null, returnedAt: null })).toEqual({
-      from: "0000-01-01",
-      to: "2026-01-10",
+      from: "0000-01-01T00:00",
+      to: "2026-01-10T23:59",
     });
   });
 
   it("uses returnedAt as the closing edge once set", () => {
     expect(effectiveRange({ plannedFrom: "2026-01-01", plannedTo: "2026-01-10", pickedUpAt: "2026-01-01", returnedAt: "2026-01-05" })).toEqual({
-      from: "2026-01-01",
-      to: "2026-01-05",
+      from: "2026-01-01T00:00",
+      to: "2026-01-05T23:59",
     });
   });
 });
@@ -106,3 +106,53 @@ describe("validateLoanDates", () => {
   });
 });
 
+
+import { blockedDays, freeFromTime } from "../lib/lending.js";
+
+describe("blockedDays / freeFromTime", () => {
+  const L = (o: Record<string, unknown>) => ({ plannedFrom: null, plannedTo: null, pickedUpAt: null, returnedAt: null, quantity: 1, ...o }) as any;
+  it("blocks only fully covered days for individual tracking", () => {
+    const loans = [L({ plannedFrom: "2026-06-02", plannedTo: "2026-06-03", plannedToTime: "12:00", plannedFromTime: "08:00" })];
+    expect(blockedDays({ individualTracking: true, stock: 1 }, loans, 1, "2026-06-01", "2026-06-04")).toEqual([]);
+    const full = [L({ plannedFrom: "2026-06-02", plannedTo: "2026-06-03" })];
+    expect(blockedDays({ individualTracking: true, stock: 1 }, full, 1, "2026-06-01", "2026-06-04")).toEqual(["2026-06-02", "2026-06-03"]);
+  });
+  it("uses remaining quantity for stock items", () => {
+    const loans = [L({ plannedFrom: "2026-06-02", plannedTo: "2026-06-02", quantity: 3 })];
+    const item = { individualTracking: false, stock: 5 };
+    expect(blockedDays(item, loans, 2, "2026-06-02", "2026-06-02")).toEqual([]);
+    expect(blockedDays(item, loans, 3, "2026-06-02", "2026-06-02")).toEqual(["2026-06-02"]);
+  });
+  it("reports free-from time", () => {
+    const loans = [L({ plannedFrom: "2026-06-01", plannedTo: "2026-06-02", plannedFromTime: "08:00", plannedToTime: "14:00" })];
+    expect(freeFromTime(loans, "2026-06-02")).toBe("14:00");
+    expect(freeFromTime(loans, "2026-06-01")).toBeNull();
+  });
+});
+
+import { matchCandidates } from "../lib/lending.js";
+
+describe("matchCandidates", () => {
+  const pool = [
+    { id: "p1", firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null },
+    { id: "p2", firstName: "Max", lastName: "Muster", email: "other@example.com", phone: "0928112345" },
+    { id: "p3", firstName: "Anna", lastName: "Muster", email: null, phone: null },
+  ];
+  const request = { firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null };
+
+  it("ranks strong matches (email) before weak name-only matches", () => {
+    const result = matchCandidates(request, pool);
+    expect(result.map((r) => r.id)).toEqual(["p1", "p2"]);
+    expect(result[0].strength).toBe("strong");
+    expect(result[1].strength).toBe("weak");
+  });
+
+  it("matches by normalized phone", () => {
+    const result = matchCandidates({ firstName: "x", lastName: "y", email: null, phone: "0928-112345" }, pool);
+    expect(result).toEqual([{ ...pool[1], strength: "strong" }]);
+  });
+
+  it("returns nothing for no overlap", () => {
+    expect(matchCandidates({ firstName: "Nobody", lastName: "Here", email: null, phone: null }, pool)).toEqual([]);
+  });
+});
