@@ -22,6 +22,13 @@ export function visibilityCondition(user: { permissions: Set<string>; roleIds: S
   return or(eq(events.visibility, "public"), eq(events.visibility, "loggedIn"), roleMatch);
 }
 
+// Formular-Vorschlagsliste: nur Tags der für den Nutzer sichtbaren Termine (nicht die ganze Tag-Tabelle).
+export async function eventTagVocabulary(user: { permissions: Set<string>; roleIds: Set<string> } | undefined): Promise<string[]> {
+  const where = visibilityCondition(user);
+  const rows = await db.select({ tag: eventTags.tag }).from(eventTags).innerJoin(events, eq(eventTags.eventId, events.id)).where(where);
+  return [...new Set(rows.map((r) => r.tag))].sort((a, b) => a.localeCompare(b, "de"));
+}
+
 // Überlappung mit [start, end] (Tage, "YYYY-MM-DD"): startsAt < Ende+1 Tag und endsAt >= Start.
 export function overlapsRange(start: string, end: string, tz: string): SQL | undefined {
   const startDate = parseLocal(start, tz);
