@@ -34,7 +34,7 @@ function DeleteAccount({ email, back }: { email: string; back: "/account" | "/pe
               id="delete-account-email"
               name="email"
               type="text"
-              class="input input-bordered w-full"
+              class="input w-full"
               placeholder={email}
               autocomplete="off"
               oninput={`document.getElementById('delete-account-submit').disabled = this.value.trim().toLowerCase() !== ${JSON.stringify(email.toLowerCase()).replace(/</g, "\\u003c")}`}
