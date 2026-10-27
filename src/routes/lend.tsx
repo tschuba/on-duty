@@ -253,7 +253,10 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
           </div>
         </section>
 
-        <ContactFooter hint={request.status === "open" ? t("lend.form.noWithdraw") : undefined} />
+        <ContactFooter
+          hint={request.status === "open" ? t("lend.form.noWithdraw") : undefined}
+          subject={request.status === "open" ? `Stornierung Leih-Anfrage ${request.lendingItem.inventoryItem.name}, ${formatPeriod(request)}` : undefined}
+        />
         <PrivacyNotice />
       </div>
     </Layout>
