@@ -373,7 +373,7 @@ function EventForm({ values, errors, roles, tz }: {
           <p class="text-xs opacity-70 mt-1" data-local-hint="event-start" hidden></p>
         </Field>
         <Field label={t("events.form.end")} required
-          after={<div class="flex gap-1 flex-wrap mt-1">{DURATION_PRESETS.map((p) => <button type="button" class="btn btn-xs" data-duration={p.key}>{p.label}</button>)}</div>}>
+          after={<div id="event-durations" hidden={values.allDay} class="flex gap-1 flex-wrap mt-1">{DURATION_PRESETS.map((p) => <button type="button" class="btn btn-xs" data-duration={p.key}>{p.label}</button>)}</div>}>
           <input type={values.allDay ? "date" : "datetime-local"} id="event-end" name="endsAt" value={values.endsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required />
           <p class="text-xs opacity-70 mt-1" data-local-hint="event-end" hidden></p>
         </Field>
@@ -422,6 +422,7 @@ function EventForm({ values, errors, roles, tz }: {
           const start = document.getElementById('event-start');
           const end = document.getElementById('event-end');
           function setType(isAllDay) {
+            document.getElementById('event-durations').hidden = isAllDay;
             start.type = isAllDay ? 'date' : 'datetime-local';
             end.type = isAllDay ? 'date' : 'datetime-local';
             if (isAllDay) { start.value = start.value.slice(0, 10); end.value = end.value.slice(0, 10); }
