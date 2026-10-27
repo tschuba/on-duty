@@ -272,6 +272,7 @@ async function emptyValues(): Promise<RequestValues> {
 
 function maxQuantityFor(item: NonNullable<Awaited<ReturnType<typeof fetchRequestableItem>>>): number {
   const stock = item.inventoryItem.quantity - item.inventoryItem.retiredQuantity;
+  if (item.maxRequestQuantity <= 0) return Math.max(1, stock);
   return Math.max(1, Math.min(item.maxRequestQuantity, stock > 0 ? stock : item.maxRequestQuantity));
 }
 

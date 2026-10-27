@@ -479,6 +479,11 @@ const CATEGORY_TOGGLE_SCRIPT = `
       el.classList.toggle('hidden', !(catOk && batchOk));
     });
     var qtyInput = document.getElementById('inventory-quantity');
+    // batch mode is derived from quantity > 1 server-side; a batch of 1 would silently save as single item
+    if (qtyInput && isBatch && __inventoryBatchCats.indexOf(cat) >= 0 && Number(qtyInput.value) < 2) {
+      qtyInput.value = '2';
+      qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     if (qtyInput && !(isBatch && __inventoryBatchCats.indexOf(cat) >= 0) && qtyInput.value !== '1') {
       qtyInput.value = '1';
       // programmatic changes fire no event; ChipInput listens for it to refresh label/counter/limit
@@ -913,7 +918,7 @@ function lendableField(
     checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: opts.locked ?? false, error: opts.error,
     individualTracking: opts.individualTracking ?? false,
     publicRequestable: opts.publicRequestable ?? false,
-    maxRequestQuantity: opts.maxRequestQuantity ?? 1,
+    maxRequestQuantity: opts.maxRequestQuantity ?? 0,
     timesRequired: opts.timesRequired ?? false,
     requestLink: opts.requestLink,
     errors: opts.errors,
@@ -979,12 +984,22 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                       </div>
                     </div>
                   )}
+                  {/* Server ignoriert maxRequestQuantity für individualTracking-Artikel (fix seit Anlage, siehe unten) — Feld dann gar nicht erst anzeigen. */}
+                  {!lendable.individualTracking && (
                   <div data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
-                    <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40" hint={t("lend.form.maxRequestQuantityHint")}
-                      after={lendable.errors?.maxRequestQuantity && <p class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</p>}>
-                      <input type="number" name="maxRequestQuantity" min="1" value={String(lendable.maxRequestQuantity)} placeholder=" " class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
-                    </Field>
+                    <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
+                      <input type="checkbox" name="maxRequestLimited" value="1" checked={lendable.maxRequestQuantity > 0 || Boolean(lendable.errors?.maxRequestQuantity)} class="toggle toggle-success mt-0.5"
+                        onchange="document.getElementById('max-request-quantity').hidden = !this.checked" />
+                      <span class="font-medium">{t("lend.form.maxRequestQuantity")}</span>
+                    </label>
+                    <div id="max-request-quantity" hidden={lendable.maxRequestQuantity <= 0 && !lendable.errors?.maxRequestQuantity} class="mt-2">
+                      <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40" hint={t("lend.form.maxRequestQuantityHint")}
+                        after={lendable.errors?.maxRequestQuantity && <p class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</p>}>
+                        <input type="number" name="maxRequestQuantity" min="1" value={lendable.maxRequestQuantity > 0 ? String(lendable.maxRequestQuantity) : ""} placeholder=" " class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
+                      </Field>
+                    </div>
                   </div>
+                  )}
                   <script dangerouslySetInnerHTML={{ __html: "updateInventoryFormVisibility()" }} />
                   <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
                     <input type="checkbox" name="timesRequired" value="1" checked={lendable.timesRequired} class="toggle toggle-success mt-0.5" />
@@ -1034,11 +1049,12 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const canManageLending = user.permissions.has("lending:manage");
   const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
   const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
-  let maxRequestQuantity = 1;
+  let maxRequestQuantity = 0;
   let maxRequestQuantityError: string | undefined;
   if (canManageLending && wantsLendable && insertValues.quantity > 1) {
-    maxRequestQuantity = Number(trimmed(body, "maxRequestQuantity") || "1");
-    if (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
+    const limited = trimmed(body, "maxRequestLimited") === "1";
+    if (limited) maxRequestQuantity = Number(trimmed(body, "maxRequestQuantity"));
+    if (limited && (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1 || maxRequestQuantity > insertValues.quantity)) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
   }
 
   if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
@@ -1246,7 +1262,8 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
         extraActions={retireAction}
         lendable={lendableField(user, Boolean(lendingItem), {
           editable: Boolean(lendingItem) || !item.retiredAt, locked: hasLoans,
-          individualTracking: lendingItem?.individualTracking,
+          // s.o. in POST /:id: Einzel-Tracking folgt der Menge, solange kein Verleihvorgang existiert.
+          individualTracking: lendingItem && hasLoans ? lendingItem.individualTracking : item.quantity <= 1,
           publicRequestable: lendingItem?.publicRequestable, maxRequestQuantity: lendingItem?.maxRequestQuantity, timesRequired: lendingItem?.timesRequired,
           requestLink: lendingItem ? new URL(`/lend/${lendingItem.id}`, env.OIDC_APP_URL).toString() : undefined,
         })}
@@ -1279,6 +1296,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   const wantsLendable = trimmed(body, "lendable") === "1";
   const canManageLending = user.permissions.has("lending:manage");
   const lendingItem = canManageLending ? await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, id) }) : undefined;
+  const lendingHasLoans = lendingItem ? Boolean(await db.query.lendingLoans.findFirst({ where: eq(lendingLoans.lendingItemId, lendingItem.id) })) : false;
   let lendingChange: "enable" | "disable" | null = null;
   let lendableError: string | undefined;
   if (canManageLending) {
@@ -1286,21 +1304,23 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
       if (existing.retiredAt) lendableError = t("inventory.form.lendableRetired");
       else lendingChange = "enable";
     } else if (!wantsLendable && lendingItem) {
-      const hasLoans = await db.query.lendingLoans.findFirst({ where: eq(lendingLoans.lendingItemId, lendingItem.id) });
-      if (hasLoans) lendableError = t("inventory.form.lendableLocked");
+      if (lendingHasLoans) lendableError = t("inventory.form.lendableLocked");
       else lendingChange = "disable";
     }
   }
   if (lendableError) errors.lendable = lendableError;
 
-  const individualTracking = lendingItem ? lendingItem.individualTracking : insertValues.quantity <= 1;
+  // Einzel-Tracking folgt der Menge, solange kein Verleihvorgang existiert — sonst würde eine
+  // nachträgliche Mengenänderung die laufende Verleih-Historie inkonsistent machen (fix ab erstem Vorgang).
+  const individualTracking = lendingItem && lendingHasLoans ? lendingItem.individualTracking : insertValues.quantity <= 1;
   const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
   const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
-  let maxRequestQuantity = 1;
+  let maxRequestQuantity = 0;
   let maxRequestQuantityError: string | undefined;
   if (canManageLending && !individualTracking) {
-    maxRequestQuantity = Number(trimmed(body, "maxRequestQuantity") || "1");
-    if (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
+    const limited = trimmed(body, "maxRequestLimited") === "1";
+    if (limited) maxRequestQuantity = Number(trimmed(body, "maxRequestQuantity"));
+    if (limited && (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1 || maxRequestQuantity > insertValues.quantity)) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
   }
 
   if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
