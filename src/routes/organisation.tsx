@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
+import { Icon } from "../components/icon.js";
 import { Field, RichTextField } from "../components/field.js";
 import { db } from "../db/index.js";
 import { orgConfig } from "../db/schema/index.js";
@@ -17,7 +18,7 @@ const SPAN_CLASS = { 1: "sm:col-span-1", 2: "sm:col-span-2", 3: "sm:col-span-3",
 
 export const organisationRoutes = new Hono<{ Variables: Variables }>();
 
-const TAB_ORDER = ["master", "tax"] as const;
+const TAB_ORDER = ["master", "privacy", "tax"] as const;
 
 const guard = requireAuth(["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"]);
 
@@ -27,7 +28,6 @@ function PrivacyGroup({ values, editable }: { values: Record<string, string>; ed
   const opts = ["none", "url", "text"] as const;
   return (
     <fieldset class="fieldset sm:col-span-4 group">
-      <legend class="fieldset-legend">{t("organisation.privacy.legend")}</legend>
       <div class="flex flex-wrap gap-x-6 gap-y-2">
         {opts.map((o) => (
           <label class="label cursor-pointer gap-2">
@@ -46,7 +46,15 @@ function PrivacyGroup({ values, editable }: { values: Record<string, string>; ed
       <div class="hidden group-has-[#pm-text:checked]:block">
         <p class="text-xs text-base-content/60 mb-2">{t("organisation.privacy.textHint")}</p>
         <RichTextField name="orgPrivacyText" value={values.orgPrivacyText ?? ""} editable={editable} />
-        {values.orgPrivacyText?.trim() && <a href="/datenschutz" target="_blank" rel="noopener" class="link text-sm mt-2 inline-block">{t("organisation.privacy.preview")}</a>}
+        {values.orgPrivacyText?.trim() && (
+          <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <a href="/datenschutz" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
+              <Icon name="arrow-top-right-on-square" class="h-4 w-4 shrink-0" />
+              {t("organisation.privacy.preview")}
+            </a>
+            <span class="text-xs text-base-content/60">{t("organisation.privacy.previewHint")}</span>
+          </div>
+        )}
       </div>
     </fieldset>
   );
@@ -135,7 +143,7 @@ organisationRoutes.get("/", guard, async (c) => {
           <OrgSection tab={tab} values={values} editable={canWriteOrgTab(perms, tab)} />
         ))}
       </form>
-      {tabs.includes("master") && (
+      {tabs.includes("privacy") && (
         <>
           <link rel="stylesheet" href="/css/trix.css" />
           <script src="/js/trix.min.js"></script>
@@ -161,7 +169,7 @@ organisationRoutes.post("/", requireAuth([TABS.master.write, TABS.tax.write]), a
 
   if (tabs.includes("master") && body.notifySeparate !== "on") body.notificationEmail = "";
 
-  if (tabs.includes("master")) {
+  if (tabs.includes("privacy")) {
     const mode = String(body.orgPrivacyMode ?? "");
     const url = String(body.orgPrivacyUrl ?? "").trim();
     const privacyError =
@@ -170,7 +178,7 @@ organisationRoutes.post("/", requireAuth([TABS.master.write, TABS.tax.write]), a
       : null;
     if (privacyError) {
       setFlash(c, t(`admin.orgConfig.flash.${privacyError}`), "error");
-      return c.redirect(`/organisation#${TABS.master.path}`);
+      return c.redirect(`/organisation#${TABS.privacy.path}`);
     }
   }
 

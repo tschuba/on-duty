@@ -28,11 +28,11 @@ describe("isOrgConfigCompleteForReceipts", () => {
 
 describe("missingReceiptFields", () => {
   it("groups missing keys by tab", () => {
-    expect(missingReceiptFields({ ...COMPLETE, orgCity: "", taxOffice: "" })).toEqual({ master: ["orgCity"], tax: ["taxOffice"] });
+    expect(missingReceiptFields({ ...COMPLETE, orgCity: "", taxOffice: "" })).toEqual({ master: ["orgCity"], privacy: [], tax: ["taxOffice"] });
   });
 
   it("is empty when complete", () => {
-    expect(missingReceiptFields(COMPLETE)).toEqual({ master: [], tax: [] });
+    expect(missingReceiptFields(COMPLETE)).toEqual({ master: [], privacy: [], tax: [] });
   });
 });
 

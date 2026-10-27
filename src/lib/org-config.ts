@@ -35,11 +35,12 @@ export function privacyMode(c: Record<string, string>): PrivacyMode {
   return c.orgPrivacyText?.trim() ? "text" : c.orgPrivacyUrl?.trim() ? "url" : "none";
 }
 
-export type OrgTab = "master" | "tax";
+export type OrgTab = "master" | "tax" | "privacy";
 
 // Single source of truth for tab → fields and tab → read permissions (write implies read; OR check, no implies mechanism in RBAC).
 export const ORG_TABS = {
   master: { path: "master-data", read: ["org:read", "org:write"], write: "org:write" },
+  privacy: { path: "privacy", read: ["org:read", "org:write"], write: "org:write" },
   tax: { path: "tax-data", read: ["org:tax-data:read", "org:tax-data:write"], write: "org:tax-data:write" },
 } as const;
 
@@ -59,6 +60,8 @@ export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
     { key: "orgContactPhone", type: "tel", span: 2 },
     { key: "orgContactEmail", type: "email", span: 2, hint: "organisation.hint.contactEmail" },
     { key: "notificationEmail", type: "notify" },
+  ],
+  privacy: [
     { key: "orgPrivacyMode", type: "privacy" },
     { key: "orgPrivacyUrl", type: "url", inGroup: true },
     { key: "orgPrivacyText", type: "richtext", inGroup: true },
@@ -85,5 +88,5 @@ export function canWriteOrgTab(perms: Set<string>, tab: OrgTab): boolean {
 export function missingReceiptFields(config: Record<string, string>): Record<OrgTab, string[]> {
   const required: readonly string[] = REQUIRED_RECEIPT_FIELDS;
   const missing = (tab: OrgTab) => TAB_FIELDS[tab].map((f) => f.key).filter((k) => required.includes(k) && !config[k]);
-  return { master: missing("master"), tax: missing("tax") };
+  return { master: missing("master"), privacy: [], tax: missing("tax") };
 }
