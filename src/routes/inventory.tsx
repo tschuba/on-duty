@@ -592,6 +592,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           <input type="checkbox" id="inventory-batch-toggle" checked={isBatch} class="checkbox" onchange="updateInventoryFormVisibility()" />
           <span class="text-sm">{t("inventory.form.batchToggle")}</span>
         </label>
+        <div data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
         <Field label={t("inventory.form.quantity")} class="max-w-40">
           <input
             type="number"
@@ -603,6 +604,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           />
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
         </Field>
+        </div>
       </div>
 
       <NumberListField
@@ -978,13 +980,13 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                       </div>
                     </div>
                   )}
-                  {!lendable.individualTracking && (
-                    <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40">
-                      <input type="number" name="maxRequestQuantity" min="1" value={String(lendable.maxRequestQuantity)} class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
-                      <span class="text-xs opacity-70 mt-1">{t("lend.form.maxRequestQuantityHint")}</span>
-                      {lendable.errors?.maxRequestQuantity && <span class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</span>}
+                  <div data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
+                    <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40" hint={t("lend.form.maxRequestQuantityHint")}
+                      after={lendable.errors?.maxRequestQuantity && <p class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</p>}>
+                      <input type="number" name="maxRequestQuantity" min="1" value={String(lendable.maxRequestQuantity)} placeholder=" " class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
                     </Field>
-                  )}
+                  </div>
+                  <script dangerouslySetInnerHTML={{ __html: "updateInventoryFormVisibility()" }} />
                   <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
                     <input type="checkbox" name="timesRequired" value="1" checked={lendable.timesRequired} class="toggle toggle-success mt-0.5" />
                     <span class="flex flex-col">
