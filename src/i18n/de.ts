@@ -1218,6 +1218,7 @@ export const de = {
   "events.publicLink": "Öffentlicher Kalender",
   "events.view.list": "Liste",
   "events.view.calendar": "Kalender",
+  "events.calendar.show": "Kalender anzeigen",
   "events.filter.allTags": "Alle Tags",
   "events.filter.tagCount": "{count} Tags",
   "events.filter.noTags": "Keine Tags vorhanden",

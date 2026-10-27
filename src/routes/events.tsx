@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events, eventTags, eventVisibleRoles, appRoles } from "../db/schema/index.js";
@@ -9,9 +9,8 @@ import { Field, FieldGroup } from "../components/field.js";
 import { RowAction } from "../components/row-action.js";
 import { ChipInput } from "../components/chip-input.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { addMonths, parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
-import { buildListUrl, parseMulti } from "../lib/list-query.js";
+import { addMonths, todayStr } from "../lib/quick-range.js";
+import { parseMulti } from "../lib/list-query.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { env } from "../env.js";
@@ -27,7 +26,7 @@ import {
   type Event,
   type EventFormValues,
 } from "../lib/events.js";
-import { formatDateTime, formatDay, formatTime, localDays, resolveTimezone, toLocalDate, toLocalInput } from "../lib/datetime.js";
+import { formatDateTime, formatDay, formatTime, resolveTimezone, toLocalDate, toLocalInput } from "../lib/datetime.js";
 
 export const eventRoutes = new Hono<{ Variables: Variables }>();
 const manage = requireAuth("events:manage");
@@ -107,143 +106,221 @@ function EventTagBadges({ tags }: { tags: string[] }) {
   return <div class="flex flex-wrap gap-1 mt-1">{tags.map((tag) => <span class="badge badge-sm badge-outline">{tag}</span>)}</div>;
 }
 
-function EventList({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canManage: boolean }) {
+const MONTH_RE = /^\d{4}-\d{2}$/;
+
+function EventRows({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canManage: boolean }) {
+  return (
+    <>
+      {rows.map((ev) => {
+        const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
+        const day = toLocalDate(ev.startsAt, tz);
+        return (
+          <tr data-date={day} data-month={day.slice(0, 7)} class={`scroll-mt-20 ${canManage ? "cursor-pointer hover" : ""}`} onclick={canManage ? `location.href='/events/${ev.id}/edit'` : undefined}>
+            <td>
+              <div class="font-medium">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
+              <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} />{ev.location && <> · {ev.location}</>}</div>
+              <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
+            </td>
+            {canManage && (
+              <td class="text-right">
+                <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{
+                  "hx-post": `/events/${ev.id}/delete`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-target": "closest tr", "hx-swap": "outerHTML",
+                }} onclick="event.stopPropagation()" />
+              </td>
+            )}
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
+// ?rows=YYYY-MM liefert nur die <tr> dieses Monats (Nachladen beim Scrollen).
+function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean) {
+  const m = c.req.query("rows");
+  if (!m || !MONTH_RE.test(m)) return null;
+  return c.html(<EventRows rows={rows.filter((ev) => toLocalDate(ev.startsAt, tz).startsWith(m))} tz={tz} canManage={canManage} />);
+}
+
+// Kalender + Liste. Die Liste zeigt ein gleitendes Fenster aus Fokusmonat ± 1 (nur Monate mit Terminen), der Rest kommt per ?rows= nach.
+function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { rows: EventRow[]; tz: string; canManage: boolean; base: string; tagFilter: string[]; monthParam?: string }) {
   if (!rows.length) return <p class="text-base-content/60 py-8">{t("events.empty")}</p>;
+  const days = [...new Set(rows.map((ev) => toLocalDate(ev.startsAt, tz)))];
+  const months = [...new Set(days.map((d) => d.slice(0, 7)))];
+  const wanted = monthParam && MONTH_RE.test(monthParam) ? monthParam : todayStr().slice(0, 7);
+  const fi = Math.max(0, months.findIndex((m) => m >= wanted) < 0 ? months.length - 1 : months.findIndex((m) => m >= wanted));
+  const shown = new Set(months.slice(Math.max(0, fi - 1), fi + 2));
+  const data = { days, months, focus: months[fi], base, tags: tagFilter };
   return (
-    <div class="overflow-x-auto">
-      <table class="table table-zebra w-full">
-        <tbody>
-          {rows.map((ev) => {
-            const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
-            return (
-              <tr class={canManage ? "cursor-pointer hover" : ""} onclick={canManage ? `location.href='/events/${ev.id}/edit'` : undefined}>
-                <td>
-                  <div class="font-medium">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
-                  <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} />{ev.location && <> · {ev.location}</>}</div>
-                  <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
-                </td>
-                {canManage && (
-                  <td class="text-right">
-                    <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{
-                      "hx-post": `/events/${ev.id}/delete`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-target": "#events-results", "hx-swap": "outerHTML",
-                    }} onclick="event.stopPropagation()" />
-                  </td>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function EventPopupHtml(ev: Event, tz: string, tags: string[]): string {
-  const time = ev.allDay ? "" : `<span data-utc-start="${ev.startsAt.getTime()}" data-utc-end="${ev.endsAt.getTime()}">${formatTime(ev.startsAt, tz)}–${formatTime(ev.endsAt, tz)}</span> `;
-  const tagBadges = tags.map((tag) => `<span class="badge badge-xs badge-outline">${escapeHtml(tag)}</span>`).join(" ");
-  return `<div class="p-1 text-xs"><div class="font-medium">${escapeHtml(ev.title)}</div><div>${time}${escapeHtml(ev.location ?? "")}</div>${tagBadges ? `<div class="flex flex-wrap gap-1 mt-1">${tagBadges}</div>` : ""}</div>`;
-}
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
-
-function CalendarView({ rows, tz, canManage, tagParam, noFetch }: { rows: EventRow[]; tz: string; canManage: boolean; tagParam: string[]; noFetch?: boolean }) {
-  const byDate = new Map<string, EventRow[]>();
-  for (const ev of rows) {
-    for (const key of localDays(ev.startsAt, ev.endsAt, tz)) {
-      const list = byDate.get(key) ?? [];
-      list.push(ev);
-      byDate.set(key, list);
-    }
-  }
-  return (
-    <div>
-      <div id="events-calendar" data-tz={tz} data-tags={tagParam.join(",")} data-no-fetch={noFetch ? "1" : ""}></div>
-      <div id="events-calendar-day" class="mt-4"></div>
-      <script type="application/json" id="events-calendar-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(
-        [...byDate.entries()].map(([date, list]) => [date, list.map((ev) => ({
-          id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz, ev.tags.map((x) => x.tag)),
-          editHref: canManage ? `/events/${ev.id}/edit` : null,
-        }))]),
-      ).replace(/</g, "\\u003c") }} />
+    <>
+      <div class="mb-4 flex items-center gap-3">
+        <div class="join lg:hidden">
+          <button type="button" data-ev-m="list" class="btn join-item btn-outline btn-primary">{t("events.view.list")}</button>
+          <button type="button" data-ev-m="cal" class="btn join-item btn-ghost">{t("events.view.calendar")}</button>
+        </div>
+        <label class="hidden lg:flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="ev-cal-toggle" class="toggle toggle-sm" checked />
+          <span>{t("events.calendar.show")}</span>
+        </label>
+      </div>
+      <div id="ev-wrap" data-m="list" data-dc="1" class="group lg:flex lg:gap-6 lg:items-start">
+        <div class="hidden group-data-[m=cal]:block lg:group-data-[dc=1]:block lg:group-data-[dc=0]:hidden lg:w-80 lg:shrink-0 lg:sticky lg:top-20">
+          <div id="ev-calendar"></div>
+        </div>
+        <div class="min-w-0 flex-1 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
+          <table class="table table-zebra w-full"><tbody id="ev-rows"><EventRows rows={rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)))} tz={tz} canManage={canManage} /></tbody></table>
+        </div>
+      </div>
+      <script type="application/json" id="ev-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />
       <link rel="stylesheet" href="/css/vanilla-calendar.css" />
-      <script type="module" dangerouslySetInnerHTML={{ __html: CALENDAR_SCRIPT }} />
-    </div>
+      <style>{`#ev-calendar [data-vc-date]:not([data-vc-date-disabled]) [data-vc-date-btn]{background-image:radial-gradient(circle at 50% calc(100% - 5px),currentColor 2.5px,transparent 3px)}`}</style>
+      <script type="module" dangerouslySetInnerHTML={{ __html: EVENTS_SCRIPT }} />
+    </>
   );
 }
 
-// Zeigt die Termine des angeklickten Tages unterhalb; lädt beim Blättern neue Monate per calendar.json nach.
-const CALENDAR_SCRIPT = `
-  import { Calendar, annotations } from "/js/vanilla-calendar.min.js";
-  const root = document.getElementById("events-calendar");
-  if (root) {
-    const dayBox = document.getElementById("events-calendar-day");
-    const tags = root.dataset.tags;
-    let byDate = new Map(JSON.parse(document.getElementById("events-calendar-data").textContent));
-    function popups() {
-      const p = {};
-      for (const [date, list] of byDate) p[date] = { modifier: "events-day" };
-      return p;
-    }
-    function renderDay(dateStr) {
-      const list = byDate.get(dateStr) || [];
-      dayBox.innerHTML = list.length ? list.map((e) =>
-        '<div class="border-b border-base-300 py-2">' + e.html + (e.editHref ? ' <a class="link text-xs" href="' + e.editHref + '">' + ${JSON.stringify(t("common.edit"))} + '</a>' : '') + '</div>'
-      ).join("") : "";
-      if (window.localTimes) window.localTimes(dayBox);
-    }
-    const calendar = new Calendar(root, {
-      extensions: [annotations],
-      locale: "de-DE",
-      firstWeekday: 1,
-      popups: popups(),
-      onClickDate(self) { renderDay(self.context.selectedDates[0] || self.selectedDates[0]); },
-      async onClickArrow(self) {
-        if (root.dataset.noFetch) return;
-        const y = self.selectedYear, m = self.selectedMonth;
-        const pad = (n) => String(n).padStart(2, "0");
-        const from = y + "-" + pad(m + 1) + "-01";
-        const to = y + "-" + pad(m + 1) + "-" + pad(new Date(y, m + 1, 0).getDate());
-        const qs = tags ? "&" + tags.split(",").map((t) => "tag=" + encodeURIComponent(t)).join("&") : "";
-        const res = await fetch("/events/calendar.json?from=" + from + "&to=" + to + qs);
-        if (!res.ok) return;
-        const data = await res.json();
-        for (const [date, list] of data) byDate.set(date, list);
-        self.set({ popups: popups() });
-      },
+const EVENTS_SCRIPT = `
+  import { Calendar } from "/js/vanilla-calendar.min.js";
+  const cfg = JSON.parse(document.getElementById("ev-data").textContent);
+  const { days, months } = cfg;
+  const wrap = document.getElementById("ev-wrap");
+  const tbody = document.getElementById("ev-rows");
+  const toggle = document.getElementById("ev-cal-toggle");
+  const rows = (sel) => [...tbody.querySelectorAll(sel)];
+  const isDesktop = () => matchMedia("(min-width: 1024px)").matches;
+  const pad = (n) => String(n).padStart(2, "0");
+
+  wrap.dataset.dc = localStorage.getItem("ev-cal") === "0" ? "0" : "1";
+  toggle.checked = wrap.dataset.dc === "1";
+  toggle.onchange = () => { wrap.dataset.dc = toggle.checked ? "1" : "0"; localStorage.setItem("ev-cal", wrap.dataset.dc); };
+  function setMobile(m) {
+    wrap.dataset.m = m;
+    document.querySelectorAll("[data-ev-m]").forEach((b) => {
+      const on = b.dataset.evM === m;
+      b.classList.toggle("btn-outline", on); b.classList.toggle("btn-primary", on); b.classList.toggle("btn-ghost", !on);
     });
-    calendar.init();
   }
+  document.querySelectorAll("[data-ev-m]").forEach((b) => { b.onclick = () => setMobile(b.dataset.evM); });
+
+  const idxOf = (m) => { const i = months.findIndex((x) => x >= m); return i < 0 ? months.length - 1 : i; };
+  const topRow = () => rows("tr").find((tr) => tr.getBoundingClientRect().bottom > 90) || null;
+
+  // Fenster = Monate i-1..i+1; ältere/entfernte Monate fliegen raus, Scrollposition wird am obersten Eintrag festgehalten.
+  async function ensureWindow(i) {
+    const want = months.slice(Math.max(0, i - 1), i + 2);
+    const have = new Set(rows("tr").map((tr) => tr.dataset.month));
+    const need = want.filter((m) => !have.has(m));
+    const drop = [...have].filter((m) => !want.includes(m));
+    if (!need.length && !drop.length) return;
+    const qs = cfg.tags.map((t) => "&tag=" + encodeURIComponent(t)).join("");
+    const parts = await Promise.all(need.map(async (m) => {
+      const res = await fetch(cfg.base + "?rows=" + m + qs);
+      return [m, res.ok ? await res.text() : ""];
+    }));
+    const anchor = topRow();
+    const before = anchor ? anchor.getBoundingClientRect().top : 0;
+    rows("tr").forEach((tr) => { if (drop.includes(tr.dataset.month)) tr.remove(); });
+    for (const [m, html] of parts) {
+      const tpl = document.createElement("template");
+      tpl.innerHTML = html;
+      tbody.insertBefore(tpl.content, rows("tr").find((tr) => tr.dataset.month > m) || null);
+    }
+    if (anchor && anchor.isConnected) scrollBy(0, anchor.getBoundingClientRect().top - before);
+    if (window.localTimes) window.localTimes(tbody);
+  }
+  let chain = Promise.resolve();
+  const ensure = (i) => (chain = chain.then(() => ensureWindow(i)));
+
+  let lock = 0, markedDate = "", shownYm = cfg.focus, curMonth = "";
+  function setUrl() {
+    const u = new URL(location.href);
+    u.searchParams.set("month", curMonth);
+    history.replaceState(null, "", u);
+  }
+  function mark(d) {
+    markedDate = d; shownYm = d.slice(0, 7);
+    calendar.set({ selectedDates: [d], selectedMonth: Number(d.slice(5, 7)) - 1, selectedYear: Number(d.slice(0, 4)) });
+  }
+  function flash(d) {
+    rows('tr[data-date="' + d + '"]').forEach((tr) => {
+      tr.style.transition = "background-color .4s";
+      tr.style.backgroundColor = "color-mix(in oklab, var(--color-warning) 35%, transparent)";
+      setTimeout(() => { tr.style.backgroundColor = ""; }, 1500);
+    });
+  }
+  // target: "YYYY-MM-DD" (erster Eintrag des Tages) oder "YYYY-MM" (erster Eintrag ab diesem Monat)
+  async function jump(target) {
+    lock = Infinity;
+    await ensure(idxOf(target.slice(0, 7)));
+    const tr = target.length > 7 ? rows('tr[data-date="' + target + '"]')[0] : rows("tr").find((r) => r.dataset.month >= target);
+    if (tr) {
+      tr.scrollIntoView();
+      curMonth = tr.dataset.month; setUrl();
+      if (target.length > 7) flash(target);
+    }
+    lock = Date.now() + 250;
+  }
+
+  function syncFromCalendar(self) {
+    const ym = self.selectedYear + "-" + pad(self.selectedMonth + 1);
+    if (ym === shownYm) return;
+    shownYm = ym;
+    if (isDesktop()) jump(ym);
+  }
+  const first = new Date(days[0] + "T00:00:00");
+  const calendar = new Calendar(document.getElementById("ev-calendar"), {
+    locale: "de-DE", firstWeekday: 1,
+    dateMin: days[0], dateMax: days[days.length - 1],
+    disableAllDates: true, enableDates: days, enableDateToggle: false,
+    selectedMonth: Number(cfg.focus.slice(5)) - 1, selectedYear: Number(cfg.focus.slice(0, 4)),
+    onClickDate(self) {
+      const d = self.context.selectedDates[0];
+      if (!d) return;
+      markedDate = d; shownYm = d.slice(0, 7);
+      setMobile("list");
+      jump(d);
+    },
+    onClickArrow: syncFromCalendar, onClickMonth: syncFromCalendar, onClickYear: syncFromCalendar,
+  });
+  calendar.init();
+
+  let ticking = false;
+  addEventListener("scroll", () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      ticking = false;
+      if (Date.now() < lock) return;
+      const tr = topRow();
+      if (!tr) return;
+      if (tr.dataset.date !== markedDate) mark(tr.dataset.date);
+      if (tr.dataset.month !== curMonth) { curMonth = tr.dataset.month; setUrl(); ensure(idxOf(curMonth)); }
+    });
+  }, { passive: true });
+
+  curMonth = cfg.focus;
+  jump(cfg.focus);
 `;
 
 // ── /events ──────────────────────────────────────────────────────────────────
 
 eventRoutes.get("/", requireAuth(), async (c) => {
+  c.header("Cache-Control", "private, no-store"); // rechteabhängige Liste: nie in geteilten Caches
   const user = c.get("user")!;
   const canManage = user.permissions.has("events:manage");
   const tz = resolveTimezone(c);
-  const today = todayStr();
-  const view = c.req.query("view") === "calendar" ? "calendar" : "list";
-  const tagFilter = parseMulti(c.req.queries("tag"), await eventTagVocabulary(user));
-
-  const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 3) });
-  const { start, end } = range;
-  const rp = rangeParams(range);
-
-  const windowStart = view === "calendar" ? today : start;
-  const windowEnd = view === "calendar" ? addMonths(today, 12) : end;
-  const where = overlapsRange(windowStart, windowEnd, tz);
-  let rows = await fetchEvents(user, where);
-  if (tagFilter.length) rows = rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag)));
-
   const allTags = await eventTagVocabulary(user);
-  const presets = rangePresets(today, "future");
-  const qs = (extra: Record<string, string | string[] | undefined>) => buildListUrl("/events", { ...rp, tag: tagFilter, view: view === "calendar" ? "calendar" : undefined }, extra);
-  const rpHidden = Object.entries(rp).filter(([, v]) => v !== undefined) as [string, string][];
+  const tagFilter = parseMulti(c.req.queries("tag"), allTags);
+
+  // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
+  let rows = await fetchEvents(user, undefined);
+  if (tagFilter.length) rows = rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag)));
+  const fragment = monthFragment(c, rows, tz, canManage);
+  if (fragment) return fragment;
 
   return c.html(
     <Layout title={t("events.title")} user={user} activeNav="events">
-      <div class="max-w-4xl mx-auto">
+      <div class="max-w-6xl mx-auto">
       <PageHeader title={t("events.title")} actions={<>
         <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />
         {canManage && <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" />}
@@ -251,49 +328,15 @@ eventRoutes.get("/", requireAuth(), async (c) => {
       <LocalTimes tz={tz} />
 
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-        <div class="join">
-          <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.list")}</a>
-          <a href={qs({ view: "calendar" })} class={`btn join-item ${view === "calendar" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.calendar")}</a>
-        </div>
-        {view === "list" && (
-          <QuickRangeFilter presets={presets} range={range} dir="future" action="/events" hidden={tagFilter.map((f): [string, string] => ["tag", f])} href={(p) => qs(p)} />
-        )}
         <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: tag }))} selected={tagFilter}
           allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
           applyLabel={t("common.apply")} resetLabel={t("common.reset")} searchPlaceholder={t("common.searchPlaceholder")} emptyLabel={t("events.filter.noTags")} />
       </div>
 
-      <div id="events-results">
-        {view === "calendar" ? <CalendarView rows={rows} tz={tz} canManage={canManage} tagParam={tagFilter} /> : <EventList rows={rows} tz={tz} canManage={canManage} />}
-      </div>
+      <EventsBrowser rows={rows} tz={tz} canManage={canManage} base="/events" tagFilter={tagFilter} monthParam={c.req.query("month")} />
       </div>
     </Layout>,
   );
-});
-
-// GET /events/calendar.json — Termine eines Zeitraums, gleiche Sichtbarkeit wie /events
-eventRoutes.get("/calendar.json", requireAuth(), async (c) => {
-  const user = c.get("user")!;
-  const tz = resolveTimezone(c);
-  const from = c.req.query("from") || todayStr();
-  const to = c.req.query("to") || addMonths(from, 1);
-  // serverseitig auf wenige Monate begrenzen
-  const cappedTo = addMonths(from, 6) < to ? addMonths(from, 6) : to;
-  const tagFilter = parseMulti(c.req.queries("tag"), await eventTagVocabulary(user));
-  const canManage = user.permissions.has("events:manage");
-
-  let rows = await fetchEvents(user, overlapsRange(from, cappedTo, tz));
-  if (tagFilter.length) rows = rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag)));
-
-  const byDate = new Map<string, unknown[]>();
-  for (const ev of rows) {
-    for (const key of localDays(ev.startsAt, ev.endsAt, tz)) {
-      const list = byDate.get(key) ?? [];
-      list.push({ id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz, ev.tags.map((x) => x.tag)), editHref: canManage ? `/events/${ev.id}/edit` : null });
-      byDate.set(key, list);
-    }
-  }
-  return c.json([...byDate.entries()]);
 });
 
 // ── /events/public ───────────────────────────────────────────────────────────
@@ -304,7 +347,6 @@ const PUBLIC_MAX_ROWS = 200;
 eventRoutes.get("/public", async (c) => {
   const tz = resolveTimezone(c);
   const today = todayStr();
-  const view = c.req.query("view") === "calendar" ? "calendar" : "list";
   const rows = (await db.query.events.findMany({
     where: and(eq(events.visibility, "public"), overlapsRange(today, addMonths(today, PUBLIC_WINDOW_MONTHS), tz)),
     with: { tags: true },
@@ -312,32 +354,20 @@ eventRoutes.get("/public", async (c) => {
     limit: PUBLIC_MAX_ROWS,
   })) as (Event & { tags: { tag: string }[] })[];
 
-  const tagFilter = parseMulti(c.req.queries("tag"), [...new Set(rows.flatMap((ev) => ev.tags.map((x) => x.tag)))]);
-  const filtered = tagFilter.length ? rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag))) : rows;
-  const allTags = [...new Set(rows.flatMap((ev) => ev.tags.map((x) => x.tag)))].sort((a, b) => a.localeCompare(b, "de"));
+  const filtered = rows.map((ev) => ({ ...ev, visibleRoles: [] }));
 
   if (!env.EVENTS_PUBLIC_INDEXING) c.header("X-Robots-Tag", "noindex");
   c.header("Cache-Control", "public, max-age=60");
 
-  const qs = (extra: Record<string, string | string[] | undefined>) => buildListUrl("/events/public", { tag: tagFilter, view: view === "calendar" ? "calendar" : undefined }, extra);
+  const fragment = monthFragment(c, filtered, tz, false);
+  if (fragment) return fragment;
 
   return c.html(
     <Layout title={t("events.title")}>
-      <div class="max-w-4xl mx-auto">
+      <div class="max-w-6xl mx-auto">
       <PageHeader title={t("events.title")} />
       <LocalTimes tz={tz} />
-      <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-        <div class="join">
-          <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.list")}</a>
-          <a href={qs({ view: "calendar" })} class={`btn join-item ${view === "calendar" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.calendar")}</a>
-        </div>
-        <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: tag }))} selected={tagFilter}
-          allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
-          applyLabel={t("common.apply")} resetLabel={t("common.reset")} searchPlaceholder={t("common.searchPlaceholder")} emptyLabel={t("events.filter.noTags")} />
-      </div>
-      {view === "calendar"
-        ? <CalendarView rows={filtered.map((ev) => ({ ...ev, visibleRoles: [] }))} tz={tz} canManage={false} tagParam={tagFilter} noFetch />
-        : <EventList rows={filtered.map((ev) => ({ ...ev, visibleRoles: [] }))} tz={tz} canManage={false} />}
+      <EventsBrowser rows={filtered} tz={tz} canManage={false} base="/events/public" tagFilter={[]} monthParam={c.req.query("month")} />
       </div>
     </Layout>,
   );
@@ -595,8 +625,5 @@ eventRoutes.post("/:id/delete", manage, async (c) => {
   await db.delete(events).where(eq(events.id, id));
   setFlash(c, t("events.form.deleted"), "success");
 
-  const user = c.get("user")!;
-  const tz = resolveTimezone(c);
-  const rows = await fetchEvents(user, undefined);
-  return c.html(<div id="events-results"><EventList rows={rows} tz={tz} canManage={true} /></div>);
+  return c.html(""); // htmx ersetzt die Zeile durch nichts
 });

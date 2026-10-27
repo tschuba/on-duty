@@ -131,28 +131,23 @@ describe("GET /events", () => {
     expect(body).toContain(t("events.orphanRoles"));
   });
 
-  it("renders the calendar view", async () => {
+  it("renders calendar and list together", async () => {
     eventsFindManyResult = [makeEvent()];
-    const res = await eventRoutes.request("/?view=calendar");
-    expect(res.status).toBe(200);
-    const body = await res.text();
-    expect(body).toContain("events-calendar");
+    const body = await (await eventRoutes.request("/")).text();
+    expect(body).toContain("ev-calendar");
+    expect(body).toContain("data-date=");
+  });
+
+  it("returns only the rows of a month for ?rows=", async () => {
+    eventsFindManyResult = [makeEvent()];
+    const body = await (await eventRoutes.request("/?rows=1999-01")).text();
+    expect(body).not.toContain("<tr");
   });
 
   it("hides the create action without events:manage", async () => {
     currentUser = { ...currentUser, permissions: new Set() };
     const body = await (await eventRoutes.request("/")).text();
     expect(body).not.toContain("/events/new");
-  });
-});
-
-describe("GET /events/calendar.json", () => {
-  it("returns events grouped by date", async () => {
-    eventsFindManyResult = [makeEvent()];
-    const res = await eventRoutes.request("/calendar.json?from=2026-11-01&to=2026-11-30");
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.some(([, list]: [string, any[]]) => list.some((e) => e.title === "Übung"))).toBe(true);
   });
 });
 
@@ -226,12 +221,12 @@ describe("POST /events/:id/edit", () => {
 });
 
 describe("POST /events/:id/delete", () => {
-  it("deletes and re-renders the list", async () => {
+  it("deletes and returns an empty row", async () => {
     eventsFindManyResult = [];
     const res = await eventRoutes.request("/e1/delete", { method: "POST" });
     expect(res.status).toBe(200);
     expect(deleteCalls.length).toBe(1);
     const body = await res.text();
-    expect(body).toContain("events-results");
+    expect(body).toBe("");
   });
 });
