@@ -174,7 +174,7 @@ function CalendarView({ rows, tz, canManage, tagParam, noFetch }: { rows: EventR
 
 // Zeigt die Termine des angeklickten Tages unterhalb; lädt beim Blättern neue Monate per calendar.json nach.
 const CALENDAR_SCRIPT = `
-  import { Calendar } from "/js/vanilla-calendar.min.js";
+  import { Calendar, annotations } from "/js/vanilla-calendar.min.js";
   const root = document.getElementById("events-calendar");
   if (root) {
     const dayBox = document.getElementById("events-calendar-day");
@@ -193,6 +193,7 @@ const CALENDAR_SCRIPT = `
       if (window.localTimes) window.localTimes(dayBox);
     }
     const calendar = new Calendar(root, {
+      extensions: [annotations],
       locale: "de-DE",
       firstWeekday: 1,
       popups: popups(),
@@ -243,7 +244,10 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   return c.html(
     <Layout title={t("events.title")} user={user} activeNav="events">
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={t("events.title")} actions={canManage ? <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" /> : undefined} />
+      <PageHeader title={t("events.title")} actions={<>
+        <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />
+        {canManage && <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" />}
+      </>} />
       <LocalTimes tz={tz} />
 
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
@@ -372,9 +376,9 @@ function EventForm({ values, errors, roles, tz }: {
           <input type={values.allDay ? "date" : "datetime-local"} id="event-start" name="startsAt" value={values.startsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required />
           <p class="text-xs opacity-70 mt-1" data-local-hint="event-start" hidden></p>
         </Field>
-        <Field label={t("events.form.end")} required={!values.allDay}
+        <Field label={values.allDay ? t("events.form.endOptional") : t("events.form.end")} required={!values.allDay}
           after={<div id="event-durations" hidden={values.allDay} class="flex gap-1 flex-wrap mt-1">{DURATION_PRESETS.map((p) => <button type="button" class="btn btn-xs" data-duration={p.key}>{p.label}</button>)}</div>}>
-          <input type={values.allDay ? "date" : "datetime-local"} id="event-end" name="endsAt" value={values.endsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required={!values.allDay} />
+          <input type={values.allDay ? "date" : "datetime-local"} id="event-end" name="endsAt" data-label={t("events.form.end")} data-label-optional={t("events.form.endOptional")} value={values.endsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required={!values.allDay} />
           <p class="text-xs opacity-70 mt-1" data-local-hint="event-end" hidden></p>
         </Field>
       </div>
@@ -426,6 +430,9 @@ function EventForm({ values, errors, roles, tz }: {
             start.type = isAllDay ? 'date' : 'datetime-local';
             end.type = isAllDay ? 'date' : 'datetime-local';
             end.required = !isAllDay;
+            const lbl = end.parentElement.firstElementChild;
+            lbl.textContent = isAllDay ? end.dataset.labelOptional : end.dataset.label;
+            if (!isAllDay) { const star = document.createElement('span'); star.className = 'text-error ml-1'; star.textContent = '*'; lbl.appendChild(star); }
             if (isAllDay) { start.value = start.value.slice(0, 10); end.value = end.value.slice(0, 10); }
           }
           allDay.addEventListener('change', function() { setType(allDay.checked); });
