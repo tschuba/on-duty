@@ -936,51 +936,65 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
-          <div class="flex flex-col">
-            <label class="label cursor-pointer justify-start gap-2 w-fit pointer-coarse:min-h-11">
-              <input
-                type="checkbox"
-                name="lendable"
-                value="1"
-                checked={lendable.checked}
-                disabled={!lendable.editable || lendable.locked}
-                class="checkbox"
-              />
-              <span class="text-sm">{t("inventory.form.lendable")}</span>
-            </label>
-            {/* Gesperrte Checkbox wird nicht gesendet — Hidden-Feld hält den Wert, damit "gesetzt" nicht als Abwahl gilt. */}
-            {lendable.editable && lendable.locked && <input type="hidden" name="lendable" value="1" />}
-            {lendable.locked && <span class="text-xs opacity-60 mt-1">{t("inventory.form.lendableLocked")}</span>}
-            {!lendable.editable && <span class="text-xs opacity-60 mt-1">{t("inventory.form.lendableReadonly")}</span>}
-            {lendable.error && <span class="text-error text-sm mt-1">{lendable.error}</span>}
-          </div>
-        )}
-        {lendable?.checked && lendable.editable && (
-          <div class="flex flex-col gap-2 pl-6 border-l border-base-300">
-            <label class="label cursor-pointer justify-start gap-2 w-fit pointer-coarse:min-h-11">
-              <input type="checkbox" name="publicRequestable" value="1" checked={lendable.publicRequestable} class="checkbox" />
-              <span class="text-sm">{t("lend.form.publicRequestable")}</span>
-            </label>
-            {!lendable.individualTracking && (
-              <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40">
-                <input type="number" name="maxRequestQuantity" min="1" value={String(lendable.maxRequestQuantity)} class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
-                {lendable.errors?.maxRequestQuantity && <span class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</span>}
-              </Field>
-            )}
-            <label class="label cursor-pointer justify-start gap-2 w-fit pointer-coarse:min-h-11">
-              <input type="checkbox" name="timesRequired" value="1" checked={lendable.timesRequired} class="checkbox" />
-              <span class="text-sm">{t("lend.form.timesRequired")}</span>
-            </label>
-            {lendable.publicRequestable && lendable.requestLink && (
-              <div class="flex items-center gap-2">
-                <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
-                <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">
-                  <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
-                  <span class="max-sm:hidden">{t("common.copy")}</span>
-                </button>
+          <fieldset class="card card-border bg-base-100 border-base-300">
+            <div class="card-body gap-4 p-4">
+              <legend class="sr-only">{t("inventory.form.lendSection")}</legend>
+              <div>
+                <h2 class="font-semibold">{t("inventory.form.lendSection")}</h2>
+                <p class="text-sm opacity-70">{t("inventory.form.lendSectionHint")}</p>
               </div>
-            )}
-          </div>
+              <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
+                <input type="checkbox" name="lendable" value="1" checked={lendable.checked}
+                  disabled={!lendable.editable || lendable.locked} class="toggle toggle-success mt-0.5" />
+                <span class="flex flex-col">
+                  <span class="font-medium">{t("inventory.form.lendable")}</span>
+                  <span class="text-sm opacity-70">{t("inventory.form.lendableHint")}</span>
+                </span>
+              </label>
+              {/* Gesperrte Checkbox wird nicht gesendet — Hidden-Feld hält den Wert, damit "gesetzt" nicht als Abwahl gilt. */}
+              {lendable.editable && lendable.locked && <input type="hidden" name="lendable" value="1" />}
+              {lendable.locked && <p class="text-sm opacity-70">{t("inventory.form.lendableLocked")}</p>}
+              {!lendable.editable && <p class="text-sm opacity-70">{t("inventory.form.lendableReadonly")}</p>}
+              {lendable.error && <p class="text-error text-sm">{lendable.error}</p>}
+              {lendable.checked && lendable.editable && (
+                <div class="flex flex-col gap-4 border-t border-base-300 pt-4">
+                  <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
+                    <input type="checkbox" name="publicRequestable" value="1" checked={lendable.publicRequestable} class="toggle toggle-success mt-0.5" />
+                    <span class="flex flex-col">
+                      <span class="font-medium">{t("lend.form.publicRequestable")}</span>
+                      <span class="text-sm opacity-70">{t("lend.form.publicRequestableHint")}</span>
+                    </span>
+                  </label>
+                  {lendable.publicRequestable && lendable.requestLink && (
+                    <div class="flex flex-col gap-1">
+                      <span class="text-sm font-medium">{t("lend.form.requestLink")}</span>
+                      <div class="flex items-center gap-2">
+                        <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
+                        <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">
+                          <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                          <span class="max-sm:hidden">{t("common.copy")}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {!lendable.individualTracking && (
+                    <Field label={t("lend.form.maxRequestQuantity")} class="max-w-40">
+                      <input type="number" name="maxRequestQuantity" min="1" value={String(lendable.maxRequestQuantity)} class={`input w-full${lendable.errors?.maxRequestQuantity ? " input-error" : ""}`} />
+                      <span class="text-xs opacity-70 mt-1">{t("lend.form.maxRequestQuantityHint")}</span>
+                      {lendable.errors?.maxRequestQuantity && <span class="text-error text-sm mt-1">{lendable.errors.maxRequestQuantity}</span>}
+                    </Field>
+                  )}
+                  <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
+                    <input type="checkbox" name="timesRequired" value="1" checked={lendable.timesRequired} class="toggle toggle-success mt-0.5" />
+                    <span class="flex flex-col">
+                      <span class="font-medium">{t("lend.form.timesRequired")}</span>
+                      <span class="text-sm opacity-70">{t("lend.form.timesRequiredHint")}</span>
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </fieldset>
         )}
       </form>
     </>
