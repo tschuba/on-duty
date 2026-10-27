@@ -87,7 +87,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       <nav class="navbar bg-base-200 shadow-sm px-4 sticky top-0 z-40 border-b-[3px] border-gold">
         <div class="navbar-start flex-1 items-center">
           {user && (
-            <label for="nav-drawer" class="btn btn-ghost btn-square mr-2" aria-label={t("common.nav.toggleSidebar")}>
+            <label for="nav-drawer" class="btn btn-ghost btn-square mr-2 lg:hidden" aria-label={t("common.nav.toggleSidebar")}>
               <Icon name="bars-3" class="h-6 w-6 text-gold" />
             </label>
           )}
