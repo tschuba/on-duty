@@ -304,3 +304,29 @@ details:not([open]) > summary .section-actions {
 .page-header + form {
   padding-top: 0.75rem;
 }
+
+/* Rich-Text aus dem Trix-Editor (Datenschutzerklärung): Tailwinds Preflight entfernt Listen-/Überschriftenstile. */
+.richtext-content h1 { font-size: 1.25rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+.richtext-content p { margin: 0.5rem 0; }
+.richtext-content ul, .richtext-content ol { margin: 0.5rem 0 0.5rem 1.5rem; }
+.richtext-content ul { list-style: disc; }
+.richtext-content ol { list-style: decimal; }
+.richtext-content blockquote { border-left: 3px solid var(--color-base-300); padding-left: 1rem; opacity: 0.8; }
+.richtext-content a { text-decoration: underline; }
+
+/* Trix-Editor im daisyUI-Look. trix.css ist unlayered und wird nach app.css geladen; "form" erhöht die Spezifität.
+   Rahmen/Radius sitzt am Wrapper (.richtext-field), Toolbar und Editor sind darin randlos. */
+.richtext-field { border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent); border-radius: var(--radius-field); background: var(--color-base-100); overflow: hidden; }
+.richtext-field:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+form trix-toolbar { background: var(--color-base-200); border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent); padding: 0.5rem 0.5rem 0; }
+form trix-toolbar .trix-button-group { border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent); border-radius: var(--radius-field); overflow: hidden; background: var(--color-base-100); }
+form trix-toolbar .trix-button { color: var(--color-base-content); border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent); }
+form trix-toolbar .trix-button.trix-active { background: color-mix(in oklab, var(--color-primary) 20%, transparent); color: var(--color-base-content); }
+form trix-toolbar .trix-dialog { background: var(--color-base-100); color: var(--color-base-content); border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent); border-radius: var(--radius-box); box-shadow: 0 4px 12px rgb(0 0 0 / 0.2); }
+form trix-toolbar .trix-input--dialog { background: var(--color-base-100); color: var(--color-base-content); border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent); border-radius: var(--radius-field); }
+form trix-editor { border: 0; border-radius: 0; min-height: 12rem; padding: 0.75rem; color: var(--color-base-content); outline: none; }
+/* Keine Dateianhänge (Button ausgeblendet, Drop/Paste per trix-file-accept in organisation.tsx blockiert). */
+form trix-toolbar .trix-button-group.trix-button-group--file-tools { display: none; }
+/* Toolbar-Icons sind schwarze SVGs; im Dark-Theme invertieren. */
+:root[data-theme="dark"] trix-toolbar .trix-button--icon::before { filter: invert(1); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) trix-toolbar .trix-button--icon::before { filter: invert(1); } }

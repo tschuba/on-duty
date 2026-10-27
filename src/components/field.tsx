@@ -88,3 +88,16 @@ export function PhoneField({ label, hint, class: cls, ...input }: {
     </Field>
   );
 }
+
+// Rich-Text-Eingabe (Trix) für Freitext mit einfacher Formatierung (z. B. Datenschutzerklärung).
+// Trix schreibt sein HTML ins verknüpfte Hidden-Input; das Formular bleibt ein normaler Submit.
+// Assets werden global einmalig per <link>/<script> geladen (siehe Layout).
+export function RichTextField({ name, value, editable }: { name: string; value: string; editable: boolean }) {
+  const inputId = `richtext-${name}`;
+  return (
+    <div class={`richtext-field ${editable ? "" : "opacity-60 pointer-events-none"}`}>
+      <input id={inputId} type="hidden" name={name} value={value} />
+      <trix-editor input={inputId} class="trix-content" {...(editable ? {} : { contenteditable: "false" })}></trix-editor>
+    </div>
+  );
+}

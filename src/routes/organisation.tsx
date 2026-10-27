@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { Field } from "../components/field.js";
+import { Field, RichTextField } from "../components/field.js";
 import { db } from "../db/index.js";
 import { orgConfig } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -8,6 +8,7 @@ import { Layout } from "../components/layout.js";
 import { FormActions, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
+import { sanitizeRichText } from "../lib/sanitize.js";
 import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
@@ -32,8 +33,13 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
               label={t(`admin.orgConfig.field.${key}` as never)}
               required={(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key)}
               class={SPAN_CLASS[span ?? 4]}
+              floating={type !== "richtext"}
             >
-              <input
+              {type === "textarea" ? (
+                <textarea name={key} rows={10} disabled={!editable} class="textarea w-full" placeholder={t(`admin.orgConfig.field.${key}` as never)}>{values[key] ?? ""}</textarea>
+              ) : type === "richtext" ? (
+                <RichTextField name={key} value={values[key] ?? ""} editable={editable} />
+              ) : <input
                 type={type}
                 name={key}
                 value={values[key] ?? ""}
@@ -41,7 +47,7 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
                 class="input w-full"
                 placeholder={editable && placeholder ? t(placeholder as never) : t(`admin.orgConfig.field.${key}` as never)}
                 {...(editable ? attrs : {})}
-              />
+              />}
             </Field>
             {editable && hint && <p class="text-sm text-base-content/70 sm:col-span-4 -mt-2">{t(hint as never)}</p>}
             </>
@@ -77,6 +83,13 @@ organisationRoutes.get("/", guard, async (c) => {
           <OrgSection tab={tab} values={values} editable={canWriteOrgTab(perms, tab)} />
         ))}
       </form>
+      {tabs.includes("master") && (
+        <>
+          <link rel="stylesheet" href="/css/trix.css" />
+          <script src="/js/trix.min.js"></script>
+          <script dangerouslySetInnerHTML={{ __html: 'document.addEventListener("trix-file-accept",function(e){e.preventDefault()})' }}></script>
+        </>
+      )}
     </Layout>,
   );
 });
@@ -90,6 +103,14 @@ organisationRoutes.post("/", requireAuth([TABS.master.write, TABS.tax.write]), a
   const perms = c.get("user").permissions;
   const body = await c.req.parseBody();
   const tabs = TAB_ORDER.filter((tab) => canWriteOrgTab(perms, tab));
+
+  // Trix liefert HTML (z. B. "<div></div>" bei leerem Editor); vor der Leer-Prüfung und dem Speichern sanitizen.
+  if (typeof body.orgPrivacyText === "string") body.orgPrivacyText = sanitizeRichText(body.orgPrivacyText);
+
+  if (tabs.includes("master") && String(body.orgPrivacyUrl ?? "").trim() && String(body.orgPrivacyText ?? "").trim()) {
+    setFlash(c, t("admin.orgConfig.flash.privacyEitherOr"), "error");
+    return c.redirect(`/organisation#${TABS.master.path}`);
+  }
 
   if (tabs.includes("tax")) {
     const from = String(body.taxAssessmentPeriodFrom ?? "").trim();

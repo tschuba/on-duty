@@ -3,6 +3,7 @@ import { db } from "./db/index.js";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import { raw } from "hono/html";
 import { getCookie, deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { validateEnv } from "./env.js";
@@ -36,6 +37,9 @@ import { pwaRoutes } from "./routes/pwa.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
+import { PageHeader } from "./components/page-header.js";
+import { t } from "./i18n/index.js";
+import { loadOrgConfig } from "./lib/org-config.js";
 
 validateEnv();
 initSentry();
@@ -64,6 +68,15 @@ app.route("/", loginRoutes);
 
 // Public application forms — no auth guard, see backlog "Digitale Anträge"
 app.route("/apply", applyRoutes);
+
+// Inline privacy policy (only if the org stored a text instead of an external link)
+app.get("/datenschutz", async (c) => {
+  const text = (await loadOrgConfig()).orgPrivacyText?.trim();
+  if (!text) return c.notFound();
+  // orgPrivacyText ist bereits sanitizetes Trix-HTML (siehe organisation.tsx); ältere Bestände ohne Tags sind Klartext ohne erkennbare Tags, "<" übernimmt daher die HTML-Rendering-Prüfung.
+  const isHtml = /<[a-z][\s\S]*>/i.test(text);
+  return c.html(<Layout title={t("privacy.title")}><div class="max-w-2xl mx-auto"><PageHeader title={t("privacy.title")} /><div class={isHtml ? "richtext-content" : "whitespace-pre-wrap"}>{isHtml ? raw(text) : text}</div></div></Layout>);
+});
 
 // Public loan request form — no auth guard, see backlog "Verleih-Anfrageformular"
 app.route("/lend", lendRoutes);

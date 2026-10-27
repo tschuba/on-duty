@@ -46,6 +46,8 @@ export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
     { key: "orgCity", type: "text", span: 3 },
     { key: "orgContactEmail", type: "email", span: 2 },
     { key: "orgContactPhone", type: "tel", span: 2 },
+    { key: "orgPrivacyUrl", type: "url", placeholder: "organisation.placeholder.orgPrivacyUrl", hint: "organisation.hint.orgPrivacy" },
+    { key: "orgPrivacyText", type: "richtext", hint: "organisation.hint.orgPrivacy" },
     { key: "notificationEmail", type: "email" },
   ],
   tax: [

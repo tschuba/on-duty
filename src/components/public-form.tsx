@@ -13,10 +13,15 @@ export function Honeypot() {
   );
 }
 
-export function PrivacyNotice() {
+// Die Datenschutzerklärung liegt auf der Seite des Vereins (orgPrivacyUrl) oder inline (orgPrivacyText, Route /datenschutz); ohne Angabe entfällt der Link.
+export async function PrivacyNotice() {
+  const c = await loadOrgConfig();
+  const inline = !!c.orgPrivacyText?.trim();
+  const href = inline ? "/datenschutz" : c.orgPrivacyUrl?.trim();
   return (
     <p class="text-xs opacity-60 mt-2">
-      {t("apply.form.privacyNoticeText")} <a href="/datenschutz" class="link">{t("apply.form.privacyNoticeLink")}</a>
+      {t("apply.form.privacyNoticeText")}
+      {href && <> <a href={href} class="link" {...(inline ? {} : { target: "_blank", rel: "noopener" })}>{t("apply.form.privacyNoticeLink")}</a></>}
     </p>
   );
 }
