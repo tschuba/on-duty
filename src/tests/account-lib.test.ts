@@ -21,7 +21,7 @@ vi.mock("../db/index.js", () => {
 const sendMail = vi.fn();
 vi.mock("../lib/mail.js", () => ({ sendMail: (...a: unknown[]) => sendMail(...a) }));
 
-import { deleteBlock, deleteOwnAccount, countOtherAdmins } from "../lib/account.js";
+import { deleteBlock, deleteOwnAccount, countOtherAdmins, resolveAccountUrl } from "../lib/account.js";
 import { onUserRegistered, countPendingUsers } from "../lib/registration.js";
 import { checkRole, clearDefaultRoleIfDeleted, setSetting, roleHasPermissions } from "../lib/settings.js";
 import { LOCAL_ADMIN_ACCOUNT_ID } from "../lib/constants.js";
@@ -98,5 +98,15 @@ describe("settings", () => {
     results.push([{ key: "registrationDefaultRoleId", value: "r1" }]);
     await clearDefaultRoleIfDeleted("r1");
     expect(calls).toHaveLength(2);
+  });
+});
+
+describe("resolveAccountUrl", () => {
+  it("resolves a path against the provider host", () => {
+    expect(resolveAccountUrl("/ui/console/users/me", "https://auth.example.com/x")).toBe("https://auth.example.com/ui/console/users/me");
+  });
+  it("keeps absolute URLs and handles unset", () => {
+    expect(resolveAccountUrl("https://other.example/me", "https://auth.example.com")).toBe("https://other.example/me");
+    expect(resolveAccountUrl(undefined, "https://auth.example.com")).toBeUndefined();
   });
 });

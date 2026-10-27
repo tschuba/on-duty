@@ -28,3 +28,8 @@ export async function deleteOwnAccount(userId: string, isAdmin: boolean): Promis
   await db.delete(users).where(eq(users.id, userId));
   return null;
 }
+
+// Resolves OIDC_ACCOUNT_URL against the host of OIDC_PROVIDER; absolute URLs stay unchanged.
+export function resolveAccountUrl(accountUrl: string | undefined, provider: string): string | undefined {
+  return accountUrl ? new URL(accountUrl, provider).href : undefined;
+}

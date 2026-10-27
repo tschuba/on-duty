@@ -22,7 +22,7 @@ vi.mock("../middleware/auth.js", () => ({
     await next();
   },
 }));
-vi.mock("../lib/account.js", () => ({ deleteOwnAccount: (...a: unknown[]) => (deleteOwnAccount as any)(...a) }));
+vi.mock("../lib/account.js", async (orig) => ({ ...(await orig<typeof import("../lib/account.js")>()), deleteOwnAccount: (...a: unknown[]) => (deleteOwnAccount as any)(...a) }));
 vi.mock("../lib/flash.js", () => ({ setFlash: vi.fn() }));
 vi.mock("../auth.js", () => ({ auth: { api: { signOut: (...a: unknown[]) => (signOut as any)(...a) } } }));
 vi.mock("../db/index.js", () => {
