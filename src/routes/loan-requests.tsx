@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -200,8 +200,7 @@ loanRequestRoutes.get("/:id/approve", guard, async (c) => {
   const pool = await db
     .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, phone: persons.phone })
     .from(persons)
-    .leftJoin(members, eq(members.personId, persons.id))
-    .leftJoin(lendingLoans, eq(lendingLoans.borrowerPersonId, persons.id));
+    .where(ne(persons.id, request.person.id));
   const candidates = matchCandidates(request.person, pool);
 
   return c.html(
