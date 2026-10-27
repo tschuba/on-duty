@@ -6,7 +6,7 @@ import { donors, donations } from "./donations";
 import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments } from "./inventory";
-import { lendingItems, lendingLoans } from "./lending";
+import { lendingItems, lendingLoans, loanRequests } from "./lending";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
 export const personsRelations = relations(persons, ({ one, many }) => ({
@@ -55,6 +55,7 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => (
 export const lendingItemsRelations = relations(lendingItems, ({ one, many }) => ({
   inventoryItem: one(inventoryItems, { fields: [lendingItems.inventoryItemId], references: [inventoryItems.id] }),
   loans: many(lendingLoans),
+  requests: many(loanRequests),
 }));
 
 export const lendingLoansRelations = relations(lendingLoans, ({ one }) => ({
@@ -88,3 +89,8 @@ export const rolesRelations = relations(memberRoles, ({ many }) => ({
   assignments: many(memberRoleAssignments),
 }));
 /* v8 ignore stop */
+
+export const loanRequestsRelations = relations(loanRequests, ({ one }) => ({
+  lendingItem: one(lendingItems, { fields: [loanRequests.lendingItemId], references: [lendingItems.id] }),
+  person: one(persons, { fields: [loanRequests.personId], references: [persons.id] }),
+}));

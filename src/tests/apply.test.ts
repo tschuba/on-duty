@@ -25,7 +25,8 @@ vi.mock("../db/index.js", () => ({
 }));
 
 let orgConfigFixture: Record<string, string> = {};
-vi.mock("../lib/org-config.js", () => ({
+vi.mock("../lib/org-config.js", async (orig) => ({
+  ...(await orig<typeof import("../lib/org-config.js")>()),
   loadOrgConfig: vi.fn(() => Promise.resolve(orgConfigFixture)),
 }));
 
@@ -121,7 +122,7 @@ describe("POST /apply", () => {
   });
 
   it("notifies the org config email on submission when configured", async () => {
-    orgConfigFixture = { applicationNotifyEmail: "vorstand@example.com" };
+    orgConfigFixture = { notificationEmail: "vorstand@example.com" };
     const res = await applyRoutes.request("/", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },

@@ -23,17 +23,30 @@ export function isOrgConfigCompleteForReceipts(config: Record<string, string>): 
   return REQUIRED_RECEIPT_FIELDS.every((key) => config[key]);
 }
 
-export type OrgTab = "master" | "tax";
+// Empfänger für Antrags-/Anfrage-Benachrichtigungen: eigene Adresse, sonst Kontakt-E-Mail.
+export const notificationRecipient = (c: Record<string, string>) => c.notificationEmail?.trim() || c.orgContactEmail?.trim() || "";
+
+export type PrivacyMode = "none" | "url" | "text";
+
+// Gespeicherte Auswahl; Altbestand ohne orgPrivacyMode wird aus den vorhandenen Feldern abgeleitet.
+export function privacyMode(c: Record<string, string>): PrivacyMode {
+  const m = c.orgPrivacyMode;
+  if (m === "none" || m === "url" || m === "text") return m;
+  return c.orgPrivacyText?.trim() ? "text" : c.orgPrivacyUrl?.trim() ? "url" : "none";
+}
+
+export type OrgTab = "master" | "tax" | "privacy";
 
 // Single source of truth for tab → fields and tab → read permissions (write implies read; OR check, no implies mechanism in RBAC).
 export const ORG_TABS = {
   master: { path: "master-data", read: ["org:read", "org:write"], write: "org:write" },
+  privacy: { path: "privacy", read: ["org:read", "org:write"], write: "org:write" },
   tax: { path: "tax-data", read: ["org:tax-data:read", "org:tax-data:write"], write: "org:tax-data:write" },
 } as const;
 
 // span: columns of 4 from sm up (default 4 = full width). placeholder/hint: i18n keys, shown only when editable.
 export type TabField = {
-  key: string; type: string; span?: 1 | 2 | 3;
+  key: string; type: string; span?: 1 | 2 | 3; inGroup?: boolean; // inGroup: rendered by the privacy group, only saved here
   placeholder?: string; hint?: string; attrs?: Record<string, string>;
 };
 
@@ -44,7 +57,14 @@ export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
     { key: "orgHouseNumber", type: "text", span: 1 },
     { key: "orgZip", type: "text", span: 1 },
     { key: "orgCity", type: "text", span: 3 },
-    { key: "applicationNotifyEmail", type: "email" },
+    { key: "orgContactPhone", type: "tel", span: 2 },
+    { key: "orgContactEmail", type: "email", span: 2, hint: "organisation.hint.contactEmail" },
+    { key: "notificationEmail", type: "notify" },
+  ],
+  privacy: [
+    { key: "orgPrivacyMode", type: "privacy" },
+    { key: "orgPrivacyUrl", type: "url", inGroup: true },
+    { key: "orgPrivacyText", type: "richtext", inGroup: true },
   ],
   tax: [
     { key: "taxExemptionDate", type: "date", span: 2 },
@@ -68,5 +88,5 @@ export function canWriteOrgTab(perms: Set<string>, tab: OrgTab): boolean {
 export function missingReceiptFields(config: Record<string, string>): Record<OrgTab, string[]> {
   const required: readonly string[] = REQUIRED_RECEIPT_FIELDS;
   const missing = (tab: OrgTab) => TAB_FIELDS[tab].map((f) => f.key).filter((k) => required.includes(k) && !config[k]);
-  return { master: missing("master"), tax: missing("tax") };
+  return { master: missing("master"), privacy: [], tax: missing("tax") };
 }
