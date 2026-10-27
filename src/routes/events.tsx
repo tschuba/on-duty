@@ -98,15 +98,16 @@ function EventList({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canM
   );
 }
 
-function EventPopupHtml(ev: Event, tz: string): string {
+function EventPopupHtml(ev: Event, tz: string, tags: string[]): string {
   const time = ev.allDay ? "" : `${formatTime(ev.startsAt, tz)}–${formatTime(ev.endsAt, tz)} `;
-  return `<div class="p-1 text-xs"><div class="font-medium">${escapeHtml(ev.title)}</div><div>${time}${escapeHtml(ev.location ?? "")}</div></div>`;
+  const tagBadges = tags.map((tag) => `<span class="badge badge-xs badge-outline">${escapeHtml(tag)}</span>`).join(" ");
+  return `<div class="p-1 text-xs"><div class="font-medium">${escapeHtml(ev.title)}</div><div>${time}${escapeHtml(ev.location ?? "")}</div>${tagBadges ? `<div class="flex flex-wrap gap-1 mt-1">${tagBadges}</div>` : ""}</div>`;
 }
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
-function CalendarView({ rows, tz, canManage, tagParam }: { rows: EventRow[]; tz: string; canManage: boolean; tagParam: string[] }) {
+function CalendarView({ rows, tz, canManage, tagParam, noFetch }: { rows: EventRow[]; tz: string; canManage: boolean; tagParam: string[]; noFetch?: boolean }) {
   const byDate = new Map<string, EventRow[]>();
   for (const ev of rows) {
     for (let d = new Date(ev.startsAt); d <= ev.endsAt; d.setUTCDate(d.getUTCDate() + 1)) {
@@ -118,11 +119,11 @@ function CalendarView({ rows, tz, canManage, tagParam }: { rows: EventRow[]; tz:
   }
   return (
     <div>
-      <div id="events-calendar" data-tz={tz} data-tags={tagParam.join(",")}></div>
+      <div id="events-calendar" data-tz={tz} data-tags={tagParam.join(",")} data-no-fetch={noFetch ? "1" : ""}></div>
       <div id="events-calendar-day" class="mt-4"></div>
       <script type="application/json" id="events-calendar-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(
         [...byDate.entries()].map(([date, list]) => [date, list.map((ev) => ({
-          id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz),
+          id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz, ev.tags.map((x) => x.tag)),
           editHref: canManage ? `/events/${ev.id}/edit` : null,
         }))]),
       ).replace(/</g, "\\u003c") }} />
@@ -157,6 +158,7 @@ const CALENDAR_SCRIPT = `
       popups: popups(),
       onClickDate(self) { renderDay(self.context.selectedDates[0] || self.selectedDates[0]); },
       async onClickArrow(self) {
+        if (root.dataset.noFetch) return;
         const y = self.selectedYear, m = self.selectedMonth;
         const from = new Date(y, m, 1).toISOString().slice(0, 10);
         const to = new Date(y, m + 1, 0).toISOString().slice(0, 10);
@@ -244,7 +246,7 @@ eventRoutes.get("/calendar.json", requireAuth(), async (c) => {
     for (let d = new Date(ev.startsAt); d <= ev.endsAt; d.setUTCDate(d.getUTCDate() + 1)) {
       const key = d.toISOString().slice(0, 10);
       const list = byDate.get(key) ?? [];
-      list.push({ id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz), editHref: canManage ? `/events/${ev.id}/edit` : null });
+      list.push({ id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz, ev.tags.map((x) => x.tag)), editHref: canManage ? `/events/${ev.id}/edit` : null });
       byDate.set(key, list);
     }
   }
@@ -291,7 +293,7 @@ eventRoutes.get("/public", async (c) => {
           applyLabel={t("common.apply")} resetLabel={t("common.reset")} searchPlaceholder={t("common.searchPlaceholder")} emptyLabel={t("events.filter.noTags")} />
       </div>
       {view === "calendar"
-        ? <CalendarView rows={filtered.map((ev) => ({ ...ev, visibleRoles: [] }))} tz={tz} canManage={false} tagParam={tagFilter} />
+        ? <CalendarView rows={filtered.map((ev) => ({ ...ev, visibleRoles: [] }))} tz={tz} canManage={false} tagParam={tagFilter} noFetch />
         : <EventList rows={filtered.map((ev) => ({ ...ev, visibleRoles: [] }))} tz={tz} canManage={false} />}
       </div>
     </Layout>,
