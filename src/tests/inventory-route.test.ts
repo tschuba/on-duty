@@ -291,7 +291,13 @@ describe("lendable flag on POST /", () => {
     currentUser = lendingManager();
     const res = await post("/", { name: "Helm", category: "equipment", lendable: "1" });
     expect(res.status).toBe(302);
-    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: true });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: true, publicRequestable: false, maxRequestQuantity: 1, timesRequired: false });
+  });
+
+  it("stores lending config given at creation", async () => {
+    currentUser = lendingManager();
+    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5", publicRequestable: "1", maxRequestQuantity: "3", timesRequired: "1" });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: false, publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
   });
 
   it("uses batch tracking for quantity > 1", async () => {

@@ -945,7 +945,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
               </div>
               <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
                 <input type="checkbox" name="lendable" value="1" checked={lendable.checked}
-                  disabled={!lendable.editable || lendable.locked} class="toggle toggle-success mt-0.5" />
+                  disabled={!lendable.editable || lendable.locked} onchange="document.getElementById('lendable-config').hidden=!this.checked" class="toggle toggle-success mt-0.5" />
                 <span class="flex flex-col">
                   <span class="font-medium">{t("inventory.form.lendable")}</span>
                   <span class="text-sm opacity-70">{t("inventory.form.lendableHint")}</span>
@@ -956,7 +956,8 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
               {lendable.locked && <p class="text-sm opacity-70">{t("inventory.form.lendableLocked")}</p>}
               {!lendable.editable && <p class="text-sm opacity-70">{t("inventory.form.lendableReadonly")}</p>}
               {lendable.error && <p class="text-error text-sm">{lendable.error}</p>}
-              {lendable.checked && lendable.editable && (
+              {lendable.editable && (
+                <div id="lendable-config" hidden={!lendable.checked}>
                 <div class="flex flex-col gap-4 border-t border-base-300 pt-4">
                   <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
                     <input type="checkbox" name="publicRequestable" value="1" checked={lendable.publicRequestable} class="toggle toggle-success mt-0.5" />
@@ -992,6 +993,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                     </span>
                   </label>
                 </div>
+                </div>
               )}
             </div>
           </fieldset>
@@ -1006,7 +1008,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   return c.html(
     <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
-      <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" />
+      <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} />
     </Layout>
   );
 });
@@ -1028,8 +1030,17 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const serialsError = validateSerials(serials, insertValues.quantity);
   if (serialsError) errors.serials = serialsError;
   const wantsLendable = trimmed(body, "lendable") === "1";
+  const canManageLending = user.permissions.has("lending:manage");
+  const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
+  const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
+  let maxRequestQuantity = 1;
+  let maxRequestQuantityError: string | undefined;
+  if (canManageLending && wantsLendable && insertValues.quantity > 1) {
+    maxRequestQuantity = Number(trimmed(body, "maxRequestQuantity") || "1");
+    if (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
+  }
 
-  if (Object.keys(errors).length > 0) {
+  if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
@@ -1041,7 +1052,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
-          lendable={lendableField(user, wantsLendable)}
+          lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired, errors: { maxRequestQuantity: maxRequestQuantityError } })}
         />
       </Layout>,
       422
@@ -1063,7 +1074,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
     if (wantsLendable && user.permissions.has("lending:manage")) {
-      await tx.insert(lendingItems).values({ inventoryItemId: item.id, individualTracking: item.quantity <= 1 });
+      await tx.insert(lendingItems).values({ inventoryItemId: item.id, individualTracking: item.quantity <= 1, publicRequestable, maxRequestQuantity, timesRequired });
     }
     if (assignments.length > 0) {
       await tx.insert(inventoryItemAssignments).values(assignments.map((a) => ({ inventoryItemId: item.id, memberId: a.memberId, quantity: a.quantity })));
@@ -1077,7 +1088,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
       <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
         <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
           values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
-          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable)} />
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired })} />
       </Layout>,
       422
     );
