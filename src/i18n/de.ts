@@ -1248,7 +1248,7 @@ export const de = {
   "events.form.duration.2h": "2 Std.",
   "events.form.duration.3h": "3 Std.",
   "events.form.duration.halfDay": "halber Tag",
-  "events.form.duration.fullDay": "ganztägig",
+  "events.form.duration.fullDay": "1 Tag",
   "events.form.created": "Termin angelegt.",
   "events.form.saved": "Termin gespeichert.",
   "events.form.deleted": "Termin gelöscht.",
