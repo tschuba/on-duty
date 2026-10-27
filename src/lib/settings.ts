@@ -9,6 +9,7 @@ export const SETTINGS = [
   { key: "registrationEnabled", type: "boolean", default: "false" },
   { key: "registrationAutoApprove", type: "boolean", default: "false" },
   { key: "registrationDefaultRoleId", type: "role", default: "" },
+  { key: "eventsPublicEnabled", type: "boolean", default: "false" },
   { key: "loanRequestRetentionDays", type: "number", default: "90" },
 ] as const satisfies readonly { key: string; type: SettingType; default: string }[];
 export type SettingKey = (typeof SETTINGS)[number]["key"];

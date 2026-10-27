@@ -859,6 +859,8 @@ const CONFIG_DESCRIPTIONS: Record<string, string> = {
   YOUTH_AGE_LIMIT: t("admin.config.desc.YOUTH_AGE_LIMIT"),
   ACTIVE_AGE_LIMIT: t("admin.config.desc.ACTIVE_AGE_LIMIT"),
   ANNIVERSARY_CUTOFF: t("admin.config.desc.ANNIVERSARY_CUTOFF"),
+  APP_TIMEZONE: t("admin.config.desc.APP_TIMEZONE"),
+  EVENTS_PUBLIC_INDEXING: t("admin.config.desc.EVENTS_PUBLIC_INDEXING"),
   SESSION_LIFETIME: t("admin.config.desc.SESSION_LIFETIME"),
   ADMIN_PASSWORD_MIN_LENGTH: t("admin.config.desc.ADMIN_PASSWORD_MIN_LENGTH"),
   BACKUP_SCHEDULE: t("admin.config.desc.BACKUP_SCHEDULE"),

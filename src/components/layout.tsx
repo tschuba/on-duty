@@ -19,7 +19,7 @@ const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).ver
 type Props = PropsWithChildren<{
   title?: string;
   user?: AuthedUser;
-  activeNav?: "members" | "donations" | "admin" | "inventory" | "organisation" | "import";
+  activeNav?: "members" | "donations" | "admin" | "inventory" | "organisation" | "import" | "events";
 }>;
 
 export function ClickToEditHint() {
@@ -90,6 +90,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
           </a>
           {user && (
             <div class="hidden md:flex gap-4 items-baseline">
+              <a href="/events" class={navLink(activeNav === "events")}>{t("common.nav.events")}</a>
               {membersNavHref && (
                 <a
                   href={membersNavHref}
@@ -153,6 +154,7 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
                 <Icon name="bars-3" class="h-6 w-6 text-gold" />
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-64 p-2 shadow">
+                <li><a href="/events" class={activeNav === "events" ? "active" : ""}>{t("common.nav.events")}</a></li>
                 {membersNavHref && <li><a href={membersNavHref} class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
                 {canReadInventory && <li><a href="/inventory" class={activeNav === "inventory" ? "active" : ""}>{t("common.nav.inventory")}<CountBadge count={activeNav === "inventory" ? 0 : overdueInspectionsCount} /></a></li>}

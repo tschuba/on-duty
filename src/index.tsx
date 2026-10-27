@@ -23,6 +23,7 @@ import { roleRoutes } from "./routes/roles.js";
 import { yearRoutes } from "./routes/anniversary-years.js";
 import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
+import { eventRoutes } from "./routes/events.js";
 import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
 import { inventoryRoutes } from "./routes/inventory.js";
@@ -133,6 +134,7 @@ app.route("/applications", applicationRoutes);
 
 // Anniversary routes
 app.route("/anniversaries", anniversaryRoutes);
+app.route("/events", eventRoutes);
 
 // Donation routes
 app.route("/donations", donationRoutes);

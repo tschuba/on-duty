@@ -7,6 +7,8 @@ import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments } from "./inventory";
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
+import { events, eventTags, eventVisibleRoles } from "./events";
+import { appRoles } from "./permissions";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
 export const personsRelations = relations(persons, ({ one, many }) => ({
@@ -87,6 +89,20 @@ export const assignmentsRelations = relations(memberRoleAssignments, ({ one }) =
 
 export const rolesRelations = relations(memberRoles, ({ many }) => ({
   assignments: many(memberRoleAssignments),
+}));
+
+export const eventsRelations = relations(events, ({ many }) => ({
+  tags: many(eventTags),
+  visibleRoles: many(eventVisibleRoles),
+}));
+
+export const eventTagsRelations = relations(eventTags, ({ one }) => ({
+  event: one(events, { fields: [eventTags.eventId], references: [events.id] }),
+}));
+
+export const eventVisibleRolesRelations = relations(eventVisibleRoles, ({ one }) => ({
+  event: one(events, { fields: [eventVisibleRoles.eventId], references: [events.id] }),
+  role: one(appRoles, { fields: [eventVisibleRoles.roleId], references: [appRoles.id] }),
 }));
 /* v8 ignore stop */
 

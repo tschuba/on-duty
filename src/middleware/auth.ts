@@ -8,7 +8,7 @@ import type { Permission } from "../lib/roles.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 export type { Permission };
-export type AuthedUser = AppUser & { permissions: Set<Permission> };
+export type AuthedUser = AppUser & { permissions: Set<Permission>; roleIds: Set<string> };
 export type Variables = { user: AuthedUser };
 
 // allowPending: let users without any app role through (used by /pending and /account); all others are sent to /pending.
@@ -35,6 +35,7 @@ export function requireAuth(required?: Permission | Permission[], opts: { allowP
       .leftJoin(appRolePermissions, eq(appRolePermissions.roleId, userAppRoles.roleId))
       .where(eq(userAppRoles.userId, user.id));
     const permissions = new Set(rows.flatMap((r) => (r.permission ? [r.permission] : [])));
+    const roleIds = new Set(rows.map((r) => r.roleId));
 
     // Zero roles = self-registered and not yet approved. A role without the needed permission still gets the 403 below.
     // Active = verified email AND at least one role. Unverified accounts only exist via the Zitadel webhook.
@@ -45,7 +46,7 @@ export function requireAuth(required?: Permission | Permission[], opts: { allowP
       return c.html("<h1>403 Zugriff verweigert</h1>", HTTP_STATUS.FORBIDDEN);
     }
 
-    c.set("user", { ...user, permissions });
+    c.set("user", { ...user, permissions, roleIds });
     await next();
   });
 }

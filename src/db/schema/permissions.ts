@@ -37,6 +37,7 @@ export const permissionEnum = pgEnum("permission", [
   "anniversary-years:read",
   "anniversary-years:write",
   "anniversary-years:delete",
+  "events:manage",
 ]);
 
 export const appRoles = pgTable("app_roles", {

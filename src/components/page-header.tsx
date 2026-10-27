@@ -36,7 +36,7 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
     </span>
   );
   return href ? (
-    <a href={href} class={cls2} aria-label={label} title={label}>{inner}</a>
+    <a href={href} class={cls2} aria-label={label} title={label} {...attrs}>{inner}</a>
   ) : (
     <button type={type ?? (form ? "submit" : "button")} form={form} name={name} value={value} onclick={onclick} class={cls2} {...attrs} aria-label={label} title={label}>{inner}</button>
   );
