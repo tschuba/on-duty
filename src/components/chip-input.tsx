@@ -141,7 +141,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
               if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); chipMove(root, e.key === 'ArrowDown' ? 1 : -1); return; }
               if (e.key === 'Escape' && !ul.hidden) { e.preventDefault(); chipClose(root); return; }
               var act = !ul.hidden && ul.querySelector('[aria-selected=true]');
-              if (e.key === 'Enter' && act) { e.preventDefault(); input.value = ''; chipAdd(root, act.textContent); chipRefresh(root); chipClose(root); return; }
+              if ((e.key === 'Enter' || e.key === 'Tab') && act) { e.preventDefault(); input.value = ''; chipAdd(root, act.textContent); chipRefresh(root); chipClose(root); return; }
             }
             if (input.readOnly && e.key === 'Enter') { e.preventDefault(); return; }
             if (e.key === 'Enter' || (e.key === ',' && root.dataset.split)) { e.preventDefault(); chipCommit(input); }

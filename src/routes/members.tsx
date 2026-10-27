@@ -515,6 +515,7 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
             if (e.key === 'Escape' && search.value) { e.preventDefault(); e.stopPropagation(); search.value = ''; filter(); return; }
             var v = visible(), cur = v.findIndex(function (o) { return o.classList.contains('menu-active'); });
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mark(v[Math.max(0, Math.min(v.length - 1, cur + (e.key === 'ArrowDown' ? 1 : -1)))]); }
+            else if (e.key === 'Tab' && cur >= 0 && !e.shiftKey) { e.preventDefault(); pick(v[cur]); }
             else if (e.key === 'Enter') { e.preventDefault(); if (cur >= 0) pick(v[cur]); else if (v.length === 1) pick(v[0]); else root.closest('form').querySelector('[name=from]').focus(); }
           });
           var sel = opts.find(function (o) { return o.getAttribute('aria-selected') === 'true'; });
