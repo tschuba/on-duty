@@ -27,7 +27,7 @@ import {
   type Event,
   type EventFormValues,
 } from "../lib/events.js";
-import { dayAfter, formatDateTime, formatDay, formatTime, resolveTimezone, toLocalInput, zoneAbbr } from "../lib/datetime.js";
+import { formatDateTime, formatDay, formatTime, localDays, resolveTimezone, toLocalDate, toLocalInput, zoneAbbr } from "../lib/datetime.js";
 
 export const eventRoutes = new Hono<{ Variables: Variables }>();
 const manage = requireAuth("events:manage");
@@ -56,7 +56,7 @@ function TimezoneHint({ tz }: { tz: string }) {
 
 function EventTimeLabel({ ev, tz }: { ev: Event; tz: string }) {
   if (ev.allDay) {
-    const sameDay = ev.startsAt.toDateString() === ev.endsAt.toDateString();
+    const sameDay = toLocalDate(ev.startsAt, tz) === toLocalDate(ev.endsAt, tz);
     return <>{formatDay(ev.startsAt, tz)}{!sameDay && <> – {formatDay(ev.endsAt, tz)}</>}</>;
   }
   return <>{formatDateTime(ev.startsAt, tz)} – {formatTime(ev.endsAt, tz)} {zoneAbbr(ev.startsAt, tz)}</>;
@@ -110,8 +110,7 @@ function escapeHtml(s: string): string {
 function CalendarView({ rows, tz, canManage, tagParam, noFetch }: { rows: EventRow[]; tz: string; canManage: boolean; tagParam: string[]; noFetch?: boolean }) {
   const byDate = new Map<string, EventRow[]>();
   for (const ev of rows) {
-    for (let d = new Date(ev.startsAt); d <= ev.endsAt; d.setUTCDate(d.getUTCDate() + 1)) {
-      const key = d.toISOString().slice(0, 10);
+    for (const key of localDays(ev.startsAt, ev.endsAt, tz)) {
       const list = byDate.get(key) ?? [];
       list.push(ev);
       byDate.set(key, list);
@@ -160,8 +159,9 @@ const CALENDAR_SCRIPT = `
       async onClickArrow(self) {
         if (root.dataset.noFetch) return;
         const y = self.selectedYear, m = self.selectedMonth;
-        const from = new Date(y, m, 1).toISOString().slice(0, 10);
-        const to = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+        const pad = (n) => String(n).padStart(2, "0");
+        const from = y + "-" + pad(m + 1) + "-01";
+        const to = y + "-" + pad(m + 1) + "-" + pad(new Date(y, m + 1, 0).getDate());
         const qs = tags ? "&" + tags.split(",").map((t) => "tag=" + encodeURIComponent(t)).join("&") : "";
         const res = await fetch("/events/calendar.json?from=" + from + "&to=" + to + qs);
         if (!res.ok) return;
@@ -188,10 +188,9 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const { start, end } = range;
   const rp = rangeParams(range);
 
-  const tagCond = tagFilter.length ? and(...tagFilter.map((tag) => eq(eventTags.tag, tag))) : undefined;
   const windowStart = view === "calendar" ? today : start;
   const windowEnd = view === "calendar" ? addMonths(today, 12) : end;
-  const where = and(overlapsRange(windowStart, windowEnd, tz), tagCond);
+  const where = overlapsRange(windowStart, windowEnd, tz);
   let rows = await fetchEvents(user, where);
   if (tagFilter.length) rows = rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag)));
 
@@ -243,8 +242,7 @@ eventRoutes.get("/calendar.json", requireAuth(), async (c) => {
 
   const byDate = new Map<string, unknown[]>();
   for (const ev of rows) {
-    for (let d = new Date(ev.startsAt); d <= ev.endsAt; d.setUTCDate(d.getUTCDate() + 1)) {
-      const key = d.toISOString().slice(0, 10);
+    for (const key of localDays(ev.startsAt, ev.endsAt, tz)) {
       const list = byDate.get(key) ?? [];
       list.push({ id: ev.id, title: ev.title, html: EventPopupHtml(ev, tz, ev.tags.map((x) => x.tag)), editHref: canManage ? `/events/${ev.id}/edit` : null });
       byDate.set(key, list);

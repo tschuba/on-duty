@@ -74,3 +74,15 @@ export function dayAfter(day: string, tz: string): Date {
   const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
   return parseLocal(next, tz)!;
 }
+
+// Alle Kalendertage ("YYYY-MM-DD", Wanduhr in `tz`), die [start, end] berühren.
+export function localDays(start: Date, end: Date, tz: string): string[] {
+  const out: string[] = [];
+  const last = toLocalDate(end, tz);
+  for (let d = toLocalDate(start, tz); d <= last; ) {
+    out.push(d);
+    const [y, m, day] = d.split("-").map(Number);
+    d = new Date(Date.UTC(y, m - 1, day + 1)).toISOString().slice(0, 10);
+  }
+  return out;
+}
