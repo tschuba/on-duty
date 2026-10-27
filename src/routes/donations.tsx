@@ -7,7 +7,7 @@ import { persons, donors, donations, users } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, canReadOrgTab, ORG_TABS, type OrgTab } from "../lib/org-config.js";
@@ -15,7 +15,7 @@ import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl } from "../lib/list-query.js";
-import { countOpenReceipts, nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
+import { nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, duplicatePersonError, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
@@ -264,11 +264,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
   const canIssueReceipts = user.permissions.has("donations:issue-receipts");
-  const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   return c.html(
-    <Layout title={t("donations.title")} user={user} activeNav="donations">
-      <DonationTabs active="donations" openReceiptsCount={openReceipts} />
+    <Layout title={t("donations.title")} user={user}>
       <PageHeader title={t("donations.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />} />
       {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
@@ -333,7 +331,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
 donationRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
-    <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
+    <Layout title={t("donations.newDonation")} user={user}>
       <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" />} />
       <form id="donation-form" method="post" action="/donations" class="space-y-4 max-w-xl">
         <DonorPickerFields />
@@ -356,7 +354,7 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donations.newDonation")} user={user} activeNav="donations">
+      <Layout title={t("donations.newDonation")} user={user}>
         <PageHeader title={t("donations.newDonation")} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-form" />} />
         <form id="donation-form" method="post" action="/donations" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={donorFields.values} errors={errors} />
@@ -401,7 +399,7 @@ donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const canLink = user.permissions.has("members:read");
 
   return c.html(
-    <Layout title={t("donations.title")} user={user} activeNav="donations">
+    <Layout title={t("donations.title")} user={user}>
       <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
@@ -425,7 +423,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donations.title")} user={user} activeNav="donations">
+      <Layout title={t("donations.title")} user={user}>
         <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
           <DonationFormFields values={values} errors={errors} />
@@ -482,7 +480,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
   );
 
   return c.html(
-    <Layout title={t("donations.receipt.title")} user={user} activeNav="donations">
+    <Layout title={t("donations.receipt.title")} user={user}>
       <PageHeader title={t("donations.receipt.title")} backHref="/donations" />
 
       {!orgComplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}

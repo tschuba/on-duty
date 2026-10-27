@@ -6,14 +6,12 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
 import { formatPeriod } from "./lend.js";
-import { InventoryTabs } from "./inventory.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
-import { countOverdueInspectionItems } from "../lib/inventory.js";
-import { checkAvailability, cleanupRejectedLoanRequests, countOpenLoanRequests, countOverdueLoans, matchCandidates } from "../lib/lending.js";
+import { checkAvailability, cleanupRejectedLoanRequests, matchCandidates } from "../lib/lending.js";
 import { sendMail } from "../lib/mail.js";
 import { loadOrgConfig } from "../lib/org-config.js";
 import { getSettings } from "../lib/settings.js";
@@ -75,16 +73,13 @@ loanRequestRoutes.get("/", guard, async (c) => {
   const rows = all
     .filter((r) => statusFilter.includes(r.status))
     .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
-  const overdueCount = await countOverdueInspectionItems();
-  const overdueLoanCount = await countOverdueLoans();
 
   function filterUrl(next: RequestStatus[]) {
     return buildListUrl("/inventory/requests", { status: statusFilter }, { status: next });
   }
 
   return c.html(
-    <Layout title={t("lend.requests.title")} user={user} activeNav="inventory">
-      <InventoryTabs active="requests" overdueCount={overdueCount} overdueLoanCount={overdueLoanCount} openRequestCount={await countOpenLoanRequests()} showLending showRequests />
+    <Layout title={t("lend.requests.title")} user={user}>
       <PageHeader title={t("lend.requests.title")} />
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         {ALL_STATUSES.map((s) => {
@@ -145,7 +140,7 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
   ).length;
 
   return c.html(
-    <Layout title={request.lendingItem.inventoryItem.name} user={user} activeNav="inventory">
+    <Layout title={request.lendingItem.inventoryItem.name} user={user}>
       <PageHeader
         title={<>{request.lendingItem.inventoryItem.name} <span class={STATUS_BADGE_CLASS[request.status]}>{STATUS_LABEL[request.status]}</span></>}
         backHref="/inventory/requests"
@@ -204,7 +199,7 @@ loanRequestRoutes.get("/:id/approve", guard, async (c) => {
   const candidates = matchCandidates(request.person, pool);
 
   return c.html(
-    <Layout title={t("lend.requests.approveTitle")} user={user} activeNav="inventory">
+    <Layout title={t("lend.requests.approveTitle")} user={user}>
       <PageHeader title={t("lend.requests.approveTitle")} backHref={`/inventory/requests/${request.id}`} />
       <form method="post" action={`/inventory/requests/${request.id}/approve`} class="max-w-xl space-y-4">
         <p class="text-sm opacity-70">{t("lend.requests.requestedBy", { name: `${request.person.firstName} ${request.person.lastName}` })}</p>

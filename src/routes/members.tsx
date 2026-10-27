@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleTypes, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments, lendingLoans } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
@@ -1038,8 +1038,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   if (isHtmx) return c.html(<>{tableEl}<MembersExportButton empty={sorted.length === 0} oob /></>);
 
   return c.html(
-    <Layout title={t("members.title")} user={user} activeNav="members">
-      <MemberTabs active="members" user={user} />
+    <Layout title={t("members.title")} user={user}>
       <PageHeader title={t("members.title")} actions={<>
         <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
           <Icon name="chart-bar" class="w-5 h-5" />
@@ -1154,7 +1153,7 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
   }
 
   return c.html(
-    <Layout title={t("members.newMember")} user={user} activeNav="members">
+    <Layout title={t("members.newMember")} user={user}>
       <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
       <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
         <NewMemberDraft ctx={draftCtx({ personId, linkMemberId, applicationId })} />
@@ -1458,7 +1457,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       ...(bank && { ...bank, iban: trimmed(body, "iban") }),
     };
     return c.html(
-      <Layout title={t("members.newMember")} user={user} activeNav="members">
+      <Layout title={t("members.newMember")} user={user}>
         <PageHeader title={t("members.newMember")} backHref="/members" subtitle={t("common.requiredLegend")} actions={<FormActions formId="member-form" saveAndNew />} />
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
@@ -1711,7 +1710,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
     // Read-only view
     const openRoles = m.assignments.filter((a) => !a.to);
     return c.html(
-      <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
+      <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
         <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}</>} />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
@@ -1752,7 +1751,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   }
 
   return c.html(
-    <Layout title={`${m.firstName} ${m.lastName}`} user={user} activeNav="members">
+    <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
       <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<HeaderAction icon="document-duplicate" class="btn-outline btn-primary" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} /><FormActions formId="member-form" /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
@@ -1785,7 +1784,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     const bank = parseBankData(body, errors);
     if (errors.iban) {
       return c.html(
-        <Layout title={`${existing.firstName} ${existing.lastName}`} user={user} activeNav="members">
+        <Layout title={`${existing.firstName} ${existing.lastName}`} user={user}>
           <form method="post" action={`/members/${id}`} class="space-y-4">
             <BankDataSection m={{ ...existing, ...bank, iban: trimmed(body, "iban") }} editable errors={errors} />
             <button type="submit" class="btn btn-primary">{t("common.save")}</button>
@@ -1823,7 +1822,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       phone: body.phone as string, mobile: body.mobile as string, email: body.email as string,
       ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
-      <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
+      <Layout title={`${firstName} ${lastName}`} user={user}>
         <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
@@ -1863,7 +1862,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     };
 
     return c.html(
-      <Layout title={`${firstName} ${lastName}`} user={user} activeNav="members">
+      <Layout title={`${firstName} ${lastName}`} user={user}>
         <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,

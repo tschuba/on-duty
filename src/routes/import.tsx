@@ -78,7 +78,7 @@ const LIST_HREF: Record<ImportKind, string> = { members: "/members", inventory: 
 
 function UploadPage({ user, error, kind: only }: { user: any; error?: string; kind?: ImportKind }) {
   return (
-    <Layout title={t("common.nav.import")} user={user} activeNav="import">
+    <Layout title={t("common.nav.import")} user={user}>
       <div class="max-w-2xl mx-auto">
         <PageTitle backHref={only && LIST_HREF[only]}>{only ? t("import.title.kind", { kind: KIND_LABEL[only] }) : t("import.title")}</PageTitle>
         {error && <div class="alert alert-error mb-4">{error}</div>}
@@ -461,7 +461,7 @@ type Summary = { label: string; value: number; tone?: "error" | "warning" }[];
 function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; fp: string; hidden: unknown; canRun: boolean; unmapped: { column: string; count: number }[]; notices: (string | { text: string; href: string } | false)[]; summary: Summary; children: unknown }) {
   const notices = props.notices.filter((n): n is string | { text: string; href: string } => !!n);
   return (
-    <Layout title={t("common.nav.import")} user={props.user} activeNav="import">
+    <Layout title={t("common.nav.import")} user={props.user}>
       <div class="max-w-6xl mx-auto">
         <PageTitle backHref={props.only && LIST_HREF[props.only]}>{t("import.preview.title", { kind: KIND_LABEL[props.kind] })}</PageTitle>
         <div id="restore-box" class="alert alert-info mb-4 hidden">
@@ -510,7 +510,7 @@ type Report = { created: number; skipped: number; lines: string[]; links: { id: 
 
 function ReportPage({ kind, only, report, unmapped, user }: { kind: ImportKind; only?: ImportKind; report: Report; unmapped: { column: string; count: number }[]; user: any }) {
   return (
-    <Layout title={t("common.nav.import")} user={user} activeNav="import">
+    <Layout title={t("common.nav.import")} user={user}>
       <div class="max-w-3xl mx-auto">
         <PageTitle backHref={only && LIST_HREF[only]}>{t("import.report.title", { kind: KIND_LABEL[kind] })}</PageTitle>
         <div class="alert alert-success mb-4">{t("import.report.summary", { created: report.created, skipped: report.skipped })}</div>

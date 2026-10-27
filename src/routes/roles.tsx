@@ -4,7 +4,7 @@ import { eq, and, count, countDistinct, asc, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
@@ -24,7 +24,7 @@ const typesDelete = requireAuth("member-role-types:delete");
 
 function badRequest(c: any, message: string, detail?: string[]) {
   return c.html(
-    <Layout title={t("admin.roles.title")} user={c.get("user")} activeNav="members">
+    <Layout title={t("admin.roles.title")} user={c.get("user")}>
       <div class="alert alert-error max-w-2xl mx-auto mb-4" role="alert">
         <div>
           <p>{message}</p>
@@ -157,8 +157,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   const canReorder = canWrite && !activeFilter;
 
   return c.html(
-    <Layout title={t("admin.roles.title")} user={user} activeNav="members">
-      <MemberTabs active={tab === "types" ? "roleTypes" : "roles"} user={user} />
+    <Layout title={t("admin.roles.title")} user={user}>
 
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>

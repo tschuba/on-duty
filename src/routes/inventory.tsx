@@ -9,7 +9,6 @@ import type { IconName } from "../components/icons.generated.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
-import { SubNav } from "../components/sub-nav.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
@@ -21,8 +20,8 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, countOverdueInspectionItems, type InventoryCategory } from "../lib/inventory.js";
-import { countOverdueLoans, countOpenLoanRequests, availableQuantity, itemStatus } from "../lib/lending.js";
+import { generateInspectionDueItems, type InventoryCategory } from "../lib/inventory.js";
+import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
@@ -73,27 +72,6 @@ const CATEGORY_BADGE: Record<InventoryCategory, string> = {
 
 // Only members who can actually carry PSA get offered in the assignment picker.
 const ASSIGNABLE_MEMBER_STATUSES = new Set(["aktiv", "jugend"]);
-
-export function InventoryTabs({ active, overdueCount, overdueLoanCount, openRequestCount, showLending, showRequests }: {
-  active: "stock" | "inspections" | "lending" | "requests";
-  overdueCount: number;
-  overdueLoanCount?: number;
-  openRequestCount?: number;
-  showLending?: boolean;
-  showRequests?: boolean;
-}) {
-  return (
-    <SubNav items={[
-      { href: "/inventory", active: active === "stock", label: t("inventory.tabs.stock") },
-      { href: "/inventory/inspections", active: active === "inspections", label: t("inventory.tabs.inspections"),
-        badge: overdueCount > 0 ? <span class="badge badge-sm badge-primary ml-1">{overdueCount}</span> : null },
-      ...(showLending ? [{ href: "/inventory/lending", active: active === "lending", label: t("inventory.tabs.lending"),
-        badge: (overdueLoanCount ?? 0) > 0 ? <span class="badge badge-sm badge-primary ml-1">{overdueLoanCount}</span> : null }] : []),
-      ...(showRequests ? [{ href: "/inventory/requests", active: active === "requests", label: t("lend.requests.title"),
-        badge: (openRequestCount ?? 0) > 0 ? <span class="badge badge-sm badge-warning ml-1">{openRequestCount}</span> : null }] : []),
-    ]} />
-  );
-}
 
 export function CategoryBadge({ category }: { category: InventoryCategory }) {
   return <span class={`${CATEGORY_BADGE[category]} badge-sm`}>{CATEGORY_LABELS[category]}</span>;
@@ -734,15 +712,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
-    <Layout title={t("inventory.title")} user={user} activeNav="inventory">
-      <InventoryTabs
-        active="stock"
-        overdueCount={await countOverdueInspectionItems()}
-        overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
-        openRequestCount={user.permissions.has("lending:manage") ? await countOpenLoanRequests() : 0}
-        showLending={user.permissions.has("lending:read")}
-        showRequests={user.permissions.has("lending:manage")}
-      />
+    <Layout title={t("inventory.title")} user={user}>
       <PageHeader title={t("inventory.title")} actions={<>
         {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
@@ -1033,7 +1003,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
 inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   return c.html(
-    <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
+    <Layout title={t("inventory.newItem")} user={user}>
       <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} />
     </Layout>
   );
@@ -1070,7 +1040,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
-      <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
+      <Layout title={t("inventory.newItem")} user={user}>
         <InventoryForm
           title={t("inventory.newItem")}
           action="/inventory"
@@ -1112,7 +1082,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     errors.numbers = t("inventory.form.numberRace");
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
-      <Layout title={t("inventory.newItem")} user={user} activeNav="inventory">
+      <Layout title={t("inventory.newItem")} user={user}>
         <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
           values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired })} />
@@ -1141,7 +1111,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     const cat = item.category as InventoryCategory;
     const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
     return c.html(
-      <Layout title={item.name} user={user} activeNav="inventory">
+      <Layout title={item.name} user={user}>
         <PageHeader title={<>{item.name} <CategoryBadge category={cat} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" />
         {item.retiredAt && (
           <div class="alert alert-warning max-w-2xl mb-4">
@@ -1251,7 +1221,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
   );
 
   return c.html(
-    <Layout title={item.name} user={user} activeNav="inventory">
+    <Layout title={item.name} user={user}>
       {item.retiredAt && (
         <div class="alert alert-warning max-w-2xl mb-4">
           {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
@@ -1336,7 +1306,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
-      <Layout title={existing.name} user={user} activeNav="inventory">
+      <Layout title={existing.name} user={user}>
         <InventoryForm
           title={existing.name}
           action={`/inventory/${id}`}
@@ -1388,7 +1358,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     errors.numbers = t("inventory.form.numberRace");
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
-      <Layout title={existing.name} user={user} activeNav="inventory">
+      <Layout title={existing.name} user={user}>
         <InventoryForm title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
           values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames}
@@ -1460,15 +1430,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
   const presets = rangePresets(today, "future");
 
   return c.html(
-    <Layout title={t("inventory.inspections.title")} user={user} activeNav="inventory">
-      <InventoryTabs
-        active="inspections"
-        overdueCount={await countOverdueInspectionItems()}
-        overdueLoanCount={user.permissions.has("lending:read") ? await countOverdueLoans() : 0}
-        openRequestCount={user.permissions.has("lending:manage") ? await countOpenLoanRequests() : 0}
-        showLending={user.permissions.has("lending:read")}
-        showRequests={user.permissions.has("lending:manage")}
-      />
+    <Layout title={t("inventory.inspections.title")} user={user}>
       <PageHeader title={t("inventory.inspections.title")} />
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">

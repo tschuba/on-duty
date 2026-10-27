@@ -3,6 +3,7 @@ import { db } from "./db/index.js";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
+import { contextStorage } from "hono/context-storage";
 import { raw } from "hono/html";
 import { getCookie, deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
@@ -47,6 +48,7 @@ initSentry();
 
 const app = new Hono<{ Variables: Variables & LogVariables }>();
 
+app.use("*", contextStorage());
 app.use("*", requestLog());
 
 app.route("/", healthRoutes);

@@ -4,8 +4,8 @@ import { Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { countOpenReceipts, recipientName } from "../lib/donations.js";
-import { ClickToEditHint, DonationTabs, Layout } from "../components/layout.js";
+import { recipientName } from "../lib/donations.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { Icon } from "../components/icon.js";
@@ -306,7 +306,6 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
   const { search, sort, dir, page, pageSize, member } = parseListQuery(c.req.query());
   const canLink = Boolean(user.permissions.has("members:read"));
   const canRecord = user.permissions.has("donations:record");
-  const openReceipts = user.permissions.has("donations:issue-receipts") ? await countOpenReceipts() : 0;
 
   const all = (await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as DonorWithPerson[];
   const needle = search.toLowerCase();
@@ -321,8 +320,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
 
   return c.html(
-    <Layout title={t("donors.title")} user={user} activeNav="donations">
-      <DonationTabs active="donors" openReceiptsCount={openReceipts} />
+    <Layout title={t("donors.title")} user={user}>
       <PageHeader title={t("donors.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />} />
 
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
@@ -388,7 +386,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
 donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
-    <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
+    <Layout title={t("donors.newDonor")} user={user}>
       <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
       <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
         <DonorPickerFields />
@@ -408,7 +406,7 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donors.newDonor")} user={user} activeNav="donations">
+      <Layout title={t("donors.newDonor")} user={user}>
         <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
         <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={values} errors={errors} />
@@ -442,7 +440,7 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
   const canRecord = user.permissions.has("donations:record");
 
   return c.html(
-    <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
+    <Layout title={t("donors.editDonor")} user={user}>
       <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
       <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
         <DonorPersonFields values={donor.person} />
@@ -464,7 +462,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   if (Object.keys(errors).length > 0) {
     return c.html(
-      <Layout title={t("donors.editDonor")} user={user} activeNav="donations">
+      <Layout title={t("donors.editDonor")} user={user}>
         <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
         <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
           <DonorPersonFields values={values} errors={errors} />

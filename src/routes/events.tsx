@@ -322,7 +322,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   if (fragment) return fragment;
 
   return c.html(
-    <Layout title={t("events.title")} user={user} activeNav="events">
+    <Layout title={t("events.title")} user={user}>
       <div class="max-w-6xl mx-auto">
       <PageHeader title={t("events.title")} actions={<>
         {canManage ? (
@@ -543,7 +543,7 @@ eventRoutes.get("/new", manage, async (c) => {
   const tz = resolveTimezone(c);
   const [roles] = await Promise.all([loadRoles()]);
   return c.html(
-    <Layout title={t("events.form.newTitle")} user={user} activeNav="events">
+    <Layout title={t("events.form.newTitle")} user={user}>
       <div class="max-w-2xl mx-auto">
       <PageHeader title={t("events.form.newTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
       <EventForm values={emptyFormValues()} errors={{}} roles={roles} tz={tz} />
@@ -563,7 +563,7 @@ eventRoutes.post("/new", manage, async (c) => {
 
   if ("errors" in result) {
     return c.html(
-      <Layout title={t("events.form.newTitle")} user={user} activeNav="events">
+      <Layout title={t("events.form.newTitle")} user={user}>
         <div class="max-w-2xl mx-auto">
         <PageHeader title={t("events.form.newTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
         <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />
@@ -611,7 +611,7 @@ eventRoutes.get("/:id/edit", manage, async (c) => {
   const tz = resolveTimezone(c);
   const roles = await loadRoles();
   return c.html(
-    <Layout title={t("events.form.editTitle")} user={user} activeNav="events">
+    <Layout title={t("events.form.editTitle")} user={user}>
       <div class="max-w-2xl mx-auto">
       <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
       <EventForm values={toEventFormValues(ev, tz)} errors={{}} roles={roles} tz={tz} />
@@ -635,7 +635,7 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
 
   if ("errors" in result) {
     return c.html(
-      <Layout title={t("events.form.editTitle")} user={user} activeNav="events">
+      <Layout title={t("events.form.editTitle")} user={user}>
         <div class="max-w-2xl mx-auto">
         <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
         <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />

@@ -18,9 +18,8 @@ import { PermissionBadges, PERMISSION_LABELS, RESOURCE_LABELS } from "../compone
 import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
-import { SubNav, type SubNavItem } from "../components/sub-nav.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
@@ -45,19 +44,6 @@ export function permissionSearchText(perms: readonly Permission[]): string {
 // system:admin is reserved for the built-in protected `admin` role — never offered
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
 const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
-
-function AdminTabs({ active }: { active: "users" | "permissions" | "config" | "backup" }) {
-  const items: SubNavItem[] = (["users", "permissions", "config", "backup"] as const).map((k) => ({ href: `/admin/${k}`, active: active === k, label: t(`admin.tabs.${k}`) }));
-  if (env.ERROR_TRACKER_URL) {
-    items.push({
-      href: env.ERROR_TRACKER_URL,
-      active: false,
-      external: true,
-      label: <>{t("admin.tabs.errorTracker")} <Icon name="arrow-top-right-on-square" class="w-4 h-4 inline-block" /></>,
-    });
-  }
-  return <SubNav items={items} />;
-}
 
 function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; lastFailed: boolean }) {
   if (configured && !lastFailed) return null;
@@ -141,8 +127,7 @@ adminRoutes.get("/users", guard, async (c) => {
   const shownUsers = onlyPending ? allUsers.filter(isPending) : allUsers;
 
   return c.html(
-    <Layout title={t("admin.users.title")} user={user} activeNav="admin">
-      <AdminTabs active="users" />
+    <Layout title={t("admin.users.title")} user={user}>
       <BackupWarnBanner {...warn} />
       <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
@@ -392,8 +377,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
   }
   const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
-    <Layout title={title} user={c.get("user")} activeNav="admin">
-      <AdminTabs active="users" />
+    <Layout title={title} user={c.get("user")}>
       <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" />} />
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
@@ -581,8 +565,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
   const countByRole = new Map(assignmentCounts.map((a) => [a.roleId, a.cnt]));
 
   return c.html(
-    <Layout title={t("admin.permissions.title")} user={user} activeNav="admin">
-      <AdminTabs active="permissions" />
+    <Layout title={t("admin.permissions.title")} user={user}>
       <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
@@ -725,8 +708,7 @@ type PermFormState = { id?: string; readOnly?: boolean; name: string; nameLocked
 async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: PermFormState, status: 200 | 422 = 200) {
   const title = t(f.id ? "admin.permissions.modal.edit" : "admin.permissions.modal.create");
   return c.html(
-    <Layout title={title} user={c.get("user")} activeNav="admin">
-      <AdminTabs active="permissions" />
+    <Layout title={title} user={c.get("user")}>
       <PageHeader title={title} backHref="/admin/permissions" actions={f.readOnly ? undefined : <FormActions formId="admin-permissions-form" />} />
       {f.readOnly && <div class="alert alert-info mb-4 max-w-2xl">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
@@ -882,8 +864,7 @@ adminRoutes.get("/config", guard, async (c) => {
     ...SETTINGS.map((s) => ({ key: s.key, writable: true as const, type: s.type, value: settings[s.key] })),
   ];
   return c.html(
-    <Layout title={t("admin.config.title")} user={user} activeNav="admin">
-      <AdminTabs active="config" />
+    <Layout title={t("admin.config.title")} user={user}>
       <BackupWarnBanner {...warn} />
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
@@ -994,8 +975,7 @@ adminRoutes.get("/backup", guard, async (c) => {
       : null;
 
   return c.html(
-    <Layout title="Backup" user={user} activeNav="admin">
-      <AdminTabs active="backup" />
+    <Layout title="Backup" user={user}>
       <BackupWarnBanner {...warn} />
       {schedule && (
         <div class="grid grid-cols-2 gap-4 text-sm mb-6">
