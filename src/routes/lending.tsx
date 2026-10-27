@@ -281,7 +281,7 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
   const maxQuantity = Math.max(1, item.inventoryItem.quantity - item.inventoryItem.retiredQuantity);
   return (
     <>
-      <PageHeader title={item.inventoryItem.name} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={<>
+      <PageHeader title={<a href={`/inventory/${item.inventoryItem.id}/edit`} class="link link-hover">{item.inventoryItem.name}</a>} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={<>
         <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-loan-modal').showModal()" />
         <HeaderAction variant="primary" icon="check" label={t("common.save")} form="loan-form" class="btn-primary" />
       </>} />
