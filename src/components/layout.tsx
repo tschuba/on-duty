@@ -149,9 +149,9 @@ export const Layout = async ({ title, children, user, activeNav }: Props) => {
         {user && (
           <div class="navbar-center md:hidden">
             <div class="dropdown dropdown-bottom dropdown-center">
-              <button tabindex={0} class="btn btn-ghost btn-md">
+              <div tabindex={0} role="button" class="btn btn-ghost btn-md" aria-label={t("common.nav.menu")}>
                 <Icon name="bars-3" class="h-6 w-6 text-gold" />
-              </button>
+              </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-50 w-64 p-2 shadow">
                 {membersNavHref && <li><a href={membersNavHref} class={activeNav === "members" ? "active" : ""}>{t("common.nav.members")}<CountBadge count={activeNav === "members" ? 0 : openApplicationsCount} /></a></li>}
                 {(user.permissions.has("donations:read") || user.permissions.has("donations:record") || user.permissions.has("donations:issue-receipts")) && <li><a href="/donations" class={activeNav === "donations" ? "active" : ""}>{t("common.nav.donations")}<CountBadge count={activeNav === "donations" ? 0 : donationsNavCount} /></a></li>}
