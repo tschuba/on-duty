@@ -9,6 +9,7 @@ Entstanden bei und im Einsatz für die Freiwillige Feuerwehr Altenhammer.
 - Inventar und Ausleihe
 - Spenden und Spender
 - Jubiläen
+- Veranstaltungskalender
 
 **Stack:** Hono · HTMX · Tailwind v4 · daisyUI v5 · Drizzle ORM · Better Auth · PostgreSQL · Docker
 

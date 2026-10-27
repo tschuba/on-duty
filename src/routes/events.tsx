@@ -71,7 +71,7 @@ function EventList({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canM
   if (!rows.length) return <p class="text-base-content/60 py-8">{t("events.empty")}</p>;
   return (
     <div class="overflow-x-auto">
-      <table class="table">
+      <table class="table table-zebra w-full">
         <tbody>
           {rows.map((ev) => {
             const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
@@ -206,8 +206,8 @@ eventRoutes.get("/", requireAuth(), async (c) => {
 
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <div class="join">
-          <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-active" : ""}`}>{t("events.view.list")}</a>
-          <a href={qs({ view: "calendar" })} class={`btn join-item ${view === "calendar" ? "btn-active" : ""}`}>{t("events.view.calendar")}</a>
+          <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.list")}</a>
+          <a href={qs({ view: "calendar" })} class={`btn join-item ${view === "calendar" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.calendar")}</a>
         </div>
         {view === "list" && (
           <QuickRangeFilter presets={presets} range={range} dir="future" action="/events" hidden={tagFilter.map((f): [string, string] => ["tag", f])} href={(p) => qs(p)} />
@@ -283,8 +283,8 @@ eventRoutes.get("/public", async (c) => {
       <TimezoneHint tz={tz} />
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <div class="join">
-          <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-active" : ""}`}>{t("events.view.list")}</a>
-          <a href={qs({ view: "calendar" })} class={`btn join-item ${view === "calendar" ? "btn-active" : ""}`}>{t("events.view.calendar")}</a>
+          <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.list")}</a>
+          <a href={qs({ view: "calendar" })} class={`btn join-item ${view === "calendar" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.calendar")}</a>
         </div>
         <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: tag }))} selected={tagFilter}
           allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
