@@ -72,7 +72,7 @@ vi.mock("../db/index.js", () => ({
         findMany: vi.fn(() => Promise.resolve([])),
       },
     },
-    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve([])) })) })),
+    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve([])), groupBy: vi.fn(() => Promise.resolve([])) })) })),
     insert,
     update,
     delete: del,

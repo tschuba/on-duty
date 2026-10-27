@@ -15,6 +15,7 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { ChipInput } from "../components/chip-input.js";
 import { trimmed, parseTags, parseList } from "../lib/forms.js";
+import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID, tagSuggestionsJson } from "../lib/tags.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
@@ -319,8 +320,17 @@ function NumberListField({ name, label, labelSingle, placeholder, placeholderSin
 
 // ── Tag input (thin wrapper over the generic ChipInput) ─────────────────────
 
+export async function TagSuggestions() {
+  return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson(await tagVocabulary()) }} />;
+}
+
 export function TagInput({ tags }: { tags?: string[] }) {
-  return <ChipInput name="tags" label={t("inventory.form.tags")} placeholder={t("inventory.form.tagsPlaceholder")} values={tags} splitOnComma caseSensitive={false} />;
+  return (
+    <>
+      <TagSuggestions />
+      <ChipInput name="tags" label={t("inventory.form.tags")} placeholder={t("inventory.form.tagsPlaceholder")} values={tags} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} />
+    </>
+  );
 }
 
 // ── Assigned-member picker(s) (search existing aktiv/jugend members, no create) ─
@@ -1034,7 +1044,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
-  const tags = parseTags(body, "tags");
+  const tags = canonicalizeTags(parseTags(body, "tags"), await tagVocabulary());
   const numbers = parseList(body, "numbers");
   const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
@@ -1280,7 +1290,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
 
   const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
-  const tags = parseTags(body, "tags");
+  const tags = canonicalizeTags(parseTags(body, "tags"), await tagVocabulary());
   const numbers = parseList(body, "numbers");
   const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;

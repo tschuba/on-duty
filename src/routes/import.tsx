@@ -8,6 +8,8 @@ import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
+import { TagSuggestions } from "./inventory.js";
 import { ChipInput } from "../components/chip-input.js";
 import { Section } from "../components/section.js";
 import { HTTP_STATUS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
@@ -287,6 +289,7 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
           <span>{t("import.positions.onlyExisting", { count: existing })}</span>
         </label>
         <p class="text-sm opacity-70 mb-2">{t("import.positions.bundleHint")}</p>
+        <TagSuggestions />
         <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
           <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th><th>{t("import.col.notes")}</th></tr></thead>
@@ -317,7 +320,7 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
                       {nums.length > 5 && <button type="button" class="badge badge-outline badge-sm cursor-pointer hover:bg-base-300" title={t("import.positions.showAll")} onclick="this.parentElement.querySelectorAll('[data-more]').forEach(e=>e.classList.remove('hidden'));this.remove()">+{nums.length - 5}</button>}
                     </div>
                   </td>
-                  <td class="min-w-80"><ChipInput name={`tags_${p.items[0].id}`} label="" values={p.tags} splitOnComma caseSensitive={false} /></td>
+                  <td class="min-w-80"><ChipInput name={`tags_${p.items[0].id}`} label="" values={p.tags} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} /></td>
                   <td>
                     {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic whitespace-nowrap" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
                   </td>
@@ -581,9 +584,11 @@ async function runInventory(plan: InventoryPlan): Promise<Report> {
   const todo = plan.positions.filter((p) => p.duplicateNumbers.length === 0);
   let current = "";
   try {
+    const existingTags = await tagVocabulary();
     return await db.transaction(async (tx) => {
       for (const p of todo) {
         current = p.numbers[0] ?? p.name;
+        p.tags = canonicalizeTags(p.tags, existingTags);
         const [item] = await tx.insert(inventoryItems).values({
           name: p.name, category: p.category, commissionedAt: p.commissionedAt, purchasePrice: p.price,
           retiredAt: p.retiredAt, quantity: p.quantity, retiredQuantity: p.retiredAt ? p.quantity : 0,
