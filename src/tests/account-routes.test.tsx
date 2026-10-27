@@ -58,7 +58,23 @@ describe("/pending", () => {
   });
 });
 
+const post = (email: string, back = "/account") =>
+  app.request("/account/delete", { method: "POST", body: new URLSearchParams({ email, back }) });
+
 describe("/account", () => {
+  it("hides the danger zone for the local admin", async () => {
+    const { LOCAL_ADMIN_ACCOUNT_ID } = await import("../lib/constants.js");
+    user.id = LOCAL_ADMIN_ACCOUNT_ID;
+    expect(await (await app.request("/account")).text()).not.toContain("Gefahrenbereich");
+  });
+  it("shows the danger zone otherwise", async () => {
+    expect(await (await app.request("/account")).text()).toContain("Gefahrenbereich");
+  });
+  it("delete: wrong email is rejected, pending goes back to /pending", async () => {
+    const res = await post("other@x.de", "/pending");
+    expect(res.headers.get("location")).toBe("/pending");
+    expect(deleteOwnAccount).not.toHaveBeenCalled();
+  });
   it("renders profile and roles", async () => {
     roleRows = [{ name: "Wehrführer" }];
     const html = await (await app.request("/account")).text();
@@ -82,12 +98,12 @@ describe("/account", () => {
   });
   it("delete: blocked redirects back to /account", async () => {
     block = "lastAdmin";
-    const res = await app.request("/account/delete", { method: "POST" });
+    const res = await post("max@x.de");
     expect(res.headers.get("location")).toBe("/account");
     expect(signOut).not.toHaveBeenCalled();
   });
   it("delete: signs out and goes to /login", async () => {
-    const res = await app.request("/account/delete", { method: "POST" });
+    const res = await post(" MAX@x.de ");
     expect(res.headers.get("location")).toBe("/login");
     expect(signOut).toHaveBeenCalled();
   });
