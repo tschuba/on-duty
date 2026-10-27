@@ -47,7 +47,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             )}
             <li key={o.value} data-title={o.label.toLowerCase()} data-unused={o.unused && !selected.includes(o.value) ? "1" : undefined}>
               <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${o.dim ? " opacity-50" : ""}`}>
-                <input type="checkbox" class="checkbox checkbox-xs" name={param} value={o.value} checked={selected.includes(o.value)} />
+                <input type="checkbox" class="checkbox checkbox-sm" name={param} value={o.value} checked={selected.includes(o.value)} />
                 {o.icon && <Icon name={o.icon} class="w-4 h-4" />}
                 <span class="text-sm flex-1">{o.label}</span>
                 {o.hint && <span class="text-xs opacity-60">{o.hint}</span>}
@@ -57,9 +57,9 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
           ))}
         </ul>
         <div class="flex gap-1 mt-2">
-          <button type="button" class="btn btn-sm btn-primary flex-1" popovertarget={id} popovertargetaction="hide">{applyLabel}</button>
+          <button type="button" class="btn btn-primary flex-1" popovertarget={id} popovertargetaction="hide">{applyLabel}</button>
           {selected.length > 0 && (
-            <button type="button" class="btn btn-sm btn-ghost" data-msf-reset popovertarget={id} popovertargetaction="hide">{resetLabel}</button>
+            <button type="button" class="btn btn-ghost" data-msf-reset popovertarget={id} popovertargetaction="hide">{resetLabel}</button>
           )}
         </div>
       </div>

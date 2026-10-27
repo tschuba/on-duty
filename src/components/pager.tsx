@@ -50,7 +50,7 @@ export function Pager(props: {
               {totalPages <= GRID_MAX_PAGES ? (
                 <div class="grid gap-2" style={`grid-template-columns: repeat(${gridColumns(totalPages)}, 2.75rem)`}>
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                    <a key={n} href={pageUrl(n)} class={`btn btn-sm${n === page ? " btn-primary" : ""}`}>{n}</a>
+                    <a key={n} href={pageUrl(n)} class={`btn${n === page ? " btn-primary" : ""}`}>{n}</a>
                   ))}
                 </div>
               ) : (

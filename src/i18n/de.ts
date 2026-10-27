@@ -39,6 +39,7 @@ export const de = {
   "common.excelExport": "Excel-Export",
   "common.saveAndNew": "Speichern & Neu",
   "common.nav.members": "Mitglieder",
+  "common.nav.menu": "Menü",
   "common.nav.anniversaries": "Jubiläen & Geburtstage",
   "common.nav.donations": "Spenden",
   "donations.tabs.donations": "Spenden",
