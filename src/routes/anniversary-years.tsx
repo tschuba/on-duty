@@ -6,7 +6,7 @@ import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { ModalScaffold } from "./admin.js";
 import { SortIcon } from "./members.js";
@@ -53,8 +53,7 @@ yearRoutes.get("/", yearsRead, async (c) => {
   };
 
   return c.html(
-    <Layout title={t("admin.anniversaries.title")} user={user} activeNav="members">
-      <MemberTabs active="anniversaryYears" user={user} />
+    <Layout title={t("admin.anniversaries.title")} user={user}>
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.anniversaries.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
 

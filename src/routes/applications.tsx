@@ -4,7 +4,7 @@ import { EmailField, Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { ClickToEditHint, Layout, MemberTabs } from "../components/layout.js";
+import { ClickToEditHint, Layout } from "../components/layout.js";
 import { Icon } from "../components/icon.js";
 import { PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
@@ -173,8 +173,7 @@ applicationRoutes.get("/", guard, async (c) => {
   }
 
   return c.html(
-    <Layout title={t("applications.title")} user={user} activeNav="members">
-      <MemberTabs active="applications" user={user} />
+    <Layout title={t("applications.title")} user={user}>
       <PageHeader title={t("applications.title")} actions={
         <div class="dropdown dropdown-end">
           <div
@@ -389,8 +388,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
   const ageWarning = app.type === "youth" && app.person.birthDate ? ageInYears(app.person.birthDate) >= env.YOUTH_AGE_LIMIT : false;
 
   return c.html(
-    <Layout title={`${app.person.firstName} ${app.person.lastName}`} user={user} activeNav="members">
-      <MemberTabs active="applications" user={user} />
+    <Layout title={`${app.person.firstName} ${app.person.lastName}`} user={user}>
       <PageHeader title={<>{app.person.firstName} {app.person.lastName} <span class={STATUS_BADGE_CLASS[app.status]}>{STATUS_LABELS[app.status]}</span></>} backHref="/applications" subtitle={<>{t("applications.detail.submittedAt", { date: formatDateTime(app.submittedAt) })} · {TYPE_LABELS[app.type]}</>} />
 
       {hasDuplicates && (

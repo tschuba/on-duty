@@ -4,7 +4,7 @@ import * as XLSX from "xlsx";
 import { db } from "../db/index.js";
 import { members, persons, memberRoles, memberRoleAssignments, anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
-import { Layout, MemberTabs } from "../components/layout.js";
+import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { setFlash } from "../lib/flash.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
@@ -236,9 +236,8 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
   const rpHidden = Object.entries(rp).filter(([, v]) => v !== undefined) as [string, string][];
 
   return c.html(
-    <Layout title={t("anniversaries.title")} user={user} activeNav="members">
+    <Layout title={t("anniversaries.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-      <MemberTabs active="anniversaries" user={user} />
       <div class="contents">
         <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
 

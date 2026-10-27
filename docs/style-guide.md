@@ -131,3 +131,9 @@ Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, 
 ## Touch-Ziele
 
 Bei `pointer: coarse` (Handy, Tablet) sind interaktive Elemente mindestens 44×44 px. Das regelt zentral `src/styles/app.css` (`min-height: 2.75rem` für `.btn`, `.join-item`, Menü-Einträge; `min-width` nur für icon-only Buttons). Checkboxen bleiben klein (daisyUI-Größe); die Trefferfläche entsteht über das umgebende `<label>` mit `pointer-coarse:min-h-11`. Einzelne Buttons bekommen dafür keine eigenen Klassen; mit Maus bleibt die kompakte Größe.
+
+## Navigation
+
+- Sidebar (`src/components/nav-menu.tsx`) statt Tab-Leisten: ab `lg` dauerhaft links (`w-64`, einklappbar auf Icon-Leiste `w-14`), darunter Drawer per Hamburger in der Navbar.
+- Untermenüs sind `<details name="nav">` (Akkordeon); die Menüstruktur steht nur in `menuDefinition()`. Neue Seiten dort eintragen, nicht pro Route.
+- Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen); Obermenü zeigt die Summe, außer es ist aktiv.

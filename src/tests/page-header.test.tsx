@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
-import { SubNav } from "../components/sub-nav.js";
 
 const render = async (n: unknown) => String(await (n as { toString(): Promise<string> | string }).toString());
 
@@ -20,14 +19,6 @@ describe("PageHeader", () => {
     expect(sec).toContain('title="Weg"');
     expect(sec).toContain("@max-xl:hidden");
     expect(pri).toContain("@max-md:hidden");
-  });
-});
-
-describe("SubNav", () => {
-  it("marks the active tab", async () => {
-    const html = await render(<SubNav items={[{ href: "/a", label: "A", active: true }, { href: "/b", label: "B", active: false }]} />);
-    expect(html).toContain("tab-active");
-    expect(html.match(/class="[^"]*tab-active/g)).toHaveLength(1);
   });
 });
 

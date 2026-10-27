@@ -140,56 +140,20 @@
   font-weight: 600;
 }
 
-/* Sticky-Offsets: Hauptnav (daisyUI navbar = 4rem) + Untermenü (tabs-sm, 2.5rem). Untermenü klebt erst ab md. */
+/* Sticky-Offsets: Hauptnav (daisyUI navbar = 4rem). */
 :root {
   --nav-h: 4rem;
-  --subnav-h: 2.5rem;
   --header-h: 4rem;
   --filter-h: 4rem; /* Fallback; das Layout überschreibt es mit der gemessenen Höhe von .filter-bar */
-}
-.subnav {
-  top: var(--nav-h);
-  /* Randlos über die volle Fensterbreite; Tabs bleiben an der Inhaltskante ausgerichtet. */
-  margin-inline: calc(50% - 50vw);
-  padding-inline: calc(50vw - 50% + 1rem);
-  /* Zu schmal: horizontal scrollen statt Einträge abzuschneiden. */
-  overflow-x: auto;
-  flex-wrap: nowrap;
-  scrollbar-width: none;
-  --fade-l: 0rem;
-  --fade-r: 0rem;
-  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
-}
-.subnav::-webkit-scrollbar {
-  display: none;
-}
-.subnav > .tab {
-  flex: none;
-}
-.subnav[data-more-l] {
-  --fade-l: 2.5rem;
-}
-.subnav[data-more-r] {
-  --fade-r: 2.5rem;
 }
 .page-header {
   top: var(--nav-h);
 }
 /* main ist flex-col (Pager klebt unten); Kinder brauchen min-width:0, sonst verhindert
-   ihr intrinsischer Inhalt (z.B. SubNav-Breakout) das Schrumpfen auf Viewport-Breite. */
+   ihr intrinsischer Inhalt das Schrumpfen auf Viewport-Breite. */
 main > * {
   min-width: 0;
   width: 100%;
-}
-/* Full-bleed subnav computes its own width via negative vw margins; the generic
-   100% above (relative to main's content box) would clip it short on the right. */
-main > [data-subnav] {
-  width: auto;
-}
-@media (min-width: 48rem) {
-  body:has([data-subnav]) .page-header {
-    top: calc(var(--nav-h) + var(--subnav-h));
-  }
 }
 /* Such-/Filterleiste klebt unter dem PageHeader. --header-h geschätzt (pt-2 + btn 2.5rem + pb-4 = min-h-16), bei Spalt/Überlappung anpassen. */
 .filter-bar {
@@ -199,12 +163,7 @@ main > [data-subnav] {
   background: var(--color-base-100);
   padding-block: 1rem 0.5rem; /* oben Platz für hochgeschobene Floating Labels */
 }
-@media (min-width: 48rem) {
-  body:has([data-subnav]) .filter-bar {
-    top: calc(var(--nav-h) + var(--subnav-h) + var(--header-h));
-  }
-}
-/* Monatszeile der Jubiläumsliste klebt unter dem PageHeader; ab md zusätzlich unter Untermenü und Filterleiste (--filter-h wird im Layout gemessen). */
+/* Monatszeile der Jubiläumsliste klebt unter dem PageHeader; ab md zusätzlich unter der Filterleiste (--filter-h wird im Layout gemessen). */
 .month-row td {
   position: sticky;
   z-index: 10;
@@ -214,15 +173,9 @@ main > [data-subnav] {
   .month-row td {
     top: calc(var(--nav-h) + var(--header-h) + var(--filter-h));
   }
-  body:has([data-subnav]) .month-row td {
-    top: calc(var(--nav-h) + var(--subnav-h) + var(--header-h) + var(--filter-h));
-  }
 }
 @media (max-width: 47.99rem) {
   .filter-bar {
-    position: static;
-  }
-  .subnav {
     position: static;
   }
 }

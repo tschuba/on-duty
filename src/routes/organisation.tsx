@@ -128,7 +128,7 @@ organisationRoutes.get("/", guard, async (c) => {
   const missingByTab = missingReceiptFields(values);
   const anyEditable = tabs.some((tab) => canWriteOrgTab(perms, tab));
   return c.html(
-    <Layout title={t("common.nav.organisation")} user={user} activeNav="organisation">
+    <Layout title={t("common.nav.organisation")} user={user}>
       <PageHeader title={t("common.nav.organisation")} actions={anyEditable && <FormActions formId="org-form" />} />
       <form id="org-form" method="post" action="/organisation" class="max-w-4xl mx-auto">
         {tabs.some((tab) => missingByTab[tab].length > 0) && (

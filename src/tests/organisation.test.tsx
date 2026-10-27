@@ -26,7 +26,7 @@ vi.mock("../lib/org-config.js", async () => ({
   ...(await vi.importActual<typeof import("../lib/org-config.js")>("../lib/org-config.js")),
   loadOrgConfig: vi.fn(() => Promise.resolve(config)),
 }));
-vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => <div>{children}</div>, CountBadge: () => null }));
+vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => <div>{children}</div> }));
 let currentUser: any;
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {

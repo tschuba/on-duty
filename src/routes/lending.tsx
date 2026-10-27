@@ -17,9 +17,8 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { effectiveRange, rangesOverlap, countOverdueLoans, countOpenLoanRequests, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
-import { InventoryTabs, CATEGORIES, CATEGORY_LABELS } from "./inventory.js";
-import { countOverdueInspectionItems } from "../lib/inventory.js";
+import { effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
+import { CATEGORIES, CATEGORY_LABELS } from "./inventory.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const lendingRoutes = new Hono<{ Variables: Variables }>();
@@ -187,15 +186,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const canManage = user.permissions.has("lending:manage");
 
   return c.html(
-    <Layout title={t("lending.title")} user={user} activeNav="inventory">
-      <InventoryTabs
-        active="lending"
-        overdueCount={await countOverdueInspectionItems()}
-        overdueLoanCount={await countOverdueLoans()}
-        openRequestCount={user.permissions.has("lending:manage") ? await countOpenLoanRequests() : 0}
-        showLending
-        showRequests={user.permissions.has("lending:manage")}
-      />
+    <Layout title={t("lending.title")} user={user}>
       <PageHeader title={t("lending.title")} actions={user.permissions.has("lending:manage") && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />} />
 
       <form method="get" action="/inventory/lending" class="filter-bar flex gap-2 items-center flex-wrap mb-4">
@@ -587,7 +578,7 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
     const user = c.get("user")!;
     const values = { quantity: String(quantity), plannedFrom: plannedFrom ?? "", plannedTo: plannedTo ?? "", plannedFromTime: plannedFromTime ?? "", plannedToTime: plannedToTime ?? "", pickedUpAt: pickedUpAt ?? "", returnedAt: returnedAt ?? "", borrowerPersonId, ...person };
     return c.html(
-      <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
+      <Layout title={t("lending.newLoan.title")} user={user}>
         <div class="max-w-md mx-auto">
           <NewLoanHeader />
           <LoanForm action="/inventory/lending/loans" item={item} items={await fetchLendableItems()} values={values} errors={errors} />
@@ -687,7 +678,7 @@ lendingRoutes.get("/loans/new", requireAuth("lending:manage"), async (c) => {
   const items = await fetchLendableItems();
   const selected = items.find((li) => li.id === c.req.query("item"));
   return c.html(
-    <Layout title={t("lending.newLoan.title")} user={user} activeNav="inventory">
+    <Layout title={t("lending.newLoan.title")} user={user}>
       <div class="max-w-md mx-auto">
         <NewLoanHeader />
         <LoanForm action="/inventory/lending/loans" item={selected} items={items} />
@@ -711,7 +702,7 @@ lendingRoutes.get("/loans/:loanId", requireAuth("lending:manage"), async (c) => 
   const found = await loadLoanWithItem(c.req.param("loanId"));
   if (!found) return c.notFound();
   return c.html(
-    <Layout title={found.item.inventoryItem.name} user={c.get("user")!} activeNav="inventory">
+    <Layout title={found.item.inventoryItem.name} user={c.get("user")!}>
       <LoanPage {...found} />
     </Layout>
   );
