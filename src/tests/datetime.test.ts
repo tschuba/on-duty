@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseLocal, toLocalInput, zoneAbbr, allDayBounds, dayAfter } from "../lib/datetime.js";
+import { parseLocal, toLocalInput, allDayBounds, dayAfter } from "../lib/datetime.js";
 
 const TZ = "Europe/Berlin";
 describe("datetime", () => {
@@ -13,10 +13,8 @@ describe("datetime", () => {
   it("Herbst: doppelte Stunde nimmt den ersten Zeitpunkt (MESZ)", () => {
     expect(parseLocal("2026-10-25T02:30", TZ)!.toISOString()).toBe("2026-10-25T00:30:00.000Z");
   });
-  it("Roundtrip und Zonenkürzel", () => {
+  it("Roundtrip", () => {
     expect(toLocalInput(parseLocal("2026-07-15T18:00", TZ)!, TZ)).toBe("2026-07-15T18:00");
-    expect(zoneAbbr(parseLocal("2026-01-15T12:00", TZ)!, TZ)).toBe("MEZ");
-    expect(zoneAbbr(parseLocal("2026-07-15T12:00", TZ)!, TZ)).toBe("MESZ");
   });
   it("ungültige Eingaben", () => {
     expect(parseLocal("2026-02-30T10:00", TZ)).toBeNull();

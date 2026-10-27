@@ -57,11 +57,6 @@ export function formatDay(date: Date, tz: string): string {
 export function formatTime(date: Date, tz: string): string {
   return new Intl.DateTimeFormat("de-DE", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(date);
 }
-// Zonenkürzel zum Zeitpunkt, z. B. "MEZ" / "MESZ".
-export function zoneAbbr(date: Date, tz: string): string {
-  return new Intl.DateTimeFormat("de-DE", { timeZone: tz, timeZoneName: "short" }).formatToParts(date).find((p) => p.type === "timeZoneName")?.value ?? tz;
-}
-
 // Ganztägig: Start 00:00 am ersten, Ende 23:59 am letzten Tag (Wanduhr in `tz`).
 export function allDayBounds(startDay: string, endDay: string, tz: string): { startsAt: Date; endsAt: Date } | null {
   const startsAt = parseLocal(startDay, tz), endsAt = parseLocal(`${endDay}T23:59`, tz);

@@ -1214,7 +1214,7 @@ export const de = {
   "events.empty": "Keine Termine im gewählten Zeitraum.",
   "events.confirmDelete": "Termin \"{title}\" wirklich löschen?",
   "events.orphanRoles": "Keine Rolle zugewiesen, nur für Verwalter sichtbar",
-  "events.timezoneHint": "Zeiten in Ortszeit der Wehr",
+  "events.localTime.here": "bei dir",
   "events.view.list": "Liste",
   "events.view.calendar": "Kalender",
   "events.filter.allTags": "Alle Tags",

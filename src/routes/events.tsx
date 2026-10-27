@@ -27,7 +27,7 @@ import {
   type Event,
   type EventFormValues,
 } from "../lib/events.js";
-import { formatDateTime, formatDay, formatTime, localDays, resolveTimezone, toLocalDate, toLocalInput, zoneAbbr } from "../lib/datetime.js";
+import { formatDateTime, formatDay, formatTime, localDays, resolveTimezone, toLocalDate, toLocalInput } from "../lib/datetime.js";
 
 export const eventRoutes = new Hono<{ Variables: Variables }>();
 const manage = requireAuth("events:manage");
@@ -39,17 +39,57 @@ async function fetchEvents(user: AuthedUser | undefined, where: ReturnType<typeo
   return db.query.events.findMany({ where: cond, with: { tags: true, visibleRoles: true }, orderBy: asc(events.startsAt) }) as Promise<EventRow[]>;
 }
 
-// ── Zeitzonen-Hinweis ────────────────────────────────────────────────────────
-
-function TimezoneHint({ tz }: { tz: string }) {
-  return (
-    <p id="tz-hint" hidden class="text-sm opacity-70 mb-4">
-      {t("events.timezoneHint")}
-      <script dangerouslySetInnerHTML={{ __html: `
-        if (Intl.DateTimeFormat().resolvedOptions().timeZone !== ${JSON.stringify(tz)}) document.getElementById('tz-hint').hidden = false;
-      ` }} />
-    </p>
-  );
+// ── Umrechnung in die Zone des Nutzers ──────────────────────────────────────
+// Nur bei abweichendem UTC-Offset (Browser vs. Wehr) erscheint "(bei dir …)" bzw. im Formular "= … bei dir".
+// shortcut: Eingabe in der DST-Lücke wird im Hinweis nicht normalisiert, serverseitig schon (parseLocal).
+function LocalTimes({ tz }: { tz: string }) {
+  return <script dangerouslySetInnerHTML={{ __html: `
+    (function () {
+      var TZ = ${JSON.stringify(tz)}, here = ${JSON.stringify(t("events.localTime.here"))};
+      var fmtParts = new Intl.DateTimeFormat("en-US", { timeZone: TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      function tzOffset(ms) {
+        var p = {}; fmtParts.formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+        return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(ms / 1000) * 1000;
+      }
+      function differs(ms) { return tzOffset(ms) !== -new Date(ms).getTimezoneOffset() * 60000; }
+      var tf = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+      var df = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit" });
+      function fmt(ms) {
+        var d = new Date(ms), wallDay = new Date(ms + tzOffset(ms)).getUTCDate();
+        return (d.getDate() !== wallDay ? df.format(d) + " " : "") + tf.format(d);
+      }
+      window.localTimes = function (root) {
+        (root || document).querySelectorAll("[data-utc-start]").forEach(function (el) {
+          if (el.dataset.done) return;
+          el.dataset.done = "1";
+          var s = +el.dataset.utcStart, e = +el.dataset.utcEnd;
+          if (!differs(s)) return;
+          var span = document.createElement("span");
+          span.className = "opacity-70";
+          span.textContent = " (" + here + " " + fmt(s) + "–" + fmt(e) + ")";
+          el.appendChild(span);
+        });
+      };
+      window.localTimes();
+      function wallToMs(v) {
+        var m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)/.exec(v);
+        if (!m) return NaN;
+        var g = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+        return g - tzOffset(g - tzOffset(g));
+      }
+      document.querySelectorAll("[data-local-hint]").forEach(function (hint) {
+        var input = document.getElementById(hint.dataset.localHint), allDay = document.getElementById("event-allday");
+        function update() {
+          var ms = allDay && allDay.checked ? NaN : wallToMs(input.value);
+          hint.hidden = isNaN(ms) || !differs(ms);
+          if (!hint.hidden) hint.textContent = "= " + fmt(ms) + " " + here;
+        }
+        input.addEventListener("input", update);
+        if (allDay) allDay.addEventListener("change", update);
+        update();
+      });
+    })();
+  ` }} />;
 }
 
 // ── Liste/Kalender ───────────────────────────────────────────────────────────
@@ -59,7 +99,7 @@ function EventTimeLabel({ ev, tz }: { ev: Event; tz: string }) {
     const sameDay = toLocalDate(ev.startsAt, tz) === toLocalDate(ev.endsAt, tz);
     return <>{formatDay(ev.startsAt, tz)}{!sameDay && <> – {formatDay(ev.endsAt, tz)}</>}</>;
   }
-  return <>{formatDateTime(ev.startsAt, tz)} – {formatTime(ev.endsAt, tz)} {zoneAbbr(ev.startsAt, tz)}</>;
+  return <span data-utc-start={ev.startsAt.getTime()} data-utc-end={ev.endsAt.getTime()}>{formatDateTime(ev.startsAt, tz)} – {formatTime(ev.endsAt, tz)}</span>;
 }
 
 function EventTagBadges({ tags }: { tags: string[] }) {
@@ -99,7 +139,7 @@ function EventList({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canM
 }
 
 function EventPopupHtml(ev: Event, tz: string, tags: string[]): string {
-  const time = ev.allDay ? "" : `${formatTime(ev.startsAt, tz)}–${formatTime(ev.endsAt, tz)} `;
+  const time = ev.allDay ? "" : `<span data-utc-start="${ev.startsAt.getTime()}" data-utc-end="${ev.endsAt.getTime()}">${formatTime(ev.startsAt, tz)}–${formatTime(ev.endsAt, tz)}</span> `;
   const tagBadges = tags.map((tag) => `<span class="badge badge-xs badge-outline">${escapeHtml(tag)}</span>`).join(" ");
   return `<div class="p-1 text-xs"><div class="font-medium">${escapeHtml(ev.title)}</div><div>${time}${escapeHtml(ev.location ?? "")}</div>${tagBadges ? `<div class="flex flex-wrap gap-1 mt-1">${tagBadges}</div>` : ""}</div>`;
 }
@@ -150,6 +190,7 @@ const CALENDAR_SCRIPT = `
       dayBox.innerHTML = list.length ? list.map((e) =>
         '<div class="border-b border-base-300 py-2">' + e.html + (e.editHref ? ' <a class="link text-xs" href="' + e.editHref + '">' + ${JSON.stringify(t("common.edit"))} + '</a>' : '') + '</div>'
       ).join("") : "";
+      if (window.localTimes) window.localTimes(dayBox);
     }
     const calendar = new Calendar(root, {
       locale: "de-DE",
@@ -203,7 +244,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
     <Layout title={t("events.title")} user={user} activeNav="events">
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("events.title")} actions={canManage ? <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" /> : undefined} />
-      <TimezoneHint tz={tz} />
+      <LocalTimes tz={tz} />
 
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <div class="join">
@@ -280,7 +321,7 @@ eventRoutes.get("/public", async (c) => {
     <Layout title={t("events.title")}>
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("events.title")} />
-      <TimezoneHint tz={tz} />
+      <LocalTimes tz={tz} />
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <div class="join">
           <a href={qs({ view: undefined })} class={`btn join-item ${view === "list" ? "btn-outline btn-primary" : "btn-ghost"}`}>{t("events.view.list")}</a>
@@ -312,8 +353,8 @@ async function TagSuggestions(user: AuthedUser) {
   return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson(await eventTagVocabulary(user)) }} />;
 }
 
-function EventForm({ values, errors, roles }: {
-  values: EventFormValues; errors: Record<string, string>; roles: { id: string; name: string }[];
+function EventForm({ values, errors, roles, tz }: {
+  values: EventFormValues; errors: Record<string, string>; roles: { id: string; name: string }[]; tz: string;
 }) {
   return (
     <form id="event-form" method="post" class="space-y-4 max-w-2xl">
@@ -329,10 +370,12 @@ function EventForm({ values, errors, roles }: {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("events.form.start")} required>
           <input type={values.allDay ? "date" : "datetime-local"} id="event-start" name="startsAt" value={values.startsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required />
+          <p class="text-xs opacity-70 mt-1" data-local-hint="event-start" hidden></p>
         </Field>
         <Field label={t("events.form.end")} required
           after={<div class="flex gap-1 flex-wrap mt-1">{DURATION_PRESETS.map((p) => <button type="button" class="btn btn-xs" data-duration={p.key}>{p.label}</button>)}</div>}>
           <input type={values.allDay ? "date" : "datetime-local"} id="event-end" name="endsAt" value={values.endsAt} class={`input w-full${errors.dates ? " input-error" : ""}`} required />
+          <p class="text-xs opacity-70 mt-1" data-local-hint="event-end" hidden></p>
         </Field>
       </div>
       {errors.dates && <p class="text-error text-sm">{errors.dates}</p>}
@@ -372,6 +415,7 @@ function EventForm({ values, errors, roles }: {
         {errors.roleIds && <p class="text-error text-sm">{errors.roleIds}</p>}
       </div>
 
+      <LocalTimes tz={tz} />
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
           const allDay = document.getElementById('event-allday');
@@ -419,12 +463,13 @@ async function loadRoles() {
 
 eventRoutes.get("/new", manage, async (c) => {
   const user = c.get("user")!;
+  const tz = resolveTimezone(c);
   const [roles] = await Promise.all([loadRoles()]);
   return c.html(
     <Layout title={t("events.form.newTitle")} user={user} activeNav="events">
       <div class="max-w-2xl mx-auto">
       <PageHeader title={t("events.form.newTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
-      <EventForm values={emptyFormValues()} errors={{}} roles={roles} />
+      <EventForm values={emptyFormValues()} errors={{}} roles={roles} tz={tz} />
       <TagSuggestions {...user} />
       </div>
     </Layout>,
@@ -444,7 +489,7 @@ eventRoutes.post("/new", manage, async (c) => {
       <Layout title={t("events.form.newTitle")} user={user} activeNav="events">
         <div class="max-w-2xl mx-auto">
         <PageHeader title={t("events.form.newTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
-        <EventForm values={values} errors={result.errors} roles={roles} />
+        <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />
         <TagSuggestions {...user} />
         </div>
       </Layout>,
@@ -492,7 +537,7 @@ eventRoutes.get("/:id/edit", manage, async (c) => {
     <Layout title={t("events.form.editTitle")} user={user} activeNav="events">
       <div class="max-w-2xl mx-auto">
       <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
-      <EventForm values={toEventFormValues(ev, tz)} errors={{}} roles={roles} />
+      <EventForm values={toEventFormValues(ev, tz)} errors={{}} roles={roles} tz={tz} />
       <TagSuggestions {...user} />
       </div>
     </Layout>,
@@ -516,7 +561,7 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
       <Layout title={t("events.form.editTitle")} user={user} activeNav="events">
         <div class="max-w-2xl mx-auto">
         <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
-        <EventForm values={values} errors={result.errors} roles={roles} />
+        <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />
         <TagSuggestions {...user} />
         </div>
       </Layout>,
