@@ -66,7 +66,6 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>{title ? `${title} · on-duty` : "on-duty"}</title>
       <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}` }} />
-      {user && <script dangerouslySetInnerHTML={{ __html: NAV_STATE_SCRIPT }} />}
       <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       <link rel="manifest" href="/manifest.webmanifest" />
@@ -83,7 +82,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       <div id="toast-container" class="toast toast-top toast-end z-50" />
 
       <div class="drawer lg:drawer-open">
-        {user && <input id="nav-drawer" type="checkbox" class="drawer-toggle" aria-label={t("common.nav.toggleSidebar")} />}
+        {user && <><input id="nav-drawer" type="checkbox" autocomplete="off" class="drawer-toggle" aria-label={t("common.nav.toggleSidebar")} /><script dangerouslySetInnerHTML={{ __html: NAV_STATE_SCRIPT }} /></>}
         <div class="drawer-content flex min-h-dvh min-w-0 flex-col">
       <nav class="navbar bg-base-200 shadow-sm px-4 sticky top-0 z-40 border-b-[3px] border-gold">
         <div class="navbar-start flex-1 items-center">
