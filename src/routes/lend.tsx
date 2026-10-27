@@ -101,7 +101,7 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
         <ContactFooter />
       </div>
       <link rel="stylesheet" href="/css/vanilla-calendar.css" />
-      <style>{"#lend-calendar{--vc-date-weekend-bg-hover:var(--color-base-200);--vc-date-weekend-hover-edge-bg:var(--color-base-200);--vc-date-weekend-outside-bg:transparent;--vc-date-weekend-outside-bg-hover:var(--color-base-200);--vc-date-weekend-outside-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-outside-color-hover:var(--color-base-content);--vc-date-range-middle-outside-bg:color-mix(in oklab,var(--color-primary) 10%,transparent);--vc-date-selected-outside-bg:var(--color-primary);--vc-bg:var(--color-base-100);--vc-color:var(--color-base-content);--vc-header-color:var(--color-base-content);--vc-week-day-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-date-color:var(--color-base-content);--vc-date-color-hover:var(--color-base-content);--vc-date-hover-bg:var(--color-base-200);--vc-date-hover-edge-bg:var(--color-base-200);--vc-date-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-today-color:var(--color-primary);--vc-date-selected-bg:var(--color-primary);--vc-date-selected-color:var(--color-primary-content);--vc-date-range-middle-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-color:var(--color-base-content);--vc-date-weekend-color:var(--color-base-content);--vc-date-weekend-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-selected-bg:var(--color-primary);--vc-date-weekend-selected-color:var(--color-primary-content);--vc-date-weekend-hover-bg:var(--color-base-200);--vc-date-weekend-today-color:var(--color-primary);--vc-date-range-middle-weekend-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-weekend-color:var(--color-base-content);--vc-week-day-off-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-months-years-bg:var(--color-base-100);--vc-months-years-color:var(--color-base-content);--vc-months-years-bg-hover:var(--color-base-200);--vc-months-years-bg-selected:var(--color-primary);--vc-months-years-color-selected:var(--color-primary-content);--vc-title-color:var(--color-base-content);--vc-title-color-hover:var(--color-primary);--vc-focus-outline-color:var(--color-primary)}"}</style>
+      <style>{"#lend-calendar [data-blocked] [data-vc-date-btn]{background:color-mix(in oklab,var(--color-error) 15%,transparent);color:var(--color-error);text-decoration:line-through;opacity:1}#lend-calendar{--vc-date-weekend-bg-hover:var(--color-base-200);--vc-date-weekend-hover-edge-bg:var(--color-base-200);--vc-date-weekend-outside-bg:transparent;--vc-date-weekend-outside-bg-hover:var(--color-base-200);--vc-date-weekend-outside-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-outside-color-hover:var(--color-base-content);--vc-date-range-middle-outside-bg:color-mix(in oklab,var(--color-primary) 10%,transparent);--vc-date-selected-outside-bg:var(--color-primary);--vc-bg:var(--color-base-100);--vc-color:var(--color-base-content);--vc-header-color:var(--color-base-content);--vc-week-day-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-date-color:var(--color-base-content);--vc-date-color-hover:var(--color-base-content);--vc-date-hover-bg:var(--color-base-200);--vc-date-hover-edge-bg:var(--color-base-200);--vc-date-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-today-color:var(--color-primary);--vc-date-selected-bg:var(--color-primary);--vc-date-selected-color:var(--color-primary-content);--vc-date-range-middle-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-color:var(--color-base-content);--vc-date-weekend-color:var(--color-base-content);--vc-date-weekend-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-selected-bg:var(--color-primary);--vc-date-weekend-selected-color:var(--color-primary-content);--vc-date-weekend-hover-bg:var(--color-base-200);--vc-date-weekend-today-color:var(--color-primary);--vc-date-range-middle-weekend-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-weekend-color:var(--color-base-content);--vc-week-day-off-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-months-years-bg:var(--color-base-100);--vc-months-years-color:var(--color-base-content);--vc-months-years-bg-hover:var(--color-base-200);--vc-months-years-bg-selected:var(--color-primary);--vc-months-years-color-selected:var(--color-primary-content);--vc-title-color:var(--color-base-content);--vc-title-color-hover:var(--color-primary);--vc-focus-outline-color:var(--color-primary)}"}</style>
       <script type="module" dangerouslySetInnerHTML={{ __html: CALENDAR_SCRIPT }} />
     </Layout>
   );
@@ -143,10 +143,12 @@ const CALENDAR_SCRIPT = `
     }
     timeFrom.addEventListener("input", updateSummary);
     timeTo.addEventListener("input", updateSummary);
+    let blocked = new Set();
     async function loadBlocked() {
       const quantity = quantityInput ? quantityInput.value : (root.dataset.quantity || "1");
       const res = await fetch(\`/lend/\${root.dataset.itemId}/blocked?quantity=\${quantity}\`);
       const disableDates = res.ok ? await res.json() : [];
+      blocked = new Set(disableDates);
       const stillValid = fromInput.value && toInput.value &&
         !disableDates.some((d) => d >= fromInput.value && d <= toInput.value);
       if (!stillValid) { fromInput.value = ""; toInput.value = ""; }
@@ -156,6 +158,9 @@ const CALENDAR_SCRIPT = `
         disableDates,
         disableDatesGaps: true,
         disableDatesPast: true,
+        onCreateDateEls(self, el) {
+          if (blocked.has(el.dataset.vcDate)) el.dataset.blocked = "";
+        },
         locale: "de-DE",
         firstWeekday: 1,
         selectedDates: fromInput.value && toInput.value ? [fromInput.value, toInput.value] : [],
