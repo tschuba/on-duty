@@ -1,11 +1,11 @@
 import { Hono, type Context } from "hono";
-import { Field } from "../components/field.js";
+import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { eq, and, count, countDistinct, asc, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
 import { ModalScaffold } from "./admin.js";
@@ -196,12 +196,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                     key={r.id}
                     data-id={r.id}
                     draggable={canReorder}
-                    {...((canWrite || r.isProtected) && {
-                      class: "cursor-pointer hover",
-                      "hx-get": `/roles/${r.id}/edit`,
-                      "hx-target": "#modal-content",
-                      "hx-swap": "innerHTML",
-                    })}
+                    class="cursor-pointer hover"
+                    onclick={`location.href='/roles/${r.id}'`}
                   >
                     <td class="font-medium">
                       {r.isProtected && (
@@ -281,12 +277,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
                 <tr
                   key={ty.id}
                   data-id={ty.id}
-                  {...(canWriteTypes && {
-                    class: "cursor-pointer hover",
-                    "hx-get": `/role-types/${ty.id}/edit`,
-                    "hx-target": "#modal-content",
-                    "hx-swap": "innerHTML",
-                  })}
+                  class="cursor-pointer hover"
+                  onclick={`location.href='/role-types/${ty.id}'`}
                 >
                   <td class="font-medium">{ty.isProtected && <span class="mr-1" title={t("admin.roles.systemRole")}>🔒</span>}{ty.name}</td>
                   <td class="w-px whitespace-nowrap text-center">
@@ -411,13 +403,38 @@ roleRoutes.get("/roles/new", rolesWrite, async (c) => {
   );
 });
 
-// HTMX fragment: edit role modal
-// Read access shows the form; it is editable only with write permission on an unprotected role.
+// GET /roles/:id — read-only
+roleRoutes.get("/roles/:id", rolesRead, async (c) => {
+  const id = c.req.param("id");
+  const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
+  if (!role) return c.notFound();
+  const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, role.typeId));
+  const user = c.get("user");
+  const canWrite = !role.isProtected && user.permissions.has("member-roles:write");
+  const canDeletePerm = user.permissions.has("member-roles:delete");
+  const [{ cnt }] = await db.select({ cnt: count() }).from(memberRoleAssignments).where(eq(memberRoleAssignments.memberRoleId, id));
+  const remove = canDeletePerm && !role.isProtected && cnt === 0 && (
+    <DeleteDialog id={role.id} action={`/roles/${role.id}/delete`} title={t("admin.roles.confirmDelete.title")} body={t("admin.roles.confirmDelete.body", { title: role.title })} />
+  );
+  return c.html(
+    <Layout title={role.title} user={user}>
+      <div class="max-w-2xl mx-auto">
+      <PageHeader title={<>{role.isProtected && "🔒 "}{role.title}</>} backHref="/roles" actions={<DetailActions editHref={canWrite ? `/roles/${id}/edit` : undefined} remove={remove} />} />
+      <ViewGrid>
+        <ViewField label={t("admin.roles.type.label")} value={type?.name} />
+        <ViewField label={t("admin.roles.table.activeStatus")} value={role.grantsActiveStatus ? t("common.yes") : t("common.no")} />
+      </ViewGrid>
+      </div>
+    </Layout>
+  );
+});
+
+// GET/POST /roles/:id/edit — form, requires write permission on an unprotected role
 roleRoutes.get("/roles/:id/edit", rolesRead, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role) return c.html("", HTTP_STATUS.NOT_FOUND);
-  const readOnly = role.isProtected || !c.get("user").permissions.has("member-roles:write");
+  if (!role) return c.notFound();
+  if (role.isProtected || !c.get("user").permissions.has("member-roles:write")) return c.redirect(`/roles/${id}`);
 
   const types = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   const [{ cnt }] = await db
@@ -431,23 +448,14 @@ roleRoutes.get("/roles/:id/edit", rolesRead, async (c) => {
     .where(and(eq(memberRoleAssignments.memberRoleId, id), isNull(memberRoleAssignments.to)));
 
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.roles.modal.edit")}</h3>
-      {role.isProtected && <div class="alert alert-info mb-3">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
-      <form method="post" action={`/roles/${id}`} class="flex flex-col gap-3">
-        <fieldset disabled={readOnly} class="contents">
-          <RoleForm types={types} role={role} hasAssignments={cnt > 0} affected={Number(affected)} />
-        </fieldset>
-        {readOnly ? (
-          <div class="modal-action mt-2">
-            <button type="button" class="btn" onclick="document.getElementById('admin-modal').close()">{t("common.close")}</button>
-          </div>
-        ) : (
-          <ModalActions submit={t("common.save")} />
-        )}
+    <Layout title={t("admin.roles.modal.edit")} user={c.get("user")}>
+      <div class="max-w-2xl mx-auto">
+      <PageHeader title={t("admin.roles.modal.edit")} backHref={`/roles/${id}`} actions={<FormActions formId="role-form" cancelHref={`/roles/${id}`} />} />
+      <form id="role-form" method="post" action={`/roles/${id}`} class="flex flex-col gap-3">
+        <RoleForm types={types} role={role} hasAssignments={cnt > 0} affected={Number(affected)} />
       </form>
-      {SHOW_MODAL}
-    </>
+      </div>
+    </Layout>
   );
 });
 
@@ -466,8 +474,9 @@ roleRoutes.post("/roles", rolesWrite, async (c) => {
   if (!type) return badRequest(c, t("admin.roles.flash.unknownType"));
   if (!flagAllowed(grantsActiveStatus, type)) return badRequest(c, t("admin.roles.flash.flagNotAllowed", { type: type.name }));
 
+  const id = crypto.randomUUID();
   await db.insert(memberRoles).values({
-    id: crypto.randomUUID(),
+    id,
     title,
     typeId,
     sortOrder: await nextRoleSortOrder(typeId),
@@ -476,7 +485,7 @@ roleRoutes.post("/roles", rolesWrite, async (c) => {
   });
 
   setFlash(c, t("admin.roles.flash.created", { title }), "success");
-  return c.redirect("/roles");
+  return c.redirect(`/roles/${id}`);
 });
 
 // POST /roles/reorder — body: id=…&id=… (all roles of ONE type, in new order)
@@ -551,7 +560,7 @@ roleRoutes.post("/roles/:id", rolesWrite, async (c) => {
   await db.update(memberRoles).set(changes).where(eq(memberRoles.id, id));
 
   setFlash(c, t("admin.roles.flash.saved"), "success");
-  return c.redirect("/roles");
+  return c.redirect(`/roles/${id}`);
 });
 
 // POST /roles/:id/delete
@@ -610,19 +619,45 @@ roleRoutes.get("/role-types/new", typesWrite, (c) =>
     </>
   ));
 
-roleRoutes.get("/role-types/:id/edit", typesWrite, async (c) => {
+// GET /role-types/:id — read-only
+roleRoutes.get("/role-types/:id", typesRead, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
-  if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
+  if (!type) return c.notFound();
+  const user = c.get("user");
+  const canWrite = user.permissions.has("member-role-types:write");
+  const canDeletePerm = user.permissions.has("member-role-types:delete");
+  const assigned = await db.select({ title: memberRoles.title }).from(memberRoles).where(eq(memberRoles.typeId, id));
+  const remove = canDeletePerm && !type.isProtected && assigned.length === 0 && (
+    <DeleteDialog id={`type-${type.id}`} action={`/role-types/${type.id}/delete`} title={t("admin.roleTypes.confirmDelete.title")} body={t("admin.roleTypes.confirmDelete.body", { name: type.name })} />
+  );
   return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.roleTypes.edit")}</h3>
-      <form method="post" action={`/role-types/${id}`} class="flex flex-col gap-3">
+    <Layout title={type.name} user={user}>
+      <div class="max-w-2xl mx-auto">
+      <PageHeader title={<>{type.isProtected && "🔒 "}{type.name}</>} backHref="/role-types" actions={<DetailActions editHref={canWrite ? `/role-types/${id}/edit` : undefined} remove={remove} />} />
+      <ViewGrid>
+        <ViewField label={t("admin.roleTypes.table.description")} value={type.description} />
+        <ViewField label={t("admin.roleTypes.table.allowsActiveLong")} value={type.allowsActiveStatus ? t("common.yes") : t("common.no")} />
+      </ViewGrid>
+      </div>
+    </Layout>
+  );
+});
+
+roleRoutes.get("/role-types/:id/edit", typesRead, async (c) => {
+  const id = c.req.param("id");
+  const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
+  if (!type) return c.notFound();
+  if (!c.get("user").permissions.has("member-role-types:write")) return c.redirect(`/role-types/${id}`);
+  return c.html(
+    <Layout title={t("admin.roleTypes.edit")} user={c.get("user")}>
+      <div class="max-w-2xl mx-auto">
+      <PageHeader title={t("admin.roleTypes.edit")} backHref={`/role-types/${id}`} actions={<FormActions formId="role-type-form" cancelHref={`/role-types/${id}`} />} />
+      <form id="role-type-form" method="post" action={`/role-types/${id}`} class="flex flex-col gap-3">
         <RoleTypeForm type={type} />
-        <ModalActions submit={t("common.save")} />
       </form>
-      {SHOW_MODAL}
-    </>
+      </div>
+    </Layout>
   );
 });
 
@@ -634,8 +669,9 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
     return c.redirect("/role-types");
   }
   const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${memberRoleTypes.sortOrder}), 0)` }).from(memberRoleTypes);
+  const id = crypto.randomUUID();
   await db.insert(memberRoleTypes).values({
-    id: crypto.randomUUID(),
+    id,
     name,
     description: String(body.description ?? "").trim().slice(0, 300) || null,
     allowsActiveStatus: body.allowsActiveStatus === "1",
@@ -643,7 +679,7 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
     isProtected: false,
   });
   setFlash(c, t("admin.roleTypes.flash.created", { name }), "success");
-  return c.redirect("/role-types");
+  return c.redirect(`/role-types/${id}`);
 });
 
 // Titles of flagged roles that forbid removing allows_active_status (empty = allowed).
@@ -682,7 +718,7 @@ roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
   if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
   await db.update(memberRoleTypes).set({ name, allowsActiveStatus, description: String(body.description ?? "").trim().slice(0, 300) || null }).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roles.flash.saved"), "success");
-  return c.redirect("/role-types");
+  return c.redirect(`/role-types/${id}`);
 });
 
 roleRoutes.post("/role-types/:id/delete", typesDelete, async (c) => {
