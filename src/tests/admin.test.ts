@@ -274,6 +274,13 @@ describe("GET /users", () => {
     expect(html).not.toContain(`/admin/users/${localAdmin.id}/edit`);
   });
 
+  it("row click leads to the read-only detail page, not directly to edit", async () => {
+    usersFixture = [makeUser({ id: "a" })];
+    const html = await (await adminRoutes.request("/users")).text();
+    expect(html).toContain("/admin/users/a&#39;");
+    expect(html).not.toContain("/admin/users/a/edit&#39;");
+  });
+
   it("shows activate and delete for a disabled user", async () => {
     usersFixture = [makeUser({ disabled: true })];
     const html = await (await adminRoutes.request("/users")).text();
@@ -377,6 +384,26 @@ describe("role picker", () => {
     expect(html).toContain(t("admin.users.modal.roleDetails"));
     expect(html).toMatch(/aria-expanded="false"/);
     expect(html).not.toContain("overflow-y-auto");
+  });
+});
+
+describe("GET /users/:id", () => {
+  it("404s for an unknown user", async () => {
+    usersFixture = [];
+    expect((await adminRoutes.request("/users/nope")).status).toBe(404);
+  });
+
+  it("404s for the built-in local admin", async () => {
+    usersFixture = [localAdmin];
+    expect((await adminRoutes.request(`/users/${localAdmin.id}`)).status).toBe(404);
+  });
+
+  it("shows the edit link and the assigned roles", async () => {
+    usersFixture = [makeUser({ id: "u2" })];
+    userAppRolesFixture = [{ id: "ar1", name: "editor" }];
+    const html = await (await adminRoutes.request("/users/u2")).text();
+    expect(html).toContain("/admin/users/u2/edit");
+    expect(html).toContain("editor");
   });
 });
 
@@ -562,6 +589,13 @@ describe("POST /users/:id/delete", () => {
 });
 
 describe("GET /permissions", () => {
+  it("row click leads to the read-only detail page, not directly to edit", async () => {
+    appRolesFixture = [makeAppRole()];
+    const html = await (await adminRoutes.request("/permissions")).text();
+    expect(html).toContain("/admin/permissions/ar1&#39;");
+    expect(html).not.toContain("/admin/permissions/ar1/edit&#39;");
+  });
+
   it("locks deletion for a protected role", async () => {
     appRolesFixture = [makeAppRole({ isProtected: true })];
     userAppRolesFixture = [];
@@ -600,21 +634,44 @@ describe("GET /permissions/new", () => {
   });
 });
 
+describe("GET /permissions/:id", () => {
+  it("404s for an unknown role", async () => {
+    appRolesFixture = [];
+    expect((await adminRoutes.request("/permissions/nope")).status).toBe(404);
+  });
+
+  it("shows the edit link and the permissions", async () => {
+    appRolesFixture = [makeAppRole()];
+    appRolePermissionsFixture = [{ roleId: "ar1", permission: "members:read" }];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const html = await (await adminRoutes.request("/permissions/ar1")).text();
+    expect(html).toContain("/admin/permissions/ar1/edit");
+  });
+
+  it("hides the edit link and offers no delete for a protected role", async () => {
+    appRolesFixture = [makeAppRole({ isProtected: true })];
+    userAppRolesFixture = [{ cnt: 0 }];
+    const html = await (await adminRoutes.request("/permissions/ar1")).text();
+    expect(html).not.toContain("/admin/permissions/ar1/edit");
+    expect(html).not.toContain("/admin/permissions/ar1/delete");
+  });
+});
+
 describe("GET /permissions/:id/edit", () => {
   it("404s for an unknown role", async () => {
     appRolesFixture = [];
     expect((await adminRoutes.request("/permissions/nope/edit")).status).toBe(404);
   });
 
-  it("renders a protected role read-only", async () => {
+  it("redirects a protected role to its read-only page", async () => {
     appRolesFixture = [makeAppRole({ isProtected: true })];
     userAppRolesFixture = [{ cnt: 0 }];
     const res = await adminRoutes.request("/permissions/ar1/edit");
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toContain("<fieldset disabled");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/admin/permissions/ar1");
+    const html = await (await adminRoutes.request("/permissions/ar1")).text();
     expect(html).toContain(t("admin.permissions.readOnlyHint"));
-    expect(html).not.toContain('form="admin-permissions-form"');
+    expect(html).not.toContain("/permissions/ar1/edit");
   });
 
   it("locks the name field when assignments exist", async () => {

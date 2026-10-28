@@ -15,6 +15,7 @@ import {
 } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
 import { formBody } from "./test-utils.js";
+import { testDetailPageContract } from "./detail-page-contract.js";
 
 process.env.ORG_NAME = "Test Feuerwehr";
 
@@ -263,14 +264,11 @@ describe("GET /roles/:id/edit", () => {
     expect((await roleRoutes.request("/roles/nope/edit")).status).toBe(404);
   });
 
-  it("renders a protected role read-only", async () => {
+  it("redirects a protected role to its read-only page", async () => {
     rolesFixture = [makeRole({ isProtected: true })];
     const res = await roleRoutes.request("/roles/r1/edit");
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toContain("<fieldset disabled");
-    expect(html).toContain(t("admin.permissions.readOnlyHint"));
-    expect(html).not.toContain(t("common.save"));
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/roles/r1");
   });
 
   it("locks the name field when assignments exist", async () => {
@@ -522,4 +520,30 @@ describe("GET /roles toggle filter", () => {
       expect(inputs[1 - idx]).not.toContain("checked");
     }
   });
+});
+
+testDetailPageContract({
+  name: "roles",
+  request: (path) => roleRoutes.request(path),
+  idPath: "/roles/r1",
+  editPath: "/roles/r1/edit",
+  editHref: "/roles/r1/edit",
+  redirectLocation: "/roles/r1",
+  setPermissions: (perms) => { currentUser = { id: "u1", disabled: false, permissions: new Set(perms) }; },
+  readPermissions: ["member-roles:read"],
+  writePermissions: ["member-roles:read", "member-roles:write"],
+  ensureRecord: () => { rolesFixture = [makeRole()]; typesFixture = [makeType()]; },
+});
+
+testDetailPageContract({
+  name: "role-types",
+  request: (path) => roleRoutes.request(path),
+  idPath: "/role-types/t1",
+  editPath: "/role-types/t1/edit",
+  editHref: "/role-types/t1/edit",
+  redirectLocation: "/role-types/t1",
+  setPermissions: (perms) => { currentUser = { id: "u1", disabled: false, permissions: new Set(perms) }; },
+  readPermissions: ["member-role-types:read"],
+  writePermissions: ["member-role-types:read", "member-role-types:write"],
+  ensureRecord: () => { typesFixture = [makeType()]; },
 });

@@ -1,5 +1,5 @@
 import { RowAction } from "../components/row-action.js";
-import { EmailField, Field, FieldGroup } from "../components/field.js";
+import { EmailField, Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Hono, type Context } from "hono";
 import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -19,7 +19,7 @@ import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
 import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
@@ -158,7 +158,7 @@ adminRoutes.get("/users", guard, async (c) => {
                   key={u.id}
                   {...(!isLocal && {
                     class: "cursor-pointer hover",
-                    onclick: `location.href='/admin/users/${u.id}/edit'`,
+                    onclick: `location.href='/admin/users/${u.id}'`,
                   })}
                 >
                   <td class="font-medium">
@@ -378,7 +378,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
   const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
     <Layout title={title} user={c.get("user")}>
-      <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" />} />
+      <PageHeader title={title} backHref="/admin/users" actions={<FormActions formId="admin-users-form" cancelHref={f.id ? `/admin/users/${f.id}` : undefined} />} />
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-users-form" method="post" action={f.id ? `/admin/users/${f.id}` : "/admin/users"} class="flex flex-col gap-3 max-w-2xl">
         <Field label={t("admin.users.modal.nameLabel")} required>
@@ -402,6 +402,29 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
 }
 
 adminRoutes.get("/users/new", guard, (c) => renderUserForm(c, { name: "", email: "", checkedIds: new Set() }));
+
+adminRoutes.get("/users/:id", guard, async (c) => {
+  const id = c.req.param("id");
+  const [u] = await db.select().from(users).where(eq(users.id, id));
+  if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.notFound();
+  const assigned = await db
+    .select({ id: appRoles.id, name: appRoles.name })
+    .from(userAppRoles)
+    .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId))
+    .where(eq(userAppRoles.userId, id))
+    .orderBy(asc(appRoles.name));
+  return c.html(
+    <Layout title={u.name} user={c.get("user")}>
+      {/* /users/:id/edit sits behind the same system:admin guard as /:id, so "Bearbeiten" is unconditional. */}
+      <PageHeader title={u.name} backHref="/admin/users" actions={<DetailActions editHref={`/admin/users/${id}/edit`} />} />
+      <ViewGrid>
+        <ViewField label={t("admin.users.modal.nameLabel")} value={u.name} />
+        <ViewField label={t("admin.users.modal.emailLabel")} value={u.email} />
+        <ViewField label={t("admin.users.modal.roleLabel")} value={assigned.map((r) => r.name).join(", ")} />
+      </ViewGrid>
+    </Layout>
+  );
+});
 
 adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
@@ -452,7 +475,7 @@ adminRoutes.post("/users", guard, async (c) => {
   }
 
   setFlash(c, t("admin.users.flash.created", { name }), "success");
-  return c.redirect("/admin/users");
+  return c.redirect(`/admin/users/${id}`);
 });
 
 // POST /admin/users/:id — update
@@ -490,7 +513,7 @@ adminRoutes.post("/users/:id", guard, async (c) => {
   }
 
   setFlash(c, t("admin.users.flash.saved"), "success");
-  return c.redirect("/admin/users");
+  return c.redirect(`/admin/users/${id}`);
 });
 
 // POST /admin/users/:id/deactivate
@@ -599,7 +622,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   key={r.id}
                   data-search={`${r.name} ${r.description ?? ""} ${permissionSearchText(permsByRole.get(r.id) ?? [])}`.toLowerCase()}
                   class="cursor-pointer hover"
-                  onclick={`location.href='/admin/permissions/${r.id}/edit'`}
+                  onclick={`location.href='/admin/permissions/${r.id}'`}
                 >
                   <td class="font-medium">
                     {r.isProtected && (
@@ -709,7 +732,7 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
   const title = t(f.id ? "admin.permissions.modal.edit" : "admin.permissions.modal.create");
   return c.html(
     <Layout title={title} user={c.get("user")}>
-      <PageHeader title={title} backHref="/admin/permissions" actions={f.readOnly ? undefined : <FormActions formId="admin-permissions-form" />} />
+      <PageHeader title={title} backHref="/admin/permissions" actions={f.readOnly ? undefined : <FormActions formId="admin-permissions-form" cancelHref={f.id ? `/admin/permissions/${f.id}` : undefined} />} />
       {f.readOnly && <div class="alert alert-info mb-4 max-w-2xl">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
       {f.error && <div class="alert alert-error mb-4 max-w-2xl">{f.error}</div>}
       <form id="admin-permissions-form" method="post" action={f.id ? `/admin/permissions/${f.id}` : "/admin/permissions"} class="flex flex-col gap-3 max-w-2xl">
@@ -748,13 +771,55 @@ adminRoutes.get("/permissions/new", guard, async (c) => {
   return renderPermissionForm(c, { name: "", description: "", checked: new Set() });
 });
 
+adminRoutes.get("/permissions/:id", guard, async (c) => {
+  const id = c.req.param("id");
+  const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
+  if (!role) return c.notFound();
+  const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
+  const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
+  const canDelete = !role.isProtected && cnt === 0;
+  const remove = canDelete && (
+    <>
+      <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`document.getElementById('delete-perm-role-${id}').showModal()`} />
+      <dialog id={`delete-perm-role-${id}`} class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">{t("admin.permissions.confirmDelete.title")}</h3>
+          <p class="py-2 opacity-70">{t("admin.permissions.confirmDelete.body", { name: role.name })}</p>
+          <div class="modal-action">
+            <form method="dialog"><button class="btn">{t("common.cancel")}</button></form>
+            <form method="post" action={`/admin/permissions/${id}/delete`}>
+              <button type="submit" class="btn btn-error">{t("common.delete")}</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+      </dialog>
+    </>
+  );
+  return c.html(
+    <Layout title={role.name} user={c.get("user")}>
+      <PageHeader title={<>{role.isProtected && "🔒 "}{role.name}</>} backHref="/admin/permissions" actions={<DetailActions editHref={role.isProtected ? undefined : `/admin/permissions/${id}/edit`} remove={remove} />} />
+      {role.isProtected && <div class="alert alert-info mb-4 max-w-2xl">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
+      <ViewGrid>
+        <ViewField label={t("admin.permissions.modal.nameLabel")} value={role.name} />
+        <ViewField label={t("admin.permissions.modal.descriptionLabel")} value={role.description} />
+        <div class="sm:col-span-2">
+          <div class="text-sm opacity-60">{t("admin.permissions.modal.permissionsLabel")}</div>
+          <PermissionBadges permissions={perms.map((p) => p.permission)} />
+        </div>
+      </ViewGrid>
+    </Layout>
+  );
+});
+
 adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(appRoles).where(eq(appRoles.id, id));
   if (!role) return c.html("", HTTP_STATUS.NOT_FOUND);
+  if (role.isProtected) return c.redirect(`/admin/permissions/${id}`); // Systemrollen sind nicht editierbar
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
   const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
-  return renderPermissionForm(c, { id, readOnly: role.isProtected, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
+  return renderPermissionForm(c, { id, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
 });
 
 function parsePermissions(body: Record<string, unknown>): Permission[] {
@@ -780,7 +845,7 @@ adminRoutes.post("/permissions", guard, async (c) => {
   }
 
   setFlash(c, t("admin.permissions.flash.created", { name }), "success");
-  return c.redirect("/admin/permissions");
+  return c.redirect(`/admin/permissions/${id}`);
 });
 
 // POST /admin/permissions/:id — update
@@ -808,7 +873,7 @@ adminRoutes.post("/permissions/:id", guard, async (c) => {
   }
 
   setFlash(c, t("admin.permissions.flash.saved"), "success");
-  return c.redirect("/admin/permissions");
+  return c.redirect(`/admin/permissions/${id}`);
 });
 
 // POST /admin/permissions/:id/delete

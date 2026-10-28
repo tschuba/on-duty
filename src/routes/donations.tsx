@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { Field } from "../components/field.js";
+import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -296,7 +296,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           {sorted.length === 0 ? (
             <tr><td colspan={canIssueReceipts ? 7 : 6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
-            <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donations/${d.id}/edit'` : undefined}>
+            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}'`}>
               <td>{formatDate(d.date)}</td>
               <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
@@ -366,7 +366,7 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
     );
   }
 
-  await db.transaction(async (tx) => {
+  const newId = await db.transaction(async (tx) => {
     let pid = personId;
     if (pid) {
       await tx.update(persons).set(donorFields.values).where(eq(persons.id, pid));
@@ -375,38 +375,62 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
       pid = person.id;
     }
     const donor = await getOrCreateDonor(tx as unknown as typeof db, pid);
-    await tx.insert(donations).values({
+    const [row] = await tx.insert(donations).values({
       donorId: donor.id,
       amount: donationFields.values.amount.replace(",", "."),
       date: donationFields.values.date,
       type: donationFields.values.type as DonationType,
       purpose: donationFields.values.purpose || null,
-    });
+    }).returning({ id: donations.id });
+    return row.id;
   });
 
   setFlash(c, t("donations.flash.created"), "success");
-  return c.redirect("/donations");
+  return c.redirect(`/donations/${newId}`);
 });
 
 const canDelete = (user: { permissions: Set<string> }, d: { receiptStatus: string }) =>
   user.permissions.has("donations:delete") && d.receiptStatus !== "issued";
 
-// GET/POST /donations/:id/edit — donation fields only, donor is fixed once recorded
-donationRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
+// GET /donations/:id — read-only; everyone who can see the list
+donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
   const canLink = user.permissions.has("members:read");
+  const canRecord = user.permissions.has("donations:record");
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
-      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} />} />
+      {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
+      <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
+      <ViewGrid>
+        <ViewField label={t("donations.form.amount")} value={`${d.amount} €`} />
+        <ViewField label={t("donations.form.date")} value={formatDate(d.date)} />
+        <ViewField label={t("donations.form.type")} value={TYPE_LABELS[d.type]} />
+        <ViewField label={t("donations.form.purpose")} value={d.purpose} />
+      </ViewGrid>
+    </Layout>
+  );
+});
+
+// GET/POST /donations/:id/edit — donation fields only, donor is fixed once recorded
+donationRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
+  const user = c.get("user");
+  const d = await fetchDonation(c.req.param("id"));
+  if (!d) return c.notFound();
+  if (!user.permissions.has("donations:record")) return c.redirect(`/donations/${d.id}`);
+  const canLink = user.permissions.has("members:read");
+
+  return c.html(
+    <Layout title={t("donations.title")} user={user}>
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-edit-form" cancelHref={`/donations/${d.id}`} />} />
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
       </form>
-      {canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}></form>}
     </Layout>
   );
 });
@@ -424,11 +448,10 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donations.title")} user={user}>
-        <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<>{canDelete(user, d) && <HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error mr-6" />}<FormActions formId="donation-edit-form" /></>} />
+        <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-edit-form" cancelHref={`/donations/${d.id}`} />} />
         <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
           <DonationFormFields values={values} errors={errors} />
         </form>
-        {canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}></form>}
       </Layout>,
       422
     );
@@ -442,7 +465,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   }).where(eq(donations.id, id));
 
   setFlash(c, t("donations.flash.saved"), "success");
-  return c.redirect("/donations");
+  return c.redirect(`/donations/${id}`);
 });
 
 // POST /donations/:id/delete
@@ -453,7 +476,7 @@ donationRoutes.post("/:id/delete", requireAuth("donations:delete"), async (c) =>
   // Issued receipts are tax documents: the donation must stay.
   if (d.receiptStatus === "issued") {
     setFlash(c, t("donations.flash.deleteBlocked"), "error");
-    return c.redirect(`/donations/${id}/edit`);
+    return c.redirect(`/donations/${id}`);
   }
   await db.delete(donations).where(eq(donations.id, id));
   setFlash(c, t("donations.flash.deleted"), "success");
@@ -567,9 +590,9 @@ donationRoutes.post("/:id/receipt-status", requireAuth("donations:issue-receipts
   const next = nextReceiptStatus(d.receiptStatus, action);
   if (!next) {
     setFlash(c, t("donations.flash.statusInvalid"), "error");
-    return c.redirect(`/donations/${id}/edit`);
+    return c.redirect(`/donations/${id}`);
   }
   await db.update(donations).set(next === "open" ? { receiptStatus: next, receiptIssuedAt: null, issuedBy: null } : { receiptStatus: next }).where(eq(donations.id, id));
   setFlash(c, t("donations.flash.statusChanged"), "success");
-  return c.redirect(`/donations/${id}/edit`);
+  return c.redirect(`/donations/${id}`);
 });
