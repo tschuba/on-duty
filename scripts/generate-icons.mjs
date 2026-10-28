@@ -47,7 +47,7 @@ const ICONS = {
   truck: "truck",
   firetruck: "firetruck",
   "shield-check": "shield-check",
-  "wrench-screwdriver": "tools",
+  axe: "axe",
   user: "user",
   jacket: "jacket",
   envelope: "mail",
