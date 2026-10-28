@@ -147,3 +147,7 @@ Bei `pointer: coarse` (Handy, Tablet) sind interaktive Elemente mindestens 44×4
 - Sidebar (`src/components/nav-menu.tsx`) statt Tab-Leisten: ab `lg` dauerhaft links (`w-64`, einklappbar auf Icon-Leiste `w-14`), darunter Drawer per Hamburger in der Navbar.
 - Untermenüs sind `<details name="nav">` (Akkordeon); die Menüstruktur steht nur in `menuDefinition()`. Neue Seiten dort eintragen, nicht pro Route.
 - Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen); Obermenü zeigt die Summe, außer es ist aktiv.
+
+## Icons
+
+Quelle: [Tabler Icons](https://tabler.io/icons) (Outline), Stroke 1,5. Neue Icons nur über die `ICONS`-Liste in `scripts/generate-icons.mjs` ergänzen (Name im Code → Tabler-Dateiname) und `pnpm icons:generate` ausführen; `icons.generated.ts` nie von Hand editieren. Es werden nur `<path>`-Icons unterstützt.

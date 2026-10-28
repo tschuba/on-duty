@@ -1,6 +1,7 @@
-// Pulls the icons this app actually uses out of the `heroicons` package
-// (raw SVGs, no React) into a committed TS module. Re-run after editing
-// the ICONS list below; never hand-edit icons.generated.ts.
+// Pulls the icons this app actually uses out of the `@tabler/icons` package
+// (outline SVGs) into a committed TS module. Keys are our names, values the
+// Tabler file names. Re-run after editing the ICONS list below; never
+// hand-edit icons.generated.ts.
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,49 +10,48 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const out = join(root, "src", "components", "icons.generated.ts");
 
 const ICONS = {
-  fire: "24/outline/fire.svg",
-  "exclamation-triangle": "24/outline/exclamation-triangle.svg",
-  "calendar-days": "24/outline/calendar-days.svg",
-  banknotes: "24/outline/banknotes.svg",
-  "archive-box": "24/outline/archive-box.svg",
-  "building-office": "24/outline/building-office.svg",
-  link: "24/outline/link.svg",
-  "magnifying-glass": "24/outline/magnifying-glass.svg",
-  "clipboard-document": "24/outline/clipboard-document.svg",
-  "cog-6-tooth": "24/outline/cog-6-tooth.svg",
-  users: "24/outline/users.svg",
-  "user-group": "24/outline/user-group.svg",
-  "bars-3": "24/outline/bars-3.svg",
-  "chevron-down": "20/solid/chevron-down.svg",
-  sun: "24/outline/sun.svg",
-  moon: "24/outline/moon.svg",
-  clock: "24/outline/clock.svg",
-  "check": "24/outline/check.svg",
-  "arrow-up": "24/outline/arrow-up.svg",
-  "arrow-down": "24/outline/arrow-down.svg",
-  "no-symbol": "24/outline/no-symbol.svg",
-  "x-mark": "24/outline/x-mark.svg",
-  "trash": "24/outline/trash.svg",
-  "plus": "24/outline/plus.svg",
-  "document-duplicate": "24/outline/document-duplicate.svg",
-  "chart-bar": "24/outline/chart-bar.svg",
-  "arrow-down-tray": "24/outline/arrow-down-tray.svg",
-  "arrow-up-tray": "24/outline/arrow-up-tray.svg",
-  "arrow-uturn-left": "24/outline/arrow-uturn-left.svg",
-  "arrow-left": "24/outline/arrow-left.svg",
-  "pencil": "24/outline/pencil.svg",
-  "no-symbol": "24/outline/no-symbol.svg",
-  "arrow-right-start-on-rectangle": "24/outline/arrow-right-start-on-rectangle.svg",
-  "arrow-top-right-on-square": "24/outline/arrow-top-right-on-square.svg",
-  truck: "24/outline/truck.svg",
-  "shield-check": "24/outline/shield-check.svg",
-  "wrench-screwdriver": "24/outline/wrench-screwdriver.svg",
-  user: "24/outline/user.svg",
-  envelope: "24/outline/envelope.svg",
-  "map-pin": "24/outline/map-pin.svg",
-  phone: "24/outline/phone.svg",
-  "device-phone-mobile": "24/outline/device-phone-mobile.svg",
-  "squares-2x2": "24/outline/squares-2x2.svg",
+  fire: "flame",
+  "exclamation-triangle": "alert-triangle",
+  "calendar-days": "calendar",
+  banknotes: "cash",
+  "archive-box": "archive",
+  "building-office": "building",
+  link: "link",
+  "magnifying-glass": "search",
+  "clipboard-document": "clipboard",
+  "cog-6-tooth": "settings",
+  users: "users",
+  "user-group": "users-group",
+  "bars-3": "menu-2",
+  "chevron-down": "chevron-down",
+  sun: "sun",
+  moon: "moon",
+  clock: "clock",
+  check: "check",
+  "arrow-up": "arrow-up",
+  "arrow-down": "arrow-down",
+  "no-symbol": "ban",
+  "x-mark": "x",
+  trash: "trash",
+  plus: "plus",
+  "document-duplicate": "copy",
+  "chart-bar": "chart-bar",
+  "arrow-down-tray": "download",
+  "arrow-up-tray": "upload",
+  "arrow-uturn-left": "arrow-back-up",
+  "arrow-left": "arrow-left",
+  pencil: "pencil",
+  "arrow-right-start-on-rectangle": "logout",
+  "arrow-top-right-on-square": "external-link",
+  truck: "truck",
+  "shield-check": "shield-check",
+  "wrench-screwdriver": "tools",
+  user: "user",
+  envelope: "mail",
+  "map-pin": "map-pin",
+  phone: "phone",
+  "device-phone-mobile": "device-mobile",
+  "squares-2x2": "layout-grid",
 };
 
 function attr(str, name) {
@@ -61,7 +61,8 @@ function attr(str, name) {
 
 function parseIcon(svg) {
   const [, svgAttrs, inner] = svg.match(/<svg([^>]*)>([\s\S]*)<\/svg>/);
-  const paths = [...inner.matchAll(/<path([^>]*)\/>/g)].map(([, pathAttrs]) => ({
+  if (/<(circle|rect|line|ellipse|polyline|polygon)\b/.test(inner)) throw new Error("unsupported non-path element");
+  const paths = [...inner.matchAll(/<path([^>]*)\/>/g)].filter(([, a]) => attr(a, "stroke") !== "none").map(([, pathAttrs]) => ({
     d: attr(pathAttrs, "d"),
     fillRule: attr(pathAttrs, "fill-rule"),
     clipRule: attr(pathAttrs, "clip-rule"),
@@ -70,12 +71,12 @@ function parseIcon(svg) {
     viewBox: attr(svgAttrs, "viewBox"),
     fill: attr(svgAttrs, "fill"),
     stroke: attr(svgAttrs, "stroke"),
-    strokeWidth: attr(svgAttrs, "stroke-width"),
+    strokeWidth: "1.5", // Tabler ships 2; 1.5 matches the style guide
     paths,
   };
 }
 
-// Icons heroicons doesn't ship, in the same outline style (24 grid, 1.5 stroke).
+// Icons Tabler doesn't ship, in the same outline style (24 grid, 1.5 stroke).
 const CUSTOM = {
   cross: {
     viewBox: "0 0 24 24",
@@ -86,12 +87,12 @@ const CUSTOM = {
   },
 };
 
-const entries = [...Object.entries(ICONS).map(([name, path]) => {
-  const svg = readFileSync(join(root, "node_modules", "heroicons", path), "utf-8");
+const entries = [...Object.entries(ICONS).map(([name, file]) => {
+  const svg = readFileSync(join(root, "node_modules", "@tabler", "icons", "icons", "outline", `${file}.svg`), "utf-8");
   return [name, parseIcon(svg)];
 }), ...Object.entries(CUSTOM)];
 
-const banner = `// Generated by scripts/generate-icons.mjs from the \`heroicons\` package.\n// Do not edit by hand — edit the ICONS list in that script and re-run it.\n`;
+const banner = `// Generated by scripts/generate-icons.mjs from the \`@tabler/icons\` package.\n// Do not edit by hand — edit the ICONS list in that script and re-run it.\n`;
 const body = `export type IconName = ${entries.map(([name]) => JSON.stringify(name)).join(" | ")};\n\nexport type IconData = {\n  viewBox: string;\n  fill?: string;\n  stroke?: string;\n  strokeWidth?: string;\n  paths: { d: string; fillRule?: string; clipRule?: string }[];\n};\n\nexport const ICONS: Record<IconName, IconData> = ${JSON.stringify(
   Object.fromEntries(entries),
   null,
