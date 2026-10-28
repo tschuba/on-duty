@@ -21,6 +21,7 @@ const ICONS = {
   "clipboard-document": "clipboard",
   "cog-6-tooth": "settings",
   users: "users",
+  "users-plus": "users-plus",
   "mood-boy": "mood-boy",
   "bars-3": "menu-2",
   "chevron-down": "chevron-down",
