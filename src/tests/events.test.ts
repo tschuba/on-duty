@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { normalizeEventTags } from "../lib/event-tags.js";
 import { parseEventForm, validateEventForm } from "../lib/events.js";
 
 const TZ = "Europe/Berlin";
@@ -44,4 +45,8 @@ describe("validateEventForm", () => {
       expect(r.endsAt.toISOString()).toBe("2026-07-16T21:59:00.000Z");
     }
   });
+});
+
+it("normalizeEventTags maps labels to keys and dedupes", () => {
+  expect(normalizeEventTags(["übung", "drill", "Pflichttermin", "Grillen"])).toEqual(["drill", "mandatory", "Grillen"]);
 });

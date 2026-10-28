@@ -32,3 +32,35 @@ describe("ChipInput suggestions", () => {
     expect(chips()).toEqual(["Übung"]);
   });
 });
+
+describe("ChipInput presets", () => {
+  const presets = [{ key: "drill", label: "Übung", badge: "badge-info" }];
+  const mountP = () => {
+    document.body.innerHTML = `<form>${String(<ChipInput name="tags" label="T" splitOnComma caseSensitive={false} presets={presets} />)}</form>`;
+    document.querySelectorAll("script").forEach((s) => { new Function(s.textContent!)(); });
+    return document.querySelector<HTMLInputElement>(".chip-text")!;
+  };
+  const btn = () => document.querySelector<HTMLElement>(".chip-preset")!;
+  const values = () => [...document.querySelectorAll<HTMLInputElement>("input[name=tags]")].map((i) => i.value);
+  it("button adds the key, hides itself, returns after removal", () => {
+    mountP();
+    btn().click();
+    expect(values()).toEqual(["drill"]);
+    expect(btn().hidden).toBe(true);
+    document.querySelector<HTMLElement>(".chip-remove")!.click();
+    expect(values()).toEqual([]);
+    expect(btn().hidden).toBe(false);
+  });
+  it("typing the label maps to the preset, no duplicate", () => {
+    const input = mountP();
+    btn().click();
+    input.value = "übung"; key(input, "Enter");
+    expect(values()).toEqual(["drill"]);
+  });
+  it("typing the label first hides the button", () => {
+    const input = mountP();
+    input.value = "ÜBUNG"; key(input, "Enter");
+    expect(values()).toEqual(["drill"]);
+    expect(btn().hidden).toBe(true);
+  });
+});

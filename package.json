@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.65.0",
+  "version": "0.66.0",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "repository": "github:tschuba/on-duty",
