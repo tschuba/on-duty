@@ -68,8 +68,8 @@ export function FormActions({ formId, saveAndNew, cancelHref }: { formId: string
   // Verwerfen-Button ist nur bei Änderungen sichtbar → dient als Dirty-Flag
   const confirmJs = `var d=document.querySelector('[data-discard="${formId}"]');return !d||d.classList.contains('hidden')||confirm(${JSON.stringify(t("common.cancelConfirm"))})`;
   return (<>
-    <HeaderAction icon="x-mark" label={t("common.discard")} type="reset" form={formId} class="btn-outline hidden" attrs={{ "data-discard": formId }} />
-    {cancelHref && <HeaderAction icon="arrow-uturn-left" label={t("common.cancel")} href={cancelHref} class="btn-outline" attrs={{ onclick: confirmJs }} />}
+    <HeaderAction icon="arrow-uturn-left" label={t("common.discard")} type="reset" form={formId} class="btn-outline hidden" attrs={{ "data-discard": formId }} />
+    {cancelHref && <HeaderAction icon="x-mark" label={t("common.cancel")} href={cancelHref} class="btn-outline" attrs={{ onclick: confirmJs }} />}
     {saveAndNew && <HeaderAction icon="plus" label={t("common.saveAndNew")} form={formId} name="_action" value="save_and_new" class="btn-outline btn-primary" />}
     <HeaderAction variant="primary" icon="check" label={t("common.save")} form={formId} class="btn-primary" />
   </>);
