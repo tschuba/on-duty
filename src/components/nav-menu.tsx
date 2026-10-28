@@ -42,7 +42,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("donations.tabs.donations"), href: "/donations", show: donations, count: c.receipts },
       { label: t("donations.tabs.donors"), href: "/donors", show: donations, count: c.donors },
     ] },
-    { icon: "archive-box", label: t("common.nav.inventory"), items: [
+    { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
       { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read") },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans, tone: "badge-primary" },
@@ -116,7 +116,8 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
     <ul id="nav-menu" class="menu w-full grow flex-nowrap gap-1 overflow-auto is-drawer-close:overflow-visible p-2">
       <li class="hidden lg:block mt-1.5">
         <label for="nav-drawer" class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={t("common.nav.toggleSidebar")} aria-label={t("common.nav.toggleSidebar")}>
-          <Icon name="bars-3" class="h-5 w-5 text-gold" />
+          <Icon name="sidebar-collapse" class="h-5 w-5 text-gold is-drawer-close:hidden" />
+          <Icon name="sidebar-expand" class="h-5 w-5 text-gold hidden is-drawer-close:block" />
         </label>
       </li>
       <li class="is-drawer-close:hidden">

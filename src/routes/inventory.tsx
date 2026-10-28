@@ -44,10 +44,10 @@ type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]
 // piece). A plain list, not scattered if/category checks, so a future category
 // opts in with one line here.
 const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean; icon: IconName }[] = [
-  { category: "vehicle", batchCapable: false, icon: "truck" },
-  { category: "scba", batchCapable: false, icon: "shield-check" },
-  { category: "equipment", batchCapable: true, icon: "wrench-screwdriver" },
-  { category: "ppe", batchCapable: true, icon: "user" },
+  { category: "vehicle", batchCapable: false, icon: "firetruck" },
+  { category: "scba", batchCapable: false, icon: "scuba-diving-tank" },
+  { category: "equipment", batchCapable: true, icon: "axe" },
+  { category: "ppe", batchCapable: true, icon: "jacket" },
   { category: "other", batchCapable: true, icon: "squares-2x2" },
 ];
 export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
