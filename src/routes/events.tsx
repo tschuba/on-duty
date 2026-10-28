@@ -146,7 +146,7 @@ function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: bool
 
 // Kalender + Liste. Die Liste zeigt ein gleitendes Fenster aus Fokusmonat ± 1 (nur Monate mit Terminen), der Rest kommt per ?rows= nach.
 function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { rows: EventRow[]; tz: string; canManage: boolean; base: string; tagFilter: string[]; monthParam?: string }) {
-  if (!rows.length) return <p class="text-base-content/60 py-8">{t("events.empty")}</p>;
+  if (!rows.length) return <p class="text-base-content/60 py-8">{t(tagFilter.length ? "events.emptyFiltered" : "events.empty")}</p>;
   const days = [...new Set(rows.map((ev) => toLocalDate(ev.startsAt, tz)))];
   const months = [...new Set(days.map((d) => d.slice(0, 7)))];
   const wanted = monthParam && MONTH_RE.test(monthParam) ? monthParam : todayStr().slice(0, 7);
