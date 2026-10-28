@@ -42,7 +42,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("donations.tabs.donations"), href: "/donations", show: donations, count: c.receipts },
       { label: t("donations.tabs.donors"), href: "/donors", show: donations, count: c.donors },
     ] },
-    { icon: "archive-box", label: t("common.nav.inventory"), items: [
+    { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
       { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read") },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans, tone: "badge-primary" },

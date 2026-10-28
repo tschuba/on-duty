@@ -15,6 +15,7 @@ const ICONS = {
   "calendar-days": "calendar",
   banknotes: "cash",
   "archive-box": "archive",
+  "building-warehouse": "building-warehouse",
   "building-office": "building",
   link: "link",
   "magnifying-glass": "search",
