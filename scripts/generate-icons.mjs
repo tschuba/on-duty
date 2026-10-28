@@ -55,6 +55,7 @@ const ICONS = {
   phone: "phone",
   "device-phone-mobile": "device-mobile",
   "squares-2x2": "layout-grid",
+  "scuba-diving-tank": "scuba-diving-tank",
 };
 
 function attr(str, name) {

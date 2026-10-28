@@ -45,7 +45,7 @@ type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]
 // opts in with one line here.
 const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean; icon: IconName }[] = [
   { category: "vehicle", batchCapable: false, icon: "firetruck" },
-  { category: "scba", batchCapable: false, icon: "shield-check" },
+  { category: "scba", batchCapable: false, icon: "scuba-diving-tank" },
   { category: "equipment", batchCapable: true, icon: "axe" },
   { category: "ppe", batchCapable: true, icon: "jacket" },
   { category: "other", batchCapable: true, icon: "squares-2x2" },
