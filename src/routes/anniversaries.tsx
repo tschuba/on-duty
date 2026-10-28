@@ -79,7 +79,7 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
   const border = divider ? " border-t border-base-300" : "";
 
   // Fördernde bekommen in der Liste kein Status-Badge.
-  const statusBadge = e.status === "foerdernd" ? null : <StatusBadge status={e.status} compact />;
+  const statusBadge = e.status === "supporting" ? null : <StatusBadge status={e.status} compact />;
   const kindBadge = e.kind === "birthday"
     ? <span class="badge badge-outline badge-sm">{t("anniversaries.event.birthday")}</span>
     : <span class="badge badge-warning badge-outline badge-sm">{anniversaryLabel(e)}</span>;

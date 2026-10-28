@@ -50,6 +50,6 @@ describe("migration 0044 keeps member status stable", () => {
     const { deriveMemberStatus } = await import("../lib/status.js");
     const role: any = { grantsActiveStatus: ROLE_SEED.find((r) => r.title === "Kommandant")!.grantsActiveStatus };
     const a: any = { role, from: "2010-01-01", to: null };
-    expect(deriveMemberStatus({ birthDate: "1980-01-01", exitDate: null, deathDate: null }, [a], 12, 18, 65, new Date("2026-01-01"))).toBe("aktiv");
+    expect(deriveMemberStatus({ birthDate: "1980-01-01", exitDate: null, deathDate: null }, [a], 12, 18, 65, new Date("2026-01-01"))).toBe("active");
   });
 });

@@ -162,8 +162,8 @@ function genderBreakdown(c: { m: number; w: number; o: number }) {
 }
 
 export function StatsCards({ all }: { all: MemberWithStatus[] }) {
-  const counts = { aktiv: 0, passiv: 0, foerdernd: 0, kinder: 0, jugend: 0, ausgetreten: 0, verstorben: 0 };
-  const genderCount = (status: "aktiv" | "kinder" | "jugend") => {
+  const counts = { active: 0, passive: 0, supporting: 0, children: 0, youth: 0, left: 0, deceased: 0 };
+  const genderCount = (status: "active" | "children" | "youth") => {
     const subset = all.filter((m) => m.status === status);
     return {
       m: subset.filter((m) => m.gender === "male").length,
@@ -173,48 +173,48 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   };
 
   for (const m of all) counts[m.status]++;
-  const aktiv = genderCount("aktiv");
-  const jugend = genderCount("jugend");
-  const kinder = genderCount("kinder");
+  const active = genderCount("active");
+  const youth = genderCount("youth");
+  const children = genderCount("children");
 
   return (
     <div id="members-stats" class="hidden sm:grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.active")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-success">{counts.aktiv}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(aktiv)}</div>
+          <div class="stat-value text-success">{counts.active}</div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(active)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.passive")}</div>
-        <div class="stat-value">{counts.passiv}</div>
+        <div class="stat-value">{counts.passive}</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.supporting")}</div>
-        <div class="stat-value text-secondary">{counts.foerdernd}</div>
+        <div class="stat-value text-secondary">{counts.supporting}</div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.youth")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-info">{counts.jugend}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(jugend)}</div>
+          <div class="stat-value text-info">{counts.youth}</div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(youth)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.children")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-warning">{counts.kinder}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(kinder)}</div>
+          <div class="stat-value text-warning">{counts.children}</div>
+          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(children)}</div>
         </div>
       </div>
       <div class="stat bg-base-200 rounded-box p-4">
         <div class="stat-title">{t("members.stats.former")}</div>
         <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-base-content/40">{counts.ausgetreten + counts.verstorben}</div>
+          <div class="stat-value text-base-content/40">{counts.left + counts.deceased}</div>
           <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">
-            {counts.ausgetreten > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.ausgetreten} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
-            {counts.verstorben > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.verstorben} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
+            {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
+            {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
           </div>
         </div>
       </div>
@@ -635,7 +635,7 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
   const status = deriveMemberStatus(member, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
   const choice = trimmed(body, "startStatus");
   const name = `${trimmed(body, "firstName")} ${trimmed(body, "lastName")}`.trim() || t("members.form.thisMember");
-  const conflict = ["aktiv", "passiv", "foerdernd"].includes(choice)
+  const conflict = ["active", "passive", "supporting"].includes(choice)
     ? checkStartStatus(choice as StartStatus, member, planned, name)
     : undefined;
   const saved = trimmed(body, "savedStatus") as MemberStatus;
@@ -935,10 +935,10 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
 function AgeFilterDropdown({ ageFilter }: { ageFilter: AgeGroup[] }) {
   const c = env.CHILDREN_AGE_LIMIT, y = env.YOUTH_AGE_LIMIT, a = env.ACTIVE_AGE_LIMIT;
   const labels: Record<AgeGroup, string> = {
-    kinder: t("members.filter.age.kinder", { limit: c }),
-    jugend: t("members.filter.age.jugend", { from: c, to: y - 1 }),
-    erwachsen: t("members.filter.age.erwachsen", { from: y, to: a - 1 }),
-    senioren: t("members.filter.age.senioren", { limit: a }),
+    children: t("members.filter.age.children", { limit: c }),
+    youth: t("members.filter.age.youth", { from: c, to: y - 1 }),
+    adult: t("members.filter.age.adult", { from: y, to: a - 1 }),
+    senior: t("members.filter.age.senior", { limit: a }),
   };
   return (
     <MultiSelectFilter
@@ -954,8 +954,8 @@ function AgeFilterDropdown({ ageFilter }: { ageFilter: AgeGroup[] }) {
   );
 }
 
-const STATUS_ORDER: MemberStatus[] = ["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"];
-const DEFAULT_STATUS: MemberStatus[] = ["aktiv", "passiv", "foerdernd", "kinder", "jugend"];
+const STATUS_ORDER: MemberStatus[] = ["active", "passive", "supporting", "youth", "children", "left", "deceased"];
+const DEFAULT_STATUS: MemberStatus[] = ["active", "passive", "supporting", "children", "youth"];
 
 function StatusFilterDropdown({ statusFilter }: { statusFilter: MemberStatus[] }) {
   const isDefault = statusFilter.length === DEFAULT_STATUS.length && DEFAULT_STATUS.every((s) => statusFilter.includes(s));
@@ -964,7 +964,7 @@ function StatusFilterDropdown({ statusFilter }: { statusFilter: MemberStatus[] }
       param="status"
       autoApply
       searchable
-      options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "verstorben" ? "cross" : undefined }))}
+      options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "deceased" ? "cross" : undefined }))}
       selected={statusFilter}
       labelOverride={isDefault ? t("members.filter.currentStatus") : undefined}
       allLabel={t("members.filter.allStatus")}
@@ -996,7 +996,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const statusParsed = statusRaw.filter((s) => STATUS_LABELS[s as MemberStatus]); // unbekannte (z. B. altes "archiviert") ignorieren
   const statusFilter: MemberStatus[] = (statusParsed.length > 0
     ? statusParsed
-    : ["aktiv", "passiv", "foerdernd", "kinder", "jugend"]) as MemberStatus[];
+    : ["active", "passive", "supporting", "children", "youth"]) as MemberStatus[];
   const roleFilter = roleFilterRaw.filter(Boolean);
   const ageFilter = ageRaw.filter((a): a is AgeGroup => AGE_GROUPS.includes(a as AgeGroup));
   const { page, pageSize } = parsePagination(q);
@@ -1256,7 +1256,7 @@ function NewMemberDraft({ ctx, rerender }: { ctx: string; rerender?: boolean }) 
   );
 }
 
-type StartStatus = "aktiv" | "passiv" | "foerdernd";
+type StartStatus = "active" | "passive" | "supporting";
 
 function PassiveHint({ show }: { show: boolean }) {
   return <p id="startStatusPassiveHint" class="text-sm opacity-70" hidden={!show}>{t("members.form.startStatusPassiveHint", { grenze: String(env.ACTIVE_AGE_LIMIT) })}</p>;
@@ -1267,7 +1267,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
     <fieldset class="space-y-2">
       <legend class="sr-only">{t("members.form.startStatus")}</legend>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {(["aktiv", "passiv", "foerdernd"] as const).map((s) => (
+        {(["active", "passive", "supporting"] as const).map((s) => (
           <label class="card bg-base-200 border-2 border-transparent cursor-pointer has-[:checked]:border-primary">
             <div class="card-body p-4 gap-1">
               <div class="flex items-center gap-2">
@@ -1287,7 +1287,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
           // Fördernd: Funktionen ausblenden und deaktivieren (nichts wird gesendet); Zeilen bleiben im DOM erhalten.
           var wrap = document.getElementById('assignments-wrap');
           function sync() {
-            var off = current() === 'foerdernd';
+            var off = current() === 'supporting';
             wrap.hidden = off;
             wrap.querySelectorAll('input,select,textarea,button').forEach(function (el) { el.disabled = off; });
           }
@@ -1298,7 +1298,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
             r.addEventListener('invalid', function (e) { e.preventDefault(); err.hidden = false; err.scrollIntoView({ block: 'center' }); });
             r.addEventListener('change', function () {
               err.hidden = true;
-              document.getElementById('startStatusPassiveHint').hidden = current() !== 'passiv';
+              document.getElementById('startStatusPassiveHint').hidden = current() !== 'passive';
               sync();
             });
           });
@@ -1322,19 +1322,19 @@ function checkStartStatus(
   const datum = new Date(ageLimitDate(member.birthDate, env.ACTIVE_AGE_LIMIT)).toLocaleDateString("de-DE");
   const runningActive = planned.find((a) => a.role.grantsActiveStatus && !a.to);
   const anyActive = planned.find((a) => a.role.grantsActiveStatus);
-  const isActiveFamily = derived === "aktiv" || derived === "kinder" || derived === "jugend";
-  const suggest = isActiveFamily ? (derived === "aktiv" ? "aktiv" : undefined) : (derived as StartStatus);
-  if (choice === "aktiv" && !isActiveFamily) {
-    return derived === "passiv"
+  const isActiveFamily = derived === "active" || derived === "children" || derived === "youth";
+  const suggest = isActiveFamily ? (derived === "active" ? "active" : undefined) : (derived as StartStatus);
+  if (choice === "active" && !isActiveFamily) {
+    return derived === "passive"
       ? { message: t("members.error.status.activeAgeLimit", { grenze, datum, name }), suggest }
       : { message: t("members.error.status.activeNoRole", { name }), suggest };
   }
-  if (choice === "passiv" && derived !== "passiv") {
-    return derived === "foerdernd"
+  if (choice === "passive" && derived !== "passive") {
+    return derived === "supporting"
       ? { message: t("members.error.status.passiveNoRole", { grenze, datum, name }), suggest }
       : { message: t("members.error.status.passiveRunning", { grenze, datum, name }), suggest };
   }
-  if (choice === "foerdernd" && derived !== "foerdernd") {
+  if (choice === "supporting" && derived !== "supporting") {
     const titel = (runningActive ?? anyActive)?.role.title ?? "";
     const status = STATUS_LABELS[derived].toLowerCase();
     return { message: t("members.error.status.supportingHasRole", { titel, name, status }), suggest };
@@ -1436,7 +1436,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   if (firstEntryDate && entryDate && firstEntryDate > entryDate) errors.firstEntryDate = t("members.form.firstEntryDateAfterEntry");
 
   // Fördernd: keine Funktionen, gesendete Felder ignorieren.
-  if ((trimmed(body, "switchStatus") || trimmed(body, "startStatus")) === "foerdernd") for (const k of ["id", "role", "from", "to", "note", "idx"]) delete body[`assignment_${k}[]`];
+  if ((trimmed(body, "switchStatus") || trimmed(body, "startStatus")) === "supporting") for (const k of ["id", "role", "from", "to", "note", "idx"]) delete body[`assignment_${k}[]`];
 
   // Parse assignments (keep rows unfiltered so index i stays aligned across role/from/to)
   const assignmentRoles = [body["assignment_role[]"]].flat() as string[];
@@ -1453,8 +1453,8 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
 
   // Auswahl aktiv/passiv/fördernd gegen den abgeleiteten Status prüfen (nur Anlegen, Server entscheidet).
   const startStatus = (trimmed(body, "switchStatus") || trimmed(body, "startStatus")) as StartStatus;
-  let statusConflict: { message: string; suggest?: "aktiv" | "passiv" | "foerdernd" } | undefined;
-  if (Object.keys(errors).length === 0 && ["aktiv", "passiv", "foerdernd"].includes(startStatus)) {
+  let statusConflict: { message: string; suggest?: "active" | "passive" | "supporting" } | undefined;
+  if (Object.keys(errors).length === 0 && ["active", "passive", "supporting"].includes(startStatus)) {
     const allRoles = await db.select().from(memberRoles);
     const planned = assignmentRoles.flatMap((r, i) => {
       const role = allRoles.find((x) => x.id === r);
@@ -1516,9 +1516,9 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
               <span class="text-sm">{t("members.form.notifyApplicant")}</span>
             </label>
           )}
-          <div id="assignments-wrap" hidden={startStatus === "foerdernd"}><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
+          <div id="assignments-wrap" hidden={startStatus === "supporting"}><Section title={t("members.form.assignments")} open actions={<AssignmentAddButton />}>
           <StatusPreview />
-          <PassiveHint show={startStatus === "passiv"} />
+          <PassiveHint show={startStatus === "passive"} />
         <AssignmentsBox rows={rowsFromBody(body, await db.select().from(memberRoles))} />
           </Section></div>
         </form>

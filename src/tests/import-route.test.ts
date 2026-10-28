@@ -42,7 +42,7 @@ describe("import routes", () => {
     expect(res.status).toBe(200);
   });
   it("previews a member list", async () => {
-    const res = await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "aktiv", Geburtstag: "01.02.1990", Eintritt: "01.01.2010" }]));
+    const res = await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "active", Geburtstag: "01.02.1990", Eintritt: "01.01.2010" }]));
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Muster");
   });
@@ -88,7 +88,7 @@ describe("import routes", () => {
     expect(res.status).toBeLessThan(500);
   });
   it("runs a member import", async () => {
-    const fd = upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "passiv", Geburtstag: "01.02.1990", Eintritt: "01.01.2010" }]);
+    const fd = upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "passive", Geburtstag: "01.02.1990", Eintritt: "01.01.2010" }]);
     fd.set("intent", "run");
     const res = await post("/run", fd);
     expect(res.status).toBe(200);
@@ -100,10 +100,10 @@ describe("import routes", () => {
     const res = await post("/run", fd);
     expect(res.status).toBe(200);
   });
-  const full = { Name: "Muster", Vorname: "Max", Status: "aktiv", Geschlecht: "m", Geburtstag: "01.02.1990", Eintritt: "01.01.2010", Dienstgrad: "Hauptfeuerwehrmann", Funktionen: "Kassier", Telefon: "0960 1", "e-Mail": "a@b.de", Strasse: "Weg", "Nr.": "1", PLZ: "95000", Ort: "Hof" };
+  const full = { Name: "Muster", Vorname: "Max", Status: "active", Geschlecht: "m", Geburtstag: "01.02.1990", Eintritt: "01.01.2010", Dienstgrad: "Hauptfeuerwehrmann", Funktionen: "Kassier", Telefon: "0960 1", "e-Mail": "a@b.de", Strasse: "Weg", "Nr.": "1", PLZ: "95000", Ort: "Hof" };
   it("previews members with assumed data, confirmed and not", async () => {
     for (const ok of [false, true]) {
-      const fd = upload(MEMBER_HEAD, [{ mID: 1, ...full }, { mID: 2, ...full, Vorname: "Eva", Status: "verstorben", "Verstorben am": "01.01.2020" }, { mID: 3, ...full, Vorname: "Bad", Geburtstag: "xx" }]);
+      const fd = upload(MEMBER_HEAD, [{ mID: 1, ...full }, { mID: 2, ...full, Vorname: "Eva", Status: "deceased", "Verstorben am": "01.01.2020" }, { mID: 3, ...full, Vorname: "Bad", Geburtstag: "xx" }]);
       if (ok) fd.set("assumed_ok", "1");
       fd.set("inc", "1");
       const res = await post("/preview", fd);
