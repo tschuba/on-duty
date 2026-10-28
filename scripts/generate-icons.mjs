@@ -45,6 +45,7 @@ const ICONS = {
   "arrow-right-start-on-rectangle": "logout",
   "arrow-top-right-on-square": "external-link",
   truck: "truck",
+  firetruck: "firetruck",
   "shield-check": "shield-check",
   "wrench-screwdriver": "tools",
   user: "user",
