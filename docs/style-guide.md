@@ -123,6 +123,16 @@ Größen: `btn` ohne Größen-Modifier nur für große ist Standard für Aktione
 
 Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, Kopieren, Aktivieren, ↑/↓) ist eine `RowAction` (`src/components/row-action.tsx`): `btn btn-xs` mit Icon, das Label verschwindet unter `md` (`max-md:hidden`). `aria-label` ist immer das Label, `title` standardmäßig ebenfalls; bei deaktivierten Buttons trägt `title` die Begründung. Icons: Bearbeiten `pencil`, Löschen `trash`, Kopieren `document-duplicate`, Aktivieren `check`, Ablehnen `x-mark`, Deaktivieren `no-symbol`, ↑/↓ `arrow-up`/`arrow-down`. Nicht betroffen: Formular-Buttons, Filter-Buttons und Buttons außerhalb von Tabellen.
 
+## Detail-Seiten (Read-only/Edit)
+
+Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donors, donations, admin/users, admin/permissions) öffnet zuerst read-only:
+
+- `GET /:id` = Read-only-Ansicht (`ViewGrid` + `ViewField` aus `src/components/field.tsx`, nie lokal neu definieren), `GET /:id/edit` = Formular. Ohne Schreibrecht leitet `/:id/edit` auf `/:id` um. „Neu“-Formulare öffnen direkt im Bearbeiten-Modus.
+- Listen-Zeilenklick führt auf `/:id`. Nach Speichern: Redirect auf `/:id` + Toast; bei Validierungsfehler im Formular bleiben.
+- Read-only-Header: `DetailActions` (`src/components/page-header.tsx`) – „Löschen“ (`btn-outline btn-error`, nur mit Löschrecht), rechts davon „Bearbeiten“ (`btn-primary`, `pencil`, nur mit Schreibrecht).
+- Formular-Header: `FormActions` mit `cancelHref` (Abbrechen → `/:id`, Rückfrage bei Änderungen), Verwerfen, Speichern. Kein Löschen im Formular.
+- Ausgenommen: anniversary-years, applications, Einstellungsseiten ohne Datensatz (`/admin/config`, `/organisation`, `/account`).
+
 ## Responsive Schwellen
 
 - **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische Filterleiste und Untermenü. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.

@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import { ToggleFilter } from "../components/toggle-filter.js";
-import { Field } from "../components/field.js";
+import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import type { IconName } from "../components/icons.generated.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -795,7 +795,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             const lending = lendingByItem.get(item.id);
             const status = itemStatus(item, !!lending);
             return (
-              <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}/edit'`}>
+              <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}'`}>
                 <td>{item.name}</td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
                 <td class="hidden md:table-cell">{due ? formatDate(due) : "—"}</td>
@@ -873,15 +873,6 @@ type LendableField = {
   errors?: { maxRequestQuantity?: string };
 };
 
-function ViewField({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <div class="text-sm opacity-60">{label}</div>
-      <div class="font-medium">{value || "—"}</div>
-    </div>
-  );
-}
-
 function lendableField(
   user: { permissions: Set<string> },
   checked: boolean,
@@ -905,7 +896,7 @@ function lendableField(
   };
 }
 
-function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable }: {
+function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable, cancelHref }: {
   title: string;
   action: string;
   values?: Partial<InventoryFieldValues>;
@@ -915,10 +906,11 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
   assignments?: AssignmentInput[];
   extraActions?: any;
   lendable?: LendableField;
+  cancelHref?: string;
 }) {
   return (
     <>
-      <PageHeader title={title} backHref="/inventory" subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} /></>} />
+      <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} cancelHref={cancelHref} /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
@@ -1056,9 +1048,11 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     );
   }
 
+  let newId = "";
   try {
   await db.transaction(async (tx) => {
     const [item] = await tx.insert(inventoryItems).values(insertValues).returning();
+    newId = item.id;
     if (tags.length > 0) {
       await tx.insert(inventoryItemTags).values(tags.map((tag) => ({ inventoryItemId: item.id, tag })));
     }
@@ -1092,71 +1086,53 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   }
 
   setFlash(c, t("inventory.flash.created"), "success");
-  return c.redirect("/inventory");
+  return c.redirect(`/inventory/${newId}`);
 });
 
 // GET /inventory/:id/edit — also where a completed inspection is recorded (no
 // inline quick-action, see backlog doc: every date is free-form anyway).
+function RetireAction({ item, isBatch, availableToRetire }: { item: ItemWithRelations; isBatch: boolean; availableToRetire: number }) {
+  return (
+    item.retiredAt ? (
+      <form method="post" action={`/inventory/${item.id}/reactivate`} onsubmit={`return confirm('${t("inventory.reactivate.confirm")}')`}>
+        <HeaderAction type="submit" icon="check" label={t("inventory.reactivate.button")} class="btn-outline" />
+      </form>
+    ) : (
+      <>
+        <HeaderAction icon="no-symbol" label={t("inventory.retire.button")} class="btn-outline btn-warning" onclick="document.getElementById('retire-modal').showModal()" />
+        <dialog id="retire-modal" class="modal">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg">{t("inventory.retire.confirmTitle")}</h3>
+            <p class="py-2 opacity-70">{t("inventory.retire.confirmBody", { name: item.name })}</p>
+            <form method="post" action={`/inventory/${item.id}/retire`} class="space-y-2">
+              {isBatch && (
+                <Field label={t("inventory.retire.quantityLabel")}>
+                  <input type="number" name="retireQuantity" min="1" max={Math.max(1, availableToRetire)} value={Math.max(1, availableToRetire)} class="input w-full" placeholder={t("inventory.retire.quantityLabel")} />
+                  <span class="text-xs opacity-60 mt-1">{t("inventory.retire.quantityHint", { available: availableToRetire, quantity: item.quantity })}</span>
+                </Field>
+              )}
+              <Field label={t("inventory.retire.reasonLabel")}>
+                <input type="text" name="retiredReason" placeholder={t("inventory.retire.reasonLabel")} class="input w-full" />
+              </Field>
+              <div class="modal-action">
+                <button type="button" class="btn" onclick="document.getElementById('retire-modal').close()">{t("common.cancel")}</button>
+                <button type="submit" class="btn btn-warning">{t("inventory.retire.button")}</button>
+              </div>
+            </form>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+        </dialog>
+      </>
+    )
+  );
+}
+
 inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
-  const item = await fetchItem(c.req.param("id"));
+  const id = c.req.param("id");
+  if (!user.permissions.has("inventory:manage")) return c.redirect(`/inventory/${id}`);
+  const item = await fetchItem(id);
   if (!item) return c.notFound();
-
-  if (!user.permissions.has("inventory:manage")) {
-    const lending = user.permissions.has("lending:read")
-      ? await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, item.id) })
-      : undefined;
-    const status = itemStatus(item, !!lending);
-    const assigned = assignmentDisplayList(item);
-    const cat = item.category as InventoryCategory;
-    const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
-    return c.html(
-      <Layout title={item.name} user={user}>
-        <PageHeader title={<>{item.name} <CategoryBadge category={cat} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" />
-        {item.retiredAt && (
-          <div class="alert alert-warning max-w-2xl mb-4">
-            {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
-          </div>
-        )}
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
-          <ViewField label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
-          <ViewField label={t("inventory.form.purchasePrice")} value={price} />
-          {item.numbers.length > 0 && (
-            <div class="sm:col-span-2">
-              <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.inventoryNumbers" : "inventory.form.inventoryNumber")}</div>
-              <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
-            </div>
-          )}
-          {SERIAL_CATEGORIES.has(cat) && item.serials.length > 0 && (
-            <div class="sm:col-span-2">
-              <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.serialNumbers" : "inventory.form.serialNumber")}</div>
-              <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
-            </div>
-          )}
-          {cat === "vehicle" && <>
-            <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
-            <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
-            <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />
-          </>}
-          {(cat === "scba" || cat === "equipment" || cat === "ppe") && <>
-            {cat === "scba" && <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />}
-            <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
-          </>}
-          {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
-          <ViewField
-            label={t("inventory.form.assignedMember")}
-            value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
-          />
-        </div>
-        {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
-        {item.tags.length > 0 && (
-          <div class="mt-6 flex flex-wrap gap-1">
-            {item.tags.map((tg) => <span class="badge badge-ghost badge-sm">{tg.tag}</span>)}
-          </div>
-        )}
-      </Layout>
-    );
-  }
 
   const assignmentList = assignmentDisplayList(item);
   const isBatch = item.quantity > 1;
@@ -1180,45 +1156,10 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     numbersList: sortedNumbers(item),
   };
 
-  const assignedTotal = assignmentList.reduce((sum, a) => sum + a.quantity, 0);
-  const availableToRetire = item.quantity - item.retiredQuantity - assignedTotal;
-
   // Zurücknehmen ist nur ohne Vorgänge möglich (Cascade würde die Historie löschen).
   const hasLoans = lendingItem
     ? Boolean(await db.query.lendingLoans.findFirst({ where: eq(lendingLoans.lendingItemId, lendingItem.id) }))
     : false;
-
-  const retireAction = item.retiredAt ? (
-    <form method="post" action={`/inventory/${item.id}/reactivate`} onsubmit={`return confirm('${t("inventory.reactivate.confirm")}')`}>
-      <HeaderAction type="submit" icon="check" label={t("inventory.reactivate.button")} class="btn-outline" />
-    </form>
-  ) : (
-    <>
-      <HeaderAction icon="no-symbol" label={t("inventory.retire.button")} class="btn-outline btn-warning" onclick="document.getElementById('retire-modal').showModal()" />
-      <dialog id="retire-modal" class="modal">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg">{t("inventory.retire.confirmTitle")}</h3>
-          <p class="py-2 opacity-70">{t("inventory.retire.confirmBody", { name: item.name })}</p>
-          <form method="post" action={`/inventory/${item.id}/retire`} class="space-y-2">
-            {isBatch && (
-              <Field label={t("inventory.retire.quantityLabel")}>
-                <input type="number" name="retireQuantity" min="1" max={Math.max(1, availableToRetire)} value={Math.max(1, availableToRetire)} class="input w-full" placeholder={t("inventory.retire.quantityLabel")} />
-                <span class="text-xs opacity-60 mt-1">{t("inventory.retire.quantityHint", { available: availableToRetire, quantity: item.quantity })}</span>
-              </Field>
-            )}
-            <Field label={t("inventory.retire.reasonLabel")}>
-              <input type="text" name="retiredReason" placeholder={t("inventory.retire.reasonLabel")} class="input w-full" />
-            </Field>
-            <div class="modal-action">
-              <button type="button" class="btn" onclick="document.getElementById('retire-modal').close()">{t("common.cancel")}</button>
-              <button type="submit" class="btn btn-warning">{t("inventory.retire.button")}</button>
-            </div>
-          </form>
-        </div>
-        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
-      </dialog>
-    </>
-  );
 
   return c.html(
     <Layout title={item.name} user={user}>
@@ -1236,10 +1177,10 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
         title={item.name}
         action={`/inventory/${item.id}`}
         formId="inventory-edit-form"
+        cancelHref={`/inventory/${item.id}`}
         values={values}
         assignedMemberName={!isBatch ? assignmentList[0]?.name : undefined}
         assignments={isBatch ? assignmentList : []}
-        extraActions={retireAction}
         lendable={lendableField(user, Boolean(lendingItem), {
           editable: Boolean(lendingItem) || !item.retiredAt, locked: hasLoans,
           // s.o. in POST /:id: Einzel-Tracking folgt der Menge, solange kein Verleihvorgang existiert.
@@ -1311,6 +1252,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           title={existing.name}
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
+          cancelHref={`/inventory/${id}`}
           values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
@@ -1369,7 +1311,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   }
 
   setFlash(c, t("inventory.flash.saved"), "success");
-  return c.redirect("/inventory");
+  return c.redirect(`/inventory/${id}`);
 });
 
 // POST /inventory/:id/retire — soft-delete; for a batch, retires `retireQuantity`
@@ -1394,7 +1336,7 @@ inventoryRoutes.post("/:id/retire", requireAuth("inventory:manage"), async (c) =
     retiredReason: reason || null,
   }).where(eq(inventoryItems.id, id));
   setFlash(c, t("inventory.flash.retired"), "success");
-  return c.redirect(`/inventory/${id}/edit`);
+  return c.redirect(`/inventory/${id}`);
 });
 
 // POST /inventory/:id/reactivate — undo the retirement entirely, low effort, keeps
@@ -1403,7 +1345,7 @@ inventoryRoutes.post("/:id/reactivate", requireAuth("inventory:manage"), async (
   const id = c.req.param("id");
   await db.update(inventoryItems).set({ retiredAt: null, retiredReason: null, retiredQuantity: 0 }).where(eq(inventoryItems.id, id));
   setFlash(c, t("inventory.flash.reactivated"), "success");
-  return c.redirect(`/inventory/${id}/edit`);
+  return c.redirect(`/inventory/${id}`);
 });
 
 // GET /inventory/inspections — Prüffristen-Übersicht, filter-UX identisch zu /anniversaries.
@@ -1465,7 +1407,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
             {due.map((d) => {
               const overdue = d.dueDate < today;
               return (
-                <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${d.id}/edit'`}>
+                <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${d.id}'`}>
                   <td class={overdue ? "text-error font-semibold" : ""}>{d.name}</td>
                   <td><CategoryBadge category={d.category} /></td>
                   <td class={overdue ? "text-error font-semibold" : ""}>{formatDate(d.dueDate)} {overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
@@ -1525,5 +1467,69 @@ inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending
         </div>
       ))}
     </>
+  );
+});
+
+// Muss nach den statischen Pfaden (/inspections, /search-members) stehen.
+inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
+  const user = c.get("user")!;
+  const item = await fetchItem(c.req.param("id"));
+  if (!item) return c.notFound();
+  const canManage = user.permissions.has("inventory:manage");
+
+  const lending = user.permissions.has("lending:read")
+    ? await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, item.id) })
+    : undefined;
+  const status = itemStatus(item, !!lending);
+  const assigned = assignmentDisplayList(item);
+  const cat = item.category as InventoryCategory;
+  const availableToRetire = item.quantity - item.retiredQuantity - assigned.reduce((sum, x) => sum + x.quantity, 0);
+  const retireAction = canManage ? <RetireAction item={item} isBatch={item.quantity > 1} availableToRetire={availableToRetire} /> : undefined;
+  const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
+  return c.html(
+    <Layout title={item.name} user={user}>
+      <PageHeader title={<>{item.name} <CategoryBadge category={cat} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
+      {item.retiredAt && (
+        <div class="alert alert-warning max-w-2xl mb-4">
+          {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
+        </div>
+      )}
+      <ViewGrid>
+        <ViewField label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
+        <ViewField label={t("inventory.form.purchasePrice")} value={price} />
+        {item.numbers.length > 0 && (
+          <div class="sm:col-span-2">
+            <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.inventoryNumbers" : "inventory.form.inventoryNumber")}</div>
+            <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+          </div>
+        )}
+        {SERIAL_CATEGORIES.has(cat) && item.serials.length > 0 && (
+          <div class="sm:col-span-2">
+            <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.serialNumbers" : "inventory.form.serialNumber")}</div>
+            <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+          </div>
+        )}
+        {cat === "vehicle" && <>
+          <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
+          <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
+          <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />
+        </>}
+        {(cat === "scba" || cat === "equipment" || cat === "ppe") && <>
+          {cat === "scba" && <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />}
+          <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
+        </>}
+        {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
+        <ViewField
+          label={t("inventory.form.assignedMember")}
+          value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
+        />
+      </ViewGrid>
+      {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
+      {item.tags.length > 0 && (
+        <div class="mt-6 flex flex-wrap gap-1">
+          {item.tags.map((tg) => <span class="badge badge-ghost badge-sm">{tg.tag}</span>)}
+        </div>
+      )}
+    </Layout>
   );
 });

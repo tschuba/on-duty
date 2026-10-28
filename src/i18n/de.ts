@@ -3,6 +3,7 @@ export const de = {
   "common.yes": "Ja",
   "common.no": "Nein",
   "common.cancel": "Abbrechen",
+  "common.cancelConfirm": "Ungespeicherte Änderungen verwerfen?",
   "common.discard": "Verwerfen",
   "common.close": "Schließen",
   "common.save": "Speichern",

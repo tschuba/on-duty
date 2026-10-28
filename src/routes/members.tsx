@@ -1,6 +1,6 @@
 import { RowAction } from "../components/row-action.js";
 import type { Context } from "hono";
-import { EmailField, Field, PhoneField } from "../components/field.js";
+import { EmailField, Field, PhoneField, ViewField, ViewGrid } from "../components/field.js";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
 import { eq, and, asc, isNull, getTableColumns } from "drizzle-orm";
@@ -12,7 +12,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
-import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { RolePopover } from "../components/role-popover.js";
 import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
@@ -1605,7 +1605,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   // Entwurf erst nach erfolgreichem Anlegen löschen: Layout-Skript entfernt den Schlüssel auf der Folgeseite.
   setCookie(c, "draft-clear", draftCtx({ personId, linkMemberId, applicationId }), { path: "/", maxAge: 60, httpOnly: false });
   const saveAndNew = String(body._action ?? "") === "save_and_new";
-  return c.redirect(saveAndNew ? "/members/new" : "/members");
+  return c.redirect(saveAndNew ? "/members/new" : `/members/${newMemberId}`);
 });
 
 // ── Export sheet building ───────────────────────────────────────────────────
@@ -1728,19 +1728,17 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const isEditor = user.permissions.has("members:write");
   const canWriteBank = user.permissions.has("members:bank-data:write");
   const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");
-  const roles = isEditor ? await fetchRoles() : [];
 
   const canDelete = user.permissions.has("members:delete");
   const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
   const assignedItemsCount = canDelete ? await countAssignedInventoryItems(m.id) : 0;
 
-  if (!isEditor) {
-    // Read-only view
+  {
     const openRoles = m.assignments.filter((a) => !a.to);
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}</>} />
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor ? `/members/${m.id}/edit` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
+        <ViewGrid>
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
           <ViewField label={t("members.form.firstName")} value={m.firstName} />
           <ViewField label={t("members.form.birthDate")} value={formatDate(m.birthDate)} />
@@ -1749,7 +1747,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
           <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
           {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
           {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
-        </div>
+        </ViewGrid>
         <Section title={t("members.contact.title")} open class="mt-6">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
@@ -1777,10 +1775,21 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
       </Layout>
     );
   }
+});
+
+memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
+  const user = c.get("user");
+  const id = c.req.param("id");
+  if (!user.permissions.has("members:write")) return c.redirect(`/members/${id}`);
+  const m = await fetchMember(id);
+  if (!m) return c.notFound();
+
+  const canWriteBank = user.permissions.has("members:bank-data:write");
+  const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");
 
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<>{canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />}<HeaderAction icon="document-duplicate" class="btn-outline btn-primary" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} /><FormActions formId="member-form" /></>} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<><HeaderAction icon="document-duplicate" class="btn-outline btn-primary" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} /><FormActions formId="member-form" cancelHref={`/members/${m.id}`} /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
@@ -1851,7 +1860,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
       ...(bank && { ...bank, iban: trimmed(body, "iban") }) };
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user}>
-        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
+        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${id}`} /></>} />
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={m} errors={errors} />
           {canWriteBank && <BankDataSection m={m} editable errors={errors} />}
@@ -1891,7 +1900,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
 
     return c.html(
       <Layout title={`${firstName} ${lastName}`} user={user}>
-        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" /></>} />
+        <PageHeader title={<>{firstName} {lastName} <StatusBadgeSlot saved={existing.status} /></>} backHref={"/members"} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${id}`} /></>} />
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <MemberFormFields m={{ ...existing, lastName, firstName, birthDate, entryDate, firstEntryDate, exitDate, deathDate,
             street: body.street as string, houseNumber: body.houseNumber as string,
@@ -2029,13 +2038,3 @@ memberRoutes.post("/:id/delete", requireAuth("members:delete"), async (c) => {
   return c.redirect("/members");
 });
 
-// ── Read-only view field helper ───────────────────────────────────────────────
-
-function ViewField({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <div class="text-sm opacity-60">{label}</div>
-      <div class="font-medium">{value || "—"}</div>
-    </div>
-  );
-}

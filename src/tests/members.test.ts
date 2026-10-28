@@ -699,7 +699,7 @@ describe("POST /new", () => {
       }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/members");
+    expect(res.headers.get("location")).toMatch(/^\/members\/[^/]+$/);
     expect(res.headers.get("set-cookie")).toMatch(/flash=/);
     expect(insertCalls.some((c) => c.table === persons)).toBe(true);
     expect(insertCalls.some((c) => c.table === members)).toBe(true);
@@ -934,11 +934,27 @@ describe("GET /:id", () => {
   it("renders the editable form with existing assignments for editors", async () => {
     findFirstResult = memberWithAssignments();
     rolesFixture = [roleAktiv];
-    const res = await memberRoutes.request("/m1");
+    const res = await memberRoutes.request("/m1/edit");
     const html = await res.text();
     expect(html).toContain("<form");
     expect(html).toContain("assignments-box");
     expect(html).toContain("assignment-modal");
+    expect(html).toContain('href="/members/m1"'); // Abbrechen
+  });
+
+  it("shows the read-only view with an edit button for editors", async () => {
+    findFirstResult = memberWithAssignments();
+    const html = await (await memberRoutes.request("/m1")).text();
+    expect(html).not.toContain('name="lastName"');
+    expect(html).toContain('href="/members/m1/edit"');
+  });
+
+  it("redirects /:id/edit to /:id without members:write", async () => {
+    currentUser = { id: "u1", permissions: new Set(["members:read"]), disabled: false };
+    findFirstResult = memberWithAssignments();
+    const res = await memberRoutes.request("/m1/edit");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members/m1");
   });
 
   it("hides the delete button without the members:delete permission", async () => {

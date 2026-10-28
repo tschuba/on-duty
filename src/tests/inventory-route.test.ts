@@ -585,15 +585,15 @@ describe("GET /:id/edit", () => {
       category: "ppe", serials: [{ serial: "SN-1" }],
       assignments: [{ id: "a1", inventoryItemId: "item1", memberId: "m1", quantity: 1, member: { id: "m1", person: { firstName: "Anna", lastName: "Bauer" } } }],
     });
-    const res = await inventoryRoutes.request("/item1/edit");
-    const html = await res.text();
+    const html = await (await inventoryRoutes.request("/item1/edit")).text();
     expect(html).toContain("Anna Bauer");
-    expect(html).toContain("Ausmustern");
+    expect(html).not.toContain("Ausmustern");
+    expect(await (await inventoryRoutes.request("/item1")).text()).toContain("Ausmustern");
   });
 
   it("shows the reactivate action and retired notice for a retired item", async () => {
     itemsFindFirstResult = makeItem({ retiredAt: "2026-01-05", retiredReason: "defekt" });
-    const res = await inventoryRoutes.request("/item1/edit");
+    const res = await inventoryRoutes.request("/item1");
     const html = await res.text();
     expect(html).toContain("Ausmusterung rückgängig");
     expect(html).toContain("defekt");
@@ -699,7 +699,7 @@ describe("inventory numbers", () => {
   it("detail view shows numbers", async () => {
     currentUser = { ...currentUser, permissions: new Set(["inventory:read"]) };
     itemsFindFirstResult = makeItem({ numbers: [{ number: "N-10" }, { number: "N-2" }] });
-    const html = await (await inventoryRoutes.request("/item1/edit")).text();
+    const html = await (await inventoryRoutes.request("/item1")).text();
     currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
     expect(html).toContain("N-10");
     expect(html.indexOf("N-2")).toBeLessThan(html.indexOf("N-10"));
@@ -710,7 +710,7 @@ describe("detail view serial number", () => {
   it("shows serial number for a single scba item", async () => {
     currentUser = { ...currentUser, permissions: new Set(["inventory:read"]) };
     itemsFindFirstResult = makeItem({ category: "scba", serials: [{ serial: "SN-4711" }], quantity: 1 });
-    const html = await (await inventoryRoutes.request("/item1/edit")).text();
+    const html = await (await inventoryRoutes.request("/item1")).text();
     currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
     expect(html).toContain("Seriennummer");
     expect(html).toContain("SN-4711");
