@@ -1,6 +1,6 @@
 import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
-import { loadOrgConfig, privacyMode } from "../lib/org-config.js";
+import { loadOrgConfig, privacyMode, isImpressumComplete } from "../lib/org-config.js";
 
 export function Honeypot() {
   return (
@@ -53,4 +53,19 @@ export async function ContactFooter({ hint, subject, body }: { hint?: string; su
 
 export function clientIp(c: any): string {
   return c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "unknown";
+}
+
+// Linkzeile für alle öffentlichen Seiten; Impressum-Link nur bei vollständigen Angaben, Datenschutz-Link wie in PrivacyNotice.
+export async function PublicFooter() {
+  const c = await loadOrgConfig();
+  const mode = privacyMode(c);
+  const privacyHref = mode === "text" && c.orgPrivacyText?.trim() ? "/datenschutz" : mode === "url" ? c.orgPrivacyUrl?.trim() : undefined;
+  const impressum = isImpressumComplete(c);
+  if (!impressum && !privacyHref) return <></>;
+  return (
+    <footer class="mt-8 flex justify-center gap-4 text-xs opacity-60">
+      {impressum && <a href="/impressum" class="link">{t("public.footer.impressum")}</a>}
+      {privacyHref && <a href={privacyHref} class="link" target="_blank" rel="noopener">{t("public.footer.privacy")}</a>}
+    </footer>
+  );
 }

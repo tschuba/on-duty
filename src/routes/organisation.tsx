@@ -10,7 +10,7 @@ import { FormActions, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { sanitizeRichText } from "../lib/sanitize.js";
-import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, missingReceiptFields, privacyMode, type OrgTab } from "../lib/org-config.js";
+import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, REQUIRED_IMPRESSUM_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, missingReceiptFields, missingImpressumFields, privacyMode, type OrgTab } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 // Full class names so Tailwind's scanner picks them up.
@@ -91,7 +91,7 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
             <>
             <Field
               label={t(`admin.orgConfig.field.${key}` as never)}
-              required={(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key)}
+              required={(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key) || (REQUIRED_IMPRESSUM_FIELDS as readonly string[]).includes(key)}
               class={SPAN_CLASS[span ?? 4]}
               floating={type !== "richtext"}
             >
@@ -136,6 +136,14 @@ organisationRoutes.get("/", guard, async (c) => {
             <div>
               <h3 class="font-bold">{t("organisation.receiptIncomplete.title")}</h3>
               <p>{t("organisation.receiptIncomplete.body")}</p>
+            </div>
+          </div>
+        )}
+        {tabs.includes("master") && missingImpressumFields(values).length > 0 && (
+          <div class="alert alert-warning mb-8">
+            <div>
+              <h3 class="font-bold">{t("impressum.incomplete.title")}</h3>
+              <p>{t("impressum.incomplete.body")}</p>
             </div>
           </div>
         )}

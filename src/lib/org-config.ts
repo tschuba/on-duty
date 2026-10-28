@@ -57,6 +57,9 @@ export const TAB_FIELDS: Record<OrgTab, TabField[]> = {
     { key: "orgHouseNumber", type: "text", span: 1 },
     { key: "orgZip", type: "text", span: 1 },
     { key: "orgCity", type: "text", span: 3 },
+    { key: "orgRepresentative", type: "text" },
+    { key: "orgRegisterCourt", type: "text", span: 2 },
+    { key: "orgRegisterNumber", type: "text", span: 2 },
     { key: "orgContactPhone", type: "tel", span: 2 },
     { key: "orgContactEmail", type: "email", span: 2, hint: "organisation.hint.contactEmail" },
     { key: "notificationEmail", type: "notify" },
@@ -90,3 +93,12 @@ export function missingReceiptFields(config: Record<string, string>): Record<Org
   const missing = (tab: OrgTab) => TAB_FIELDS[tab].map((f) => f.key).filter((k) => required.includes(k) && !config[k]);
   return { master: missing("master"), privacy: [], tax: missing("tax") };
 }
+
+// § 5 DDG: public pages need a complete Impressum. Phone and register are optional.
+export const REQUIRED_IMPRESSUM_FIELDS = ["orgName", "orgStreet", "orgHouseNumber", "orgZip", "orgCity", "orgRepresentative", "orgContactEmail"] as const;
+
+export function missingImpressumFields(config: Record<string, string>): string[] {
+  return REQUIRED_IMPRESSUM_FIELDS.filter((k) => !config[k]?.trim());
+}
+
+export const isImpressumComplete = (config: Record<string, string>) => missingImpressumFields(config).length === 0;

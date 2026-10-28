@@ -41,7 +41,7 @@ import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
 import { PageHeader } from "./components/page-header.js";
 import { t } from "./i18n/index.js";
-import { loadOrgConfig, privacyMode } from "./lib/org-config.js";
+import { loadOrgConfig, privacyMode, isImpressumComplete } from "./lib/org-config.js";
 
 validateEnv();
 initSentry();
@@ -80,6 +80,22 @@ app.get("/datenschutz", async (c) => {
   // orgPrivacyText ist bereits sanitizetes Trix-HTML (siehe organisation.tsx); ältere Bestände ohne Tags sind Klartext ohne erkennbare Tags, "<" übernimmt daher die HTML-Rendering-Prüfung.
   const isHtml = /<[a-z][\s\S]*>/i.test(text);
   return c.html(<Layout title={t("privacy.title")}><div class="max-w-2xl mx-auto"><PageHeader title={t("privacy.title")} /><section class="mb-6"><h2 class="font-semibold">{t("privacy.controller")}</h2><address class="not-italic whitespace-pre-line">{[cfg.orgName, [cfg.orgStreet, cfg.orgHouseNumber].filter(Boolean).join(" "), [cfg.orgZip, cfg.orgCity].filter(Boolean).join(" "), cfg.orgContactEmail, cfg.orgContactPhone].map((l) => l?.trim()).filter(Boolean).join("\n")}</address></section><div class={isHtml ? "richtext-content" : "whitespace-pre-wrap"}>{isHtml ? raw(text) : text}</div></div></Layout>);
+});
+
+// Impressum (§ 5 DDG) for the public pages; 404 until the required org data is complete
+app.get("/impressum", async (c) => {
+  const cfg = await loadOrgConfig();
+  if (!isImpressumComplete(cfg)) return c.notFound();
+  const line = (...p: (string | undefined)[]) => p.map((x) => x?.trim()).filter(Boolean).join(" ");
+  const address = [cfg.orgName, line(cfg.orgStreet, cfg.orgHouseNumber), line(cfg.orgZip, cfg.orgCity)].map((x) => x?.trim()).filter(Boolean).join("\n");
+  const contact = [cfg.orgContactEmail, cfg.orgContactPhone].map((x) => x?.trim()).filter(Boolean).join("\n");
+  c.header("Cache-Control", "public, max-age=60");
+  return c.html(<Layout title={t("impressum.title")}><div class="max-w-2xl mx-auto"><PageHeader title={t("impressum.title")} />
+    <section class="mb-6"><address class="not-italic whitespace-pre-line">{address}</address></section>
+    <section class="mb-6"><h2 class="font-semibold">{t("impressum.represented")}</h2><p>{cfg.orgRepresentative.trim()}</p></section>
+    {cfg.orgRegisterNumber?.trim() && <section class="mb-6"><h2 class="font-semibold">{t("impressum.register")}</h2><p>{line(cfg.orgRegisterCourt, cfg.orgRegisterNumber)}</p></section>}
+    <section class="mb-6"><h2 class="font-semibold">{t("impressum.contact")}</h2><p class="whitespace-pre-line">{contact}</p></section>
+  </div></Layout>);
 });
 
 // Public loan request form — no auth guard, see backlog "Verleih-Anfrageformular"

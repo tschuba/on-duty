@@ -10,7 +10,7 @@ import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { isApplicationFormActive } from "../lib/application-forms.js";
 import { sendMail } from "../lib/mail.js";
 import { HTTP_STATUS } from "../lib/constants.js";
-import { ContactFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
+import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
 
 export const applyRoutes = new Hono();
 
@@ -165,6 +165,7 @@ function MembershipPage({ values, errors }: { values: ApplicantValues; errors: R
           <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
         </form>
         <ContactFooter />
+        <PublicFooter />
       </div>
     </Layout>
   );
@@ -208,6 +209,7 @@ function YouthPage({
           <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
         </form>
         <ContactFooter />
+        <PublicFooter />
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
@@ -240,6 +242,7 @@ function SuccessPage() {
       <div class="max-w-xl mx-auto text-center py-12">
         <PageHeader title={t("apply.success.title")} />
         <p class="opacity-70">{t("apply.success.body")}</p>
+        <PublicFooter />
       </div>
     </Layout>
   );
