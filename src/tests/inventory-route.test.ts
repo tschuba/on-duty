@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
+import { testDetailPageContract } from "./detail-page-contract.js";
 import { t } from "../i18n/index.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -775,4 +776,17 @@ describe("GET / inventory toggles", () => {
     expect(inputs[0]).not.toContain("checked");
     expect(inputs[1]).toContain("checked");
   });
+});
+
+testDetailPageContract({
+  name: "inventory",
+  request: (path) => inventoryRoutes.request(path),
+  idPath: "/item1",
+  editPath: "/item1/edit",
+  editHref: "/inventory/item1/edit",
+  redirectLocation: "/inventory/item1",
+  setPermissions: (perms) => { currentUser = { id: "u1", permissions: new Set(perms), disabled: false }; },
+  readPermissions: ["inventory:read"],
+  writePermissions: ["inventory:read", "inventory:manage"],
+  ensureRecord: () => { itemsFindFirstResult = makeItem(); },
 });

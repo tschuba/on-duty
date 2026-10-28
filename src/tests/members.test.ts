@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { members, persons, memberRoles, memberRoleAssignments, applications, applicationGuardians, donors, inventoryItemAssignments } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
 import { formBody } from "./test-utils.js";
+import { testDetailPageContract } from "./detail-page-contract.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
@@ -1248,4 +1249,17 @@ describe("role combobox tabs (Spec 47)", () => {
     expect(html).toMatch(/data-type="t1"[^>]*class="[^"]*tab-active/);
     expect(html).not.toMatch(/data-type="t3"[^>]*class="[^"]*tab-active/);
   });
+});
+
+testDetailPageContract({
+  name: "members",
+  request: (path) => memberRoutes.request(path),
+  idPath: "/m1",
+  editPath: "/m1/edit",
+  editHref: "/members/m1/edit",
+  redirectLocation: "/members/m1",
+  setPermissions: (perms) => { currentUser = { id: "u1", permissions: new Set(perms), disabled: false }; },
+  readPermissions: ["members:read"],
+  writePermissions: ["members:read", "members:write"],
+  ensureRecord: () => { findFirstResult = memberWithAssignments(); },
 });
