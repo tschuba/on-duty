@@ -116,7 +116,8 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
     <ul id="nav-menu" class="menu w-full grow flex-nowrap gap-1 overflow-auto is-drawer-close:overflow-visible p-2">
       <li class="hidden lg:block mt-1.5">
         <label for="nav-drawer" class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={t("common.nav.toggleSidebar")} aria-label={t("common.nav.toggleSidebar")}>
-          <Icon name="bars-3" class="h-5 w-5 text-gold" />
+          <Icon name="sidebar-collapse" class="h-5 w-5 text-gold is-drawer-close:hidden" />
+          <Icon name="sidebar-expand" class="h-5 w-5 text-gold hidden is-drawer-close:block" />
         </label>
       </li>
       <li class="is-drawer-close:hidden">

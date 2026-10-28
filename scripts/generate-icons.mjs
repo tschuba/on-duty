@@ -25,6 +25,8 @@ const ICONS = {
   "users-plus": "users-plus",
   "mood-boy": "mood-boy",
   "bars-3": "menu-2",
+  "sidebar-collapse": "layout-sidebar-left-collapse",
+  "sidebar-expand": "layout-sidebar-left-expand",
   "chevron-down": "chevron-down",
   sun: "sun",
   moon: "moon",
