@@ -29,9 +29,30 @@ export function ageInYears(birthDate: string, today = new Date()): number {
 }
 
 /** Stichtag (YYYY-MM-DD), an dem die Altersgrenze erreicht wird. */
+/** Alters-/Ehrenabteilung: ab diesem Alter nicht mehr aktiv. */
+export const DEFAULT_ACTIVE_AGE_LIMIT = 65;
+
 export function ageLimitDate(birthDate: string, limit: number): string {
   const [y, m, d] = birthDate.split("-");
   return `${Number(y) + limit}-${m}-${d}`;
+}
+
+export type AgeGroup = "kinder" | "jugend" | "erwachsen" | "senioren";
+export const AGE_GROUPS: AgeGroup[] = ["kinder", "jugend", "erwachsen", "senioren"];
+
+/** Reine Altersgruppe am heutigen Tag, unabhängig von Status/Funktion. */
+export function ageGroupOf(
+  birthDate: string,
+  childrenAgeLimit: number,
+  youthAgeLimit: number,
+  activeAgeLimit: number,
+  today = new Date()
+): AgeGroup {
+  const age = ageInYears(birthDate, today);
+  if (age < childrenAgeLimit) return "kinder";
+  if (age < youthAgeLimit) return "jugend";
+  if (age < activeAgeLimit) return "erwachsen";
+  return "senioren";
 }
 
 export function deriveMemberStatus(
@@ -39,7 +60,7 @@ export function deriveMemberStatus(
   assignments: Assignment[],
   childrenAgeLimit: number,
   youthAgeLimit: number,
-  activeAgeLimit = 65,
+  activeAgeLimit = DEFAULT_ACTIVE_AGE_LIMIT,
   today = new Date()
 ): MemberStatus {
   if (member.deathDate) return "verstorben";

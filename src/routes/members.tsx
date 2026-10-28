@@ -14,7 +14,7 @@ import { Icon } from "../components/icon.js";
 import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
 import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { RolePopover } from "../components/role-popover.js";
-import { ageLimitDate, deriveMemberStatus, isFormer, type MemberStatus } from "../lib/status.js";
+import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
@@ -223,7 +223,7 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
 }
 
 export function MembersTable({
-  items, sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, isEditor,
+  items, sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, ageFilter, isEditor,
 }: {
   items: MemberWithStatus[];
   sort: SortKey;
@@ -235,9 +235,10 @@ export function MembersTable({
   search: string;
   statusFilter: MemberStatus[];
   roleFilter: string[];
+  ageFilter: AgeGroup[];
   isEditor: boolean;
 }) {
-  const currentState = { search, status: statusFilter, role: roleFilter, sort, sort_dir: dir, page, pageSize };
+  const currentState = { search, status: statusFilter, role: roleFilter, age: ageFilter, sort, sort_dir: dir, page, pageSize };
 
   function sortUrl(col: SortKey) {
     const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
@@ -897,7 +898,7 @@ function MembersExportModal() {
             fields.forEach(function(f){if(document.getElementById('exp-'+f).checked)p.set(f,'1');});
             var url=new URL(window.location.href);
             ['search','sort','sort_dir'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
-            ['status','role'].forEach(function(k){url.searchParams.getAll(k).forEach(function(v){p.append(k,v)});});
+            ['status','role','age'].forEach(function(k){url.searchParams.getAll(k).forEach(function(v){p.append(k,v)});});
             window.location='/members/export?'+p;
             document.getElementById('members-export-modal').close();
           });
@@ -927,6 +928,28 @@ function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
       applyLabel={t("common.apply")}
       resetLabel={t("common.reset")}
       searchPlaceholder={t("common.searchPlaceholder")}
+    />
+  );
+}
+
+function AgeFilterDropdown({ ageFilter }: { ageFilter: AgeGroup[] }) {
+  const c = env.CHILDREN_AGE_LIMIT, y = env.YOUTH_AGE_LIMIT, a = env.ACTIVE_AGE_LIMIT;
+  const labels: Record<AgeGroup, string> = {
+    kinder: t("members.filter.age.kinder", { limit: c }),
+    jugend: t("members.filter.age.jugend", { from: c, to: y - 1 }),
+    erwachsen: t("members.filter.age.erwachsen", { from: y, to: a - 1 }),
+    senioren: t("members.filter.age.senioren", { limit: a }),
+  };
+  return (
+    <MultiSelectFilter
+      param="age"
+      autoApply
+      options={AGE_GROUPS.map((g) => ({ value: g, label: labels[g] }))}
+      selected={ageFilter}
+      allLabel={t("members.filter.allAges")}
+      countLabel={(count) => t("members.table.ageCount", { count })}
+      applyLabel={t("common.apply")}
+      resetLabel={t("common.reset")}
     />
   );
 }
@@ -961,11 +984,12 @@ export type ListQuery = {
   dir: "asc" | "desc";
   statusFilter: MemberStatus[];
   roleFilter: string[];
+  ageFilter: AgeGroup[];
   page: number;
   pageSize: number;
 };
 
-export function parseListQuery(q: Record<string, string>, statusRaw: string[], roleFilterRaw: string[]): ListQuery {
+export function parseListQuery(q: Record<string, string>, statusRaw: string[], roleFilterRaw: string[], ageRaw: string[]): ListQuery {
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
@@ -974,16 +998,18 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
     ? statusParsed
     : ["aktiv", "passiv", "foerdernd", "kinder", "jugend"]) as MemberStatus[];
   const roleFilter = roleFilterRaw.filter(Boolean);
+  const ageFilter = ageRaw.filter((a): a is AgeGroup => AGE_GROUPS.includes(a as AgeGroup));
   const { page, pageSize } = parsePagination(q);
 
-  return { search, sort, dir, statusFilter, roleFilter, page, pageSize };
+  return { search, sort, dir, statusFilter, roleFilter, ageFilter, page, pageSize };
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
-export function filterMembers(all: MemberWithStatus[], statusFilter: MemberStatus[], roleFilter: string[]): MemberWithStatus[] {
+export function filterMembers(all: MemberWithStatus[], statusFilter: MemberStatus[], roleFilter: string[], ageFilter: AgeGroup[]): MemberWithStatus[] {
   return all
     .filter((m) => statusFilter.includes(m.status))
+    .filter((m) => ageFilter.length === 0 || ageFilter.includes(ageGroupOf(m.birthDate, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT)))
     .filter((m) => roleFilter.length === 0 || m.assignments.some((a) => !a.to && roleFilter.includes(a.memberRoleId)));
 }
 
@@ -1000,8 +1026,8 @@ function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) 
 memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const q = c.req.query();
-  const { search, sort, dir, statusFilter, roleFilter, page, pageSize } = parseListQuery(
-    q, c.req.queries("status") ?? [], c.req.queries("role") ?? []
+  const { search, sort, dir, statusFilter, roleFilter, ageFilter, page, pageSize } = parseListQuery(
+    q, c.req.queries("status") ?? [], c.req.queries("role") ?? [], c.req.queries("age") ?? []
   );
 
   const [all, allRoles, activeRoleRows] = await Promise.all([
@@ -1011,7 +1037,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   ]);
   // Unabhängig von Suche/Statusfilter, damit "ungenutzt" stabil bleibt.
   const activeRoleIds = new Set(activeRoleRows.map((r) => r.id));
-  const filtered = filterMembers(all, statusFilter, roleFilter);
+  const filtered = filterMembers(all, statusFilter, roleFilter, ageFilter);
   const sorted = sortMembers(filtered, sort, dir);
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -1031,6 +1057,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       search={search}
       statusFilter={statusFilter}
       roleFilter={roleFilter}
+      ageFilter={ageFilter}
       isEditor={isEditor}
     />
   );
@@ -1071,6 +1098,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
         </label>
         <StatusFilterDropdown statusFilter={statusFilter} />
         <RoleFilterDropdown roles={allRoles} roleFilter={roleFilter} activeRoleIds={activeRoleIds} />
+        <AgeFilterDropdown ageFilter={ageFilter} />
       </div>
 
       {tableEl}
@@ -1645,12 +1673,12 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
     assignments: q.assignments === "1",
   };
 
-  const { search, sort, dir, statusFilter, roleFilter } = parseListQuery(q, c.req.queries("status") ?? [], c.req.queries("role") ?? []);
-  const exported = sortMembers(filterMembers(await fetchMembersWithStatus(search || undefined), statusFilter, roleFilter), sort, dir);
+  const { search, sort, dir, statusFilter, roleFilter, ageFilter } = parseListQuery(q, c.req.queries("status") ?? [], c.req.queries("role") ?? [], c.req.queries("age") ?? []);
+  const exported = sortMembers(filterMembers(await fetchMembersWithStatus(search || undefined), statusFilter, roleFilter, ageFilter), sort, dir);
   if (exported.length === 0) {
     setFlash(c, t("common.exportEmpty"), "error");
     const back = new URLSearchParams();
-    for (const [k, v] of new URL(c.req.url).searchParams) if (k === "search" || k === "status" || k === "role" || k === "sort" || k === "sort_dir") back.append(k, v);
+    for (const [k, v] of new URL(c.req.url).searchParams) if (k === "search" || k === "status" || k === "role" || k === "age" || k === "sort" || k === "sort_dir") back.append(k, v);
     return c.redirect(`/members?${back}`, 302);
   }
   const allMembers: Member[] = exported;

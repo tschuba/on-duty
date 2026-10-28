@@ -1,4 +1,5 @@
 import { logger } from "./lib/logger.js";
+import { DEFAULT_ACTIVE_AGE_LIMIT } from "./lib/status.js";
 const REQUIRED = [
   "DATABASE_URL",
   "ORG_NAME",
@@ -60,7 +61,7 @@ export const env = {
   SESSION_LIFETIME: process.env.SESSION_LIFETIME ?? "7d",
   CHILDREN_AGE_LIMIT: Number(process.env.CHILDREN_AGE_LIMIT ?? "12"),
   YOUTH_AGE_LIMIT: Number(process.env.YOUTH_AGE_LIMIT ?? "18"),
-  ACTIVE_AGE_LIMIT: Number(process.env.ACTIVE_AGE_LIMIT ?? "65"),
+  ACTIVE_AGE_LIMIT: Number(process.env.ACTIVE_AGE_LIMIT ?? String(DEFAULT_ACTIVE_AGE_LIMIT)),
   // Ehrungstermin (MM-DD): Datum, an dem Jubiläen geehrt werden
   ANNIVERSARY_CUTOFF: process.env.ANNIVERSARY_CUTOFF ?? "01-06",
   // Feste Zone der Wehr für Termine (IANA-Name), siehe lib/datetime.ts

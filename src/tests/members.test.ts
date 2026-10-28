@@ -119,10 +119,13 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
+import { ageGroupOf } from "../lib/status.js";
+
 const {
   memberRoutes,
   sortMembers,
   parseListQuery,
+  filterMembers,
   buildExportSheets,
   StatsCards,
   MembersTable,
@@ -232,34 +235,56 @@ describe("sortMembers", () => {
   });
 });
 
+describe("age filter", () => {
+  const today = new Date(2026, 5, 15);
+  it("ageGroupOf: Geburtstag am Grenzdatum liegt schon in der höheren Gruppe", () => {
+    expect(ageGroupOf("2014-06-16", 12, 18, 65, today)).toBe("kinder");
+    expect(ageGroupOf("2014-06-15", 12, 18, 65, today)).toBe("jugend");
+    expect(ageGroupOf("2008-06-15", 12, 18, 65, today)).toBe("erwachsen");
+    expect(ageGroupOf("1961-06-15", 12, 18, 65, today)).toBe("senioren");
+  });
+
+  it("parseListQuery verwirft ungültige age-Werte", () => {
+    expect(parseListQuery({}, [], [], ["kinder", "x"]).ageFilter).toEqual(["kinder"]);
+  });
+
+  it("filterMembers findet Kind ohne Funktion (fördernd) über den Altersfilter", () => {
+    const child = { ...makeMember({ birthDate: `${new Date().getFullYear() - 5}-01-01` }), assignments: [], status: "foerdernd" } as never;
+    const adult = { ...makeMember(), assignments: [], status: "foerdernd" } as never;
+    expect(filterMembers([child, adult], ["foerdernd"], [], ["kinder"])).toEqual([child]);
+    expect(filterMembers([child, adult], ["foerdernd"], [], [])).toHaveLength(2);
+  });
+});
+
 describe("parseListQuery", () => {
   it("applies defaults when nothing is set", () => {
-    expect(parseListQuery({}, [], [])).toEqual({
+    expect(parseListQuery({}, [], [], [])).toEqual({
       search: "",
       sort: "lastName",
       dir: "asc",
       statusFilter: ["aktiv", "passiv", "foerdernd", "kinder", "jugend"],
       roleFilter: [],
+      ageFilter: [],
       page: 1,
       pageSize: 25,
     });
   });
 
   it("keeps repeated status/role params as-is", () => {
-    const q = parseListQuery({}, ["aktiv", "jugend"], ["r1", "r2"]);
+    const q = parseListQuery({}, ["aktiv", "jugend"], ["r1", "r2"], []);
     expect(q.statusFilter).toEqual(["aktiv", "jugend"]);
     expect(q.roleFilter).toEqual(["r1", "r2"]);
   });
 
   it("clamps page to at least 1 and rejects invalid pageSize", () => {
-    expect(parseListQuery({ page: "0" }, [], []).page).toBe(1);
-    expect(parseListQuery({ page: "-5" }, [], []).page).toBe(1);
-    expect(parseListQuery({ pageSize: "7" }, [], []).pageSize).toBe(25);
-    expect(parseListQuery({ pageSize: "50" }, [], []).pageSize).toBe(50);
+    expect(parseListQuery({ page: "0" }, [], [], []).page).toBe(1);
+    expect(parseListQuery({ page: "-5" }, [], [], []).page).toBe(1);
+    expect(parseListQuery({ pageSize: "7" }, [], [], []).pageSize).toBe(25);
+    expect(parseListQuery({ pageSize: "50" }, [], [], []).pageSize).toBe(50);
   });
 
   it("reads search, sort and dir", () => {
-    const q = parseListQuery({ search: "an", sort: "birthDate", sort_dir: "desc" }, [], []);
+    const q = parseListQuery({ search: "an", sort: "birthDate", sort_dir: "desc" }, [], [], []);
     expect(q.search).toBe("an");
     expect(q.sort).toBe("birthDate");
     expect(q.dir).toBe("desc");
@@ -369,6 +394,7 @@ describe("MembersTable", () => {
     search: "",
     statusFilter: ["aktiv"] as any,
     roleFilter: [] as string[],
+    ageFilter: [] as never[],
     isEditor: true,
   };
 
