@@ -190,7 +190,7 @@ applicationRoutes.get("/", guard, async (c) => {
                 const status = formatFormStatusText(forms[type]);
                 return (
                   <span key={type} class={`flex items-center gap-1 ${status.active ? "text-success" : "text-error opacity-40"}`} title={`${TYPE_LABELS[type]}: ${status.text}`}>
-                    <Icon name={type === "membership" ? "users" : "user-group"} class="h-5 w-5" />
+                    <Icon name={type === "membership" ? "users" : "mood-boy"} class="h-5 w-5" />
                     <span class="hidden md:inline text-xs text-base-content/70">{TYPE_LABELS[type]}</span>
                   </span>
                 );
