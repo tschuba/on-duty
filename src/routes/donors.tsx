@@ -447,7 +447,7 @@ donorRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "dona
     <Layout title={recipientName(donor.person)} user={user}>
       <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" actions={<DetailActions editHref={canRecord ? `/donors/${donor.id}/edit` : undefined} />} />
       <ViewGrid>
-        <ViewField label={t("donors.form.companyName")} value={donor.person.companyName} />
+        <ViewField label={t("donors.table.companyName")} value={donor.person.companyName} />
         <ViewField label={t("donors.form.lastName")} value={donor.person.lastName} />
         <ViewField label={t("donors.form.firstName")} value={donor.person.firstName} />
         <ViewField label={t("donors.table.address")} value={formatAddress(donor.person)} />
