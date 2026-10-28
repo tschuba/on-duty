@@ -10,6 +10,7 @@ const out = join(root, "src", "components", "icons.generated.ts");
 
 const ICONS = {
   fire: "24/outline/fire.svg",
+  "exclamation-triangle": "24/outline/exclamation-triangle.svg",
   "calendar-days": "24/outline/calendar-days.svg",
   banknotes: "24/outline/banknotes.svg",
   "archive-box": "24/outline/archive-box.svg",

@@ -20,6 +20,7 @@ vi.mock("../lib/org-config.js", async () => ({
 vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => <div>{children}</div> }));
 
 const { impressumRoutes } = await import("../routes/impressum.js");
+const { datenschutzRoutes } = await import("../routes/datenschutz.js");
 const { PublicFooter } = await import("../components/public-form.js");
 const { ImpressumHint } = await import("../components/impressum-hint.js");
 
@@ -45,6 +46,27 @@ describe("GET /impressum", () => {
     const html = await (await impressumRoutes.request("/")).text();
     expect(html).not.toContain("AG Hof");
     expect(html).not.toContain("intern@x.de");
+  });
+});
+
+describe("GET /datenschutz", () => {
+  it("404 without inline text", async () => {
+    expect((await datenschutzRoutes.request("/")).status).toBe(404);
+  });
+  it("renders text, address and link to Impressum", async () => {
+    config = { ...full, orgPrivacyText: "<p>Wir speichern wenig.</p>" };
+    const res = await datenschutzRoutes.request("/");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Wir speichern wenig.");
+    expect(html).toContain("mailto:a@b.de");
+    expect(html).toContain('href="/impressum"');
+  });
+  it("Impressum links to Datenschutz only with inline text", async () => {
+    config = { ...full, orgPrivacyText: "x" };
+    expect(await (await impressumRoutes.request("/")).text()).toContain('href="/datenschutz"');
+    config = full;
+    expect(await (await impressumRoutes.request("/")).text()).not.toContain('href="/datenschutz"');
   });
 });
 

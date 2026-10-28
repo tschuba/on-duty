@@ -61,8 +61,8 @@ export const de = {
   "organisation.tabs.privacy": "Datenschutzerklärung",
   "organisation.tabs.tax": "Steuerdaten",
   "organisation.receiptRequired": "Pflichtangabe für Zuwendungsbestätigungen",
-  "organisation.receiptIncomplete.title": "Angaben für Zuwendungsbestätigungen unvollständig",
-  "organisation.receiptIncomplete.body": "Mit * markierte Felder sind für Zuwendungsbestätigungen nötig. Speichern ist weiterhin möglich, Bestätigungen können aber erst mit vollständigen Angaben ausgestellt werden.",
+  "organisation.missing.receipt": "Fehlt: für Zuwendungsbestätigungen erforderlich.",
+  "organisation.missing.impressum": "Fehlt: für das Impressum (§ 5 DDG) erforderlich.",
   "common.remove": "Entfernen",
 
   // ── Status ───────────────────────────────────────────────────────────────────
@@ -546,9 +546,7 @@ export const de = {
   "impressum.represented": "Vertreten durch",
   "impressum.register": "Registereintrag",
   "impressum.contact": "Kontakt",
-  "impressum.incomplete.title": "Angaben für das Impressum unvollständig",
   "impressum.adminHint": "Impressum unvollständig —",
-  "impressum.incomplete.body": "Öffentliche Seiten (Anträge, Verleih, Kalender) brauchen ein Impressum nach § 5 DDG. Es fehlen Pflichtangaben; Telefon wird als zweiter Kontaktweg empfohlen.",
   "public.footer.impressum": "Impressum",
   "public.footer.privacy": "Datenschutz",
   "privacy.title": "Datenschutzerklärung",
@@ -718,7 +716,6 @@ export const de = {
   "apply.form.message": "Nachricht / Motivation (optional)",
   "apply.form.submit": "Antrag senden",
   "apply.form.privacyNoticeText": "Ihre Angaben werden zur Bearbeitung dieses Antrags gespeichert.",
-  "apply.form.privacyNoticeLink": "Datenschutzerklärung",
   "apply.error.contactRequired": "Bitte E-Mail oder Telefon angeben.",
   "apply.error.rateLimited": "Zu viele Anfragen von dieser Verbindung. Bitte versuchen Sie es später erneut.",
   "apply.youth.guardian.title": "Erziehungsberechtigte/r {index}",

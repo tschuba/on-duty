@@ -10,7 +10,7 @@ import { FormActions, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { sanitizeRichText } from "../lib/sanitize.js";
-import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, REQUIRED_IMPRESSUM_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, missingReceiptFields, missingImpressumFields, privacyMode, type OrgTab } from "../lib/org-config.js";
+import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, REQUIRED_IMPRESSUM_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, privacyMode, type OrgTab } from "../lib/org-config.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 // Full class names so Tailwind's scanner picks them up.
@@ -77,6 +77,13 @@ function NotifyGroup({ values, editable }: { values: Record<string, string>; edi
   );
 }
 
+// Warnhinweis am Feld: leer, aber für Zuwendungsbestätigung bzw. Impressum nötig.
+function missingReason(key: string, values: Record<string, string>): string | undefined {
+  if (values[key]?.trim()) return undefined;
+  if ((REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key)) return t("organisation.missing.receipt");
+  if ((REQUIRED_IMPRESSUM_FIELDS as readonly string[]).includes(key)) return t("organisation.missing.impressum");
+}
+
 function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<string, string>; editable: boolean }) {
   return (
     <section id={TABS[tab].path} class="mb-8">
@@ -91,8 +98,14 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
             <>
             <Field
               label={t(`admin.orgConfig.field.${key}` as never)}
+              after={missingReason(key, values) && (
+                <span class="tooltip tooltip-left before:whitespace-normal before:max-w-xs absolute right-3 top-3" data-tip={missingReason(key, values)}>
+                  <Icon name="exclamation-triangle" class="h-5 w-5 text-warning" />
+                  <span class="sr-only">{missingReason(key, values)}</span>
+                </span>
+              )}
               required={(REQUIRED_RECEIPT_FIELDS as readonly string[]).includes(key) || (REQUIRED_IMPRESSUM_FIELDS as readonly string[]).includes(key)}
-              class={SPAN_CLASS[span ?? 4]}
+              class={`relative ${SPAN_CLASS[span ?? 4]}`}
               floating={type !== "richtext"}
             >
               {type === "textarea" ? (
@@ -125,28 +138,11 @@ organisationRoutes.get("/", guard, async (c) => {
   if (tabs.length === 0) return c.html("<h1>403 Zugriff verweigert</h1>", HTTP_STATUS.FORBIDDEN);
   const values = await loadOrgConfig();
   // A viewer only sees (and can only fix) the fields of the sections they may read.
-  const missingByTab = missingReceiptFields(values);
   const anyEditable = tabs.some((tab) => canWriteOrgTab(perms, tab));
   return c.html(
     <Layout title={t("common.nav.organisation")} user={user}>
       <PageHeader title={t("common.nav.organisation")} actions={anyEditable && <FormActions formId="org-form" />} />
       <form id="org-form" method="post" action="/organisation" class="max-w-4xl mx-auto">
-        {tabs.some((tab) => missingByTab[tab].length > 0) && (
-          <div class="alert alert-warning mb-8">
-            <div>
-              <h3 class="font-bold">{t("organisation.receiptIncomplete.title")}</h3>
-              <p>{t("organisation.receiptIncomplete.body")}</p>
-            </div>
-          </div>
-        )}
-        {tabs.includes("master") && missingImpressumFields(values).length > 0 && (
-          <div class="alert alert-warning mb-8">
-            <div>
-              <h3 class="font-bold">{t("impressum.incomplete.title")}</h3>
-              <p>{t("impressum.incomplete.body")}</p>
-            </div>
-          </div>
-        )}
         {tabs.map((tab) => (
           <OrgSection tab={tab} values={values} editable={canWriteOrgTab(perms, tab)} />
         ))}

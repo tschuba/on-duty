@@ -52,7 +52,7 @@ describe("organisation", () => {
   it("marks receipt fields as required and warns about missing ones, but stays saveable", async () => {
     config = { orgName: "FF" };
     const html = await get();
-    expect(html).toContain("alert-warning");
+    expect(html).toContain("text-warning");
     expect(html).toContain("text-error");
     expect(html).not.toContain(" required");
   });

@@ -13,18 +13,9 @@ export function Honeypot() {
   );
 }
 
-// Die Datenschutzerklärung liegt auf der Seite des Vereins (orgPrivacyUrl) oder inline (orgPrivacyText, Route /datenschutz); ohne Angabe entfällt der Link.
-export async function PrivacyNotice() {
-  const c = await loadOrgConfig();
-  const mode = privacyMode(c);
-  const inline = mode === "text" && !!c.orgPrivacyText?.trim();
-  const href = inline ? "/datenschutz" : mode === "url" ? c.orgPrivacyUrl?.trim() : undefined;
-  return (
-    <p class="text-xs opacity-60 mt-2">
-      {t("apply.form.privacyNoticeText")}
-      {href && <> <a href={href} class="link" target="_blank" rel="noopener">{t("apply.form.privacyNoticeLink")}</a></>}
-    </p>
-  );
+// Hinweistext im Formular; der Link zur Datenschutzerklärung steht im PublicFooter.
+export function PrivacyNotice() {
+  return <p class="text-xs opacity-60 mt-2">{t("apply.form.privacyNoticeText")}</p>;
 }
 
 // "Kontakt zum Verein": leere Felder entfallen, ohne jede Angabe entfällt der Baustein.
@@ -64,7 +55,7 @@ export async function PublicFooter() {
   if (!impressum && !privacyHref) return <></>;
   return (
     <footer class="mt-8 flex justify-center gap-4 text-xs opacity-60">
-      {impressum && <a href="/impressum" class="link">{t("public.footer.impressum")}</a>}
+      {impressum && <a href="/impressum" target="_blank" rel="noopener" class="link">{t("public.footer.impressum")}</a>}
       {privacyHref && <a href={privacyHref} class="link" target="_blank" rel="noopener">{t("public.footer.privacy")}</a>}
     </footer>
   );
