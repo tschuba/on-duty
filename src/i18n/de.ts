@@ -547,6 +547,7 @@ export const de = {
   "impressum.register": "Registereintrag",
   "impressum.contact": "Kontakt",
   "impressum.incomplete.title": "Angaben für das Impressum unvollständig",
+  "impressum.adminHint": "Impressum unvollständig —",
   "impressum.incomplete.body": "Öffentliche Seiten (Anträge, Verleih, Kalender) brauchen ein Impressum nach § 5 DDG. Es fehlen Pflichtangaben; Telefon wird als zweiter Kontaktweg empfohlen.",
   "public.footer.impressum": "Impressum",
   "public.footer.privacy": "Datenschutz",

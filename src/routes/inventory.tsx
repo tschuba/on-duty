@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { ImpressumHint } from "../components/impressum-hint.js";
 import type { IconName } from "../components/icons.generated.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -944,6 +945,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                       <span class="text-sm opacity-70">{t("lend.form.publicRequestableHint")}</span>
                     </span>
                   </label>
+                  {lendable.publicRequestable && <ImpressumHint />}
                   {lendable.publicRequestable && lendable.requestLink && (
                     <div class="flex flex-col gap-1">
                       <span class="text-sm font-medium">{t("lend.form.requestLink")}</span>

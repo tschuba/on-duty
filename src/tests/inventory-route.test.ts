@@ -83,6 +83,10 @@ vi.mock("../db/index.js", () => ({
 
 let currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage"]), disabled: false };
 
+vi.mock("../lib/org-config.js", async () => ({
+  ...(await vi.importActual<typeof import("../lib/org-config.js")>("../lib/org-config.js")),
+  loadOrgConfig: vi.fn(() => Promise.resolve({})),
+}));
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
     c.set("user", currentUser);

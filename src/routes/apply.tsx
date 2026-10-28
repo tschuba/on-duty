@@ -231,6 +231,7 @@ function InactivePage() {
       <div class="max-w-xl mx-auto text-center py-12">
         <PageHeader title={t("apply.inactive.title")} />
         <p class="opacity-70">{t("apply.inactive.body")}</p>
+        <PublicFooter />
       </div>
     </Layout>
   );
