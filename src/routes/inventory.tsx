@@ -71,7 +71,7 @@ const CATEGORY_BADGE: Record<InventoryCategory, string> = {
 };
 
 // Only members who can actually carry PSA get offered in the assignment picker.
-const ASSIGNABLE_MEMBER_STATUSES = new Set(["aktiv", "jugend"]);
+const ASSIGNABLE_MEMBER_STATUSES = new Set(["active", "youth"]);
 
 export function CategoryBadge({ category }: { category: InventoryCategory }) {
   return <span class={`${CATEGORY_BADGE[category]} badge-sm`}>{CATEGORY_LABELS[category]}</span>;

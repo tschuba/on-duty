@@ -9,11 +9,11 @@ type Assignment = typeof memberRoleAssignments.$inferSelect & {
   role: typeof memberRoles.$inferSelect;
 };
 
-export type MemberStatus = "ausgetreten" | "verstorben" | "kinder" | "jugend" | "aktiv" | "passiv" | "foerdernd";
+export type MemberStatus = "left" | "deceased" | "children" | "youth" | "active" | "passive" | "supporting";
 
 /** Ausgeschieden = ausgetreten oder verstorben. */
-export function isFormer(status: MemberStatus): status is "ausgetreten" | "verstorben" {
-  return status === "ausgetreten" || status === "verstorben";
+export function isFormer(status: MemberStatus): status is "left" | "deceased" {
+  return status === "left" || status === "deceased";
 }
 
 // Local date components, not new Date(str).getTime() — avoids UTC/local timezone
@@ -28,10 +28,31 @@ export function ageInYears(birthDate: string, today = new Date()): number {
   return age;
 }
 
-/** Stichtag (YYYY-MM-DD), an dem die Altersgrenze erreicht wird. */
+/** Veteran/honorary division: from this age on, no longer active. */
+export const DEFAULT_ACTIVE_AGE_LIMIT = 65;
+
+/** Cutoff date (YYYY-MM-DD) on which the age limit is reached. */
 export function ageLimitDate(birthDate: string, limit: number): string {
   const [y, m, d] = birthDate.split("-");
   return `${Number(y) + limit}-${m}-${d}`;
+}
+
+export type AgeGroup = "children" | "youth" | "adult" | "senior";
+export const AGE_GROUPS: AgeGroup[] = ["children", "youth", "adult", "senior"];
+
+/** Pure age group as of today, independent of status/function. */
+export function ageGroupOf(
+  birthDate: string,
+  childrenAgeLimit: number,
+  youthAgeLimit: number,
+  activeAgeLimit: number,
+  today = new Date()
+): AgeGroup {
+  const age = ageInYears(birthDate, today);
+  if (age < childrenAgeLimit) return "children";
+  if (age < youthAgeLimit) return "youth";
+  if (age < activeAgeLimit) return "adult";
+  return "senior";
 }
 
 export function deriveMemberStatus(
@@ -39,21 +60,21 @@ export function deriveMemberStatus(
   assignments: Assignment[],
   childrenAgeLimit: number,
   youthAgeLimit: number,
-  activeAgeLimit = 65,
+  activeAgeLimit = DEFAULT_ACTIVE_AGE_LIMIT,
   today = new Date()
 ): MemberStatus {
-  if (member.deathDate) return "verstorben";
-  if (member.exitDate) return "ausgetreten";
+  if (member.deathDate) return "deceased";
+  if (member.exitDate) return "left";
 
   const age = ageInYears(member.birthDate, today);
   if (age < activeAgeLimit && assignments.some((a) => a.role.grantsActiveStatus && !a.to)) {
-    if (age < childrenAgeLimit) return "kinder";
-    return age < youthAgeLimit ? "jugend" : "aktiv";
+    if (age < childrenAgeLimit) return "children";
+    return age < youthAgeLimit ? "youth" : "active";
   }
 
   const cutoff = ageLimitDate(member.birthDate, activeAgeLimit);
   const wasActiveAtCutoff = assignments.some(
     (a) => a.role.grantsActiveStatus && a.from <= cutoff && (!a.to || a.to >= cutoff)
   );
-  return wasActiveAtCutoff ? "passiv" : "foerdernd";
+  return wasActiveAtCutoff ? "passive" : "supporting";
 }

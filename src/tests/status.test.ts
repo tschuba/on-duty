@@ -39,68 +39,68 @@ function member(overrides: Partial<{ exitDate: string | null; deathDate: string 
 }
 
 describe("deriveMemberStatus", () => {
-  it("ausgetreten when exitDate set", () => {
-    expect(deriveMemberStatus(member({ exitDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("ausgetreten");
+  it("left when exitDate set", () => {
+    expect(deriveMemberStatus(member({ exitDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("left");
   });
 
-  it("verstorben when deathDate set", () => {
-    expect(deriveMemberStatus(member({ deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("verstorben");
+  it("deceased when deathDate set", () => {
+    expect(deriveMemberStatus(member({ deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("deceased");
   });
 
-  it("verstorben takes priority over exitDate and active role", () => {
-    expect(deriveMemberStatus(member({ exitDate: "2023-01-01", deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("verstorben");
+  it("deceased takes priority over exitDate and active role", () => {
+    expect(deriveMemberStatus(member({ exitDate: "2023-01-01", deathDate: "2023-01-01" }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("deceased");
   });
 
-  it("aktiv when open active-role assignment and age >= youth limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(25) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("aktiv");
+  it("active when open active-role assignment and age >= youth limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(25) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("active");
   });
 
-  it("jugend when open active-role assignment and age between limits", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(15) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("jugend");
+  it("youth when open active-role assignment and age between limits", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(15) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("youth");
   });
 
-  it("jugend on exact day before birthday that would reach youth limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(YOUTH_LIMIT, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("jugend");
+  it("youth on exact day before birthday that would reach youth limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(YOUTH_LIMIT, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("youth");
   });
 
-  it("aktiv on exact birthday reaching youth limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(YOUTH_LIMIT, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("aktiv");
+  it("active on exact birthday reaching youth limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(YOUTH_LIMIT, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("active");
   });
 
-  it("kinder when open active-role assignment and age < children limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(8) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("kinder");
+  it("children when open active-role assignment and age < children limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(8) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("children");
   });
 
-  it("kinder on exact day before birthday that would reach children limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(CHILDREN_LIMIT, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("kinder");
+  it("children on exact day before birthday that would reach children limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(CHILDREN_LIMIT, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("children");
   });
 
-  it("jugend on exact birthday reaching children limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(CHILDREN_LIMIT, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("jugend");
+  it("youth on exact birthday reaching children limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(CHILDREN_LIMIT, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("youth");
   });
 
-  it("foerdernd when no active-role assignment", () => {
-    expect(deriveMemberStatus(member(), [], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("foerdernd");
+  it("supporting when no active-role assignment", () => {
+    expect(deriveMemberStatus(member(), [], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("supporting");
   });
 
-  it("foerdernd when active role ended before the age limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(70) }), [assignment(activeRole, "2020-06-01")], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("foerdernd");
+  it("supporting when active role ended before the age limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(70) }), [assignment(activeRole, "2020-06-01")], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("supporting");
   });
 
-  it("foerdernd under limit with only non-granting role", () => {
-    expect(deriveMemberStatus(member(), [assignment(passiveRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("foerdernd");
+  it("supporting under limit with only non-granting role", () => {
+    expect(deriveMemberStatus(member(), [assignment(passiveRole)], CHILDREN_LIMIT, YOUTH_LIMIT)).toBe("supporting");
   });
 
-  it("passiv when open active role and age limit reached", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(66) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passiv");
+  it("passive when open active role and age limit reached", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(66) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passive");
   });
 
-  it("passiv when active role ended after the age limit", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(70) }), [assignment(activeRole, "2030-01-01".replace("2030", String(new Date().getFullYear() - 1)))], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passiv");
+  it("passive when active role ended after the age limit", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(70) }), [assignment(activeRole, "2030-01-01".replace("2030", String(new Date().getFullYear() - 1)))], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passive");
   });
 
-  it("aktiv on day before age limit, passiv on the limit day", () => {
-    expect(deriveMemberStatus(member({ birthDate: age(65, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("aktiv");
-    expect(deriveMemberStatus(member({ birthDate: age(65, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passiv");
+  it("active on day before age limit, passive on the limit day", () => {
+    expect(deriveMemberStatus(member({ birthDate: age(65, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("active");
+    expect(deriveMemberStatus(member({ birthDate: age(65, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passive");
   });
 });

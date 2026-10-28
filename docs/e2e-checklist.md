@@ -15,11 +15,11 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 
 - [ ] Mitglied anlegen (alle Pflichtfelder + mindestens eine Funktion)
 - [ ] Inline-Validierung: Speichern ohne Pflichtfeld → Fehlermeldung
-- [ ] Statusableitung: aktive Rolle → `aktiv`; kein Eintragsalter unter Jugendgrenze → `jugend`
+- [ ] Statusableitung: aktive Rolle → `active`; kein Eintragsalter unter Jugendgrenze → `youth`
 - [ ] Mitglied bearbeiten (Stammdaten + Zuweisung hinzufügen/entfernen)
 - [ ] Archivieren: Austrittsdatum setzen → offene Zuweisungen werden geschlossen
 - [ ] Reaktivierung: Reaktivierungs-Dialog erscheint bei `auto_closed`-Zuweisungen
-- [ ] Filter (`aktiv / passiv / jugend / kinder / archiviert`) kombinierbar mit Suche
+- [ ] Filter (`active / passive / youth / children / archiviert`) kombinierbar mit Suche
 - [ ] Paginierung + Seitengröße-Wechsel bleibt bei aktiven Filtern korrekt
 - [ ] Statistik-Karten zeigen korrekte Zahlen
 

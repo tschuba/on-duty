@@ -119,10 +119,13 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
+import { ageGroupOf } from "../lib/status.js";
+
 const {
   memberRoutes,
   sortMembers,
   parseListQuery,
+  filterMembers,
   buildExportSheets,
   StatsCards,
   MembersTable,
@@ -204,7 +207,7 @@ function memberWithAssignments(overrides: Record<string, unknown> = {}, assignme
 describe("sortMembers", () => {
   const withStatus = (m: ReturnType<typeof memberWithAssignments>) => ({
     ...m,
-    status: "aktiv" as const,
+    status: "active" as const,
   });
   const a = withStatus(memberWithAssignments({ id: "1", lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2015-01-01" }));
   const b = withStatus(memberWithAssignments({ id: "2", lastName: "Adler", firstName: "Ben", birthDate: "1980-01-01", entryDate: "2020-01-01" }));
@@ -232,34 +235,56 @@ describe("sortMembers", () => {
   });
 });
 
+describe("age filter", () => {
+  const today = new Date(2026, 5, 15);
+  it("ageGroupOf: birthday on the boundary date already falls in the higher group", () => {
+    expect(ageGroupOf("2014-06-16", 12, 18, 65, today)).toBe("children");
+    expect(ageGroupOf("2014-06-15", 12, 18, 65, today)).toBe("youth");
+    expect(ageGroupOf("2008-06-15", 12, 18, 65, today)).toBe("adult");
+    expect(ageGroupOf("1961-06-15", 12, 18, 65, today)).toBe("senior");
+  });
+
+  it("parseListQuery drops invalid age values", () => {
+    expect(parseListQuery({}, [], [], ["children", "x"]).ageFilter).toEqual(["children"]);
+  });
+
+  it("filterMembers finds a child without a function (supporting) via the age filter", () => {
+    const child = { ...makeMember({ birthDate: `${new Date().getFullYear() - 5}-01-01` }), assignments: [], status: "supporting" } as never;
+    const adult = { ...makeMember(), assignments: [], status: "supporting" } as never;
+    expect(filterMembers([child, adult], ["supporting"], [], ["children"])).toEqual([child]);
+    expect(filterMembers([child, adult], ["supporting"], [], [])).toHaveLength(2);
+  });
+});
+
 describe("parseListQuery", () => {
   it("applies defaults when nothing is set", () => {
-    expect(parseListQuery({}, [], [])).toEqual({
+    expect(parseListQuery({}, [], [], [])).toEqual({
       search: "",
       sort: "lastName",
       dir: "asc",
-      statusFilter: ["aktiv", "passiv", "foerdernd", "kinder", "jugend"],
+      statusFilter: ["active", "passive", "supporting", "children", "youth"],
       roleFilter: [],
+      ageFilter: [],
       page: 1,
       pageSize: 25,
     });
   });
 
   it("keeps repeated status/role params as-is", () => {
-    const q = parseListQuery({}, ["aktiv", "jugend"], ["r1", "r2"]);
-    expect(q.statusFilter).toEqual(["aktiv", "jugend"]);
+    const q = parseListQuery({}, ["active", "youth"], ["r1", "r2"], []);
+    expect(q.statusFilter).toEqual(["active", "youth"]);
     expect(q.roleFilter).toEqual(["r1", "r2"]);
   });
 
   it("clamps page to at least 1 and rejects invalid pageSize", () => {
-    expect(parseListQuery({ page: "0" }, [], []).page).toBe(1);
-    expect(parseListQuery({ page: "-5" }, [], []).page).toBe(1);
-    expect(parseListQuery({ pageSize: "7" }, [], []).pageSize).toBe(25);
-    expect(parseListQuery({ pageSize: "50" }, [], []).pageSize).toBe(50);
+    expect(parseListQuery({ page: "0" }, [], [], []).page).toBe(1);
+    expect(parseListQuery({ page: "-5" }, [], [], []).page).toBe(1);
+    expect(parseListQuery({ pageSize: "7" }, [], [], []).pageSize).toBe(25);
+    expect(parseListQuery({ pageSize: "50" }, [], [], []).pageSize).toBe(50);
   });
 
   it("reads search, sort and dir", () => {
-    const q = parseListQuery({ search: "an", sort: "birthDate", sort_dir: "desc" }, [], []);
+    const q = parseListQuery({ search: "an", sort: "birthDate", sort_dir: "desc" }, [], [], []);
     expect(q.search).toBe("an");
     expect(q.sort).toBe("birthDate");
     expect(q.dir).toBe("desc");
@@ -330,11 +355,11 @@ function renderApp(el: any) {
 describe("StatsCards", () => {
   it("counts members per status and splits gender within aktiv/jugend/kinder", async () => {
     const all = [
-      { ...makeMember(), status: "aktiv", gender: "male" },
-      { ...makeMember(), status: "aktiv", gender: "female" },
-      { ...makeMember(), status: "aktiv", gender: null },
-      { ...makeMember(), status: "passiv", gender: "male" },
-      { ...makeMember(), status: "ausgetreten", gender: "male" },
+      { ...makeMember(), status: "active", gender: "male" },
+      { ...makeMember(), status: "active", gender: "female" },
+      { ...makeMember(), status: "active", gender: null },
+      { ...makeMember(), status: "passive", gender: "male" },
+      { ...makeMember(), status: "left", gender: "male" },
     ] as any;
     const res = await renderApp(StatsCards({ all }));
     const html = await res.text();
@@ -345,10 +370,10 @@ describe("StatsCards", () => {
 
   it("colors Fördernd and breaks down Ausgeschieden", async () => {
     const all = [
-      { ...makeMember(), status: "foerdernd", gender: null },
-      { ...makeMember(), status: "ausgetreten", gender: null },
-      { ...makeMember(), status: "ausgetreten", gender: null },
-      { ...makeMember(), status: "verstorben", gender: null },
+      { ...makeMember(), status: "supporting", gender: null },
+      { ...makeMember(), status: "left", gender: null },
+      { ...makeMember(), status: "left", gender: null },
+      { ...makeMember(), status: "deceased", gender: null },
     ] as any;
     const html = await (await renderApp(StatsCards({ all }))).text();
     expect(html).toContain('stat-value text-secondary">1<');
@@ -367,8 +392,9 @@ describe("MembersTable", () => {
     totalPages: 1,
     totalCount: 0,
     search: "",
-    statusFilter: ["aktiv"] as any,
+    statusFilter: ["active"] as any,
     roleFilter: [] as string[],
+    ageFilter: [] as never[],
     isEditor: true,
   };
 
@@ -379,7 +405,7 @@ describe("MembersTable", () => {
 
   it("renders a single badge for one open role", async () => {
     const item = memberWithAssignments({}, [makeAssignment({ role: roleAktiv })]);
-    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
+    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "active" } as any] }));
     const html = await res.text();
     expect(html).toContain(roleAktiv.title);
     expect(html).not.toContain("role-popover");
@@ -390,7 +416,7 @@ describe("MembersTable", () => {
       makeAssignment({ id: "a1", role: roleAktiv }),
       makeAssignment({ id: "a2", role: roleVorstand, memberRoleId: roleVorstand.id }),
     ]);
-    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
+    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "active" } as any] }));
     const html = await res.text();
     expect(html).toContain("role-popover");
     expect(html).toContain(roleAktiv.title);
@@ -399,7 +425,7 @@ describe("MembersTable", () => {
 
   it("hides secondary columns on narrow viewports (th and td)", async () => {
     const item = memberWithAssignments({}, [makeAssignment({ role: roleAktiv })]);
-    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
+    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "active" } as any] }));
     const html = await res.text();
     const count = (c: string) => html.split(`class="${c}"`).length - 1;
     expect(count("hidden md:table-cell")).toBe(2);
@@ -411,7 +437,7 @@ describe("MembersTable", () => {
 
   it("hides closed assignments from the open-roles display", async () => {
     const item = memberWithAssignments({}, [makeAssignment({ to: "2020-01-01" })]);
-    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "aktiv" } as any] }));
+    const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "active" } as any] }));
     expect(await res.text()).not.toContain(roleAktiv.title);
   });
 });
@@ -477,7 +503,7 @@ describe("GET /", () => {
       memberWithAssignments({ id: "m1", lastName: "Aktiv" }),
       memberWithAssignments({ id: "m2", lastName: "Weg", exitDate: "2020-01-01" }, []),
     ];
-    const res = await memberRoutes.request("/?status=aktiv");
+    const res = await memberRoutes.request("/?status=active");
     const html = await res.text();
     expect(html).toContain("Aktiv");
     expect(html).not.toContain("Weg");
@@ -498,14 +524,14 @@ describe("GET /", () => {
     findManyResult = [];
     const html = await (await memberRoutes.request("/")).text();
     expect(html).toContain('data-msf-param="status"');
-    for (const v of ["aktiv", "passiv", "foerdernd", "jugend", "kinder", "ausgetreten", "verstorben"]) expect(html).toContain(`name="status" value="${v}"`);
+    for (const v of ["active", "passive", "supporting", "youth", "children", "left", "deceased"]) expect(html).toContain(`name="status" value="${v}"`);
     expect(html).toContain(t("members.filter.currentStatus"));
   });
 
   it("labels the status filter by selection", async () => {
     findManyResult = [];
-    expect(await (await memberRoutes.request("/?status=aktiv&status=jugend")).text()).toContain("2 Status");
-    expect(await (await memberRoutes.request("/?status=jugend")).text()).toContain(`${t("status.jugend")} ▾`);
+    expect(await (await memberRoutes.request("/?status=active&status=youth")).text()).toContain("2 Status");
+    expect(await (await memberRoutes.request("/?status=youth")).text()).toContain(`${t("status.youth")} ▾`);
   });
 
   it("hides the add-member button for a read-only user", async () => {
@@ -680,41 +706,41 @@ describe("POST /new", () => {
     expect(insertCalls.some((c) => c.table === memberRoleAssignments)).toBe(true);
   });
 
-  it("rejects start status 'aktiv' without a running function (422, offers fördernd)", async () => {
+  it("rejects start status 'active' without a running function (422, offers fördernd)", async () => {
     const res = await memberRoutes.request("/new", {
       method: "POST",
-      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "aktiv" }),
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "active" }),
     });
     expect(res.status).toBe(422);
     const html = await res.text();
-    expect(html).toContain('name="switchStatus" value="foerdernd"');
+    expect(html).toContain('name="switchStatus" value="supporting"');
     expect(insertCalls.some((c) => c.table === members)).toBe(false);
   });
 
-  it("accepts start status 'foerdernd' without functions, and switchStatus overrides the choice", async () => {
+  it("accepts start status 'supporting' without functions, and switchStatus overrides the choice", async () => {
     const res = await memberRoutes.request("/new", {
       method: "POST",
-      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "aktiv", switchStatus: "foerdernd" }),
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "active", switchStatus: "supporting" }),
     });
     expect(res.status).toBe(302);
   });
 
-  it("ignores submitted functions for start status 'foerdernd'", async () => {
+  it("ignores submitted functions for start status 'supporting'", async () => {
     rolesFixture = [roleAktiv];
     const res = await memberRoutes.request("/new", {
       method: "POST",
       body: formBody({
-        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "foerdernd",
+        lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "supporting",
         "assignment_role[]": roleAktiv.id, "assignment_from[]": "2020-01-01", "assignment_to[]": "",
       }),
     });
     expect(res.status).toBe(302);
   });
 
-  it("rejects start status 'aktiv' without a function and keeps the form values", async () => {
+  it("rejects start status 'active' without a function and keeps the form values", async () => {
     const res = await memberRoutes.request("/new", {
       method: "POST",
-      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "aktiv" }),
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", entryDate: "2020-01-01", startStatus: "active" }),
     });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain('value="Bauer"');
@@ -723,7 +749,7 @@ describe("POST /new", () => {
   it("status preview shows derived status and the conflict", async () => {
     const res = await memberRoutes.request("/status-preview", {
       method: "POST",
-      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", startStatus: "passiv" }),
+      body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", startStatus: "passive" }),
     });
     expect(res.status).toBe(200);
     const html = await res.text();
@@ -766,10 +792,10 @@ describe("POST /new", () => {
       method: "POST",
       body: formBody({ lastName: "Bauer", firstName: "Anna", birthDate: "1990-01-01", savedStatus }),
     });
-    const changed = await (await post("aktiv")).text();
+    const changed = await (await post("active")).text();
     expect(changed).toContain('hx-swap-oob="true"');
     expect(changed).toContain("absolute");
-    expect(await (await post("foerdernd")).text()).not.toContain("absolute");
+    expect(await (await post("supporting")).text()).not.toContain("absolute");
   });
 
   it("redirects back to the new-member form for save_and_new", async () => {

@@ -66,7 +66,7 @@ export function generateEvents(
     // Service: aktiv only, based on first entry into any fire brigade.
     // Membership: everyone who has not left, based on entry into ours.
     const bases: { type: AnniversaryType; base: string }[] = [];
-    if (m.status === "aktiv") bases.push({ type: "service", base: m.firstEntryDate ?? m.entryDate });
+    if (m.status === "active") bases.push({ type: "service", base: m.firstEntryDate ?? m.entryDate });
     bases.push({ type: "membership", base: m.entryDate });
 
     const found = new Map<string, AnniversaryEvent>();
