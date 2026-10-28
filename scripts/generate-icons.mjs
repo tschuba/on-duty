@@ -50,6 +50,7 @@ const ICONS = {
   "shield-check": "shield-check",
   axe: "axe",
   user: "user",
+  "user-circle": "user-circle",
   jacket: "jacket",
   envelope: "mail",
   "map-pin": "map-pin",
