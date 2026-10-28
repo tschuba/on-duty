@@ -472,12 +472,7 @@ function EventForm({ values, errors, roles, tz }: {
         <textarea name="description" rows={4} maxlength={5000} class={`textarea w-full${errors.description ? " textarea-error" : ""}`}>{values.description}</textarea>
       </Field>
 
-      <div class="flex flex-wrap gap-2" role="group" aria-label={t("events.form.tags")}>
-        {EVENT_TAGS.map((d) => (
-          <input type="checkbox" name="tags" value={d.key} aria-label={eventTagLabel(d.key)} checked={values.tags.includes(d.key)} class={`btn btn-sm btn-outline btn-${d.color}`} />
-        ))}
-      </div>
-      <ChipInput name="tags" label={t("events.form.tags")} placeholder={t("events.form.tagsPlaceholder")} values={values.tags.filter((tag) => !eventTagDef(tag))} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} />
+      <ChipInput name="tags" label={t("events.form.tags")} placeholder={t("events.form.tagsPlaceholder")} values={sortEventTags(values.tags)} presets={EVENT_TAGS.map((d) => ({ key: d.key, label: eventTagLabel(d.key), badge: d.badge }))} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} />
 
       <FieldGroup legend={t("events.form.visibility")}>
         <div class="flex flex-col gap-2">

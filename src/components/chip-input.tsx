@@ -4,7 +4,7 @@ import { t } from "../i18n/index.js";
 // values may contain commas. Script is bound once per page and works per instance
 // via [data-chip-input] (no fixed ids → several instances per page are fine).
 let instanceCount = 0;
-export function ChipInput({ name, label, placeholder, values, max, maxFrom, splitOnComma = false, caseSensitive = true, hint, suggestionsFrom }: {
+export function ChipInput({ name, label, placeholder, values, max, maxFrom, splitOnComma = false, caseSensitive = true, hint, suggestionsFrom, presets }: {
   name: string;
   label: string;
   placeholder?: string;
@@ -18,23 +18,35 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
   hint?: string;
   /** CSS selector of a `<script type="application/json">` holding a string[] of suggestions (once per page). */
   suggestionsFrom?: string;
+  /** Fixed tags: stored by key, shown by label/colour, offered as one-click buttons inside the box. */
+  presets?: { key: string; label: string; badge: string }[];
 }) {
   const list = values ?? [];
   const listId = `chip-list-${++instanceCount}`;
   return (
-    <div class="flex flex-col relative" data-chip-input data-suggestions-from={suggestionsFrom ?? ""} data-name={name} data-split={splitOnComma ? "1" : ""} data-case={caseSensitive ? "1" : ""}
-      data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-label={label} data-placeholder={placeholder ?? ""} data-remove-label={t("common.remove")}>
-      <label class="label"><span class="text-sm chip-label">{label}</span></label>
+    <div class="group/chip flex flex-col relative" data-chip-input data-suggestions-from={suggestionsFrom ?? ""} data-name={name} data-split={splitOnComma ? "1" : ""} data-case={caseSensitive ? "1" : ""}
+      data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-presets={presets ? JSON.stringify(presets) : ""} data-label={label} data-placeholder={placeholder ?? ""} data-remove-label={t("common.remove")}>
+      <span class={`chip-label pointer-events-none absolute z-[2] start-3 -translate-y-1/2 px-1 rounded-sm bg-base-100 text-sm leading-none transition-all${placeholder ? " top-0 scale-75 -translate-x-[12.5%]" : " top-5 opacity-60"} duration-100 group-focus-within/chip:top-0 group-focus-within/chip:scale-75 group-focus-within/chip:-translate-x-[12.5%] group-focus-within/chip:opacity-100 group-has-[[data-chip]]/chip:top-0 group-has-[[data-chip]]/chip:scale-75 group-has-[[data-chip]]/chip:-translate-x-[12.5%] group-has-[[data-chip]]/chip:opacity-100`}>{label}</span>
       <div class="chip-box cursor-text input w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
-        {list.map((v) => (
-          <span class="badge badge-outline gap-1 pr-1" data-chip={v}>
-            {v}
+        {list.map((v) => {
+          const p = presets?.find((x) => x.key === v);
+          return (
+          <span class={`badge gap-1 pr-1 ${p ? p.badge : "badge-outline"}`} data-chip={v} data-label={p?.label}>
+            {p ? p.label : v}
             <button type="button" class="chip-remove inline-flex items-center justify-center rounded-full h-4 w-4 ml-0.5 bg-base-300 text-xs leading-none cursor-pointer [-webkit-tap-highlight-color:transparent] hover:bg-error hover:text-error-content" aria-label={t("common.remove")}>×</button>
             <input type="hidden" name={name} value={v} />
           </span>
-        ))}
-        <input type="text" class="chip-text grow min-w-24 outline-none bg-transparent" placeholder={placeholder}
+          );
+        })}
+        <input type="text" class={`chip-text grow min-w-24 outline-none bg-transparent ${placeholder ? "" : "placeholder:opacity-0 focus:placeholder:opacity-100"}`} placeholder={placeholder}
           {...(suggestionsFrom ? { role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": listId, autocomplete: "off" } : {})} />
+        {presets && (
+          <div class="chip-presets basis-full flex flex-wrap items-center gap-1 border-t border-base-300 mt-1 pt-2">
+            {presets.map((p) => (
+              <button type="button" class={`chip-preset badge badge-outline cursor-pointer ${p.badge}`} data-preset={p.key} hidden={list.includes(p.key)}>+ {p.label}</button>
+            ))}
+          </div>
+        )}
       </div>
       {suggestionsFrom && <ul id={listId} role="listbox" hidden class="chip-list menu menu-sm absolute left-0 right-0 top-full z-10 mt-1 max-h-48 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow" />}
       <span class="text-xs opacity-60 mt-1 chip-counter" />
@@ -54,6 +66,12 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
             var input = root.querySelector('.chip-text');
             // readonly statt disabled: bleibt fokussierbar, nimmt aber nichts mehr an
             input.readOnly = count >= max;
+            var any = false;
+            root.querySelectorAll('.chip-preset').forEach(function(b){
+              var used = root.querySelector('[data-chip="' + b.dataset.preset + '"]');
+              b.hidden = !!used || count >= max; if (!b.hidden) any = true;
+            });
+            var pc = root.querySelector('.chip-presets'); if (pc) pc.hidden = !any;
             var c = root.querySelector('.chip-counter');
             c.textContent = (root.dataset.hint && max !== Infinity) ? root.dataset.hint.replace('{n}', count).replace('{max}', max) : '';
           }
@@ -66,7 +84,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
             var el = document.querySelector(sel);
             try { (el ? JSON.parse(el.textContent) : []).forEach(add); } catch (e) {}
             document.querySelectorAll('[data-chip-input]').forEach(function(r){
-              if (r.dataset.suggestionsFrom === sel) r.querySelectorAll('[data-chip]').forEach(function(c){ add(c.dataset.chip); });
+              if (r.dataset.suggestionsFrom === sel) r.querySelectorAll('[data-chip]').forEach(function(c){ add(c.dataset.label || c.dataset.chip); });
             });
             return out;
           }
@@ -79,7 +97,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
           function chipOpen(root) {
             var ul = root.querySelector('.chip-list'); if (!ul) return;
             var input = root.querySelector('.chip-text'), q = input.value.trim().toLowerCase();
-            var own = Array.from(root.querySelectorAll('[data-chip]')).map(function(s){ return s.dataset.chip.toLowerCase(); });
+            var own = []; root.querySelectorAll('[data-chip]').forEach(function(s){ own.push(s.dataset.chip.toLowerCase()); if (s.dataset.label) own.push(s.dataset.label.toLowerCase()); });
             var hits = chipVocab(root).filter(function(v){ var l = v.toLowerCase(); return own.indexOf(l) < 0 && l.indexOf(q) >= 0; }).slice(0, 8);
             ul.textContent = '';
             if (!hits.length || input.readOnly) { chipClose(root); return; }
@@ -102,7 +120,13 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
           function chipAdd(root, value) {
             value = value.trim();
             if (!value) return;
-            if (root.dataset.suggestionsFrom && !root.dataset.case) {
+            var preset = null;
+            if (root.dataset.presets) {
+              var lv = value.toLowerCase();
+              preset = JSON.parse(root.dataset.presets).find(function(p){ return p.key === lv || p.label.toLowerCase() === lv; }) || null;
+              if (preset) value = preset.key;
+            }
+            if (!preset && root.dataset.suggestionsFrom && !root.dataset.case) {
               var known = chipVocab(root).find(function(v){ return v.toLowerCase() === value.toLowerCase(); });
               if (known) value = known;
             }
@@ -112,9 +136,10 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
             });
             if (exists || root.querySelectorAll('[data-chip]').length >= chipMax(root)) return;
             var chip = document.createElement('span');
-            chip.className = 'badge badge-outline gap-1 pr-1';
+            chip.className = 'badge gap-1 pr-1 ' + (preset ? preset.badge : 'badge-outline');
             chip.dataset.chip = value;
-            chip.appendChild(document.createTextNode(value));
+            if (preset) chip.dataset.label = preset.label;
+            chip.appendChild(document.createTextNode(preset ? preset.label : value));
             var rm = document.createElement('button');
             rm.type = 'button'; rm.className = 'chip-remove inline-flex items-center justify-center rounded-full h-4 w-4 ml-0.5 bg-base-300 text-xs leading-none cursor-pointer [-webkit-tap-highlight-color:transparent] hover:bg-error hover:text-error-content'; rm.textContent = '×';
             rm.setAttribute('aria-label', root.dataset.removeLabel);
@@ -158,6 +183,12 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
             if (r) chipClose(r);
           });
           document.body.addEventListener('click', function(e) {
+            var pb = e.target.closest && e.target.closest('.chip-preset');
+            if (pb) {
+              var pr = pb.closest('[data-chip-input]');
+              chipAdd(pr, pb.dataset.preset); chipRefresh(pr);
+              return;
+            }
             var opt = e.target.closest && e.target.closest('.chip-list li');
             if (opt) {
               var r = opt.closest('[data-chip-input]'), ti = r.querySelector('.chip-text');
