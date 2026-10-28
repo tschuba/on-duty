@@ -122,8 +122,8 @@ adminRoutes.get("/users", guard, async (c) => {
     rolesByUser.set(r.userId, [...(rolesByUser.get(r.userId) ?? []), r.roleName]);
   }
   const isPending = (u: typeof allUsers[number]) => isPendingUser(u, rolesByUser.has(u.id));
-  const onlyPending = c.req.query("filter") === "pending";
   const pendingCount = allUsers.filter(isPending).length;
+  const onlyPending = pendingCount > 0 && c.req.query("filter") === "pending";
   const shownUsers = onlyPending ? allUsers.filter(isPending) : allUsers;
 
   return c.html(
@@ -131,13 +131,15 @@ adminRoutes.get("/users", guard, async (c) => {
       <BackupWarnBanner {...warn} />
       <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
-      <div class="tabs tabs-boxed mb-2 w-fit">
-        <a href="/admin/users" class={`tab${onlyPending ? "" : " tab-active"}`}>{t("admin.users.filter.all")}</a>
-        <a href="/admin/users?filter=pending" class={`tab${onlyPending ? " tab-active" : ""}`}>
-          {t("admin.users.filter.pending")}
-          {pendingCount > 0 && <span class="badge badge-warning badge-sm ml-1">{pendingCount}</span>}
-        </a>
-      </div>
+      {pendingCount > 0 && (
+        <form method="get" class="mb-2">
+          <label class="label cursor-pointer w-fit gap-2">
+            <input type="checkbox" name="filter" value="pending" class="toggle toggle-sm" checked={onlyPending} onchange="this.form.submit()" />
+            <span class="text-sm">{t("admin.users.filter.pending")}</span>
+            <span class="badge badge-warning badge-sm">{pendingCount}</span>
+          </label>
+        </form>
+      )}
       <ClickToEditHint />
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
