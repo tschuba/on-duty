@@ -2,6 +2,7 @@ import { and, eq, exists, gte, inArray, lt, or, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events, eventTags, eventVisibleRoles } from "../db/schema/index.js";
 import { trimmed, parseTags } from "./forms.js";
+import { EVENT_TAGS, normalizeEventTags } from "./event-tags.js";
 import { allDayBounds, parseLocal, dayAfter } from "./datetime.js";
 import { t } from "../i18n/index.js";
 
@@ -26,7 +27,8 @@ export function visibilityCondition(user: { permissions: Set<string>; roleIds: S
 export async function eventTagVocabulary(user: { permissions: Set<string>; roleIds: Set<string> } | undefined): Promise<string[]> {
   const where = visibilityCondition(user);
   const rows = await db.select({ tag: eventTags.tag }).from(eventTags).innerJoin(events, eq(eventTags.eventId, events.id)).where(where);
-  return [...new Set(rows.map((r) => r.tag))].sort((a, b) => a.localeCompare(b, "de"));
+  // Vordefinierte Tags kommen separat aus EVENT_TAGS.
+  return [...new Set(rows.map((r) => r.tag))].filter((tag) => !EVENT_TAGS.some((d) => d.key === tag)).sort((a, b) => a.localeCompare(b, "de"));
 }
 
 // Überlappung mit [start, end] (Tage, "YYYY-MM-DD"): startsAt < Ende+1 Tag und endsAt >= Start.
@@ -59,7 +61,7 @@ export function parseEventForm(body: Record<string, any>): EventFormValues {
     startsAt: trimmed(body, "startsAt"),
     endsAt: trimmed(body, "endsAt"),
     visibility,
-    tags: parseTags(body, "tags"),
+    tags: normalizeEventTags(parseTags(body, "tags")),
     roleIds: [...new Set((Array.isArray(body.roleIds) ? body.roleIds : body.roleIds ? [body.roleIds] : []).map(String))],
   };
 }

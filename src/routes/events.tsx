@@ -18,6 +18,7 @@ import { getSettings, setSetting } from "../lib/settings.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
+import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
 import {
   eventTagVocabulary,
   overlapsRange,
@@ -105,7 +106,7 @@ function EventTimeLabel({ ev, tz }: { ev: Event; tz: string }) {
 
 function EventTagBadges({ tags }: { tags: string[] }) {
   if (!tags.length) return null;
-  return <div class="flex flex-wrap gap-1 mt-1">{tags.map((tag) => <span class="badge badge-sm badge-outline">{tag}</span>)}</div>;
+  return <div class="flex flex-wrap gap-1 mt-1">{sortEventTags(tags).map((tag) => <span class={`badge badge-sm ${eventTagDef(tag)?.badge ?? "badge-outline"}`}>{eventTagLabel(tag)}</span>)}</div>;
 }
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -152,7 +153,11 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
   const wanted = monthParam && MONTH_RE.test(monthParam) ? monthParam : todayStr().slice(0, 7);
   const fi = Math.max(0, months.findIndex((m) => m >= wanted) < 0 ? months.length - 1 : months.findIndex((m) => m >= wanted));
   const shown = new Set(months.slice(Math.max(0, fi - 1), fi + 2));
-  const data = { days, months, focus: months[fi], base, tags: tagFilter };
+  const dayTags = new Map<string, string[]>();
+  for (const ev of rows) { const d = toLocalDate(ev.startsAt, tz); dayTags.set(d, [...(dayTags.get(d) ?? []), ...ev.tags.map((x) => x.tag)]); }
+  const dayColors: Record<string, { c: string; l: string }> = {};
+  for (const [d, tg] of dayTags) { const def = firstEventTagDef(tg); if (def) dayColors[d] = { c: def.color, l: eventTagLabel(def.key) }; }
+  const data = { days, months, focus: months[fi], base, tags: tagFilter, dayColors };
   return (
     <>
       <div class="mb-4 flex items-center gap-3">
@@ -175,7 +180,7 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
       </div>
       <script type="application/json" id="ev-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />
       <link rel="stylesheet" href="/css/vanilla-calendar.css" />
-      <style>{`#ev-calendar [data-vc-date]:not([data-vc-date-disabled]) [data-vc-date-btn]{background-image:radial-gradient(circle at 50% calc(100% - 5px),currentColor 2.5px,transparent 3px)}`}</style>
+      <style>{`#ev-calendar [data-vc-date]:not([data-vc-date-disabled]) [data-vc-date-btn]{background-image:radial-gradient(circle at 50% calc(100% - 5px),var(--ev-dot,currentColor) 2.5px,transparent 3px)}`}</style>
       <script type="module" dangerouslySetInnerHTML={{ __html: EVENTS_SCRIPT }} />
     </>
   );
@@ -282,6 +287,12 @@ const EVENTS_SCRIPT = `
       setMobile("list");
       jump(d);
     },
+    onCreateDateEls(self, el) {
+      const dc = cfg.dayColors[el.dataset.vcDate];
+      if (!dc) return;
+      el.firstElementChild.style.setProperty("--ev-dot", "var(--color-" + dc.c + ")");
+      el.title = dc.l;
+    },
     onClickArrow: syncFromCalendar, onClickMonth: syncFromCalendar, onClickYear: syncFromCalendar,
   });
   calendar.init();
@@ -311,8 +322,9 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const user = c.get("user")!;
   const canManage = user.permissions.has("events:manage");
   const tz = resolveTimezone(c);
-  const allTags = await eventTagVocabulary(user);
-  const tagFilter = parseMulti(c.req.queries("tag"), allTags);
+  const freeTags = await eventTagVocabulary(user);
+  const allTags = [...EVENT_TAGS.map((d) => d.key as string), ...freeTags];
+  const tagFilter = parseMulti(normalizeEventTags(c.req.queries("tag") ?? []), allTags);
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
 
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
@@ -358,7 +370,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
       </>} />
       <LocalTimes tz={tz} />
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-        <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: tag }))} selected={tagFilter}
+        <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: eventTagLabel(tag) }))} selected={tagFilter}
           allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
           applyLabel={t("common.apply")} resetLabel={t("common.reset")} searchPlaceholder={t("common.searchPlaceholder")} emptyLabel={t("events.filter.noTags")} />
       </div>
@@ -422,7 +434,7 @@ const DURATION_PRESETS: { key: string; label: string }[] = [
 ];
 
 async function TagSuggestions(user: AuthedUser) {
-  return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson(await eventTagVocabulary(user)) }} />;
+  return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson([...EVENT_TAGS.map((d) => eventTagLabel(d.key)), ...(await eventTagVocabulary(user))]) }} />;
 }
 
 function EventForm({ values, errors, roles, tz }: {
@@ -460,7 +472,12 @@ function EventForm({ values, errors, roles, tz }: {
         <textarea name="description" rows={4} maxlength={5000} class={`textarea w-full${errors.description ? " textarea-error" : ""}`}>{values.description}</textarea>
       </Field>
 
-      <ChipInput name="tags" label={t("events.form.tags")} placeholder={t("events.form.tagsPlaceholder")} values={values.tags} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} />
+      <div class="flex flex-wrap gap-2" role="group" aria-label={t("events.form.tags")}>
+        {EVENT_TAGS.map((d) => (
+          <input type="checkbox" name="tags" value={d.key} aria-label={eventTagLabel(d.key)} checked={values.tags.includes(d.key)} class={`btn btn-sm btn-outline btn-${d.color}`} />
+        ))}
+      </div>
+      <ChipInput name="tags" label={t("events.form.tags")} placeholder={t("events.form.tagsPlaceholder")} values={values.tags.filter((tag) => !eventTagDef(tag))} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} />
 
       <FieldGroup legend={t("events.form.visibility")}>
         <div class="flex flex-col gap-2">
