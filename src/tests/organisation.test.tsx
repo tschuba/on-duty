@@ -59,7 +59,7 @@ describe("organisation", () => {
 
   it("shows no warning in a section whose required fields are filled", async () => {
     currentUser.permissions = new Set(["org:read"]);
-    config = { orgName: "a", orgStreet: "b", orgHouseNumber: "1", orgZip: "2", orgCity: "c" };
+    config = { orgName: "a", orgStreet: "b", orgHouseNumber: "1", orgZip: "2", orgCity: "c", orgRepresentative: "r", orgContactEmail: "a@b.de" };
     expect(await get()).not.toContain("alert-warning");
   });
 
