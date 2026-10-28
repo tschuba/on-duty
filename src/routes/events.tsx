@@ -4,8 +4,8 @@ import { db } from "../db/index.js";
 import { events, eventTags, eventVisibleRoles, appRoles } from "../db/schema/index.js";
 import { requireAuth, type Variables, type AuthedUser } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
-import { Field, FieldGroup } from "../components/field.js";
+import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Icon } from "../components/icon.js";
 import { RowAction } from "../components/row-action.js";
 import { ChipInput } from "../components/chip-input.js";
@@ -111,14 +111,14 @@ function EventTagBadges({ tags }: { tags: string[] }) {
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
-function EventRows({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canManage: boolean }) {
+function EventRows({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: string; canManage: boolean; linked: boolean }) {
   return (
     <>
       {rows.map((ev) => {
         const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
         const day = toLocalDate(ev.startsAt, tz);
         return (
-          <tr data-date={day} data-month={day.slice(0, 7)} class={`scroll-mt-20 ${canManage ? "cursor-pointer hover" : ""}`} onclick={canManage ? `location.href='/events/${ev.id}/edit'` : undefined}>
+          <tr data-date={day} data-month={day.slice(0, 7)} class={`scroll-mt-20 ${linked ? "cursor-pointer hover" : ""}`} onclick={linked ? `location.href='/events/${ev.id}'` : undefined}>
             <td>
               <div class="font-medium">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
               <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} />{ev.location && <> · {ev.location}</>}</div>
@@ -139,10 +139,10 @@ function EventRows({ rows, tz, canManage }: { rows: EventRow[]; tz: string; canM
 }
 
 // ?rows=YYYY-MM liefert nur die <tr> dieses Monats (Nachladen beim Scrollen).
-function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean) {
+function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean, linked: boolean) {
   const m = c.req.query("rows");
   if (!m || !MONTH_RE.test(m)) return null;
-  return c.html(<EventRows rows={rows.filter((ev) => toLocalDate(ev.startsAt, tz).startsWith(m))} tz={tz} canManage={canManage} />);
+  return c.html(<EventRows rows={rows.filter((ev) => toLocalDate(ev.startsAt, tz).startsWith(m))} tz={tz} canManage={canManage} linked={linked} />);
 }
 
 // Kalender + Liste. Die Liste zeigt ein gleitendes Fenster aus Fokusmonat ± 1 (nur Monate mit Terminen), der Rest kommt per ?rows= nach.
@@ -175,7 +175,7 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
           <div id="ev-calendar"></div>
         </div>
         <div class="min-w-0 flex-1 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
-          <table class="table table-zebra w-full"><tbody id="ev-rows"><EventRows rows={rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)))} tz={tz} canManage={canManage} /></tbody></table>
+          <table class="table table-zebra w-full"><tbody id="ev-rows"><EventRows rows={rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)))} tz={tz} canManage={canManage} linked={base === "/events"} /></tbody></table>
         </div>
       </div>
       <script type="application/json" id="ev-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />
@@ -330,7 +330,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
   let rows = await fetchEvents(user, undefined);
   if (tagFilter.length) rows = rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag)));
-  const fragment = monthFragment(c, rows, tz, canManage);
+  const fragment = monthFragment(c, rows, tz, canManage, true);
   if (fragment) return fragment;
 
   return c.html(
@@ -409,7 +409,7 @@ eventRoutes.get("/public", async (c) => {
   if (!env.EVENTS_PUBLIC_INDEXING) c.header("X-Robots-Tag", "noindex");
   c.header("Cache-Control", "public, max-age=60");
 
-  const fragment = monthFragment(c, filtered, tz, false);
+  const fragment = monthFragment(c, filtered, tz, false, false);
   if (fragment) return fragment;
 
   return c.html(
@@ -586,16 +586,18 @@ eventRoutes.post("/new", manage, async (c) => {
     );
   }
 
+  let newId = "";
   await db.transaction(async (tx) => {
     const [row] = await tx.insert(events).values({
       title: values.title, location: values.location || null, description: values.description || null,
       allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
     }).returning({ id: events.id });
+    newId = row.id;
     await saveEventTagsAndRoles(tx as never, row.id, values.tags, values.visibility, values.roleIds);
   });
 
   setFlash(c, t("events.form.created"), "success");
-  return c.redirect("/events");
+  return c.redirect(`/events/${newId}`);
 });
 
 async function fetchEventForEdit(id: string) {
@@ -616,16 +618,42 @@ function toEventFormValues(ev: NonNullable<Awaited<ReturnType<typeof fetchEventF
   };
 }
 
-eventRoutes.get("/:id/edit", manage, async (c) => {
+eventRoutes.get("/:id", requireAuth(), async (c) => {
+  const user = c.get("user")!;
+  const id = c.req.param("id");
+  const ev = await db.query.events.findFirst({ where: and(eq(events.id, id), visibilityCondition(user)), with: { tags: true, visibleRoles: true } });
+  if (!ev) return c.notFound();
+  const tz = resolveTimezone(c);
+  const canManage = user.permissions.has("events:manage");
+  const roleNames = ev.visibility === "roles" ? (await loadRoles()).filter((r) => ev.visibleRoles.some((x) => x.roleId === r.id)).map((r) => r.name).join(", ") : null;
+  return c.html(
+    <Layout title={ev.title} user={user}>
+      <div class="max-w-2xl mx-auto">
+      <PageHeader title={ev.title} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/events/${ev.id}/delete?from=detail`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-swap": "none" }} />} />} />
+      <LocalTimes tz={tz} />
+      <ViewGrid>
+        <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.start")}</div><div class="font-medium"><EventTimeLabel ev={ev} tz={tz} /></div></div>
+        <ViewField label={t("events.form.location")} value={ev.location} />
+        <ViewField label={t("events.form.visibility")} value={t(`events.form.visibility.${ev.visibility}`) + (roleNames ? `: ${roleNames}` : "")} />
+        <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.description")}</div><div class="font-medium whitespace-pre-wrap">{ev.description || "—"}</div></div>
+        <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
+      </ViewGrid>
+      </div>
+    </Layout>,
+  );
+});
+
+eventRoutes.get("/:id/edit", requireAuth(), async (c) => {
   const user = c.get("user")!;
   const ev = await fetchEventForEdit(c.req.param("id"));
   if (!ev) return c.notFound();
+  if (!user.permissions.has("events:manage")) return c.redirect(`/events/${ev.id}`);
   const tz = resolveTimezone(c);
   const roles = await loadRoles();
   return c.html(
     <Layout title={t("events.form.editTitle")} user={user}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
+      <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" cancelHref={`/events/${ev.id}`} />} />
       <EventForm values={toEventFormValues(ev, tz)} errors={{}} roles={roles} tz={tz} />
       <TagSuggestions {...user} />
       </div>
@@ -649,7 +677,7 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
     return c.html(
       <Layout title={t("events.form.editTitle")} user={user}>
         <div class="max-w-2xl mx-auto">
-        <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
+        <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" cancelHref={`/events/${id}`} />} />
         <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />
         <TagSuggestions {...user} />
         </div>
@@ -667,13 +695,14 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
   });
 
   setFlash(c, t("events.form.saved"), "success");
-  return c.redirect("/events");
+  return c.redirect(`/events/${id}`);
 });
 
 eventRoutes.post("/:id/delete", manage, async (c) => {
   const id = c.req.param("id");
   await db.delete(events).where(eq(events.id, id));
   setFlash(c, t("events.form.deleted"), "success");
+  if (c.req.query("from") === "detail") { c.header("HX-Redirect", "/events"); return c.body(null, 204); }
 
   return c.html(""); // htmx ersetzt die Zeile durch nichts
 });

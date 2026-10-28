@@ -183,7 +183,7 @@ describe("POST /events/new", () => {
       body: formBody({ title: "Neue Übung", startsAt: "2026-11-15T18:00", endsAt: "2026-11-15T20:00", visibility: "loggedIn", tags: "a,b" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/events");
+    expect(res.headers.get("Location")).toBe("/events/new-id");
     expect(insertCalls[0].values.title).toBe("Neue Übung");
   });
 
@@ -240,5 +240,24 @@ describe("POST /events/:id/delete", () => {
     expect(deleteCalls.length).toBe(1);
     const body = await res.text();
     expect(body).toBe("");
+  });
+});
+
+describe("GET /events/:id (read-only)", () => {
+  const ev = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], visibleRoles: [] };
+
+  it("shows edit button only with events:manage", async () => {
+    eventFindFirstResult = ev;
+    expect(await (await eventRoutes.request("/e1")).text()).toContain('href="/events/e1/edit"');
+    currentUser = { ...currentUser, permissions: new Set() };
+    expect(await (await eventRoutes.request("/e1")).text()).not.toContain('href="/events/e1/edit"');
+  });
+
+  it("redirects /:id/edit to /:id without events:manage", async () => {
+    eventFindFirstResult = ev;
+    currentUser = { ...currentUser, permissions: new Set() };
+    const res = await eventRoutes.request("/e1/edit");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/events/e1");
   });
 });
