@@ -1737,7 +1737,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
     const openRoles = m.assignments.filter((a) => !a.to);
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
+        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
         <ViewGrid>
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
           <ViewField label={t("members.form.firstName")} value={m.firstName} />
@@ -1766,12 +1766,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
             </div>
           </Section>
         )}
-        {canWriteBank ? (
-          <form method="post" action={`/members/${m.id}`} class="space-y-4">
-            <BankDataSection m={m} editable />
-            <button type="submit" class="btn btn-primary">{t("common.save")}</button>
-          </form>
-        ) : canReadBank && <BankDataSection m={m} editable={false} />}
+        {canReadBank && <BankDataSection m={m} editable={false} />}
       </Layout>
     );
   }
@@ -1780,9 +1775,21 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  if (!user.permissions.has("members:write")) return c.redirect(`/members/${id}`);
+  const canWriteMaster = user.permissions.has("members:write");
+  if (!canWriteMaster && !user.permissions.has("members:bank-data:write")) return c.redirect(`/members/${id}`);
   const m = await fetchMember(id);
   if (!m) return c.notFound();
+  if (!canWriteMaster) {
+    // Nur Bankdaten-Schreibrecht: Formular enthält ausschließlich die Bankdaten.
+    return c.html(
+      <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
+        <PageHeader title={`${m.firstName} ${m.lastName}`} backHref={`/members/${id}`} actions={<FormActions formId="member-form" cancelHref={`/members/${id}`} />} />
+        <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
+          <BankDataSection m={m} editable />
+        </form>
+      </Layout>
+    );
+  }
 
   const canWriteBank = user.permissions.has("members:bank-data:write");
   const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");

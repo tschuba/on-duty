@@ -1016,7 +1016,7 @@ describe("bank data gating", () => {
     expect(html).toContain("DE89 3704 0044 0532 0130 00");
     expect(html).not.toContain('name="iban"');
     perms("members:read", "members:bank-data:write");
-    html = await (await memberRoutes.request("/m1")).text();
+    html = await (await memberRoutes.request("/m1/edit")).text();
     expect(html).toContain('name="iban"');
   });
 
