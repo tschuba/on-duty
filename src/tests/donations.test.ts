@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { persons, donors, donations } from "../db/schema/index.js";
 import { t } from "../i18n/index.js";
+import { testDetailPageContract } from "./detail-page-contract.js";
 import { formBody } from "./test-utils.js";
 
 function chainOf(rows: unknown) {
@@ -367,7 +368,7 @@ describe("POST /:id/delete", () => {
   it("refuses once a receipt was issued", async () => {
     donationsFindFirstResult = makeDonation({ id: "don1", receiptStatus: "issued", receiptIssuedAt: new Date() });
     const res = await donationRoutes.request("/don1/delete", { method: "POST" });
-    expect(res.headers.get("location")).toBe("/donations/don1/edit");
+    expect(res.headers.get("location")).toBe("/donations/don1");
     expect(deleteCalls.some((c) => c.table === donations)).toBe(false);
   });
 });
@@ -424,4 +425,17 @@ describe("mark-issued from issued / receipt-status", () => {
     expect(res.headers.get("content-disposition")).toContain("Mueller_GmbH");
     expect(await res.text()).toContain("Müller GmbH");
   });
+});
+
+testDetailPageContract({
+  name: "donations",
+  request: (path) => donationRoutes.request(path),
+  idPath: "/don1",
+  editPath: "/don1/edit",
+  editHref: "/donations/don1/edit",
+  redirectLocation: "/donations/don1",
+  setPermissions: (perms) => { currentUser = { ...currentUser, permissions: new Set(perms) }; },
+  readPermissions: ["donations:read"],
+  writePermissions: ["donations:read", "donations:record"],
+  ensureRecord: () => { donationsFindFirstResult = makeDonation({ id: "don1" }); },
 });

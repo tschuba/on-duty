@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, or, ilike, asc, and, exists, sql } from "drizzle-orm";
-import { Field } from "../components/field.js";
+import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, donors, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -9,7 +9,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { Icon } from "../components/icon.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
 import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
@@ -361,7 +361,7 @@ donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donatio
           {pageItems.length === 0 ? (
             <tr><td colspan={4} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageItems.map((d) => (
-            <tr key={d.id} class="cursor-pointer hover" onclick={canRecord ? `window.location='/donors/${d.id}/edit'` : undefined}>
+            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donors/${d.id}'`}>
               <td class="font-medium"><MemberLink memberId={d.person.member?.id} canLink={canLink}>{d.person.lastName || "—"}</MemberLink><MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
               <td>{d.person.firstName}</td>
               <td>{d.person.companyName ?? "—"}</td>
@@ -428,20 +428,45 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   });
 
   setFlash(c, t("donors.flash.created"), "success");
-  return c.redirect(`/donors/${donor.id}/edit`);
+  return c.redirect(`/donors/${donor.id}`);
 });
 
-// GET/POST /donors/:id/edit — name + address only, even if the person is also a member
-donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
+async function fetchDonorWithPerson(id: string) {
+  return db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: { with: { member: true } } } }) as Promise<DonorWithPerson | undefined>;
+}
+
+// GET /donors/:id — read-only; everyone who can see the list
+donorRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
   const user = c.get("user");
-  const donor = await db.query.donors.findFirst({ where: eq(donors.id, c.req.param("id")), with: { person: { with: { member: true } } } }) as DonorWithPerson | undefined;
+  const donor = await fetchDonorWithPerson(c.req.param("id"));
   if (!donor) return c.notFound();
   const canLink = Boolean(user.permissions.has("members:read"));
   const canRecord = user.permissions.has("donations:record");
 
   return c.html(
+    <Layout title={recipientName(donor.person)} user={user}>
+      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" actions={<DetailActions editHref={canRecord ? `/donors/${donor.id}/edit` : undefined} />} />
+      <ViewGrid>
+        <ViewField label={t("donors.form.companyName")} value={donor.person.companyName} />
+        <ViewField label={t("donors.form.lastName")} value={donor.person.lastName} />
+        <ViewField label={t("donors.form.firstName")} value={donor.person.firstName} />
+        <ViewField label={t("donors.table.address")} value={formatAddress(donor.person)} />
+      </ViewGrid>
+    </Layout>
+  );
+});
+
+// GET/POST /donors/:id/edit — name + address only, even if the person is also a member
+donorRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
+  const user = c.get("user");
+  const donor = await fetchDonorWithPerson(c.req.param("id"));
+  if (!donor) return c.notFound();
+  if (!user.permissions.has("donations:record")) return c.redirect(`/donors/${donor.id}`);
+  const canLink = Boolean(user.permissions.has("members:read"));
+
+  return c.html(
     <Layout title={t("donors.editDonor")} user={user}>
-      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
+      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref={`/donors/${donor.id}`} />} />
       <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
         <DonorPersonFields values={donor.person} />
       </form>
@@ -452,10 +477,9 @@ donorRoutes.get("/:id/edit", requireAuth("donations:record"), async (c) => {
 donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const donor = await db.query.donors.findFirst({ where: eq(donors.id, id), with: { person: { with: { member: true } } } }) as DonorWithPerson | undefined;
+  const donor = await fetchDonorWithPerson(id);
   if (!donor) return c.notFound();
   const canLink = Boolean(user.permissions.has("members:read"));
-  const canRecord = user.permissions.has("donations:record");
 
   const body = await c.req.parseBody();
   const { values, errors } = parseDonorPersonFields(body);
@@ -463,7 +487,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.editDonor")} user={user}>
-        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
+        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref={`/donors/${donor.id}`} />} />
         <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
           <DonorPersonFields values={values} errors={errors} />
         </form>
@@ -474,6 +498,6 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
 
   await db.update(persons).set(values).where(eq(persons.id, donor.personId));
   setFlash(c, t("donors.flash.saved"), "success");
-  return c.redirect("/donors");
+  return c.redirect(`/donors/${id}`);
 });
 

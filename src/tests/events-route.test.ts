@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { formBody } from "./test-utils.js";
+import { testDetailPageContract } from "./detail-page-contract.js";
 import { t } from "../i18n/index.js";
 
 process.env.ORG_NAME = "Test Feuerwehr";
@@ -260,4 +261,17 @@ describe("GET /events/:id (read-only)", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/events/e1");
   });
+});
+
+testDetailPageContract({
+  name: "events",
+  request: (path) => eventRoutes.request(path),
+  idPath: "/e1",
+  editPath: "/e1/edit",
+  editHref: "/events/e1/edit",
+  redirectLocation: "/events/e1",
+  setPermissions: (perms) => { currentUser = { ...currentUser, permissions: new Set(perms) }; },
+  readPermissions: [],
+  writePermissions: ["events:manage"],
+  ensureRecord: () => { eventFindFirstResult = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], visibleRoles: [] }; },
 });

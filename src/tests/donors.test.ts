@@ -3,6 +3,7 @@ import { t } from "../i18n/index.js";
 import { persons, donors } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 import { makePerson } from "./fixtures.js";
+import { testDetailPageContract } from "./detail-page-contract.js";
 
 // ── DB chain-stub helpers (same philosophy as members.test.ts/admin.test.ts) ──
 
@@ -326,4 +327,17 @@ describe("GET /donors toggle filter", () => {
       expect(inputs[1 - idx]).not.toContain("checked");
     }
   });
+});
+
+testDetailPageContract({
+  name: "donors",
+  request: (path) => donorRoutes.request(path),
+  idPath: "/d1",
+  editPath: "/d1/edit",
+  editHref: "/donors/d1/edit",
+  redirectLocation: "/donors/d1",
+  setPermissions: (perms) => { currentUser = { ...currentUser, permissions: new Set(perms) }; },
+  readPermissions: ["donations:read"],
+  writePermissions: ["donations:read", "donations:record"],
+  ensureRecord: () => { donorsFindFirstResult = { id: "d1", personId: "p1", person: makePerson({ id: "p1" }) }; },
 });
