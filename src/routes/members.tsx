@@ -1733,43 +1733,41 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
   const assignedItemsCount = canDelete ? await countAssignedInventoryItems(m.id) : 0;
 
-  {
-    const openRoles = m.assignments.filter((a) => !a.to);
-    return c.html(
-      <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
-        <ViewGrid>
-          <ViewField label={t("members.form.lastName")} value={m.lastName} />
-          <ViewField label={t("members.form.firstName")} value={m.firstName} />
-          <ViewField label={t("members.form.birthDate")} value={formatDate(m.birthDate)} />
-          {m.firstEntryDate && <ViewField label={t("members.form.firstEntryDate")} value={formatDate(m.firstEntryDate)} />}
-          <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
-          <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
-          {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
-          {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
-        </ViewGrid>
-        <Section title={t("members.contact.title")} open class="mt-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
-            <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
-            <ViewField label={t("members.form.phone")} value={m.phone} />
-            <ViewField label={t("members.form.mobile")} value={m.mobile} />
-            <ViewField label={t("members.form.email")} value={m.email} />
+  const openRoles = m.assignments.filter((a) => !a.to);
+  return c.html(
+    <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
+      <ViewGrid>
+        <ViewField label={t("members.form.lastName")} value={m.lastName} />
+        <ViewField label={t("members.form.firstName")} value={m.firstName} />
+        <ViewField label={t("members.form.birthDate")} value={formatDate(m.birthDate)} />
+        {m.firstEntryDate && <ViewField label={t("members.form.firstEntryDate")} value={formatDate(m.firstEntryDate)} />}
+        <ViewField label={t("members.form.entryDate")} value={formatDate(m.entryDate)} />
+        <ViewField label={t("members.form.gender")} value={m.gender === "male" ? t("members.form.genderMale") : m.gender === "female" ? t("members.form.genderFemale") : t("members.form.genderNone")} />
+        {m.exitDate && <ViewField label={t("members.form.exitDate")} value={formatDate(m.exitDate)} />}
+        {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
+      </ViewGrid>
+      <Section title={t("members.contact.title")} open class="mt-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
+          <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
+          <ViewField label={t("members.form.phone")} value={m.phone} />
+          <ViewField label={t("members.form.mobile")} value={m.mobile} />
+          <ViewField label={t("members.form.email")} value={m.email} />
+        </div>
+      </Section>
+      {openRoles.length > 0 && (
+        <Section title={t("members.view.activeFunctions")} open>
+          <div class="flex flex-wrap gap-2">
+            {openRoles.map((a) => (
+              <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
+            ))}
           </div>
         </Section>
-        {openRoles.length > 0 && (
-          <Section title={t("members.view.activeFunctions")} open>
-            <div class="flex flex-wrap gap-2">
-              {openRoles.map((a) => (
-                <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
-              ))}
-            </div>
-          </Section>
-        )}
-        {canReadBank && <BankDataSection m={m} editable={false} />}
-      </Layout>
-    );
-  }
+      )}
+      {canReadBank && <BankDataSection m={m} editable={false} />}
+    </Layout>
+  );
 });
 
 memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
