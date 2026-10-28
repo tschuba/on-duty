@@ -947,11 +947,14 @@ describe("GET /:id", () => {
     const html = await (await memberRoutes.request("/m1")).text();
     expect(html).not.toContain('name="lastName"');
     expect(html).toContain('href="/members/m1/edit"');
+    expect(html).toContain('href="/members/new?copyFrom=m1"');
   });
 
   it("redirects /:id/edit to /:id without members:write", async () => {
     currentUser = { id: "u1", permissions: new Set(["members:read"]), disabled: false };
     findFirstResult = memberWithAssignments();
+    const ro = await (await memberRoutes.request("/m1")).text();
+    expect(ro).not.toContain("copyFrom");
     const res = await memberRoutes.request("/m1/edit");
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/members/m1");

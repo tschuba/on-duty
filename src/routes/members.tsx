@@ -1737,7 +1737,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
     const openRoles = m.assignments.filter((a) => !a.to);
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor ? `/members/${m.id}/edit` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
+        <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
         <ViewGrid>
           <ViewField label={t("members.form.lastName")} value={m.lastName} />
           <ViewField label={t("members.form.firstName")} value={m.firstName} />
@@ -1789,7 +1789,7 @@ memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
 
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<><HeaderAction icon="document-duplicate" class="btn-outline btn-primary" label={t("common.copy")} href={`/members/new?copyFrom=${m.id}`} /><FormActions formId="member-form" cancelHref={`/members/${m.id}`} /></>} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${m.id}`} /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
         <MemberFormFields m={m} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}

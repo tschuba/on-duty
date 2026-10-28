@@ -76,9 +76,10 @@ export function FormActions({ formId, saveAndNew, cancelHref }: { formId: string
 }
 
 // Standard-Aktionen für Read-only-Detailseiten: Löschen (Slot, z. B. Dialog-Trigger) und Bearbeiten (Link auf /:id/edit, nur mit Schreibrecht).
-export function DetailActions({ editHref, remove }: { editHref?: string; remove?: unknown }) {
+export function DetailActions({ editHref, copyHref, remove }: { editHref?: string; copyHref?: string; remove?: unknown }) {
   return (<>
     {remove as never}
+    {copyHref && <HeaderAction icon="document-duplicate" label={t("common.copy")} href={copyHref} class="btn-outline btn-primary" />}
     {editHref && <HeaderAction variant="primary" icon="pencil" label={t("common.edit")} href={editHref} class="btn-primary" />}
   </>);
 }
