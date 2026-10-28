@@ -15,6 +15,8 @@ import { parseMulti } from "../lib/list-query.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { getSettings, setSetting } from "../lib/settings.js";
+import { PublicFooter } from "../components/public-form.js";
+import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
@@ -363,6 +365,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
                   </button>
                 </div>
               ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
+              <ImpressumHint />
             </div>
           </div>
         ) : publicEnabled && <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
@@ -418,6 +421,7 @@ eventRoutes.get("/public", async (c) => {
       <PageHeader title={t("events.title")} />
       <LocalTimes tz={tz} />
       <EventsBrowser rows={filtered} tz={tz} canManage={false} base="/events/public" tagFilter={[]} monthParam={c.req.query("month")} />
+      <PublicFooter />
       </div>
     </Layout>,
   );

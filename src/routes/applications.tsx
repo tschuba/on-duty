@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
+import { ImpressumHint } from "../components/impressum-hint.js";
 import { Icon } from "../components/icon.js";
 import { PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
@@ -253,6 +254,7 @@ applicationRoutes.get("/", guard, async (c) => {
                 </div>
                 <p class="text-sm form-status-preview"></p>
                 <p class="text-xs opacity-60">{t("applications.formSettings.dateHint")}</p>
+                <ImpressumHint />
                 <div class="modal-action">
                   <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
                   <button type="submit" class="btn btn-primary">{t("applications.formSettings.save")}</button>

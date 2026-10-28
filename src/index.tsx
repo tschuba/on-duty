@@ -4,7 +4,6 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { contextStorage } from "hono/context-storage";
-import { raw } from "hono/html";
 import { getCookie, deleteCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { validateEnv } from "./env.js";
@@ -17,6 +16,8 @@ import { hookRoutes } from "./routes/hooks.js";
 import { loginRoutes } from "./routes/login.js";
 import { applyRoutes } from "./routes/apply.js";
 import { lendRoutes } from "./routes/lend.js";
+import { impressumRoutes } from "./routes/impressum.js";
+import { datenschutzRoutes } from "./routes/datenschutz.js";
 import { memberRoutes } from "./routes/members.js";
 import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -39,9 +40,7 @@ import { pwaRoutes } from "./routes/pwa.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
-import { PageHeader } from "./components/page-header.js";
 import { t } from "./i18n/index.js";
-import { loadOrgConfig, privacyMode } from "./lib/org-config.js";
 
 validateEnv();
 initSentry();
@@ -72,15 +71,10 @@ app.route("/", loginRoutes);
 // Public application forms — no auth guard, see backlog "Digitale Anträge"
 app.route("/apply", applyRoutes);
 
-// Inline privacy policy (only if the org stored a text instead of an external link)
-app.get("/datenschutz", async (c) => {
-  const cfg = await loadOrgConfig();
-  const text = privacyMode(cfg) === "text" ? cfg.orgPrivacyText?.trim() : undefined;
-  if (!text) return c.notFound();
-  // orgPrivacyText ist bereits sanitizetes Trix-HTML (siehe organisation.tsx); ältere Bestände ohne Tags sind Klartext ohne erkennbare Tags, "<" übernimmt daher die HTML-Rendering-Prüfung.
-  const isHtml = /<[a-z][\s\S]*>/i.test(text);
-  return c.html(<Layout title={t("privacy.title")}><div class="max-w-2xl mx-auto"><PageHeader title={t("privacy.title")} /><section class="mb-6"><h2 class="font-semibold">{t("privacy.controller")}</h2><address class="not-italic whitespace-pre-line">{[cfg.orgName, [cfg.orgStreet, cfg.orgHouseNumber].filter(Boolean).join(" "), [cfg.orgZip, cfg.orgCity].filter(Boolean).join(" "), cfg.orgContactEmail, cfg.orgContactPhone].map((l) => l?.trim()).filter(Boolean).join("\n")}</address></section><div class={isHtml ? "richtext-content" : "whitespace-pre-wrap"}>{isHtml ? raw(text) : text}</div></div></Layout>);
-});
+app.route("/datenschutz", datenschutzRoutes);
+
+// Impressum (§ 5 DDG) for the public pages
+app.route("/impressum", impressumRoutes);
 
 // Public loan request form — no auth guard, see backlog "Verleih-Anfrageformular"
 app.route("/lend", lendRoutes);

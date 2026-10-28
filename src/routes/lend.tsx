@@ -7,7 +7,7 @@ import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader, HeaderAction } from "../components/page-header.js";
 import { Field, EmailInput, PhoneInput } from "../components/field.js";
-import { ContactFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
+import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
@@ -99,6 +99,7 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
         )}
         <RequestForm item={item} values={values} errors={errors} maxQuantity={maxQuantity} />
         <ContactFooter />
+        <PublicFooter />
       </div>
       <link rel="stylesheet" href="/css/vanilla-calendar.css" />
       <style>{"#lend-calendar [data-blocked] [data-vc-date-btn]{background:color-mix(in oklab,var(--color-error) 15%,transparent);color:var(--color-error);text-decoration:line-through;opacity:1}#lend-calendar{--vc-date-weekend-bg-hover:var(--color-base-200);--vc-date-weekend-hover-edge-bg:var(--color-base-200);--vc-date-weekend-outside-bg:transparent;--vc-date-weekend-outside-bg-hover:var(--color-base-200);--vc-date-weekend-outside-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-outside-color-hover:var(--color-base-content);--vc-date-range-middle-outside-bg:color-mix(in oklab,var(--color-primary) 10%,transparent);--vc-date-selected-outside-bg:var(--color-primary);--vc-bg:var(--color-base-100);--vc-color:var(--color-base-content);--vc-header-color:var(--color-base-content);--vc-week-day-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-date-color:var(--color-base-content);--vc-date-color-hover:var(--color-base-content);--vc-date-hover-bg:var(--color-base-200);--vc-date-hover-edge-bg:var(--color-base-200);--vc-date-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-today-color:var(--color-primary);--vc-date-selected-bg:var(--color-primary);--vc-date-selected-color:var(--color-primary-content);--vc-date-range-middle-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-color:var(--color-base-content);--vc-date-weekend-color:var(--color-base-content);--vc-date-weekend-disabled-color:color-mix(in oklab,var(--color-base-content) 35%,transparent);--vc-date-weekend-selected-bg:var(--color-primary);--vc-date-weekend-selected-color:var(--color-primary-content);--vc-date-weekend-hover-bg:var(--color-base-200);--vc-date-weekend-today-color:var(--color-primary);--vc-date-range-middle-weekend-bg:color-mix(in oklab,var(--color-primary) 20%,transparent);--vc-date-range-middle-weekend-color:var(--color-base-content);--vc-week-day-off-color:color-mix(in oklab,var(--color-base-content) 60%,transparent);--vc-months-years-bg:var(--color-base-100);--vc-months-years-color:var(--color-base-content);--vc-months-years-bg-hover:var(--color-base-200);--vc-months-years-bg-selected:var(--color-primary);--vc-months-years-color-selected:var(--color-primary-content);--vc-title-color:var(--color-base-content);--vc-title-color-hover:var(--color-primary);--vc-focus-outline-color:var(--color-primary)}"}</style>
@@ -259,6 +260,7 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
           body={request.status === "open" ? `Zu meiner Leih-Anfrage:\n${request.lendingItem.inventoryItem.name}${request.quantity > 1 ? ` (${request.quantity}x)` : ""}\n${formatPeriod(request)}\n${statusUrl}\n\n` : undefined}
         />
         <PrivacyNotice />
+        <PublicFooter />
       </div>
     </Layout>
   );

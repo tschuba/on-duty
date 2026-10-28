@@ -21,6 +21,7 @@ Entstanden bei und im Einsatz für die Freiwillige Feuerwehr Altenhammer.
 - [Backup konfigurieren](docs/backup.md)
 - [Standalone-Deployment (App + DB + OIDC, ohne Coolify)](docs/standalone-deployment.md)
 - [GitHub-Repository konfigurieren](docs/github-setup.md)
+- Impressum für öffentliche Seiten: Unter „Organisation → Stammdaten“ Name, Anschrift, E-Mail und vertretungsberechtigte Person (Pflicht, § 5 DDG) sowie optional Telefon und Registergericht/-nummer pflegen. Erst dann ist `/impressum` erreichbar und wird von Anträgen, Verleih und öffentlichem Kalender verlinkt.
 
 ## Deployment (Docker)
 
