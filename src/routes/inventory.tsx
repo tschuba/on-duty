@@ -47,7 +47,7 @@ const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean; ico
   { category: "vehicle", batchCapable: false, icon: "firetruck" },
   { category: "scba", batchCapable: false, icon: "shield-check" },
   { category: "equipment", batchCapable: true, icon: "wrench-screwdriver" },
-  { category: "ppe", batchCapable: true, icon: "user" },
+  { category: "ppe", batchCapable: true, icon: "jacket" },
   { category: "other", batchCapable: true, icon: "squares-2x2" },
 ];
 export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);

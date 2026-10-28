@@ -49,6 +49,7 @@ const ICONS = {
   "shield-check": "shield-check",
   "wrench-screwdriver": "tools",
   user: "user",
+  jacket: "jacket",
   envelope: "mail",
   "map-pin": "map-pin",
   phone: "phone",
