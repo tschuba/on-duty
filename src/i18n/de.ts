@@ -27,7 +27,7 @@ export const de = {
   "common.filter.nonMembers": "Nicht-Mitglieder",
   "common.filter.external": "Extern",
   "common.backToList": "← Zurück zur Liste",
-  "common.rowClickHint": "Zeile anklicken zum Bearbeiten",
+  "common.rowClickHint": "Zeile anklicken zum Öffnen",
   "common.export": "Export",
   "common.exportEmpty": "Keine Einträge zum Exportieren",
   "common.apply": "Anwenden",
