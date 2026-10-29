@@ -4,8 +4,10 @@ import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
+import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
-import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import type { IconName } from "../components/icons.generated.js";
+import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -40,23 +42,31 @@ function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>;
 }
 
 // Status changes only here (detail area); offers only transitions valid from the current status.
-function ReceiptStatusActions({ d, canIssue }: { d: DonationRow; canIssue: boolean }) {
-  const actions: { action: ReceiptAction; label: string; confirm?: string }[] = [
-    { action: "markNotRequired", label: t("donations.receiptStatus.markNotRequired") },
-    { action: "reopen", label: t("donations.receiptStatus.reopen") },
-    { action: "revoke", label: t("donations.receiptStatus.revoke"), confirm: t("donations.receiptStatus.revokeConfirm") },
+function ReceiptStatusButtons({ d }: { d: DonationRow }) {
+  const actions: { action: ReceiptAction; icon: IconName; label: string; hint: string; confirm?: string }[] = [
+    { action: "markNotRequired", icon: "no-symbol", label: t("donations.receiptStatus.markNotRequired"), hint: t("donations.receiptStatus.markNotRequiredHint") },
+    { action: "reopen", icon: "arrow-uturn-left", label: t("donations.receiptStatus.reopen"), hint: t("donations.receiptStatus.reopenHint") },
+    { action: "revoke", icon: "x-mark", label: t("donations.receiptStatus.revoke"), hint: t("donations.receiptStatus.revokeHint"), confirm: t("donations.receiptStatus.revokeConfirm") },
   ];
-  const offered = actions.filter((a) => nextReceiptStatus(d.receiptStatus, a.action));
-  if (!canIssue || offered.length === 0) return null;
+  return (
+    <>
+      {actions.filter((a) => nextReceiptStatus(d.receiptStatus, a.action)).map((a) => (
+        <form method="post" action={`/donations/${d.id}/receipt-status`} onsubmit={a.confirm ? `return confirm(${JSON.stringify(a.confirm)})` : undefined}>
+          <input type="hidden" name="action" value={a.action} />
+          <button type="submit" class="btn btn-outline btn-sm" title={a.hint} aria-label={a.label}><ActionContent icon={a.icon} label={a.label} /></button>
+        </form>
+      ))}
+    </>
+  );
+}
+
+// Standalone variant with its own label (edit page; detail page when no section is shown).
+function ReceiptStatusActions({ d, canIssue }: { d: DonationRow; canIssue: boolean }) {
+  if (!canIssue || !(["markNotRequired", "reopen", "revoke"] as ReceiptAction[]).some((a) => nextReceiptStatus(d.receiptStatus, a))) return null;
   return (
     <div class="flex flex-wrap items-center gap-2 max-w-xl mb-4">
       <span class="font-semibold">{t("donations.receiptStatus.heading")}:</span>
-      {offered.map((a) => (
-        <form method="post" action={`/donations/${d.id}/receipt-status`} onsubmit={a.confirm ? `return confirm(${JSON.stringify(a.confirm)})` : undefined}>
-          <input type="hidden" name="action" value={a.action} />
-          <button type="submit" class="btn btn-outline btn-sm">{a.label}</button>
-        </form>
-      ))}
+      <ReceiptStatusButtons d={d} />
     </div>
   );
 }
@@ -240,6 +250,73 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
   );
 }
 
+// Receipt preview + XML button for the donation detail page (open/issued only).
+function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnType<typeof fetchDonation>>>; config: Record<string, string>; perms: Set<string> }) {
+  const orgComplete = isOrgConfigCompleteForReceipts(config);
+  const missingOrg = new Set(Object.values(missingReceiptFields(config)).flat());
+  const p = d.donor.person;
+  const addressMissing = !p.street || !p.houseNumber || !p.zip || !p.city;
+
+  const row = (label: string, value: string | null | undefined, missing = false) => (
+    <tr>
+      <th class="font-semibold w-48">{label}</th>
+      <td class={missing || !value ? "text-error" : ""}>{value || t("donations.receipt.missing")}</td>
+    </tr>
+  );
+
+  const issued = d.receiptStatus === "issued";
+  const mainLabel = t(issued ? "donations.receipt.download" : "donations.receipt.generate");
+
+  return (
+    <Section title={t("donations.receipt.title")} collapsible={false} actions={
+      <div class="flex flex-wrap justify-end gap-2">
+        <ReceiptStatusButtons d={d} />
+        <form method="post" action={`/donations/${d.id}/mark-issued`}>
+          <button type="submit" class="btn btn-primary btn-sm" disabled={!orgComplete} title={t(issued ? "donations.receipt.downloadHint" : "donations.receipt.generateHint")} aria-label={mainLabel}>
+            <ActionContent icon="arrow-down-tray" label={mainLabel} variant="primary" />
+          </button>
+        </form>
+      </div>
+    }>
+
+      {!orgComplete && <OrgIncompleteAlert config={config} perms={perms} />}
+
+      {d.receiptStatus === "issued" && d.receiptIssuedAt && (
+        <div class="alert alert-info max-w-2xl mb-4">
+          <span>
+            {t("donations.warn.receiptIssued")}{" "}
+            {t("donations.receipt.issuedBy", { name: d.issuer?.name ?? t("donations.receipt.issuedByUnknown"), date: formatDateObj(d.receiptIssuedAt) })}
+          </span>
+        </div>
+      )}
+
+      {addressMissing && (
+        <div class="alert alert-error max-w-2xl mb-4">
+          <span>{t("donations.receipt.addressMissing")} <a href={`/donors/${d.donorId}/edit`} class="link">{t("donations.receipt.addressMissingLink")}</a></span>
+        </div>
+      )}
+
+      <h2 class="font-semibold mb-2">{t("donations.receipt.previewTitle")}</h2>
+      <table class="table max-w-2xl mb-4">
+        <tbody>
+          {row(t("donations.receipt.previewRecipient"), recipientName(p))}
+          {row(t("donations.receipt.previewAddress"), addressMissing ? null : `${p.street} ${p.houseNumber}, ${p.zip} ${p.city}`)}
+          {row(t("donations.receipt.summaryAmount"), formatAmount(d.amount))}
+          {row(t("donations.receipt.summaryDate"), formatDate(d.date))}
+          {row(t("donations.receipt.previewType"), typeLabel(d.type))}
+          {row(t("donations.receipt.previewPurpose"), d.purpose ?? "—")}
+          {row(t("donations.receipt.previewTaxOffice"), config.taxOffice, missingOrg.has("taxOffice"))}
+          {row(t("donations.receipt.previewTaxNumber"), config.taxExemptionNumber, missingOrg.has("taxExemptionNumber"))}
+          {row(t("donations.receipt.previewTaxDate"), config.taxExemptionDate ? formatDate(config.taxExemptionDate) : "", missingOrg.has("taxExemptionDate"))}
+        </tbody>
+      </table>
+
+      <p class="text-sm opacity-80 mb-2 max-w-2xl">{t("donations.receipt.explanation")}</p>
+      <a href="https://www.formulare-bfinv.de/ffw/action/invoke.do?id=034122" target="_blank" rel="noopener" class="link text-sm">{t("donations.receipt.officialFormLink")}</a>
+    </Section>
+  );
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 // GET /donations — list with donor-name search and date range (filtered in JS,
@@ -263,16 +340,12 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
 
   const presets = rangePresets(todayStr(), "past");
-  const config = await loadOrgConfig();
-  const orgConfigIncomplete = !isOrgConfigCompleteForReceipts(config);
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
-  const canIssueReceipts = user.permissions.has("donations:issue-receipts");
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
       <PageHeader title={t("donations.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />} />
-      {orgConfigIncomplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
 
       <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
         <div class="flex flex-col w-full md:w-auto">
@@ -293,12 +366,11 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             <th>{t("donations.table.type")}</th>
             <th>{t("donations.table.purpose")}</th>
             <th>{t("donations.table.receipt")}</th>
-            {canIssueReceipts && <th>{t("donations.table.actions")}</th>}
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <tr><td colspan={canIssueReceipts ? 7 : 6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
+            <tr><td colspan={6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}'`}>
               <td>{formatDate(d.date)}</td>
@@ -313,15 +385,6 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
                     ? <span class="badge badge-ghost badge-sm">{t("donations.table.receiptNotRequired")}</span>
                     : <span class="badge badge-warning badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
-              {canIssueReceipts && (
-                <td class="whitespace-nowrap">
-                  {d.receiptStatus === "not_required"
-                    ? null
-                    : orgConfigIncomplete
-                    ? <span class="text-sm opacity-40" title={t("donations.receipt.blockedTitle")} onclick="event.stopPropagation()">{t("donations.receipt.title")}</span>
-                    : <a href={`/donations/${d.id}/receipt`} class="link link-hover text-sm" onclick="event.stopPropagation()">{t("donations.receipt.title")}</a>}
-                </td>
-              )}
             </tr>
           ))}
         </tbody>
@@ -403,18 +466,23 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
   if (!d) return c.notFound();
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
+  const canIssue = user.permissions.has("donations:issue-receipts");
+  const showReceipt = canIssue && d.receiptStatus !== "not_required";
+  const config = showReceipt ? await loadOrgConfig() : {};
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
       <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} />} />
-      {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
-      <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
+      {d.receiptStatus === "issued" && !canIssue && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
+      {!showReceipt && <ReceiptStatusActions d={d} canIssue={canIssue} />}
       <ViewGrid>
         <ViewField label={t("donations.form.amount")} value={`${d.amount} €`} />
         <ViewField label={t("donations.form.date")} value={formatDate(d.date)} />
         <ViewField label={t("donations.form.type")} value={typeLabel(d.type)} />
         <ViewField label={t("donations.form.purpose")} value={d.purpose} />
       </ViewGrid>
+      {showReceipt && c.req.query("download") === "1" && <iframe src={`/donations/${d.id}/receipt.xml`} class="hidden" title={t("donations.receipt.title")} />}
+      {showReceipt && <ReceiptSection d={d} config={config} perms={user.permissions} />}
     </Layout>
   );
 });
@@ -487,72 +555,6 @@ donationRoutes.post("/:id/delete", requireAuth("donations:delete"), async (c) =>
   return c.redirect("/donations");
 });
 
-// GET /donations/:id/receipt — Einzelbestätigung, blocked if org config is incomplete
-donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), async (c) => {
-  const user = c.get("user");
-  const d = await fetchDonation(c.req.param("id"));
-  if (!d) return c.notFound();
-
-  const config = await loadOrgConfig();
-  const orgComplete = isOrgConfigCompleteForReceipts(config);
-  const missingOrg = new Set(Object.values(missingReceiptFields(config)).flat());
-  const p = d.donor.person;
-  const addressMissing = !p.street || !p.houseNumber || !p.zip || !p.city;
-
-  const row = (label: string, value: string | null | undefined, missing = false) => (
-    <tr>
-      <th class="font-semibold w-48">{label}</th>
-      <td class={missing || !value ? "text-error" : ""}>{value || t("donations.receipt.missing")}</td>
-    </tr>
-  );
-
-  return c.html(
-    <Layout title={t("donations.receipt.title")} user={user}>
-      <PageHeader title={t("donations.receipt.title")} backHref="/donations" />
-
-      {!orgComplete && <OrgIncompleteAlert config={config} perms={user.permissions} />}
-
-      {d.receiptStatus === "issued" && d.receiptIssuedAt && (
-        <div class="alert alert-info max-w-2xl mb-4">
-          <span>
-            {t("donations.warn.receiptIssued")}{" "}
-            {t("donations.receipt.issuedBy", { name: d.issuer?.name ?? t("donations.receipt.issuedByUnknown"), date: formatDateObj(d.receiptIssuedAt) })}
-          </span>
-        </div>
-      )}
-
-      {addressMissing && (
-        <div class="alert alert-error max-w-2xl mb-4">
-          <span>{t("donations.receipt.addressMissing")} <a href={`/donors/${d.donorId}/edit`} class="link">{t("donations.receipt.addressMissingLink")}</a></span>
-        </div>
-      )}
-
-      <h2 class="font-semibold mb-2">{t("donations.receipt.previewTitle")}</h2>
-      <table class="table max-w-2xl mb-4">
-        <tbody>
-          {row(t("donations.receipt.previewRecipient"), recipientName(p))}
-          {row(t("donations.receipt.previewAddress"), addressMissing ? null : `${p.street} ${p.houseNumber}, ${p.zip} ${p.city}`)}
-          {row(t("donations.receipt.summaryAmount"), formatAmount(d.amount))}
-          {row(t("donations.receipt.summaryDate"), formatDate(d.date))}
-          {row(t("donations.receipt.previewType"), typeLabel(d.type))}
-          {row(t("donations.receipt.previewPurpose"), d.purpose ?? "—")}
-          {row(t("donations.receipt.previewTaxOffice"), config.taxOffice, missingOrg.has("taxOffice"))}
-          {row(t("donations.receipt.previewTaxNumber"), config.taxExemptionNumber, missingOrg.has("taxExemptionNumber"))}
-          {row(t("donations.receipt.previewTaxDate"), config.taxExemptionDate ? formatDate(config.taxExemptionDate) : "", missingOrg.has("taxExemptionDate"))}
-        </tbody>
-      </table>
-
-      <p class="text-sm opacity-80 mb-2 max-w-2xl">{t("donations.receipt.explanation")}</p>
-      <a href="https://www.formulare-bfinv.de/ffw/action/invoke.do?id=034122" target="_blank" rel="noopener" class="link text-sm">{t("donations.receipt.officialFormLink")}</a>
-
-      {/* The button is the confirmation; only missing org data blocks it. */}
-      <form method="post" action={`/donations/${d.id}/mark-issued`} class="mt-4">
-        <button type="submit" class="btn btn-primary" disabled={!orgComplete}>{t("donations.receipt.generate")}</button>
-      </form>
-    </Layout>
-  );
-});
-
 // GET /donations/:id/receipt.xml — the FFW-schema XML file itself, downloadable
 // standalone (e.g. to re-download after mark-issued already ran once)
 donationRoutes.get("/:id/receipt.xml", requireAuth("donations:issue-receipts"), async (c) => {
@@ -577,11 +579,12 @@ donationRoutes.post("/:id/mark-issued", requireAuth("donations:issue-receipts"),
   const d = await fetchDonation(id);
   if (!d) return c.notFound();
   // Same guard as receipt.xml: without complete org data no file can be produced, so don't mark as issued.
-  if (!isOrgConfigCompleteForReceipts(await loadOrgConfig())) return c.redirect(`/donations/${id}/receipt`);
+  if (!isOrgConfigCompleteForReceipts(await loadOrgConfig())) return c.redirect(`/donations/${id}`);
   if (nextReceiptStatus(d.receiptStatus, "issue")) {
     await db.update(donations).set({ receiptStatus: "issued", receiptIssuedAt: new Date(), issuedBy: user.id }).where(eq(donations.id, id));
   }
-  return c.redirect(`/donations/${id}/receipt.xml`);
+  // Page reloads with the new status and starts the download itself (an attachment response would leave the old page standing).
+  return c.redirect(`/donations/${id}?download=1`);
 });
 
 // POST /donations/:id/receipt-status — markNotRequired / reopen / revoke (invalid transitions rejected)

@@ -152,11 +152,9 @@ describe("GET /", () => {
     expect(html).toContain("100,00");
   });
 
-  it("shows the receipt link only with donations:issue-receipts", async () => {
+  it("never shows a receipt link or actions column in the list", async () => {
     completeOrgConfig();
     donationsFindManyResult = [makeDonation()];
-    expect(await (await donationRoutes.request("/")).text()).toContain("/donations/don1/receipt");
-    currentUser = { ...currentUser, permissions: new Set(["donations:record"]) };
     const html = await (await donationRoutes.request("/")).text();
     expect(html).not.toContain("/receipt");
     expect(html).not.toContain("Aktionen");
@@ -260,12 +258,12 @@ describe("POST /", () => {
 
 // ── Receipt ──────────────────────────────────────────────────────────────────
 
-describe("GET /:id/receipt", () => {
+describe("GET /:id receipt section", () => {
   it("blocks with a link to org-config when org data is incomplete", async () => {
     orgConfigFixture = [];
     donationsFindFirstResult = makeDonation();
     currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts", "org:tax-data:read"]) };
-    const res = await donationRoutes.request("/don1/receipt");
+    const res = await donationRoutes.request("/don1");
     const html = await res.text();
     expect(html).toContain("/organisation#tax-data");
     expect(html).not.toContain("/organisation#master-data");
@@ -275,16 +273,26 @@ describe("GET /:id/receipt", () => {
   it("renders the receipt summary and download link when org data is complete", async () => {
     completeOrgConfig();
     donationsFindFirstResult = makeDonation();
-    const res = await donationRoutes.request("/don1/receipt");
+    const res = await donationRoutes.request("/don1");
     const html = await res.text();
     expect(html).toContain("Anna Bauer");
     expect(html).toContain(t("donations.receipt.explanation"));
   });
 
+  it("hides the section without donations:issue-receipts or when not required", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation();
+    currentUser = { ...currentUser, permissions: new Set(["donations:record"]) };
+    expect(await (await donationRoutes.request("/don1")).text()).not.toContain(t("donations.receipt.explanation"));
+    currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts"]) };
+    donationsFindFirstResult = makeDonation({ receiptStatus: "not_required" });
+    expect(await (await donationRoutes.request("/don1")).text()).not.toContain(t("donations.receipt.explanation"));
+  });
+
   it("shows who issued the receipt and when, once issued", async () => {
     completeOrgConfig();
     donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date("2026-03-05"), issuer: { id: "u1", name: "Erika Musterfrau" } });
-    const res = await donationRoutes.request("/don1/receipt");
+    const res = await donationRoutes.request("/don1");
     const html = await res.text();
     expect(html).toContain("Erika Musterfrau");
     expect(html).toContain("05.03.2026");
@@ -293,7 +301,7 @@ describe("GET /:id/receipt", () => {
   it("falls back to 'unbekannt' when the issuing user is gone", async () => {
     completeOrgConfig();
     donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date("2026-03-05"), issuer: null });
-    const res = await donationRoutes.request("/don1/receipt");
+    const res = await donationRoutes.request("/don1");
     const html = await res.text();
     expect(html).toContain(t("donations.receipt.issuedByUnknown"));
   });
@@ -347,12 +355,12 @@ describe("GET /:id/receipt.xml", () => {
 });
 
 describe("POST /:id/mark-issued", () => {
-  it("stamps receiptIssuedAt and issuedBy, and redirects to the xml download", async () => {
+  it("stamps receiptIssuedAt and issuedBy, and redirects to the detail page with download trigger", async () => {
     completeOrgConfig();
     donationsFindFirstResult = makeDonation();
     const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/donations/don1/receipt.xml");
+    expect(res.headers.get("location")).toBe("/donations/don1?download=1");
     expect(updateCalls.some((c) => c.table === donations && "receiptIssuedAt" in c.set && c.set.issuedBy === "u1")).toBe(true);
   });
 });
@@ -378,7 +386,7 @@ describe("mark-issued with incomplete org data", () => {
     orgConfigFixture = [];
     donationsFindFirstResult = makeDonation();
     const res = await donationRoutes.request("/don1/mark-issued", { method: "POST" });
-    expect(res.headers.get("location")).toBe("/donations/don1/receipt");
+    expect(res.headers.get("location")).toBe("/donations/don1");
     expect(updateCalls.length).toBe(0);
   });
 });
@@ -389,6 +397,15 @@ describe("mark-issued from not_required", () => {
     donationsFindFirstResult = makeDonation({ receiptStatus: "not_required" });
     await donationRoutes.request("/don1/mark-issued", { method: "POST" });
     expect(updateCalls[0].set.receiptStatus).toBe("issued");
+  });
+});
+
+describe("GET /:id?download=1", () => {
+  it("embeds the xml download only on request", async () => {
+    completeOrgConfig();
+    donationsFindFirstResult = makeDonation({ receiptStatus: "issued", receiptIssuedAt: new Date() });
+    expect(await (await donationRoutes.request("/don1?download=1")).text()).toContain("/donations/don1/receipt.xml\"");
+    expect(await (await donationRoutes.request("/don1")).text()).not.toContain("<iframe");
   });
 });
 
