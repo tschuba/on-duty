@@ -28,6 +28,7 @@ services:
       # Link zum Fehler-Tracker-Dashboard, erscheint unter Admin → Konfiguration. Leer = kein Link.
       ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-}
       BACKUP_STATUS_FILE: /backup-status/status.json
+      BACKUP_STATUS_MAX_AGE_HOURS: ${BACKUP_STATUS_MAX_AGE_HOURS:-26}
     ports:
       - "3000:3000"
     depends_on:

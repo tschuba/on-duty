@@ -45,6 +45,7 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
       BACKUP_STATUS_FILE: /backup-status/status.json
+      BACKUP_STATUS_MAX_AGE_HOURS: ${BACKUP_STATUS_MAX_AGE_HOURS:-26}
       # One-time start values for the registration settings (only applied while unset in the DB).
       # Role ID = built-in role "Leser" (src/db/seed.ts).
       REGISTRATION_ENABLED: "true"
