@@ -1048,7 +1048,9 @@ adminRoutes.get("/backup", guard, async (c) => {
         <div class={`stats stats-vertical sm:stats-horizontal w-full ${style.stat} rounded-box mb-4`}><div class="stat p-4">
           <div class="stat-figure"><Icon name={style.icon} class={`h-8 w-8 ${style.color}`} /></div>
           <div class={`stat-title ${style.color} font-medium`}>{title}</div>
-          <div class="stat-desc text-base-content text-sm mt-1 whitespace-normal">{desc} {(state === "unknown" || state === "unconfigured") && docs}</div>
+          <div class="stat-desc text-base-content text-sm mt-1 whitespace-normal" title={state === "ok" && lastSuccess ? fmtBackupDate(lastSuccess) : undefined}>
+            {desc} {(state === "unknown" || state === "unconfigured") && docs}
+          </div>
         </div></div>
         {(state === "failed" || state === "stale") && <p class="text-sm mb-4">{t("admin.backup.hintContact")}</p>}
         <details class="text-sm text-base-content/60">
