@@ -21,7 +21,7 @@ export function Section({ id, title, badge, badge2, tone, open, collapsible = tr
   if (!collapsible) {
     return (
       <section id={id} class={`rounded-box ${box}`} {...attrs}>
-        <h2 class={`${titleClass} rounded-t-box px-4 py-4`} style="font-family: var(--font-heading)">{heading}</h2>
+        <h2 class={`@container ${titleClass} rounded-t-box px-4 py-4`} style="font-family: var(--font-heading)">{heading}</h2>
         <div class="p-4">{children as never}</div>
       </section>
     );
