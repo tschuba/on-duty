@@ -1,5 +1,10 @@
 CREATE TYPE "public"."inventory_field_type" AS ENUM('text', 'number', 'date', 'boolean', 'select');--> statement-breakpoint
-ALTER TYPE "public"."permission" ADD VALUE 'inventory:configure' BEFORE 'lending:read';--> statement-breakpoint
+-- Recreate statt ADD VALUE: drizzle migriert in einer Transaktion, ein per ADD VALUE ergänzter Wert
+-- wäre vor dem Commit dieser Transaktion nicht nutzbar (siehe drizzle/0025 für das gleiche Problem).
+ALTER TABLE "public"."app_role_permissions" ALTER COLUMN "permission" SET DATA TYPE text;--> statement-breakpoint
+DROP TYPE "public"."permission";--> statement-breakpoint
+CREATE TYPE "public"."permission" AS ENUM('members:read', 'members:write', 'members:delete', 'members:bank-data:read', 'members:bank-data:write', 'system:admin', 'donations:read', 'donations:record', 'donations:delete', 'donations:issue-receipts', 'applications:read', 'applications:record', 'applications:review', 'applications:manage-forms', 'inventory:read', 'inventory:manage', 'inventory:configure', 'lending:read', 'lending:manage', 'org:read', 'org:write', 'org:tax-data:read', 'org:tax-data:write', 'import:run', 'member-roles:read', 'member-roles:write', 'member-roles:delete', 'member-role-types:read', 'member-role-types:write', 'member-role-types:delete', 'anniversary-years:read', 'anniversary-years:write', 'anniversary-years:delete', 'events:manage');--> statement-breakpoint
+ALTER TABLE "public"."app_role_permissions" ALTER COLUMN "permission" SET DATA TYPE "public"."permission" USING "permission"::"public"."permission";--> statement-breakpoint
 CREATE TABLE "inventory_field_defs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,
