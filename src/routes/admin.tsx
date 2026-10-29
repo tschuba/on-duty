@@ -49,10 +49,10 @@ const fmtBackupDate = (d: Date) =>
 
 function agoHours(d: Date): string {
   const h = Math.floor((Date.now() - d.getTime()) / 3600_000);
-  return h < 1 ? "vor < 1 Std." : `vor ${h} Std.`;
+  return h < 1 ? t("admin.backup.agoLess") : t("admin.backup.ago", { hours: h });
 }
 
-function BackupWarnBanner({ status }: { status: BackupStatus }) {
+function BackupWarnBanner({ status, details = true }: { status: BackupStatus; details?: boolean }) {
   const { state, timestamp, lastSuccess } = status;
   if (state !== "failed" && state !== "stale") return null;
   const text = state === "failed"
@@ -62,7 +62,7 @@ function BackupWarnBanner({ status }: { status: BackupStatus }) {
     <div class="alert alert-error mb-4">
       <span>
         {text}{" "}
-        <a href="/admin/backup" class="link">{t("admin.backup.warnDetails")}</a>
+        {details && <a href="/admin/backup" class="link">{t("admin.backup.warnDetails")}</a>}
       </span>
     </div>
   );
@@ -1026,7 +1026,7 @@ adminRoutes.get("/backup", guard, async (c) => {
 
   return c.html(
     <Layout title="Backup" user={user}>
-      <BackupWarnBanner status={status} />
+      <BackupWarnBanner status={status} details={false} />
       {state === "unconfigured" ? wide(t("admin.backup.unconfigured"))
         : state === "unknown" ? wide(t("admin.backup.unknown", { file: env.BACKUP_STATUS_FILE ?? "" }))
         : (
