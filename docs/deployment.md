@@ -49,6 +49,7 @@ Optional (Defaults in der App):
 | `SMTP_PASS` | — | SMTP-Passwort |
 | `SMTP_FROM` | — | Absenderadresse für E-Mail-Benachrichtigungen |
 | `SENTRY_DSN` | — | Fehlererfassung an ein Sentry-kompatibles Backend (Bugsink, GlitchTip, Sentry); leer = aus. Browser-JS-Fehler laufen über `POST /sentry-tunnel` (nur eingeloggt, 100 KB, 20/min je Nutzer); die DSN bleibt serverseitig. Der Browser-Teil ist clientgesteuert, die Server-Allowlist greift dort nicht inhaltlich. Bundle `public/js/sentry.min.js`: 91 KB / 31 KB gzip |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Traces/Metriken per OpenTelemetry (OTLP/HTTP, z. B. OpenObserve `https://<host>/api/default`); leer = aus. Basic-Auth aus `OPENOBSERVE_USER`/`OPENOBSERVE_PASSWORD`, `OTEL_EXPORTER_OTLP_HEADERS` überschreibt; `OTEL_TRACES_SAMPLER_ARG` = Anteil 0..1 (Standard 1). Spans tragen `request_id`, `http.route`, `user_id` (Pseudonym), DB-Spans nur Statement ohne Werte; Logzeilen `trace_id`. Assets und `/health` werden nicht getraced. Hinweis: `GET /loan-requests` räumt abgelehnte Anfragen lazy auf – an Tagen mit Löschungen ist dessen Trace länger und enthält zusätzliche DB-Spans. Start per `node --import ./dist/lib/otel.js` (im Docker-Image gesetzt) |
 | `ERROR_TRACKER_URL` | — | Link zum Fehler-Tracker-Dashboard unter Admin → Konfiguration; leer = kein Link |
 
 ### 3. Erste Version deployen

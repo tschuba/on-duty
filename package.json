@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.76.0",
+  "version": "0.77.0",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "repository": "github:tschuba/on-duty",
@@ -10,7 +10,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "concurrently \"LOG_FORMAT=pretty NODE_EXTRA_CA_CERTS=.dev-stack/caddy-root.crt node --env-file=.env --env-file-if-exists=.env.dev-stack --import=tsx/esm --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
+    "dev": "concurrently \"LOG_FORMAT=pretty NODE_EXTRA_CA_CERTS=.dev-stack/caddy-root.crt node --env-file=.env --env-file-if-exists=.env.dev-stack --import=tsx/esm --import=./src/lib/otel.ts --watch src/index.tsx\" \"tailwindcss -i src/styles/app.css -o public/css/app.css --watch\"",
     "build": "node scripts/build-browser-sentry.mjs && tsup && tailwindcss -i src/styles/app.css -o public/css/app.css --minify",
     "start": "node dist/index.js",
     "stack:up": "scripts/dev-stack.sh up",
@@ -35,11 +35,21 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
+    "@opentelemetry/api": "^1.10.0",
+    "@opentelemetry/core": "^3.0.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.300.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
+    "@opentelemetry/instrumentation": "^0.300.0",
+    "@opentelemetry/instrumentation-http": "^0.300.0",
+    "@opentelemetry/instrumentation-pg": "^0.77.0",
+    "@opentelemetry/sdk-metrics": "^3.0.0",
+    "@opentelemetry/sdk-node": "^0.300.0",
     "@sentry/node": "^11.9.0",
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.7.12",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13",
+    "import-in-the-middle": "^3.5.3",
     "n2words": "^6.3.0",
     "nodemailer": "^10.2.1",
     "pg": "^8.23.1",

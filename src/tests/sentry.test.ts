@@ -156,3 +156,22 @@ describe("isAuthSessionError", () => {
     expect(isAuthSessionError(null)).toBe(false);
   });
 });
+
+describe("Sentry with active OTel SDK", () => {
+  it("still delivers sanitized error events when OTel starts first", async () => {
+    const { startOtel } = await import("../lib/otel.js");
+    const sdk = startOtel({ OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:1" });
+    expect(sdk).toBeDefined();
+    process.env.SENTRY_DSN = "https://key@sentry.example/1";
+    vi.spyOn(process, "on").mockImplementation(() => process);
+    const { envelopes, transport } = setup();
+    initSentry({ transport });
+    captureServerError(new Error("boom"), { requestId: "req-1", userId: "u-1", route: "/x" });
+    await closeSentry();
+    const ev = eventOf(envelopes[0]);
+    expect(ev.tags).toEqual({ request_id: "req-1", route: "/x" });
+    expect(ev.user).toEqual({ id: "u-1" });
+    expect(ev.request).toBeUndefined();
+    await sdk!.shutdown().catch(() => undefined);
+  });
+});

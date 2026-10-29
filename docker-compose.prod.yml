@@ -25,6 +25,11 @@ services:
       # Optionale Fehlererfassung (Sentry-kompatibel: Bugsink, GlitchTip, Sentry). Leer = aus.
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_DSN_FILE: ${SENTRY_DSN_FILE:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-}
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:-}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:-}
       # Link zum Fehler-Tracker-Dashboard, erscheint unter Admin → Konfiguration. Leer = kein Link.
       ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-}
       BACKUP_STATUS_FILE: /backup-status/status.json

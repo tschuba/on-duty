@@ -18,4 +18,4 @@ COPY scripts/zitadel-init.mjs ./scripts/zitadel-init.mjs
 COPY branding ./branding
 COPY LICENSE ./LICENSE
 EXPOSE 3000
-CMD ["node", "dist/entrypoint.js"]
+CMD ["node", "--import", "./dist/lib/otel.js", "dist/entrypoint.js"]
