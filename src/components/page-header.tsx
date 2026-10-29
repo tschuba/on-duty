@@ -53,7 +53,7 @@ export function PageHeader({ title, backHref, backLabel, subtitle, actions }: {
   return (
     <header class="page-header @container sticky z-20 bg-base-100 pt-2 pb-4 min-h-16 flex items-center justify-between gap-4">
       <div class="min-w-0">
-        {backHref && <a href={backHref} class="link link-hover text-sm opacity-70">{backLabel ?? t("common.backToList")}</a>}
+        {backHref && <a href={backHref} data-keep-filter class="link link-hover text-sm opacity-70">{backLabel ?? t("common.backToList")}</a>}
         <h1 class={`text-2xl font-bold truncate${backHref ? " mt-1" : ""}`} style="font-family: var(--font-heading)">{title}</h1>
         {subtitle && <p class="text-sm opacity-60 mt-1">{subtitle}</p>}
       </div>
