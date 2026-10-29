@@ -743,13 +743,13 @@ describe("GET /config", () => {
   it("shows no backup warning when healthy", async () => {
     backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
     const html = await (await adminRoutes.request("/config")).text();
-    expect(html).not.toContain("Datenbank-Backup");
+    expect(html).not.toContain("Sicherung der Datenbank");
   });
 
   it("shows the failed backup warning", async () => {
     backupStatus = { state: "failed", timestamp: new Date("2024-01-01T01:00:00Z"), lastSuccess: null };
     const html = await (await adminRoutes.request("/config")).text();
-    expect(html).toContain("Das letzte Datenbank-Backup ist fehlgeschlagen");
+    expect(html).toContain("Sicherung der Datenbank ist fehlgeschlagen");
   });
 });
 
@@ -759,36 +759,36 @@ describe("GET /backup", () => {
   it("shows the not-configured card without banner", async () => {
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain("Backup-Überwachung nicht eingerichtet");
-    expect(html).not.toContain("Datenbank-Backup");
+    expect(html).not.toContain("Sicherung der Datenbank");
   });
 
   it("shows the unknown card without banner", async () => {
     backupStatus = { state: "unknown", timestamp: null, lastSuccess: null };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("Noch kein Backup-Status");
-    expect(html).not.toContain("Datenbank-Backup");
+    expect(html).toContain("Noch kein Backup-Status vorhanden");
+    expect(html).not.toContain("Sicherung der Datenbank");
   });
 
   it("shows ok without banner", async () => {
     backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain("✓ Backup aktuell");
-    expect(html).not.toContain("Datenbank-Backup");
+    expect(html).not.toContain("Sicherung der Datenbank");
   });
 
   it("shows a banner when failed", async () => {
     backupStatus = { state: "failed", timestamp: ts, lastSuccess: null };
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain("fehlgeschlagen");
-    expect(html).toContain("Das letzte Datenbank-Backup");
-    expect(html).toContain("docker compose logs backup");
+    expect(html).toContain("Sicherung der Datenbank ist fehlgeschlagen");
+    expect(html).toContain("Server betreibt");
   });
 
   it("shows a banner when stale", async () => {
     backupStatus = { state: "stale", timestamp: ts, lastSuccess: ts };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("kein erfolgreiches Datenbank-Backup");
-    expect(html).toContain("Läuft der Container");
+    expect(html).toContain("keine erfolgreiche Sicherung");
+    expect(html).toContain("Server betreibt");
   });
 });
 

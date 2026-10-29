@@ -25,7 +25,7 @@ import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
 import { setFlash } from "../lib/flash.js";
-import { LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
 import { isPendingUser } from "../lib/registration.js";
 import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
@@ -1022,13 +1022,14 @@ adminRoutes.get("/backup", guard, async (c) => {
   const status = await getBackupStatus();
   const { state, timestamp, lastSuccess } = status;
   const bad = state === "failed" || state === "stale";
-  const wide = (text: string) => <div class="p-4 rounded-box border bg-base-200 border-base-300 text-sm">{text}</div>;
+  const docs = <a href={`${SOURCE_REPO_URL}/blob/master/docs/backup.md`} class="link" target="_blank" rel="noopener">{t("admin.backup.docsLink")}</a>;
+  const wide = (text: string) => <div class="p-4 rounded-box border bg-base-200 border-base-300 text-sm">{text} {docs}</div>;
 
   return c.html(
     <Layout title="Backup" user={user}>
       <BackupWarnBanner status={status} details={false} />
       {state === "unconfigured" ? wide(t("admin.backup.unconfigured"))
-        : state === "unknown" ? wide(t("admin.backup.unknown", { file: env.BACKUP_STATUS_FILE ?? "" }))
+        : state === "unknown" ? wide(t("admin.backup.unknown"))
         : (
           <>
             <div class="grid grid-cols-2 gap-4 text-sm mb-6">
@@ -1060,7 +1061,15 @@ adminRoutes.get("/backup", guard, async (c) => {
             </div>
             {state === "failed" && <p class="text-sm mb-2">{t("admin.backup.hintFailed")}</p>}
             {state === "stale" && <p class="text-sm mb-2">{t("admin.backup.hintStale")}</p>}
-            <p class="text-sm text-base-content/50">{t("admin.backup.scope")}</p>
+            <p class="text-sm text-base-content/50 mb-4">{t("admin.backup.scope")} {docs}</p>
+            <details class="text-sm text-base-content/70">
+              <summary class="cursor-pointer">{t("admin.backup.opsTitle")}</summary>
+              <ul class="mt-2 space-y-1">
+                <li>{t("admin.backup.opsFile")} <code class="font-mono">{env.BACKUP_STATUS_FILE}</code></li>
+                <li>{t("admin.backup.opsMaxAge", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</li>
+                {state === "failed" && <li>{t("admin.backup.opsLogs")} <code class="font-mono">docker compose logs backup</code></li>}
+              </ul>
+            </details>
           </>
         )}
     </Layout>,
