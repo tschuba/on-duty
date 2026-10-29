@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.75.1",
+  "version": "0.76.0",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "repository": "github:tschuba/on-duty",
@@ -21,6 +21,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file-if-exists=.env --env-file-if-exists=.env.dev-stack --import=tsx/esm scripts/seed.ts",
+    "ops:pseudonym": "node --env-file-if-exists=.env --import=tsx/esm scripts/user-pseudonym.ts",
     "db:setup": "pnpm db:migrate && pnpm db:seed",
     "db:studio": "drizzle-kit studio",
     "icons:generate": "node scripts/generate-icons.mjs",

@@ -92,6 +92,7 @@ Android (Chrome): Menü → „Zum Startbildschirm hinzufügen“ · iOS (Safari
 | `pnpm stack:up` / `stack:down` / `stack:reset` / `stack:trust` | Dev-Stack (Docker) starten / stoppen / komplett löschen / lokale CA im System vertrauen — Details: [docs/standalone-deployment.md](docs/standalone-deployment.md#dev-stack-im-host-modus) |
 | `pnpm db:setup` | Migrate + Seed (Ersteinrichtung) |
 | `pnpm db:studio` | Drizzle Studio öffnen |
+| `pnpm ops:pseudonym <userId>` | Nutzer-Pseudonym (16 Hex, HMAC mit `BETTER_AUTH_SECRET`) berechnen, um „Seite ist langsam“-Meldungen in Logs/Traces einem Nutzer zuzuordnen. Rotation des Secrets ändert alle Pseudonyme |
 
 ## Umgebungsvariablen
 
