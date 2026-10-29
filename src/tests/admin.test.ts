@@ -759,21 +759,21 @@ describe("GET /backup", () => {
   it("shows the not-configured card without banner", async () => {
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain("Backup-Überwachung nicht eingerichtet");
-    expect(html).not.toContain("Sicherung der Datenbank");
+    expect(html).not.toContain(`alert alert-error`);
   });
 
   it("shows the unknown card without banner", async () => {
     backupStatus = { state: "unknown", timestamp: null, lastSuccess: null };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("Noch kein Backup-Status vorhanden");
-    expect(html).not.toContain("Sicherung der Datenbank");
+    expect(html).toContain("Noch kein Backup-Status");
+    expect(html).not.toContain(`alert alert-error`);
   });
 
   it("shows ok without banner", async () => {
     backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("✓ Backup aktuell");
-    expect(html).not.toContain("Sicherung der Datenbank");
+    expect(html).toContain("Backup aktuell");
+    expect(html).not.toContain(`alert alert-error`);
   });
 
   it("shows a banner when failed", async () => {

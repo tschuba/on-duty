@@ -1016,62 +1016,51 @@ adminRoutes.post("/config", guard, async (c) => {
   return c.redirect("/admin/config");
 });
 
+const BACKUP_STATE_STYLE = {
+  ok: { icon: "check" as const, color: "text-success", stat: "bg-success/10" },
+  failed: { icon: "exclamation-triangle" as const, color: "text-error", stat: "bg-error/10" },
+  stale: { icon: "clock" as const, color: "text-error", stat: "bg-error/10" },
+  unknown: { icon: "cog-6-tooth" as const, color: "text-base-content/50", stat: "bg-base-200" },
+  unconfigured: { icon: "cog-6-tooth" as const, color: "text-base-content/50", stat: "bg-base-200" },
+};
+
 // ── /admin/backup ──────────────────────────────────────────────────────────────
 adminRoutes.get("/backup", guard, async (c) => {
   const user = c.get("user");
   const status = await getBackupStatus();
   const { state, timestamp, lastSuccess } = status;
-  const bad = state === "failed" || state === "stale";
+  const style = BACKUP_STATE_STYLE[state];
   const docs = <a href={`${SOURCE_REPO_URL}/blob/master/docs/backup.md`} class="link" target="_blank" rel="noopener">{t("admin.backup.docsLink")}</a>;
-  const wide = (text: string) => <div class="p-4 rounded-box border bg-base-200 border-base-300 text-sm">{text} {docs}</div>;
+
+  const title = t(`admin.backup.title.${state}`);
+  const desc =
+    state === "ok" ? t("admin.backup.desc.ok", { ago: agoHours(lastSuccess!) })
+    : state === "failed" ? t("admin.backup.desc.failed", { time: timestamp ? fmtBackupDate(timestamp) : "—" })
+    : state === "stale" ? t("admin.backup.desc.stale", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS, last: lastSuccess ? fmtBackupDate(lastSuccess) : "—" })
+    : state === "unknown" ? t("admin.backup.desc.unknown")
+    : t("admin.backup.desc.unconfigured");
 
   return c.html(
     <Layout title="Backup" user={user}>
+      <PageHeader title="Backup" />
       <BackupWarnBanner status={status} details={false} />
-      {state === "unconfigured" ? wide(t("admin.backup.unconfigured"))
-        : state === "unknown" ? wide(t("admin.backup.unknown"))
-        : (
-          <>
-            <div class="grid grid-cols-2 gap-4 text-sm mb-6">
-              <div class={`p-4 rounded-box border ${bad ? "bg-error/10 border-error/30" : "bg-success/10 border-success/30"}`}>
-                <div class="text-base-content/50 mb-1">{t("admin.backup.lastSuccess")}</div>
-                {lastSuccess ? (
-                  <>
-                    <div class="font-mono font-medium">{fmtBackupDate(lastSuccess)}</div>
-                    <div class={`mt-1 ${bad ? "text-error" : "text-success"}`}>
-                      {bad ? t("admin.backup.old", { ago: agoHours(lastSuccess) }) : t("admin.backup.current", { ago: agoHours(lastSuccess) })}
-                    </div>
-                  </>
-                ) : (
-                  <div class="text-base-content/40">—</div>
-                )}
-              </div>
-              <div class="p-4 rounded-box border bg-base-200 border-base-300">
-                {state === "ok" ? (
-                  <div>{t("admin.backup.expected", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</div>
-                ) : (
-                  <>
-                    <div class="text-base-content/50 mb-1">{t("admin.backup.lastRun")}</div>
-                    <div class="font-mono">
-                      {state === "failed" && timestamp ? t("admin.backup.lastRunFailed", { time: fmtBackupDate(timestamp) }) : "—"}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-            {state === "failed" && <p class="text-sm mb-2">{t("admin.backup.hintFailed")}</p>}
-            {state === "stale" && <p class="text-sm mb-2">{t("admin.backup.hintStale")}</p>}
-            <p class="text-sm text-base-content/50 mb-4">{t("admin.backup.scope")} {docs}</p>
-            <details class="text-sm text-base-content/70">
-              <summary class="cursor-pointer">{t("admin.backup.opsTitle")}</summary>
-              <ul class="mt-2 space-y-1">
-                <li>{t("admin.backup.opsFile")} <code class="font-mono">{env.BACKUP_STATUS_FILE}</code></li>
-                <li>{t("admin.backup.opsMaxAge", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</li>
-                {state === "failed" && <li>{t("admin.backup.opsLogs")} <code class="font-mono">docker compose logs backup</code></li>}
-              </ul>
-            </details>
-          </>
-        )}
+      <div class="max-w-2xl">
+        <div class={`stats stats-vertical sm:stats-horizontal w-full ${style.stat} rounded-box mb-4`}><div class="stat p-4">
+          <div class="stat-figure"><Icon name={style.icon} class={`h-8 w-8 ${style.color}`} /></div>
+          <div class={`stat-title ${style.color} font-medium`}>{title}</div>
+          <div class="stat-desc text-base-content text-sm mt-1 whitespace-normal">{desc} {(state === "unknown" || state === "unconfigured") && docs}</div>
+        </div></div>
+        {(state === "failed" || state === "stale") && <p class="text-sm mb-4">{t("admin.backup.hintContact")}</p>}
+        <details class="text-sm text-base-content/60">
+          <summary class="cursor-pointer">{t("admin.backup.opsTitle")}</summary>
+          <ul class="mt-2 space-y-1">
+            <li>{t("admin.backup.opsFile")} <code class="font-mono">{env.BACKUP_STATUS_FILE ?? "—"}</code></li>
+            <li>{t("admin.backup.opsMaxAge", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</li>
+            {state === "failed" && <li>{t("admin.backup.opsLogs")} <code class="font-mono">docker compose logs backup</code></li>}
+            <li>{docs}</li>
+          </ul>
+        </details>
+      </div>
     </Layout>,
   );
 });
