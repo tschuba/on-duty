@@ -1033,12 +1033,16 @@ adminRoutes.get("/backup", guard, async (c) => {
   const docs = <a href={`${SOURCE_REPO_URL}/blob/master/docs/backup.md`} class="link" target="_blank" rel="noopener">{t("admin.backup.docsLink")}</a>;
 
   const title = t(`admin.backup.title.${state}`);
+  const agoEl = state === "ok" && lastSuccess && (
+    <span class="underline decoration-dotted cursor-help" title={fmtBackupDate(lastSuccess)}>{agoHours(lastSuccess)}</span>
+  );
   const desc =
-    state === "ok" ? t("admin.backup.desc.ok", { ago: agoHours(lastSuccess!) })
+    state === "ok" ? t("admin.backup.desc.ok", { ago: "{ago}" })
     : state === "failed" ? t("admin.backup.desc.failed", { time: timestamp ? fmtBackupDate(timestamp) : "—" })
     : state === "stale" ? t("admin.backup.desc.stale", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS, last: lastSuccess ? fmtBackupDate(lastSuccess) : "—" })
     : state === "unknown" ? t("admin.backup.desc.unknown")
     : t("admin.backup.desc.unconfigured");
+  const [descPre, descPost] = desc.split("{ago}");
 
   return c.html(
     <Layout title="Backup" user={user}>
@@ -1048,8 +1052,8 @@ adminRoutes.get("/backup", guard, async (c) => {
         <div class={`stats stats-vertical sm:stats-horizontal w-full ${style.stat} rounded-box mb-4`}><div class="stat p-4">
           <div class="stat-figure"><Icon name={style.icon} class={`h-8 w-8 ${style.color}`} /></div>
           <div class={`stat-title ${style.color} font-medium`}>{title}</div>
-          <div class="stat-desc text-base-content text-sm mt-1 whitespace-normal" title={state === "ok" && lastSuccess ? fmtBackupDate(lastSuccess) : undefined}>
-            {desc} {(state === "unknown" || state === "unconfigured") && docs}
+          <div class="stat-desc text-base-content text-sm mt-1 whitespace-normal">
+            {state === "ok" ? <>{descPre}{agoEl}{descPost}</> : desc} {(state === "unknown" || state === "unconfigured") && docs}
           </div>
         </div></div>
         {(state === "failed" || state === "stale") && <p class="text-sm mb-4">{t("admin.backup.hintContact")}</p>}
