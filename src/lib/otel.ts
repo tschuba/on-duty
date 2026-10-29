@@ -1,5 +1,7 @@
 // Loaded via `node --import` BEFORE any instrumented module (pg, http). No-op without OTEL_EXPORTER_OTLP_ENDPOINT.
 import { register } from "node:module";
+// @ts-expect-error -- package ships register-hooks.d.ts but no "types" mapping for this subpath
+import { register as registerSync, supportsSyncHooks } from "import-in-the-middle/register-hooks.mjs";
 import type { IncomingMessage } from "node:http";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -58,8 +60,10 @@ export function startOtel(env: NodeJS.ProcessEnv = process.env): NodeSDK | undef
       new PgInstrumentation({ requireParentSpan: true, ignoreConnectSpans: true, requestHook: pgRequestHook }),
     ],
   });
-  // ESM imports of node:http only get patched through the import-in-the-middle loader hook
-  register("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
+  // ESM imports of node:http only get patched through the import-in-the-middle loader hook. The sync in-thread
+  // variant limited to http does not clash with tsx's resolver in dev; the async fallback (older Node) intercepts all modules.
+  if (supportsSyncHooks()) registerSync({ include: ["node:http", "http"] });
+  else register("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
   sdk.start();
   return sdk;
 }

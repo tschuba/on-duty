@@ -49,6 +49,7 @@
     "better-auth": "^1.7.12",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.13",
+    "import-in-the-middle": "^3.5.3",
     "n2words": "^6.3.0",
     "nodemailer": "^10.2.1",
     "pg": "^8.23.1",

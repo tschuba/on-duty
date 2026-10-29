@@ -211,6 +211,9 @@ importers:
       hono:
         specifier: ^4.13.13
         version: 4.13.13
+      import-in-the-middle:
+        specifier: ^3.5.3
+        version: 3.5.3
       n2words:
         specifier: ^6.3.0
         version: 6.3.0
