@@ -11,11 +11,11 @@ let existingAccounts: unknown[] = [];
 const where = vi.fn(() => Promise.resolve(existingAccounts));
 const select = vi.fn(() => ({ from: vi.fn(() => ({ where })) }));
 
-vi.mock("postgres", () => ({
-  default: vi.fn(() => ({ end: vi.fn().mockResolvedValue(undefined) })),
+vi.mock("pg", () => ({
+  Pool: vi.fn(function () { return { end: vi.fn().mockResolvedValue(undefined) }; }),
 }));
 
-vi.mock("drizzle-orm/postgres-js", () => ({
+vi.mock("drizzle-orm/node-postgres", () => ({
   drizzle: vi.fn(() => ({ insert, select })),
 }));
 

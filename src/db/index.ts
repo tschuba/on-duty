@@ -1,8 +1,8 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema/index";
 
 /* v8 ignore start -- db client wiring, no branching logic to unit-test */
-const client = postgres(process.env.DATABASE_URL!);
-export const db = drizzle(client, { schema });
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10, idleTimeoutMillis: 30_000 });
+export const db = drizzle(pool, { schema });
 /* v8 ignore stop */
