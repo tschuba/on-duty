@@ -7,7 +7,6 @@ COPY . .
 RUN pnpm run postinstall && pnpm build
 
 FROM node:24-alpine AS runtime
-RUN apk add --no-cache postgresql-client
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

@@ -7,7 +7,6 @@ import {
   memberRoleTypes,
   memberRoleAssignments,
   anniversaryYears,
-  backupHistory,
   appRoles,
   appRolePermissions,
   userAppRoles,
@@ -45,7 +44,6 @@ let rolesFixture: any[] = [];
 let typesFixture: any[] = [makeType()];
 let assignmentCountFixture: any[] = [{ cnt: 0 }];
 let yearsFixture: any[] = [];
-let backupHistoryFixture: any[] = [];
 let appRolesFixture: any[] = [];
 let appRolePermissionsFixture: any[] = [];
 let userAppRolesFixture: any[] = [];
@@ -75,7 +73,6 @@ const select = vi.fn(() => ({
     if (table === memberRoleTypes) return chainOf(nextRows(memberRoleTypes, typesFixture));
     if (table === memberRoleAssignments) return chainOf(nextRows(memberRoleAssignments, assignmentCountFixture));
     if (table === anniversaryYears) return chainOf(nextRows(anniversaryYears, yearsFixture));
-    if (table === backupHistory) return chainOf(nextRows(backupHistory, backupHistoryFixture));
     if (table === appRoles) return chainOf(nextRows(appRoles, appRolesFixture));
     if (table === appRolePermissions) return chainOf(nextRows(appRolePermissions, appRolePermissionsFixture));
     if (table === userAppRoles) return chainOf(nextRows(userAppRoles, userAppRolesFixture));
@@ -130,20 +127,12 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
-let backupConfigured = false;
-let lastBackupResult: any = null;
-let scheduleResult: { prev: Date | null; next: Date | null } = { prev: null, next: null };
-const runBackupMock = vi.fn(() => Promise.resolve());
+let backupStatus: any = { state: "unconfigured", timestamp: null, lastSuccess: null };
 
 // Layout badge count is a separate DB query; keep it out of the per-route select-call assertions.
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
 
-vi.mock("../lib/backup.js", () => ({
-  isBackupConfigured: () => backupConfigured,
-  getLastBackup: () => Promise.resolve(lastBackupResult),
-  getCronScheduleTimes: () => scheduleResult,
-  runBackup: () => runBackupMock(),
-}));
+vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve(backupStatus) }));
 
 const { adminRoutes, backupWarnProps } = await import("../routes/admin.js");
 
@@ -158,15 +147,12 @@ beforeEach(() => {
   typesFixture = [makeType()];
   assignmentCountFixture = [{ cnt: 0 }];
   yearsFixture = [];
-  backupHistoryFixture = [];
   appRolesFixture = [];
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
   currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
-  backupConfigured = false;
-  lastBackupResult = null;
-  scheduleResult = { prev: null, next: null };
+  backupStatus = { state: "unconfigured", timestamp: null, lastSuccess: null };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -205,54 +191,9 @@ function makeYear(overrides: Record<string, unknown> = {}) {
   return { kind: "service", year: 10, title: "Zehnjähriges", ...overrides };
 }
 
-function makeBackupEntry(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "b1",
-    startedAt: new Date("2024-01-01T02:00:00Z"),
-    status: "success",
-    targets: JSON.stringify([{ type: "local", status: "success" }]),
-    errorMessage: null,
-    ...overrides,
-  };
-}
-
-// ── Pure logic ───────────────────────────────────────────────────────────────
-
 describe("backupWarnProps", () => {
-  it("skips backup lookups entirely when not configured", async () => {
-    backupConfigured = false;
-    expect(await backupWarnProps()).toEqual({ configured: false, lastFailed: false });
-  });
-
-  it("is not failed when the last backup succeeded after the last scheduled run", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01T00:00:00Z"), next: new Date("2024-01-08T00:00:00Z") };
-    lastBackupResult = { startedAt: new Date("2024-01-01T01:00:00Z"), status: "success" };
-    expect(await backupWarnProps()).toEqual({ configured: true, lastFailed: false });
-  });
-
-  it("is failed when no backup ran since the last scheduled time", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01T00:00:00Z"), next: new Date("2024-01-08T00:00:00Z") };
-    lastBackupResult = null;
-    expect((await backupWarnProps()).lastFailed).toBe(true);
-  });
-
-  it("is failed when the run since schedule reported failure", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01T00:00:00Z"), next: null };
-    lastBackupResult = { startedAt: new Date("2024-01-01T01:00:00Z"), status: "failed" };
-    expect((await backupWarnProps()).lastFailed).toBe(true);
-  });
-
-  it("falls back to the last run's own status when there is no schedule", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: null, next: null };
-    lastBackupResult = { startedAt: new Date(), status: "failed" };
-    expect((await backupWarnProps()).lastFailed).toBe(true);
-
-    lastBackupResult = { startedAt: new Date(), status: "success" };
-    expect((await backupWarnProps()).lastFailed).toBe(false);
+  it("returns the current backup status", async () => {
+    expect(await backupWarnProps()).toEqual({ status: backupStatus });
   });
 });
 
@@ -799,95 +740,55 @@ describe("GET /config", () => {
     expect(html).toContain('form="config-form"');
   });
 
-  it("shows the not-configured backup warning", async () => {
-    backupConfigured = false;
+  it("shows no backup warning when healthy", async () => {
+    backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
     const html = await (await adminRoutes.request("/config")).text();
-    expect(html).toContain(t("admin.backup.warnNotConfigured"));
+    expect(html).not.toContain("Datenbank-Backup");
   });
 
-  it("shows no warning when backups are healthy", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01"), next: new Date("2024-01-08") };
-    lastBackupResult = { startedAt: new Date("2024-01-01T01:00:00Z"), status: "success" };
+  it("shows the failed backup warning", async () => {
+    backupStatus = { state: "failed", timestamp: new Date("2024-01-01T01:00:00Z"), lastSuccess: null };
     const html = await (await adminRoutes.request("/config")).text();
-    expect(html).not.toContain(t("admin.backup.warnLastFailed"));
-  });
-
-  it("shows the last-failed backup warning", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01"), next: null };
-    lastBackupResult = { startedAt: new Date("2024-01-01T01:00:00Z"), status: "failed" };
-    const html = await (await adminRoutes.request("/config")).text();
-    expect(html).toContain(t("admin.backup.warnLastFailed"));
+    expect(html).toContain("Das letzte Datenbank-Backup ist fehlgeschlagen");
   });
 });
 
 describe("GET /backup", () => {
-  it("shows the empty-history message when not configured and no runs", async () => {
-    backupHistoryFixture = [];
+  const ts = new Date("2024-01-01T01:00:00Z");
+
+  it("shows the not-configured card without banner", async () => {
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain(t("admin.backup.noRuns"));
+    expect(html).toContain("Backup-Überwachung nicht eingerichtet");
+    expect(html).not.toContain("Datenbank-Backup");
   });
 
-  it("shows a missing-backup state when nothing ran since the last schedule", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01T00:00:00Z"), next: new Date("2024-01-08T00:00:00Z") };
-    backupHistoryFixture = [];
+  it("shows the unknown card without banner", async () => {
+    backupStatus = { state: "unknown", timestamp: null, lastSuccess: null };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain(t("admin.backup.backupMissing"));
-    expect(html).toContain(t("admin.backup.scheduleNextTime"));
-    expect(html).toContain(t("admin.backup.warnLastFailed"));
-    expect(select).toHaveBeenCalledTimes(1);
+    expect(html).toContain("Noch kein Backup-Status");
+    expect(html).not.toContain("Datenbank-Backup");
   });
 
-  it("shows a successful backup after the schedule", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01T00:00:00Z"), next: null };
-    backupHistoryFixture = [makeBackupEntry({ startedAt: new Date("2024-01-01T01:00:00Z"), status: "success" })];
+  it("shows ok without banner", async () => {
+    backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain(t("admin.backup.backupAvailable"));
-    expect(html).not.toContain(t("admin.backup.warnLastFailed"));
+    expect(html).toContain("✓ Backup aktuell");
+    expect(html).not.toContain("Datenbank-Backup");
   });
 
-  it("shows a failed backup after the schedule, including its error", async () => {
-    backupConfigured = true;
-    scheduleResult = { prev: new Date("2024-01-01T00:00:00Z"), next: null };
-    backupHistoryFixture = [makeBackupEntry({ startedAt: new Date("2024-01-01T01:00:00Z"), status: "failed", errorMessage: "boom" })];
+  it("shows a banner when failed", async () => {
+    backupStatus = { state: "failed", timestamp: ts, lastSuccess: null };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain(t("admin.backup.backupFailed"));
-    expect(html).toContain(t("admin.backup.warnLastFailed"));
-    expect(html).toContain("boom");
+    expect(html).toContain("fehlgeschlagen");
+    expect(html).toContain("Das letzte Datenbank-Backup");
+    expect(html).toContain("docker compose logs backup");
   });
 
-  it("renders local and S3 target badges, and an empty-targets placeholder", async () => {
-    backupHistoryFixture = [
-      makeBackupEntry({ targets: JSON.stringify([{ type: "local", status: "success" }, { type: "s3", status: "error" }]) }),
-      makeBackupEntry({ id: "b2", targets: JSON.stringify([]) }),
-    ];
+  it("shows a banner when stale", async () => {
+    backupStatus = { state: "stale", timestamp: ts, lastSuccess: ts };
     const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain(t("admin.backup.targetLocal"));
-    expect(html).toContain("S3");
-  });
-});
-
-import { logger } from "../lib/logger.js";
-
-describe("POST /backup/run", () => {
-  it("triggers a backup asynchronously and redirects immediately", async () => {
-    const res = await adminRoutes.request("/backup/run", { method: "POST" });
-    expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/admin/backup");
-    expect(runBackupMock).toHaveBeenCalled();
-  });
-
-  it("logs but does not crash when the background backup rejects", async () => {
-    const errSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-    runBackupMock.mockReturnValueOnce(Promise.reject(new Error("boom")));
-    const res = await adminRoutes.request("/backup/run", { method: "POST" });
-    expect(res.status).toBe(302);
-    await new Promise((r) => setImmediate(r));
-    expect(errSpy).toHaveBeenCalledWith({ err: expect.any(Error) }, "[backup] manual run failed");
-    errSpy.mockRestore();
+    expect(html).toContain("kein erfolgreiches Datenbank-Backup");
+    expect(html).toContain("Läuft der Container");
   });
 });
 

@@ -10,7 +10,6 @@ import { validateEnv } from "./env.js";
 import { initSentry, captureServerError, isAuthSessionError } from "./lib/sentry.js";
 import { auth } from "./auth.js";
 import { env } from "./env.js";
-import { startBackupScheduler } from "./lib/backup.js";
 import { accountRoutes, pendingRoutes } from "./routes/account.js";
 import { hookRoutes } from "./routes/hooks.js";
 import { loginRoutes } from "./routes/login.js";
@@ -187,5 +186,4 @@ app.onError(async (err, c) => {
 
 serve({ fetch: app.fetch, port: 3000 }, () => {
   logger.info({ org: env.ORG_NAME }, "listening on http://localhost:3000");
-  startBackupScheduler().catch((err) => logger.error({ err }, "[backup] scheduler start failed"));
 });

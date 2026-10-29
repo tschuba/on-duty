@@ -38,12 +38,6 @@ describe("validateEnv logging", () => {
     expect(fatal).toHaveBeenCalledWith({ childrenLimit: 20, youthLimit: 18 }, expect.any(String));
   });
 
-  it("logs fatal on incomplete S3 config", () => {
-    vi.stubEnv("S3_BUCKET", "b");
-    const fatal = vi.spyOn(logger, "fatal").mockImplementation(() => {});
-    validateEnv();
-    expect(fatal).toHaveBeenCalledWith({ s3Missing: ["S3_ENDPOINT", "S3_ACCESS_KEY", "S3_SECRET_KEY"] }, expect.any(String));
-  });
 });
 
 describe("sendMail logging", () => {

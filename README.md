@@ -18,7 +18,7 @@ Entstanden bei und im Einsatz für die Freiwillige Feuerwehr Altenhammer.
 ## Konfiguration
 
 - [OIDC-Provider konfigurieren](docs/oidc.md)
-- [Backup konfigurieren](docs/backup.md)
+- [Backup-Überwachung](docs/backup.md)
 - [Standalone-Deployment (App + DB + OIDC, ohne Coolify)](docs/standalone-deployment.md)
 - [GitHub-Repository konfigurieren](docs/github-setup.md)
 - Impressum für öffentliche Seiten: Unter „Organisation → Stammdaten“ Name, Anschrift, E-Mail und vertretungsberechtigte Person (Pflicht, § 5 DDG) sowie optional Telefon und Registergericht/-nummer pflegen. Erst dann ist `/impressum` erreichbar und wird von Anträgen, Verleih und öffentlichem Kalender verlinkt.
@@ -50,18 +50,13 @@ docker compose -f docker-compose.prod.yml exec app \
 
 > **Migrationen:** Da `drizzle-kit` ein Dev-Tool ist, empfiehlt sich das einmalige Ausführen von `pnpm db:migrate` lokal gegen die Produktionsdatenbank (via `DATABASE_URL`) oder ein separater Init-Container.
 
-> **Lokales Backup-Volume:** `BACKUP_LOCAL_PATH=/app/backups` in `.env` setzen und das Volume in `docker-compose.prod.yml` einkommentieren.
+> **Backup:** `docker-compose.prod.yml` enthält einen `backup`-Service; on-duty zeigt dessen Status unter `/admin/backup` ([Details](docs/backup.md)).
 
 ---
 
 ## Lokale Entwicklung
 
 **Voraussetzungen:** Node.js 22, pnpm, Docker
-
-> **macOS:** Für Backups wird `pg_dump` benötigt. Da `libpq` bei Homebrew keg-only ist, muss es explizit verlinkt werden:
-> ```bash
-> brew install libpq && brew link --force libpq
-> ```
 
 ```bash
 # 1. Abhängigkeiten installieren (kopiert auch Fonts nach public/fonts/)
@@ -121,23 +116,14 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `REGISTRATION_DEFAULT_ROLE_ID` | — | — | Startwert (einmalig): Rollen-ID für automatisch freigegebene Nutzer |
 | `YOUTH_AGE_LIMIT` | — | `18` | Altersgrenze Jugendfeuerwehr (Jahre) |
 | `ANNIVERSARY_CUTOFF` | — | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
-| `BACKUP_SCHEDULE` | — | `0 2 * * 0` | Backup-Intervall (Cron-Ausdruck) |
-| `BACKUP_LOCAL_PATH` | — | — | Pfad für lokales Backup-Volume |
-| `BACKUP_RETENTION_COUNT` | — | `4` | Max. Backup-Dateien pro Ziel |
-| `S3_ENDPOINT` | — | — | S3-Endpoint-URL |
-| `S3_BUCKET` | — | — | S3-Bucket-Name |
-| `S3_ACCESS_KEY` | — | — | S3 Access Key ID |
-| `S3_SECRET_KEY` | — | — | S3 Secret Access Key |
-| `S3_REGION` | — | — | S3-Region (optional) |
-| `S3_PREFIX` | — | — | Pfad-Prefix im Bucket (optional) |
+| `BACKUP_STATUS_FILE` | — | — | Pfad zur `status.json` des Backup-Containers (leer = Überwachung aus) |
+| `BACKUP_STATUS_MAX_AGE_HOURS` | — | `26` | Nach so vielen Stunden ohne erfolgreiches Backup wird gewarnt |
 | `SMTP_HOST` | — | — | SMTP-Server für E-Mail-Benachrichtigungen |
 | `SMTP_PORT` | — | `587` | SMTP-Port |
 | `SMTP_USER` | — | — | SMTP-Benutzername |
 | `SMTP_PASS` | — | — | SMTP-Passwort |
 | `SMTP_FROM` | — | — | Absenderadresse für E-Mail-Benachrichtigungen |
 
-> S3-Backup ist aktiv wenn `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY` und `S3_SECRET_KEY` alle gesetzt sind.
-> Lokales Backup ist aktiv wenn `BACKUP_LOCAL_PATH` gesetzt ist.
 > E-Mail-Versand ist aktiv wenn `SMTP_HOST` und `SMTP_FROM` gesetzt sind — ohne SMTP-Konfiguration (oder falls der Server nicht erreichbar ist) wird die Benachrichtigung übersprungen, der jeweilige Workflow (Antrag einreichen/annehmen/ablehnen) schlägt dadurch nie fehl.
 
 ## Lizenz

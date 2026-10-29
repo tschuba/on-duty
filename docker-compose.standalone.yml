@@ -44,11 +44,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      # The built-in backup mechanism is disabled in the standalone stack — the
-      # dedicated `backup` service below backs up both databases instead.
-      # See 17_Backup-Status-Flag (separate task): hard-wired, no placeholder
-      # in .env.standalone since toggling it never makes sense here.
-      BACKUP_DISABLED: "true"
+      BACKUP_STATUS_FILE: /backup-status/status.json
       # One-time start values for the registration settings (only applied while unset in the DB).
       # Role ID = built-in role "Leser" (src/db/seed.ts).
       REGISTRATION_ENABLED: "true"
@@ -61,6 +57,7 @@ services:
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
       - bugsink-bootstrap:/bugsink:ro
+      - backup-status:/backup-status:ro
     depends_on:
       db:
         condition: service_healthy
@@ -326,11 +323,17 @@ services:
       BACKUP_KEEP_MONTHS: 6
     volumes:
       - ./data/backups:/backups
+      - backup-status:/status
+    configs:
+      - source: backup-status-hook
+        target: /hooks/10-status
+        mode: 0755
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
+  backup-status:
   bugsink-data:
   bugsink-bootstrap:
   pgdata:
@@ -338,6 +341,19 @@ volumes:
   zitadel-admin:
 
 configs:
+  backup-status-hook:
+    content: |
+      #!/bin/sh
+      # Schreibt nach jedem Lauf den Status für on-duty (/admin/backup).
+      f=/status/status.json
+      now=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      case "$$1" in
+        post-backup) s=success; ls=$$now ;;
+        error) s=failed; ls=$$(sed -n 's/.*"lastSuccess":"\([^"]*\)".*/\1/p' "$$f" 2>/dev/null) ;;
+        *) exit 0 ;;
+      esac
+      if [ -n "$$ls" ]; then lsj="\"$$ls\""; else lsj=null; fi
+      printf '{"timestamp":"%s","status":"%s","lastSuccess":%s}\n' "$$now" "$$s" "$$lsj" > "$$f.tmp" && mv "$$f.tmp" "$$f"
   init-zitadel-db:
     content: |
       #!/bin/sh

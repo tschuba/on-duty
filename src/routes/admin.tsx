@@ -1,14 +1,13 @@
 import { RowAction } from "../components/row-action.js";
 import { EmailField, Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Hono, type Context } from "hono";
-import { eq, and, count, asc, desc, inArray } from "drizzle-orm";
+import { eq, and, count, asc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   users,
   sessions,
   accounts,
   anniversaryYears,
-  backupHistory,
   appRoles,
   appRolePermissions,
   userAppRoles,
@@ -22,7 +21,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
-import { getCronScheduleTimes, getLastBackup, isBackupConfigured, runBackup } from "../lib/backup.js";
+import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
 import { setFlash } from "../lib/flash.js";
@@ -45,41 +44,32 @@ export function permissionSearchText(perms: readonly Permission[]): string {
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
 const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
 
-function BackupWarnBanner({ configured, lastFailed }: { configured: boolean; lastFailed: boolean }) {
-  if (configured && !lastFailed) return null;
-  if (!configured) {
-    return (
-      <div class="alert alert-warning mb-4">
-        <span>{t("admin.backup.warnNotConfigured")}</span>
-      </div>
-    );
-  }
+const fmtBackupDate = (d: Date) =>
+  d.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+function agoHours(d: Date): string {
+  const h = Math.floor((Date.now() - d.getTime()) / 3600_000);
+  return h < 1 ? "vor < 1 Std." : `vor ${h} Std.`;
+}
+
+function BackupWarnBanner({ status }: { status: BackupStatus }) {
+  const { state, timestamp, lastSuccess } = status;
+  if (state !== "failed" && state !== "stale") return null;
+  const text = state === "failed"
+    ? t("admin.backup.warnFailed", { time: timestamp ? fmtBackupDate(timestamp) : "—" })
+    : t("admin.backup.warnStale", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS, last: lastSuccess ? fmtBackupDate(lastSuccess) : "—" });
   return (
     <div class="alert alert-error mb-4">
       <span>
-        {t("admin.backup.warnLastFailed")}{" "}
+        {text}{" "}
         <a href="/admin/backup" class="link">{t("admin.backup.warnDetails")}</a>
       </span>
     </div>
   );
 }
 
-function getBackupWarnProps(
-  configured: boolean,
-  last: Awaited<ReturnType<typeof getLastBackup>> | null,
-  schedule: ReturnType<typeof getCronScheduleTimes> | null,
-) {
-  const lastFailed = schedule?.prev
-    ? !(last?.startedAt && last.startedAt >= schedule.prev && last.status === "success")
-    : last?.status === "failed";
-  return { configured, lastFailed: lastFailed ?? false };
-}
-
 export async function backupWarnProps() {
-  const configured = isBackupConfigured();
-  const last = configured ? await getLastBackup() : null;
-  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
-  return getBackupWarnProps(configured, last, schedule);
+  return { status: await getBackupStatus() };
 }
 
 export function ModalScaffold() {
@@ -912,11 +902,8 @@ const CONFIG_DESCRIPTIONS: Record<string, string> = {
   EVENTS_PUBLIC_INDEXING: t("admin.config.desc.EVENTS_PUBLIC_INDEXING"),
   SESSION_LIFETIME: t("admin.config.desc.SESSION_LIFETIME"),
   ADMIN_PASSWORD_MIN_LENGTH: t("admin.config.desc.ADMIN_PASSWORD_MIN_LENGTH"),
-  BACKUP_SCHEDULE: t("admin.config.desc.BACKUP_SCHEDULE"),
-  BACKUP_RETENTION_COUNT: t("admin.config.desc.BACKUP_RETENTION_COUNT"),
-  BACKUP_LOCAL_PATH: t("admin.config.desc.BACKUP_LOCAL_PATH"),
-  S3_ENDPOINT: t("admin.config.desc.S3_ENDPOINT"),
-  S3_BUCKET: t("admin.config.desc.S3_BUCKET"),
+  BACKUP_STATUS_FILE: t("admin.config.desc.BACKUP_STATUS_FILE"),
+  BACKUP_STATUS_MAX_AGE_HOURS: t("admin.config.desc.BACKUP_STATUS_MAX_AGE_HOURS"),
 };
 
 adminRoutes.get("/config", guard, async (c) => {
@@ -1032,102 +1019,50 @@ adminRoutes.post("/config", guard, async (c) => {
 // ── /admin/backup ──────────────────────────────────────────────────────────────
 adminRoutes.get("/backup", guard, async (c) => {
   const user = c.get("user");
-  const configured = isBackupConfigured();
-  const schedule = configured ? getCronScheduleTimes(env.BACKUP_SCHEDULE) : null;
-  const entries = await db.select().from(backupHistory).orderBy(desc(backupHistory.startedAt)).limit(50);
-  const warn = getBackupWarnProps(configured, entries[0] ?? null, schedule);
-  const lastBackupAfterSchedule =
-    schedule?.prev && entries[0]?.startedAt && entries[0].startedAt >= schedule.prev
-      ? entries[0].status
-      : null;
+  const status = await getBackupStatus();
+  const { state, timestamp, lastSuccess } = status;
+  const bad = state === "failed" || state === "stale";
+  const wide = (text: string) => <div class="p-4 rounded-box border bg-base-200 border-base-300 text-sm">{text}</div>;
 
   return c.html(
     <Layout title="Backup" user={user}>
-      <BackupWarnBanner {...warn} />
-      {schedule && (
-        <div class="grid grid-cols-2 gap-4 text-sm mb-6">
-          <div class={`p-4 rounded-box border ${lastBackupAfterSchedule === "success" ? "bg-success/10 border-success/30" : "bg-error/10 border-error/30"}`}>
-            <div class="text-base-content/50 mb-1">{t("admin.backup.scheduleLastTime")}</div>
-            {schedule.prev ? (
-              <>
-                <div class="font-mono font-medium">{schedule.prev.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-                {lastBackupAfterSchedule === "success" ? (
-                  <div class="mt-1 text-success">{t("admin.backup.backupAvailable")}</div>
-                ) : lastBackupAfterSchedule === "failed" ? (
-                  <div class="mt-1 text-error">{t("admin.backup.backupFailed")}</div>
+      <BackupWarnBanner status={status} />
+      {state === "unconfigured" ? wide(t("admin.backup.unconfigured"))
+        : state === "unknown" ? wide(t("admin.backup.unknown", { file: env.BACKUP_STATUS_FILE ?? "" }))
+        : (
+          <>
+            <div class="grid grid-cols-2 gap-4 text-sm mb-6">
+              <div class={`p-4 rounded-box border ${bad ? "bg-error/10 border-error/30" : "bg-success/10 border-success/30"}`}>
+                <div class="text-base-content/50 mb-1">{t("admin.backup.lastSuccess")}</div>
+                {lastSuccess ? (
+                  <>
+                    <div class="font-mono font-medium">{fmtBackupDate(lastSuccess)}</div>
+                    <div class={`mt-1 ${bad ? "text-error" : "text-success"}`}>
+                      {bad ? t("admin.backup.old", { ago: agoHours(lastSuccess) }) : t("admin.backup.current", { ago: agoHours(lastSuccess) })}
+                    </div>
+                  </>
                 ) : (
-                  <div class="mt-1 text-error">{t("admin.backup.backupMissing")}</div>
+                  <div class="text-base-content/40">—</div>
                 )}
-              </>
-            ) : (
-              <div class="text-base-content/40">—</div>
-            )}
-          </div>
-          <div class="p-4 rounded-box border bg-base-200 border-base-300">
-            <div class="text-base-content/50 mb-1">{t("admin.backup.scheduleNextTime")}</div>
-            {schedule.next ? (
-              <div class="font-mono font-medium">{schedule.next.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
-            ) : (
-              <div class="text-base-content/40">—</div>
-            )}
-          </div>
-        </div>
-      )}
-      <PageHeader title={t("admin.backup.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("admin.backup.startNow")} form="backup-form" class="btn-outline" onclick={`return confirm('${t("admin.backup.confirmStart")}')`} />} />
-      <form id="backup-form" method="post" action="/admin/backup/run" />
-
-      {entries.length === 0 ? (
-        <p class="text-base-content/60">{t("admin.backup.noRuns")}</p>
-      ) : (
-        <div class="overflow-x-auto">
-          <table class="table table-zebra w-full">
-            <thead>
-              <tr>
-                <th>{t("admin.backup.table.timestamp")}</th>
-                <th>{t("admin.backup.table.targets")}</th>
-                <th>{t("admin.backup.table.status")}</th>
-                <th>{t("admin.backup.table.error")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((e) => {
-                const targets: { type: string; status: string; error?: string }[] = JSON.parse(e.targets);
-                return (
-                  <tr>
-                    <td class="font-mono text-sm whitespace-nowrap">
-                      {e.startedAt.toLocaleString("de-DE")}
-                    </td>
-                    <td>
-                      <div class="flex gap-1 flex-wrap">
-                        {targets.map((tgt) => (
-                          <span
-                            class={`badge badge-sm ${tgt.status === "success" ? "badge-success" : "badge-error"}`}
-                          >
-                            {tgt.type === "local" ? t("admin.backup.targetLocal") : "S3"}
-                          </span>
-                        ))}
-                        {targets.length === 0 && <span class="text-base-content/40 text-sm">—</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <span class={`badge badge-sm ${e.status === "success" ? "badge-success" : "badge-error"}`}>
-                        {e.status === "success" ? t("admin.backup.statusSuccess") : t("admin.backup.statusFailed")}
-                      </span>
-                    </td>
-                    <td class="text-sm text-error max-w-xs truncate">{e.errorMessage ?? ""}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Layout>
+              </div>
+              <div class="p-4 rounded-box border bg-base-200 border-base-300">
+                {state === "ok" ? (
+                  <div>{t("admin.backup.expected", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</div>
+                ) : (
+                  <>
+                    <div class="text-base-content/50 mb-1">{t("admin.backup.lastRun")}</div>
+                    <div class="font-mono">
+                      {state === "failed" && timestamp ? t("admin.backup.lastRunFailed", { time: fmtBackupDate(timestamp) }) : "—"}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {state === "failed" && <p class="text-sm mb-2">{t("admin.backup.hintFailed")}</p>}
+            {state === "stale" && <p class="text-sm mb-2">{t("admin.backup.hintStale")}</p>}
+            <p class="text-sm text-base-content/50">{t("admin.backup.scope")}</p>
+          </>
+        )}
+    </Layout>,
   );
-});
-
-adminRoutes.post("/backup/run", guard, async (c) => {
-  runBackup().catch((err) => logger.error({ err }, "[backup] manual run failed"));
-  setFlash(c, t("admin.backup.flash.started"), "success");
-  return c.redirect("/admin/backup");
 });
