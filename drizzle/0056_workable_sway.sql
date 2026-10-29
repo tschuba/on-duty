@@ -1,0 +1,1 @@
+ALTER TABLE "donations" ALTER COLUMN "type" DROP NOT NULL;

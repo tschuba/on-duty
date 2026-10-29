@@ -241,6 +241,7 @@ export const de = {
   "donations.form.type": "Spendenart",
   "donations.form.typeCash": "Bar",
   "donations.form.typeTransfer": "Überweisung",
+  "donations.form.typeNone": "Keine Angabe",
   "donations.form.purpose": "Verwendungszweck / Notiz",
   "donations.form.donor": "Spender suchen",
   "donations.form.duplicateWarning": "Ein Mitglied oder Spender mit diesem Namen existiert bereits. Bitte oben über die Suche auswählen.",
