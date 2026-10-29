@@ -18,7 +18,7 @@ export function requestLog(base: Logger = logger) {
     const span = trace.getActiveSpan();
     // Assets/health are not traced (see lib/otel.ts), so no active span there
     const traceId = span?.spanContext().traceId;
-    const log = base.child(traceId ? { requestId, traceId } : { requestId });
+    const log = base.child(traceId ? { requestId, trace_id: traceId } : { requestId });
     span?.setAttribute("request_id", requestId);
     c.set("requestId", requestId);
     c.set("log", log);

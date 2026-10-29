@@ -71,3 +71,21 @@ describe("/health", () => {
     expect(await res.text()).not.toContain("secret");
   });
 });
+
+describe("request log tracing", () => {
+  it("sets span attributes and logs trace_id of the active span", async () => {
+    const { trace } = await import("@opentelemetry/api");
+    const setAttribute = vi.fn();
+    vi.spyOn(trace, "getActiveSpan").mockReturnValue({ setAttribute, spanContext: () => ({ traceId: "t".repeat(32) }) } as never);
+    process.env.BETTER_AUTH_SECRET = "s";
+    const { lines, log } = capture();
+    const app = new Hono<{ Variables: LogVariables }>();
+    app.use("*", requestLog(log));
+    app.get("/m/:id", (c) => c.text("ok"));
+    await app.request("/m/5?x=secret", { headers: { "x-request-id": "r-1" } });
+    expect(JSON.parse(lines[0])).toMatchObject({ requestId: "r-1", trace_id: "t".repeat(32) });
+    expect(setAttribute).toHaveBeenCalledWith("request_id", "r-1");
+    expect(setAttribute).toHaveBeenCalledWith("http.route", "/m/:id");
+    vi.restoreAllMocks();
+  });
+});
