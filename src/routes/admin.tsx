@@ -1056,6 +1056,7 @@ adminRoutes.get("/backup", guard, async (c) => {
         <details class="text-sm text-base-content/60">
           <summary class="cursor-pointer">{t("admin.backup.opsTitle")}</summary>
           <ul class="mt-2 space-y-1">
+            {state === "ok" && lastSuccess && <li>{t("admin.backup.opsTimestamp")} {fmtBackupDate(lastSuccess)}</li>}
             <li>{t("admin.backup.opsFile")} <code class="font-mono">{env.BACKUP_STATUS_FILE ?? "—"}</code></li>
             <li>{t("admin.backup.opsMaxAge", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</li>
             {state === "failed" && <li>{t("admin.backup.opsLogs")} <code class="font-mono">docker compose logs backup</code></li>}

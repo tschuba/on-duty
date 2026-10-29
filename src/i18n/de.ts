@@ -574,6 +574,7 @@ export const de = {
   "admin.backup.hintContact": "Bitte die Person informieren, die den Server betreibt.",
   "admin.backup.docsLink": "Anleitung ansehen →",
   "admin.backup.opsTitle": "Für Server-Betreiber",
+  "admin.backup.opsTimestamp": "Zeitpunkt:",
   "admin.backup.opsFile": "Statusdatei:",
   "admin.backup.opsMaxAge": "Warnschwelle (BACKUP_STATUS_MAX_AGE_HOURS): {hours} Stunden",
   "admin.backup.opsLogs": "Fehlerursache:",
