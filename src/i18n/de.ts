@@ -385,6 +385,7 @@ export const de = {
   "admin.permissions.key.applicationsManageForms": "Formulare de-/aktivieren",
   "admin.permissions.key.inventoryRead": "Inventar ansehen",
   "admin.permissions.key.inventoryManage": "Inventar verwalten",
+  "admin.permissions.key.inventoryConfigure": "Inventarfelder konfigurieren",
   "admin.permissions.key.lendingRead": "Verleih ansehen",
   "admin.permissions.key.lendingManage": "Verleih verwalten",
   "admin.permissions.badge.full": "Unbeschränkter Vollzugriff",

@@ -21,6 +21,7 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `applications:manage-forms`| ✔ | ✔ |   | ✔ |   |   |
 | `inventory:read`           |   |   | ✔ | ✔ | ✔ |   |
 | `inventory:manage`         |   |   |   | ✔ | ✔ |   |
+| `inventory:configure`      |   |   |   | ✔ | ✔ |   |
 | `lending:read`             |   |   | ✔ | ✔ | ✔ |   |
 | `lending:manage`           |   |   |   | ✔ |   |   |
 | `org:read`                 |   |   | ✔ | ✔ | ✔ | ✔ |
