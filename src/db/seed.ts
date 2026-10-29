@@ -1,7 +1,7 @@
 import { logger } from "../lib/logger.js";
 import { hashPassword } from "better-auth/crypto";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { eq, and } from "drizzle-orm";
 import { appSettings } from "./schema/index.js";
 import { LOCAL_ADMIN_ACCOUNT_ID, LOCAL_ADMIN_EMAIL } from "../lib/constants.js";
@@ -67,8 +67,8 @@ export async function runSeed() {
   if (!process.env.ADMIN_PASSWORD) throw new Error("ADMIN_PASSWORD is not set");
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not set");
 
-  const client = postgres(process.env.DATABASE_URL);
-  const db = drizzle(client);
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+  const db = drizzle(pool);
 
   try {
     await db.insert(memberRoleTypes).values(ROLE_TYPES.map(({ key: _key, ...t }) => t)).onConflictDoNothing();
@@ -143,6 +143,6 @@ export async function runSeed() {
       logger.info("admin account already exists, password unchanged");
     }
   } finally {
-    await client.end();
+    await pool.end();
   }
 }
