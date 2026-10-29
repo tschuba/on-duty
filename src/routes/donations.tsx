@@ -143,7 +143,6 @@ function buildReceiptXml(d: DonationWithDonor, config: Record<string, string>): 
     xmlEl("datum2", datum2),
     xmlEl("zeitraum", zeitraum),
     xmlEl("k4", "false"),
-    xmlEl("zwecke", config.charitablePurpose),
     xmlEl("k5", "true"),
     xmlEl("ort_datum", ortDatum),
   ].join("\n");
@@ -155,6 +154,7 @@ const TYPE_LABELS: Record<DonationType, string> = {
   cash: t("donations.form.typeCash"),
   transfer: t("donations.form.typeTransfer"),
 };
+const typeLabel = (ty: DonationType | null) => (ty ? TYPE_LABELS[ty] : "–");
 
 async function fetchDonations(): Promise<DonationWithDonor[]> {
   return db.query.donations.findMany({ with: { donor: { with: { person: { with: { member: true } } } }, issuer: true } }) as Promise<DonationWithDonor[]>;
@@ -177,7 +177,7 @@ function parseDonationFields(body: Record<string, any>): { values: DonationField
   const amountNum = Number(values.amount.replace(",", "."));
   if (!values.amount || !Number.isFinite(amountNum) || amountNum <= 0) errors.amount = t("common.required");
   if (!values.date) errors.date = t("common.required");
-  if (values.type !== "cash" && values.type !== "transfer") errors.type = t("common.required");
+  if (values.type && values.type !== "cash" && values.type !== "transfer") errors.type = t("common.required");
   return { values, errors };
 }
 
@@ -216,8 +216,12 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
           {errors?.date && <span class="text-error text-sm mt-1">{errors.date}</span>}
         </Field>
       </div>
-      <Field label={t("donations.form.type")} required floating={false}>
+      <Field label={t("donations.form.type")} floating={false}>
         <div class={`join w-full${errors?.type ? " border border-error rounded-lg" : ""}`}>
+          <label class="join-item btn flex-1 has-[:checked]:btn-primary">
+            <input type="radio" name="type" value="" checked={!values?.type} class="hidden" />
+            {t("donations.form.typeNone")}
+          </label>
           <label class="join-item btn flex-1 has-[:checked]:btn-primary">
             <input type="radio" name="type" value="cash" checked={values?.type === "cash"} class="hidden" />
             {t("donations.form.typeCash")}
@@ -300,7 +304,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
               <td>{formatDate(d.date)}</td>
               <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
-              <td>{TYPE_LABELS[d.type]}</td>
+              <td>{typeLabel(d.type)}</td>
               <td>{d.purpose ?? "—"}</td>
               <td>
                 {d.receiptStatus === "issued"
@@ -379,7 +383,7 @@ donationRoutes.post("/", requireAuth("donations:record"), async (c) => {
       donorId: donor.id,
       amount: donationFields.values.amount.replace(",", "."),
       date: donationFields.values.date,
-      type: donationFields.values.type as DonationType,
+      type: (donationFields.values.type || null) as DonationType | null,
       purpose: donationFields.values.purpose || null,
     }).returning({ id: donations.id });
     return row.id;
@@ -408,7 +412,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
       <ViewGrid>
         <ViewField label={t("donations.form.amount")} value={`${d.amount} €`} />
         <ViewField label={t("donations.form.date")} value={formatDate(d.date)} />
-        <ViewField label={t("donations.form.type")} value={TYPE_LABELS[d.type]} />
+        <ViewField label={t("donations.form.type")} value={typeLabel(d.type)} />
         <ViewField label={t("donations.form.purpose")} value={d.purpose} />
       </ViewGrid>
     </Layout>
@@ -429,7 +433,7 @@ donationRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
-        <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type, purpose: d.purpose ?? "" }} />
+        <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type ?? "", purpose: d.purpose ?? "" }} />
       </form>
     </Layout>
   );
@@ -460,7 +464,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   await db.update(donations).set({
     amount: values.amount.replace(",", "."),
     date: values.date,
-    type: values.type as DonationType,
+    type: (values.type || null) as DonationType | null,
     purpose: values.purpose || null,
   }).where(eq(donations.id, id));
 
@@ -530,7 +534,7 @@ donationRoutes.get("/:id/receipt", requireAuth("donations:issue-receipts"), asyn
           {row(t("donations.receipt.previewAddress"), addressMissing ? null : `${p.street} ${p.houseNumber}, ${p.zip} ${p.city}`)}
           {row(t("donations.receipt.summaryAmount"), formatAmount(d.amount))}
           {row(t("donations.receipt.summaryDate"), formatDate(d.date))}
-          {row(t("donations.receipt.previewType"), TYPE_LABELS[d.type])}
+          {row(t("donations.receipt.previewType"), typeLabel(d.type))}
           {row(t("donations.receipt.previewPurpose"), d.purpose ?? "—")}
           {row(t("donations.receipt.previewTaxOffice"), config.taxOffice, missingOrg.has("taxOffice"))}
           {row(t("donations.receipt.previewTaxNumber"), config.taxExemptionNumber, missingOrg.has("taxExemptionNumber"))}

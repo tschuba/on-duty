@@ -23,7 +23,7 @@ export const donations = pgTable("donations", {
     .references(() => donors.id, { onDelete: "restrict" }),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   date: date("date").notNull(),
-  type: donationTypeEnum("type").notNull(),
+  type: donationTypeEnum("type"),
   purpose: text("purpose"),
   receiptStatus: receiptStatusEnum("receipt_status").notNull().default("open"),
   receiptIssuedAt: timestamp("receipt_issued_at"),
