@@ -211,6 +211,8 @@ export const de = {
   "donations.table.amount": "Betrag",
   "donations.table.purpose": "Verwendungszweck",
   "donations.table.receipt": "Bestätigung",
+  "donations.filter.allReceipts": "Alle Bestätigungen",
+  "donations.filter.receiptCount": "{count} Bestätigungen",
   "donations.table.empty": "Keine Spenden gefunden.",
   "donations.table.receiptIssued": "Ausgestellt",
   "donations.table.receiptOpen": "Offen",

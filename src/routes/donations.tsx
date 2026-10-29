@@ -16,7 +16,9 @@ import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, ca
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
-import { buildListUrl } from "../lib/list-query.js";
+import { buildListUrl, parseMulti } from "../lib/list-query.js";
+import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { SortIcon } from "./members.js";
 import { nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
@@ -319,6 +321,25 @@ function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnTyp
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
+export type SortKey = "date" | "donor" | "amount";
+const SORT_KEYS: readonly SortKey[] = ["date", "donor", "amount"];
+const RECEIPT_STATUSES = ["open", "issued", "not_required"] as const;
+
+type Sortable = { date: string; amount: string | number; donor: { person: { firstName: string; lastName: string; companyName?: string | null } } };
+
+// Default order (date desc → name → first name) is the tiebreaker for every sort.
+export function sortDonations<T extends Sortable>(list: T[], sort: SortKey = "date", dir: "asc" | "desc" = "desc"): T[] {
+  const name = (d: T) => d.donor.person.companyName || d.donor.person.lastName;
+  const base = (a: T, b: T) =>
+    b.date.localeCompare(a.date) || name(a).localeCompare(name(b), "de") || a.donor.person.firstName.localeCompare(b.donor.person.firstName, "de");
+  const cmp = (a: T, b: T) =>
+    sort === "amount" ? Number(a.amount) - Number(b.amount)
+    : sort === "donor" ? name(a).localeCompare(name(b), "de") || a.donor.person.firstName.localeCompare(b.donor.person.firstName, "de")
+    : a.date.localeCompare(b.date);
+  const sign = dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => sign * cmp(a, b) || base(a, b));
+}
+
 // GET /donations — list with donor-name search and date range (filtered in JS,
 // same reasoning as members.tsx: the full set is small and already needs to be
 // loaded for the filter to run over joined donor/person fields).
@@ -328,16 +349,23 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const search = q.search ?? "";
   const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" });
   const { start: from, end: to } = range;
+  const sort: SortKey = (SORT_KEYS as readonly string[]).includes(q.sort) ? (q.sort as SortKey) : "date";
+  const dir = q.sort_dir === "asc" || q.sort_dir === "desc" ? q.sort_dir : sort === "donor" ? "asc" : "desc";
+  const receipt = parseMulti(c.req.queries("receipt"), RECEIPT_STATUSES);
 
   const all = await fetchDonations();
   const needle = search.toLowerCase();
   const filtered = all.filter((d) => {
     if (search && !`${d.donor.person.companyName ?? ""} ${d.donor.person.firstName} ${d.donor.person.lastName}`.toLowerCase().includes(needle)) return false;
+    if (receipt.length > 0 && !receipt.includes(d.receiptStatus)) return false;
     if (from && d.date < from) return false;
     if (to && d.date > to) return false;
     return true;
   });
-  const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = sortDonations(filtered, sort, dir);
+  const state = { search, from, to, sort: q.sort ? sort : undefined, sort_dir: q.sort ? dir : undefined, receipt };
+  const sortUrl = (col: SortKey) => buildListUrl("/donations", state, { sort: col, sort_dir: sort === col ? (dir === "asc" ? "desc" : "asc") : col === "donor" ? "asc" : "desc" });
+  const th = (col: SortKey, label: string, cls = "") => <th class={cls}><a href={sortUrl(col)} class="link link-hover">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>;
 
   const presets = rangePresets(todayStr(), "past");
   const canLink = user.permissions.has("members:read");
@@ -351,8 +379,21 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
         <div class="flex flex-col w-full md:w-auto">
           <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
+        {q.sort && <input type="hidden" name="sort" value={sort} />}
+        {q.sort && <input type="hidden" name="sort_dir" value={dir} />}
+        {receipt.map((r) => <input type="hidden" name="receipt" value={r} />)}
         <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
-          href={(p) => buildListUrl("/donations", { search }, p)} />
+          href={(p) => buildListUrl("/donations", { search, sort: state.sort, sort_dir: state.sort_dir, receipt }, p)} />
+        <MultiSelectFilter
+          param="receipt"
+          autoApply
+          options={RECEIPT_STATUSES.map((v) => ({ value: v, label: t(`donations.table.${v === "open" ? "receiptOpen" : v === "issued" ? "receiptIssued" : "receiptNotRequired"}`) }))}
+          selected={receipt}
+          allLabel={t("donations.filter.allReceipts")}
+          countLabel={(count) => t("donations.filter.receiptCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
       </form>
 
       <ClickToEditHint />
@@ -360,9 +401,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
       <table class="table table-zebra w-full">
         <thead>
           <tr>
-            <th>{t("donations.table.date")}</th>
-            <th>{t("donations.table.donor")}</th>
-            <th class="text-right">{t("donations.table.amount")}</th>
+            {th("date", t("donations.table.date"))}
+            {th("donor", t("donations.table.donor"))}
+            {th("amount", t("donations.table.amount"), "text-right")}
             <th>{t("donations.table.purpose")}</th>
             <th>{t("donations.table.receipt")}</th>
           </tr>
