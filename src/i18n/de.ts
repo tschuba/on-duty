@@ -209,7 +209,6 @@ export const de = {
   "donations.table.date": "Datum",
   "donations.table.donor": "Spender",
   "donations.table.amount": "Betrag",
-  "donations.table.type": "Art",
   "donations.table.purpose": "Verwendungszweck",
   "donations.table.receipt": "Bestätigung",
   "donations.table.empty": "Keine Spenden gefunden.",

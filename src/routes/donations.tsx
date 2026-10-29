@@ -363,20 +363,18 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             <th>{t("donations.table.date")}</th>
             <th>{t("donations.table.donor")}</th>
             <th class="text-right">{t("donations.table.amount")}</th>
-            <th>{t("donations.table.type")}</th>
             <th>{t("donations.table.purpose")}</th>
             <th>{t("donations.table.receipt")}</th>
           </tr>
         </thead>
         <tbody>
           {sorted.length === 0 ? (
-            <tr><td colspan={6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
+            <tr><td colspan={5} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : sorted.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}'`}>
               <td>{formatDate(d.date)}</td>
               <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
-              <td>{typeLabel(d.type)}</td>
               <td>{d.purpose ?? "—"}</td>
               <td>
                 {d.receiptStatus === "issued"
@@ -476,7 +474,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
       {d.receiptStatus === "issued" && !canIssue && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       {!showReceipt && <ReceiptStatusActions d={d} canIssue={canIssue} />}
       <ViewGrid>
-        <ViewField label={t("donations.form.amount")} value={`${d.amount} €`} />
+        <ViewField label={t("donations.form.amount")} value={formatAmount(d.amount)} />
         <ViewField label={t("donations.form.date")} value={formatDate(d.date)} />
         <ViewField label={t("donations.form.type")} value={typeLabel(d.type)} />
         <ViewField label={t("donations.form.purpose")} value={d.purpose} />
@@ -501,7 +499,7 @@ donationRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
       <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
-        <DonationFormFields values={{ amount: d.amount, date: d.date, type: d.type ?? "", purpose: d.purpose ?? "" }} />
+        <DonationFormFields values={{ amount: Number(d.amount).toFixed(2).replace(".", ","), date: d.date, type: d.type ?? "", purpose: d.purpose ?? "" }} />
       </form>
     </Layout>
   );
