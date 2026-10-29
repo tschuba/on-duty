@@ -39,6 +39,12 @@ services:
       SENTRY_DSN_FILE: ${SENTRY_DSN_FILE:-/bugsink/dsn}
       # Link shown in /admin/config; defaults to the Bugsink issue list, empty when the `errors` profile is off.
       ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-${SERVICE_FQDN_BUGSINK:+https://${SERVICE_FQDN_BUGSINK}/issues/}}
+      # Optional OpenTelemetry traces/metrics (OTLP/HTTP, e.g. OpenObserve). Empty endpoint = off.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-}
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:-}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:-}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USER: ${SMTP_USER:-}
@@ -54,7 +60,7 @@ services:
     command:
       - sh
       - -c
-      - '[ -n "$$OIDC_CLIENT_ID" ] || . /zitadel/bootstrap/oidc.env; export OIDC_CLIENT_ID OIDC_CLIENT_SECRET; exec node dist/entrypoint.js'
+      - '[ -n "$$OIDC_CLIENT_ID" ] || . /zitadel/bootstrap/oidc.env; export OIDC_CLIENT_ID OIDC_CLIENT_SECRET; exec node --import ./dist/lib/otel.js dist/entrypoint.js'
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
       - bugsink-bootstrap:/bugsink:ro

@@ -276,6 +276,10 @@ Unbehandelte Serverfehler (5xx, `uncaughtException`, `unhandledRejection`) könn
 - Gesendet werden nur Fehlertyp/Stack, interne `user.id`, Route-Pattern, Request-ID, App-Version und Umgebung. Kein Body, Query-String, Cookie, Header oder IP; keine Performance-Daten.
 - Restgrenze: Fehlermeldungen und Stacks können Werte enthalten (z. B. SQL-Fehler). DSN nur eintragen, wenn dem Empfänger der Daten vertraut wird.
 
+### Traces (OpenTelemetry, optional)
+
+Mit `OTEL_EXPORTER_OTLP_ENDPOINT` (z. B. `https://<host>/api/default` bei OpenObserve) exportiert die App Traces und Metriken per OTLP/HTTP; leer = aus. Anmeldung über `OPENOBSERVE_USER`/`OPENOBSERVE_PASSWORD` (Basic), `OTEL_EXPORTER_OTLP_HEADERS` überschreibt; `OTEL_TRACES_SAMPLER_ARG` = Anteil 0..1 (Standard 1). Details: `docs/deployment.md`.
+
 ### Bugsink mitliefern (Compose-Profil `errors`)
 
 Optional und standardmäßig aus. Aktivieren: in Coolify die Variable `COMPOSE_PROFILES=errors` setzen und neu deployen. Ohne Profil starten weder `bugsink` noch `bugsink-init`. (Coolify beachtet Profile ggf. nicht, siehe Coolify-Issue #6395; dann `bugsink`/`bugsink-init` in eine eigene Compose-Datei auslagern.)
