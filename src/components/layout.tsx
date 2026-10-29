@@ -180,6 +180,15 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         const watchFilter = () => { filterRO.disconnect(); const f = document.querySelector(".filter-bar"); if (f) filterRO.observe(f); };
         watchFilter();
         document.body.addEventListener("htmx:afterSettle", watchFilter);
+        // Listenfilter pro Pfad merken; Zurück-Links (data-keep-filter) auf die nackte Liste bekommen ihn wieder angehängt
+        const saveFilter = () => { try { if (document.querySelector(".filter-bar")) sessionStorage.setItem("filter:" + location.pathname, location.search); } catch(e) {} };
+        saveFilter();
+        document.body.addEventListener("htmx:afterSettle", saveFilter);
+        document.addEventListener("click", (e) => {
+          const a = e.target.closest && e.target.closest("a[data-keep-filter]");
+          if (!a || a.search || a.origin !== location.origin || a.pathname === location.pathname || e.defaultPrevented) return;
+          try { const s = sessionStorage.getItem("filter:" + a.pathname); if (s) a.search = s; } catch(e) {}
+        }, true);
         // HTMX spinner: add loading class to triggering element
         document.body.addEventListener("htmx:beforeRequest", (e) => e.detail.elt.classList.add("loading", "loading-spinner"));
         document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));
