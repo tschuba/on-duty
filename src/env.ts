@@ -11,7 +11,6 @@ const REQUIRED = [
   "OIDC_APP_URL",
 ] as const;
 
-const S3_VARS = ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY"] as const;
 
 export function validateEnv(): void {
   const missing = REQUIRED.filter((k) => !process.env[k]);
@@ -40,12 +39,6 @@ export function validateEnv(): void {
     process.exit(1);
   }
 
-  const s3Set = S3_VARS.filter((k) => process.env[k]);
-  if (s3Set.length > 0 && s3Set.length < S3_VARS.length) {
-    const s3Missing = S3_VARS.filter((k) => !process.env[k]);
-    logger.fatal({ s3Missing }, "Incomplete S3 configuration");
-    process.exit(1);
-  }
 }
 
 export const env = {
@@ -67,15 +60,9 @@ export const env = {
   // Feste Zone der Wehr für Termine (IANA-Name), siehe lib/datetime.ts
   APP_TIMEZONE: process.env.APP_TIMEZONE ?? "Europe/Berlin",
   EVENTS_PUBLIC_INDEXING: process.env.EVENTS_PUBLIC_INDEXING === "true",
-  BACKUP_SCHEDULE: process.env.BACKUP_SCHEDULE ?? "0 2 * * 0",
-  BACKUP_RETENTION_COUNT: Number(process.env.BACKUP_RETENTION_COUNT ?? "4"),
-  BACKUP_LOCAL_PATH: process.env.BACKUP_LOCAL_PATH,
-  S3_ENDPOINT: process.env.S3_ENDPOINT,
-  S3_BUCKET: process.env.S3_BUCKET,
-  S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
-  S3_SECRET_KEY: process.env.S3_SECRET_KEY,
-  S3_REGION: process.env.S3_REGION,
-  S3_PREFIX: process.env.S3_PREFIX,
+  // Pfad zur status.json des Backup-Containers; leer = Überwachung aus
+  BACKUP_STATUS_FILE: process.env.BACKUP_STATUS_FILE,
+  BACKUP_STATUS_MAX_AGE_HOURS: Number(process.env.BACKUP_STATUS_MAX_AGE_HOURS ?? "26"),
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: process.env.SMTP_PORT,
   SMTP_USER: process.env.SMTP_USER,
@@ -99,11 +86,8 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "EVENTS_PUBLIC_INDEXING",    value: String(env.EVENTS_PUBLIC_INDEXING) },
   { key: "SESSION_LIFETIME",          value: env.SESSION_LIFETIME },
   { key: "ADMIN_PASSWORD_MIN_LENGTH", value: env.ADMIN_PASSWORD_MIN_LENGTH },
-  { key: "BACKUP_SCHEDULE",           value: env.BACKUP_SCHEDULE },
-  { key: "BACKUP_RETENTION_COUNT",    value: env.BACKUP_RETENTION_COUNT },
-  { key: "BACKUP_LOCAL_PATH",         value: env.BACKUP_LOCAL_PATH },
-  { key: "S3_ENDPOINT",               value: env.S3_ENDPOINT },
-  { key: "S3_BUCKET",                 value: env.S3_BUCKET },
+  { key: "BACKUP_STATUS_FILE",       value: env.BACKUP_STATUS_FILE },
+  { key: "BACKUP_STATUS_MAX_AGE_HOURS", value: env.BACKUP_STATUS_MAX_AGE_HOURS },
   { key: "SMTP_HOST",                 value: env.SMTP_HOST },
   { key: "SMTP_FROM",                 value: env.SMTP_FROM },
   { key: "ERROR_TRACKER_URL",         value: env.ERROR_TRACKER_URL },

@@ -106,7 +106,7 @@ docker compose --file docker-compose.standalone.yml --env-file .env.standalone u
 
 ## Backup
 
-Der dedizierte `backup`-Service (`prodrigestivill/postgres-backup-local`) sichert **beide** Datenbanken (`onduty` und `zitadel`) täglich nach `./data/backups`, Retention 7 Tage / 4 Wochen / 6 Monate. Der in on-duty eingebaute Backup-Mechanismus ist über `BACKUP_DISABLED=true` deaktiviert (fest verdrahtet in `docker-compose.standalone.yml`, kein Umschalten vorgesehen).
+Der dedizierte `backup`-Service (`prodrigestivill/postgres-backup-local`) sichert **beide** Datenbanken (`onduty` und `zitadel`) täglich nach `./data/backups`, Retention 7 Tage / 4 Wochen / 6 Monate. Nach jedem Lauf schreibt ein Hook den Status in das Volume `backup-status`; on-duty zeigt ihn unter `/admin/backup` an und warnt per Banner (siehe [backup.md](backup.md)).
 
 Dateien landen als gzip-komprimierte SQL-Dumps unter `data/backups/daily|weekly|monthly/<db>-<datum>.sql.gz`. Wiederherstellen (Beispiel `onduty`-DB, über den laufenden `backup`-Container):
 

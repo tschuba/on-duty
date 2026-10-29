@@ -42,8 +42,6 @@ Optional (Defaults in der App):
 | `POSTGRES_USER` | `onduty` | DB-Benutzername |
 | `POSTGRES_DB` | `onduty` | DB-Name |
 | `SESSION_LIFETIME` | `7d` | Session-Gültigkeitsdauer |
-| `BACKUP_SCHEDULE` | `0 2 * * 0` | Cron-Ausdruck für automatisches Backup |
-| `BACKUP_RETENTION_COUNT` | `4` | Anzahl aufbewahrter Backups |
 | `ANNIVERSARY_CUTOFF` | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
 | `SMTP_HOST` | — | SMTP-Server für E-Mail-Benachrichtigungen bei Anträgen (leer = Versand deaktiviert) |
 | `SMTP_PORT` | `587` | SMTP-Port |

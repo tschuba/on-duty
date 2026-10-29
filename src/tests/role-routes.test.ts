@@ -7,7 +7,6 @@ import {
   memberRoleTypes,
   memberRoleAssignments,
   anniversaryYears,
-  backupHistory,
   appRoles,
   appRolePermissions,
   userAppRoles,
@@ -46,7 +45,6 @@ let rolesFixture: any[] = [];
 let typesFixture: any[] = [makeType()];
 let assignmentCountFixture: any[] = [{ cnt: 0 }];
 let yearsFixture: any[] = [];
-let backupHistoryFixture: any[] = [];
 let appRolesFixture: any[] = [];
 let appRolePermissionsFixture: any[] = [];
 let userAppRolesFixture: any[] = [];
@@ -76,7 +74,6 @@ const select = vi.fn(() => ({
     if (table === memberRoleTypes) return chainOf(nextRows(memberRoleTypes, typesFixture));
     if (table === memberRoleAssignments) return chainOf(nextRows(memberRoleAssignments, assignmentCountFixture));
     if (table === anniversaryYears) return chainOf(nextRows(anniversaryYears, yearsFixture));
-    if (table === backupHistory) return chainOf(nextRows(backupHistory, backupHistoryFixture));
     if (table === appRoles) return chainOf(nextRows(appRoles, appRolesFixture));
     if (table === appRolePermissions) return chainOf(nextRows(appRolePermissions, appRolePermissionsFixture));
     if (table === userAppRoles) return chainOf(nextRows(userAppRoles, userAppRolesFixture));
@@ -130,20 +127,12 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
-let backupConfigured = false;
-let lastBackupResult: any = null;
-let scheduleResult: { prev: Date | null; next: Date | null } = { prev: null, next: null };
-const runBackupMock = vi.fn(() => Promise.resolve());
+let backupStatus: any = { state: "unconfigured", timestamp: null, lastSuccess: null };
 
 // Layout badge count is a separate DB query; keep it out of the per-route select-call assertions.
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
 
-vi.mock("../lib/backup.js", () => ({
-  isBackupConfigured: () => backupConfigured,
-  getLastBackup: () => Promise.resolve(lastBackupResult),
-  getCronScheduleTimes: () => scheduleResult,
-  runBackup: () => runBackupMock(),
-}));
+vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve(backupStatus) }));
 
 const { roleRoutes } = await import("../routes/roles.js");
 
@@ -158,15 +147,12 @@ beforeEach(() => {
   typesFixture = [makeType()];
   assignmentCountFixture = [{ cnt: 0 }];
   yearsFixture = [];
-  backupHistoryFixture = [];
   appRolesFixture = [];
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
   currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
-  backupConfigured = false;
-  lastBackupResult = null;
-  scheduleResult = { prev: null, next: null };
+  backupStatus = { state: "unconfigured", timestamp: null, lastSuccess: null };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -203,17 +189,6 @@ function makeAppRole(overrides: Record<string, unknown> = {}) {
 
 function makeYear(overrides: Record<string, unknown> = {}) {
   return { kind: "service", year: 10, title: "Zehnjähriges", ...overrides };
-}
-
-function makeBackupEntry(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "b1",
-    startedAt: new Date("2024-01-01T02:00:00Z"),
-    status: "success",
-    targets: JSON.stringify([{ type: "local", status: "success" }]),
-    errorMessage: null,
-    ...overrides,
-  };
 }
 
 // ── Pure logic ───────────────────────────────────────────────────────────────

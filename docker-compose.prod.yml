@@ -27,13 +27,15 @@ services:
       SENTRY_DSN_FILE: ${SENTRY_DSN_FILE:-}
       # Link zum Fehler-Tracker-Dashboard, erscheint unter Admin → Konfiguration. Leer = kein Link.
       ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-}
+      BACKUP_STATUS_FILE: /backup-status/status.json
+      BACKUP_STATUS_MAX_AGE_HOURS: ${BACKUP_STATUS_MAX_AGE_HOURS:-26}
     ports:
       - "3000:3000"
     depends_on:
       db:
         condition: service_healthy
-    # volumes:
-    #   - ./backups:/app/backups  # wenn BACKUP_LOCAL_PATH=/app/backups gesetzt
+    volumes:
+      - backup-status:/backup-status:ro
 
   db:
     image: postgres:17-alpine
@@ -51,5 +53,45 @@ services:
       retries: 10
       start_period: 10s
 
+  backup:
+    image: prodrigestivill/postgres-backup-local:17-alpine-d257e5d
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: ${POSTGRES_USER:-onduty}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: ${POSTGRES_DB:-onduty}
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 4
+      BACKUP_KEEP_MONTHS: 6
+    volumes:
+      - ./data/backups:/backups
+      - backup-status:/status
+    configs:
+      - source: backup-status-hook
+        target: /hooks/10-status
+        mode: 0755
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
+  backup-status:
   pgdata:
+
+configs:
+  backup-status-hook:
+    content: |
+      #!/bin/sh
+      # Schreibt nach jedem Lauf den Status für on-duty (/admin/backup).
+      f=/status/status.json
+      now=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
+      case "$$1" in
+        post-backup) s=success; ls=$$now ;;
+        error) s=failed; ls=$$(sed -n 's/.*"lastSuccess":"\([^"]*\)".*/\1/p' "$$f" 2>/dev/null) ;;
+        *) exit 0 ;;
+      esac
+      if [ -n "$$ls" ]; then lsj="\"$$ls\""; else lsj=null; fi
+      printf '{"timestamp":"%s","status":"%s","lastSuccess":%s}\n' "$$now" "$$s" "$$lsj" > "$$f.tmp" && mv "$$f.tmp" "$$f"
+

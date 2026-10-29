@@ -38,9 +38,9 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 
 ## Backup
 
-- [ ] Backup manuell auslösen (Cron-Ausdruck auf kurzen Intervall setzen, neu starten)
-- [ ] Backup-History in `/admin/backup` sichtbar
-- [ ] Fehlendes Backup → Warn-Banner in Admin-Bereich sichtbar
+- [ ] Backup im Container auslösen (`docker compose exec backup /backup.sh`)
+- [ ] Status „Backup aktuell“ in `/admin/backup` sichtbar
+- [ ] `status.json` auf `failed` setzen oder Container stoppen/alt werden lassen → Warn-Banner in Admin-Bereich sichtbar
 
 ## Pager (Mitglieder, Spender)
 
