@@ -74,6 +74,12 @@ export const env = {
   SENTRY_DSN_FILE: process.env.SENTRY_DSN_FILE,
   // Link shown in /admin/config (opt-in); not read by lib/sentry.ts, purely informational.
   ERROR_TRACKER_URL: process.env.ERROR_TRACKER_URL,
+  // OpenTelemetry traces/metrics (opt-in); read in lib/otel.ts, which loads before this module
+  OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+  OTEL_EXPORTER_OTLP_HEADERS: process.env.OTEL_EXPORTER_OTLP_HEADERS,
+  OTEL_TRACES_SAMPLER_ARG: process.env.OTEL_TRACES_SAMPLER_ARG,
+  OPENOBSERVE_USER: process.env.OPENOBSERVE_USER,
+  OPENOBSERVE_PASSWORD: process.env.OPENOBSERVE_PASSWORD,
 };
 
 export const ENV_META: { key: keyof typeof env; value: string | number | undefined }[] = [
