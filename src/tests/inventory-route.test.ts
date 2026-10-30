@@ -652,6 +652,13 @@ describe("inspection types", () => {
       expect(updateCalls.at(-1)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: null });
     });
 
+    it("refuses a retired item", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      itemsFindFirstResult = { retiredAt: "2026-01-01" };
+      await post({ inspectedAt: "2026-05-20" });
+      expect(updateCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+    });
+
     it("rejects a future inspection date", async () => {
       inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
       await post({ inspectedAt: "2999-01-01" });

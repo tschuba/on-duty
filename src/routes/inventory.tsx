@@ -1827,6 +1827,12 @@ inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("invento
     where: and(eq(inventoryInspections.id, c.req.param("inspectionId")), eq(inventoryInspections.inventoryItemId, id)),
   });
   if (!inspection) return c.notFound();
+  // Ausgemusterte Posten werden nicht mehr geprüft (der Button ist dort ausgeblendet, hier die serverseitige Sperre).
+  const item = await db.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, id), columns: { retiredAt: true } });
+  if (item?.retiredAt) {
+    setFlash(c, t("inventory.inspection.retiredItem"), "error");
+    return c.redirect(`/inventory/${id}`);
+  }
   const body = await c.req.parseBody();
   const today = new Date().toISOString().slice(0, 10);
   const inspectedAt = trimmed(body, "inspectedAt");
