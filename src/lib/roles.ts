@@ -18,6 +18,7 @@ export const PERMISSIONS = [
   "applications:manage-forms",
   "inventory:read",
   "inventory:manage",
+  "inventory:configure",
   "lending:read",
   "lending:manage",
   "org:read",

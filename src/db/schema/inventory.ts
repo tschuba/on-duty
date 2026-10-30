@@ -1,4 +1,4 @@
-import { date, index, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
@@ -26,6 +26,12 @@ export const inventoryItems = pgTable("inventory_items", {
   // SCBA / Gerät / PSA
   nextInspectionDue: date("next_inspection_due"),
   lastInspectionDate: date("last_inspection_date"),
+  // Feste Felder, die dieser Posten hat (Schlüssel siehe INVENTORY_FIELDS in lib/inventory.ts).
+  enabledFields: text("enabled_fields").array().notNull().default([]),
+  // Feld "location": Standort-Text + optionale Koordinaten (nur zusammen).
+  locationText: text("location_text"),
+  latitude: numeric("latitude", { precision: 9, scale: 6 }),
+  longitude: numeric("longitude", { precision: 9, scale: 6 }),
 });
 
 // Replaces the old single assignedMemberId FK — a batch item can be split across
@@ -81,5 +87,32 @@ export const inventoryItemSerials = pgTable(
     serial: text("serial").notNull(),
   },
   (t) => [uniqueIndex("inventory_item_serials_item_serial_idx").on(t.inventoryItemId, t.serial)],
+);
+
+export const inventoryFieldTypeEnum = pgEnum("inventory_field_type", ["text", "number", "date", "boolean", "select"]);
+
+// Freie Felder: zentral definiert, Werte pro Posten. Typ ist nach dem Anlegen fix.
+export const inventoryFieldDefs = pgTable("inventory_field_defs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  type: inventoryFieldTypeEnum("type").notNull(),
+  options: text("options").array(),
+  archived: boolean("archived").notNull().default(false),
+});
+
+// Eine Zeile = Feld ist am Posten aktiv; value darf leer sein. Als Text gespeichert, Typ steckt in der Definition.
+export const inventoryFieldValues = pgTable(
+  "inventory_field_values",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    fieldDefId: uuid("field_def_id")
+      .notNull()
+      .references(() => inventoryFieldDefs.id, { onDelete: "restrict" }),
+    value: text("value"),
+  },
+  (t) => [uniqueIndex("inventory_field_values_item_field_idx").on(t.inventoryItemId, t.fieldDefId)],
 );
 /* v8 ignore stop */
