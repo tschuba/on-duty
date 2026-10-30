@@ -22,6 +22,8 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
+vi.mock("../lib/inventory.js", () => ({ countOverdueInspections: async () => 0 }));
+
 const { Layout } = await import("../components/layout.js");
 
 beforeEach(() => {
@@ -71,6 +73,16 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
     const html = await renderAt("/", "members:write");
     expect(html).not.toContain("Spenden");
     expect(html).not.toContain("Import");
+  });
+
+  it("nests the inventory configuration entries under Bestand, visible only when it is active", async () => {
+    const onStock = await renderAt("/inventory", "inventory:read", "inventory:configure");
+    expect(onStock).toContain('href="/inventory/inspection-templates"');
+    expect(onStock).toContain('href="/inventory/fields"');
+    expect(await renderAt("/inventory/fields", "inventory:read", "inventory:configure")).toContain('href="/inventory/inspection-templates"');
+    expect(await renderAt("/inventory/inspections", "inventory:read", "inventory:configure")).not.toContain('href="/inventory/fields"');
+    expect(await renderAt("/inventory", "inventory:read")).not.toContain('href="/inventory/fields"');
+    expect(await renderAt("/inventory", "inventory:configure")).not.toContain('href="/inventory/fields"');
   });
 
   it("offers the error tracker only with ERROR_TRACKER_URL", async () => {

@@ -428,6 +428,13 @@
       "when": 1794200000000,
       "tag": "0060_inventory_configure_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794300000000,
+      "tag": "0061_inventory_inspections",
+      "breakpoints": true
     }
   ]
 }

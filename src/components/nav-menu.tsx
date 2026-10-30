@@ -17,7 +17,7 @@ export type NavCounts = {
 };
 
 type Tone = "badge-warning" | "badge-primary";
-type Leaf = { label: string; href: string; show: boolean; count?: number; tone?: Tone; external?: boolean };
+type Leaf = { label: string; href: string; show: boolean; count?: number; tone?: Tone; external?: boolean; children?: Leaf[] };
 type Group = { icon: IconName; label: string; items: Leaf[] };
 
 export function CountBadge({ count, tone = "badge-warning" }: { count: number; tone?: Tone }) {
@@ -43,7 +43,10 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("donations.tabs.donors"), href: "/donors", show: donations, count: c.donors },
     ] },
     { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
-      { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read") },
+      { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read"), children: [
+        { label: t("inventory.tabs.inspectionTemplates"), href: "/inventory/inspection-templates", show: has("inventory:configure") },
+        { label: t("inventory.tabs.fields"), href: "/inventory/fields", show: has("inventory:configure") },
+      ] },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans, tone: "badge-primary" },
       { label: t("lend.requests.title"), href: "/inventory/requests", show: has("lending:manage"), count: c.loanRequests },
@@ -107,9 +110,9 @@ q.addEventListener("input",function(){
 export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavCounts; path: string }) {
   // Obermenü ohne sichtbare Unterpunkte entfällt, mit genau einem wird zum Link.
   const groups = menuDefinition(user, counts)
-    .map((g) => ({ ...g, items: g.items.filter((i) => i.show) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => i.show).map((i) => ({ ...i, children: i.children?.filter((k) => k.show) ?? [] })) }))
     .filter((g) => g.items.length > 0);
-  const active = findActiveHref(groups.flatMap((g) => g.items.filter((i) => !i.external).map((i) => i.href)), path);
+  const active = findActiveHref(groups.flatMap((g) => g.items.filter((i) => !i.external).flatMap((i) => [i.href, ...i.children.map((k) => k.href)])), path);
   const lc = (s: string) => s.toLowerCase();
 
   return (
@@ -147,7 +150,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
             </li>
           );
         }
-        const open = g.items.some((i) => i.href === active);
+        const open = g.items.some((i) => i.href === active || i.children.some((k) => k.href === active));
         return (
           <li data-nav-top data-label={lc(g.label)}>
             <details name="nav" data-nav open={open} data-active={open ? "" : undefined}>
@@ -157,15 +160,25 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
                 {!open && <span class="is-drawer-close:hidden"><CountBadge count={sum} /></span>}
               </summary>
               <ul class="is-drawer-close:hidden">
-                {g.items.map((i) => (
-                  <li data-label={lc(i.label)}>
-                    <a href={i.href} class={i.href === active ? "menu-active" : ""} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
-                      {i.label as Child}
-                      {i.external && <Icon name="arrow-top-right-on-square" class="h-4 w-4" />}
-                      <CountBadge count={i.count ?? 0} tone={i.tone} />
-                    </a>
-                  </li>
-                ))}
+                {g.items.map((i) => {
+                  const showKids = i.children.length > 0 && (i.href === active || i.children.some((k) => k.href === active));
+                  return (
+                    <li data-label={lc([i.label, ...i.children.map((k) => k.label)].join(" "))}>
+                      <a href={i.href} class={i.href === active ? "menu-active" : ""} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+                        {i.label as Child}
+                        {i.external && <Icon name="arrow-top-right-on-square" class="h-4 w-4" />}
+                        <CountBadge count={i.count ?? 0} tone={i.tone} />
+                      </a>
+                      {showKids && (
+                        <ul>
+                          {i.children.map((k) => (
+                            <li data-label={lc(k.label)}><a href={k.href} class={k.href === active ? "menu-active" : ""}>{k.label}</a></li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </details>
           </li>

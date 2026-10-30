@@ -133,6 +133,8 @@ Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donor
 - Formular-Header: `FormActions` mit `cancelHref` (Abbrechen → `/:id`, Rückfrage bei Änderungen), Verwerfen, Speichern. Kein Löschen im Formular.
 - Ausgenommen: anniversary-years, applications, Einstellungsseiten ohne Datensatz (`/admin/config`, `/organisation`, `/account`).
 
+⚠️ Abweichung im Code: `/inventory/fields` und `/inventory/inspection-templates` nutzen Karten mit Mini-Formularen statt Tabelle, `RowAction`, Detailseite und Kopf-Aktionen; Angleichung siehe Backlog 123.
+
 ## Responsive Schwellen
 
 - **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische Filterleiste und Untermenü. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.
@@ -146,6 +148,7 @@ Bei `pointer: coarse` (Handy, Tablet) sind interaktive Elemente mindestens 44×4
 
 - Sidebar (`src/components/nav-menu.tsx`) statt Tab-Leisten: ab `lg` dauerhaft links (`w-64`, einklappbar auf Icon-Leiste `w-14`), darunter Drawer per Hamburger in der Navbar.
 - Untermenüs sind `<details name="nav">` (Akkordeon); die Menüstruktur steht nur in `menuDefinition()`. Neue Seiten dort eintragen, nicht pro Route.
+- Dritte Ebene: Ein Eintrag kann `children` haben (z. B. Inventar > Bestand > Prüfvorlagen/Felder). Er bleibt ein Link; die Kinder stehen als verschachteltes `<ul>` (daisyUI-`menu`) darunter und sind nur sichtbar, wenn er oder ein Kind aktiv ist. Kinder erscheinen nur bei sichtbarem Eltern-Eintrag.
 - Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen); Obermenü zeigt die Summe, außer es ist aktiv.
 
 ## Icons

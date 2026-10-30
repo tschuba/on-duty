@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { boolean, date, index, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
@@ -114,5 +115,32 @@ export const inventoryFieldValues = pgTable(
     value: text("value"),
   },
   (t) => [uniqueIndex("inventory_field_values_item_field_idx").on(t.inventoryItemId, t.fieldDefId)],
+);
+
+// Prüfarten pro Posten (Feld "inspection"). Ohne dueDate erledigt, ohne Intervall Einmalfrist.
+export const inventoryInspections = pgTable(
+  "inventory_inspections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    inventoryItemId: uuid("inventory_item_id")
+      .notNull()
+      .references(() => inventoryItems.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    intervalMonths: integer("interval_months"),
+    inspectedAt: date("inspected_at"),
+    dueDate: date("due_date"),
+  },
+  (t) => [uniqueIndex("inventory_inspections_item_name_idx").on(t.inventoryItemId, sql`lower(${t.name})`)],
+);
+
+// Zentrale Vorlagen: Name und Intervall werden beim Anlegen einer Prüfart kopiert, nicht verknüpft.
+export const inventoryInspectionTemplates = pgTable(
+  "inventory_inspection_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    defaultIntervalMonths: integer("default_interval_months"),
+  },
+  (t) => [uniqueIndex("inventory_inspection_templates_name_idx").on(sql`lower(${t.name})`)],
 );
 /* v8 ignore stop */

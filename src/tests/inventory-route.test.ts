@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldValues, lendingItems } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldValues, inventoryInspections, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 import { testDetailPageContract } from "./detail-page-contract.js";
 import { t } from "../i18n/index.js";
@@ -14,6 +14,9 @@ let membersFindManyResult: any[] = [];
 let numbersFindManyResult: any[] = [];
 let fieldDefsFindManyResult: any[] = [];
 let fieldValuesFindManyResult: any[] = [];
+let inspectionsFindManyResult: any[] = [];
+let inspectionFindFirstResult: any = undefined;
+let templatesFindManyResult: any[] = [];
 let lendingItemFindFirstResult: any = undefined;
 let lendingItemsFindManyResult: any[] = [];
 let lendingLoanFindFirstResult: any = undefined;
@@ -64,6 +67,11 @@ vi.mock("../db/index.js", () => ({
         findMany: vi.fn(() => Promise.resolve(numbersFindManyResult)),
       },
       inventoryFieldDefs: { findMany: vi.fn(() => Promise.resolve(fieldDefsFindManyResult)) },
+      inventoryInspections: {
+        findMany: vi.fn(() => Promise.resolve(inspectionsFindManyResult)),
+        findFirst: vi.fn(() => Promise.resolve(inspectionFindFirstResult)),
+      },
+      inventoryInspectionTemplates: { findMany: vi.fn(() => Promise.resolve(templatesFindManyResult)) },
       inventoryFieldValues: { findMany: vi.fn(() => Promise.resolve(fieldValuesFindManyResult)) },
       members: {
         findMany: vi.fn(() => Promise.resolve(membersFindManyResult)),
@@ -111,6 +119,9 @@ beforeEach(() => {
   numbersFindManyResult = [];
   fieldDefsFindManyResult = [];
   fieldValuesFindManyResult = [];
+  inspectionsFindManyResult = [];
+  inspectionFindFirstResult = undefined;
+  templatesFindManyResult = [];
   lendingItemFindFirstResult = undefined;
   lendingItemsFindManyResult = [];
   lendingLoanFindFirstResult = undefined;
@@ -122,8 +133,8 @@ function makeItem(overrides: Record<string, unknown> = {}) {
     id: "item1", name: "TSF-W", category: "vehicle",
     commissionedAt: null, numbers: [], purchasePrice: null, notes: null,
     retiredAt: null, retiredReason: null, quantity: 1, retiredQuantity: 0,
-    licensePlate: "ABC-123", yearOfManufacture: 2015, vehicleInspectionDue: "2026-06-01",
-    serials: [], nextInspectionDue: null, lastInspectionDate: null,
+    licensePlate: "ABC-123", yearOfManufacture: 2015,
+    serials: [], inspections: [],
     tags: [], assignments: [],
     ...overrides,
   };
@@ -508,19 +519,19 @@ describe("GET / lending columns", () => {
 
 describe("GET /inspections", () => {
   it("keeps range/rel/dir in the filter form and preset link resets them", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
-    const html = (await (await inventoryRoutes.request("/inspections?category=vehicle&range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
+    const html = (await (await inventoryRoutes.request("/inspections?inspection=HU&range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
     expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="rel" value="P6M"(?![^>]*disabled)/);
-    expect(html).toMatch(/<input type="hidden" name="category" value="vehicle"/);
+    expect(html).toMatch(/<input type="hidden" name="inspection" value="HU"/);
     // Preset-Link: behält category, setzt range auf Preset-Id; rel/dir/start/end fallen weg
     const preset = html.match(/href="(\/inventory\/inspections\?[^"]*range=3m[^"]*)"/)![1];
-    expect(preset).toContain("category=vehicle");
+    expect(preset).toContain("inspection=HU");
     expect(preset).not.toMatch(/rel=|dir=|start=|end=/);
   });
 
   it("marks an overdue item", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
     const res = await inventoryRoutes.request("/inspections?start=1999-01-01&end=2100-01-01");
     const html = await res.text();
     expect(html).toContain("TÜV fällig");
@@ -528,13 +539,141 @@ describe("GET /inspections", () => {
   });
 
   it("shows an overdue item even outside the selected date range", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", vehicleInspectionDue: "2000-01-01" })];
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
     // No start/end query params → route defaults to today..+12 months, which
     // would otherwise hide this item entirely.
     const res = await inventoryRoutes.request("/inspections");
     const html = await res.text();
     expect(html).toContain("TÜV fällig");
     expect(html).toContain("überfällig");
+  });
+});
+
+describe("inspection types", () => {
+  const insp = (id: string, name: string, dueDate: string | null) => ({ id, name, intervalMonths: 12, inspectedAt: null, dueDate });
+
+  it("lists one row per due inspection with its name", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "LF 10", inspections: [insp("p1", "HU", "2000-01-01"), insp("p2", "UVV-Prüfung", "2000-02-01"), insp("p3", "Funk", null)] })];
+    const html = await (await inventoryRoutes.request("/inspections")).text();
+    expect(html).toContain("UVV-Prüfung");
+    expect(html.match(/window\.location=(?:'|&#39;|&quot;)\/inventory\/a/g)?.length).toBe(2);
+  });
+
+  it("shows the earliest open due in the inventory list with a +N badge", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "LF 10", inspections: [insp("p1", "HU", "2030-05-01"), insp("p2", "UVV-Prüfung", "2030-02-01")] })];
+    const html = await (await inventoryRoutes.request("/")).text();
+    expect(html).toContain("UVV-Prüfung");
+    expect(html).toContain("+1");
+  });
+
+  it("filters the inventory list by inspection name and by overdue", async () => {
+    itemsFindManyResult = [
+      makeItem({ id: "a", name: "Alt", inspections: [insp("p1", "HU", "2000-01-01")] }),
+      makeItem({ id: "b", name: "Neu", inspections: [insp("p2", "HU", "2099-01-01")] }),
+      makeItem({ id: "c", name: "Ohne", inspections: [insp("p3", "Druckprüfung", "2000-01-01")] }),
+    ];
+    const html = await (await inventoryRoutes.request("/?inspection=HU&due=overdue")).text();
+    expect(html).toContain(">Alt<");
+    expect(html).not.toContain(">Neu<");
+    expect(html).not.toContain(">Ohne<");
+  });
+
+  it("creates inspections with a new item, ignoring blank rows", async () => {
+    const res = await inventoryRoutes.request("/", {
+      method: "POST",
+      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: ["", ""], insp_name: ["HU", ""], insp_interval: ["24", ""], insp_last: ["", ""], insp_due: ["2027-01-01", ""] } as any),
+    });
+    expect(res.status).toBe(302);
+    const call = insertCalls.find((c) => c.table === inventoryInspections)!;
+    expect(call.values).toEqual([{ inventoryItemId: "new-id", name: "HU", intervalMonths: 24, inspectedAt: null, dueDate: "2027-01-01" }]);
+  });
+
+  it("rejects an invalid inspection row and re-renders the form", async () => {
+    const res = await inventoryRoutes.request("/", {
+      method: "POST",
+      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: "", insp_name: "", insp_interval: "5", insp_last: "", insp_due: "" } as any),
+    });
+    expect(res.status).toBe(422);
+    expect(insertCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+  });
+
+  it("offers the configuration links in the item form (new tab) only with inventory:configure, and no gear in the list", async () => {
+    const plain = await (await inventoryRoutes.request("/new")).text();
+    expect(plain).not.toContain('href="/inventory/inspection-templates"');
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "inventory:configure"]), disabled: false };
+    const html = await (await inventoryRoutes.request("/new")).text();
+    expect(html).toMatch(/href="\/inventory\/inspection-templates" target="_blank"/);
+    expect(html).toMatch(/href="\/inventory\/fields" target="_blank"/);
+    expect(await (await inventoryRoutes.request("/")).text()).not.toContain("Freie Felder");
+  });
+
+  it("warns client-side before saving a due date earlier than the inspection date, server stays permissive", async () => {
+    itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "HU", "2026-06-01")] });
+    const html = await (await inventoryRoutes.request("/item1")).text();
+    expect(html).toContain(t("inventory.inspection.dueBeforeDoneConfirm").slice(0, 20));
+    inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+    itemsFindFirstResult = { retiredAt: null };
+    expect((await inventoryRoutes.request("/item1/inspections/p1/done", { method: "POST", body: formBody({ inspectedAt: "2026-05-20", dueDate: "2026-05-01" }) })).status).toBe(302);
+    expect(updateCalls.at(-1)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: "2026-05-01" });
+  });
+
+  it("renames swapped inspections via a temporary name first", async () => {
+    itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "A", null), insp("p2", "B", null)] });
+    const res = await inventoryRoutes.request("/item1", {
+      method: "POST",
+      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: ["p1", "p2"], insp_name: ["B", "A"], insp_interval: ["", ""], insp_last: ["", ""], insp_due: ["", ""] } as any),
+    });
+    expect(res.status).toBe(302);
+    const sets = updateCalls.filter((c) => c.table === inventoryInspections).map((c) => c.set.name);
+    expect(sets).toEqual(["__tmp_p1", "__tmp_p2", "B", "A"]);
+  });
+
+  it("names a duplicate inspection collision instead of blaming the inventory number", async () => {
+    transaction.mockRejectedValueOnce({ code: "23505", constraint: "inventory_inspections_item_name_idx" });
+    const res = await inventoryRoutes.request("/", {
+      method: "POST",
+      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: "", insp_name: "HU", insp_interval: "", insp_last: "", insp_due: "" } as any),
+    });
+    expect(res.status).toBe(422);
+    const html = await res.text();
+    expect(html).toContain(t("inventory.form.inspectionError.duplicate"));
+    expect(html).not.toContain(t("inventory.form.numberRace"));
+  });
+
+  describe("POST /:id/inspections/:inspectionId/done", () => {
+    const post = (fields: Record<string, string>) => inventoryRoutes.request("/item1/inspections/p1/done", { method: "POST", body: formBody(fields) });
+
+    it("404s for an unknown inspection", async () => {
+      expect((await post({ inspectedAt: "2026-01-01" })).status).toBe(404);
+    });
+
+    it("anchors the new due date on the old one", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      await post({ inspectedAt: "2026-05-20" });
+      expect(updateCalls.find((c) => c.table === inventoryInspections)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: "2027-06-01" });
+    });
+
+    it("takes the overridden due date and clears it without an interval", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      await post({ inspectedAt: "2026-05-20", dueDate: "2027-01-15" });
+      expect(updateCalls.at(-1)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: "2027-01-15" });
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: null, dueDate: "2026-06-01" };
+      await post({ inspectedAt: "2026-05-20", dueDate: "2027-01-15" });
+      expect(updateCalls.at(-1)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: null });
+    });
+
+    it("refuses a retired item", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      itemsFindFirstResult = { retiredAt: "2026-01-01" };
+      await post({ inspectedAt: "2026-05-20" });
+      expect(updateCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+    });
+
+    it("rejects a future inspection date", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      await post({ inspectedAt: "2999-01-01" });
+      expect(updateCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+    });
   });
 });
 
