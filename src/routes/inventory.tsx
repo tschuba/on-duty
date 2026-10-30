@@ -586,6 +586,19 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <TagInput tags={v.tagsList} />
 
+      <div class="space-y-2">
+        <div class="divider">{t("inventory.form.fields")}</div>
+        <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields" data-preset={v.enabledFieldsList ? undefined : JSON.stringify(FIELD_PRESETS)}>
+          {INVENTORY_FIELDS.map((f) => (
+            <label class="label cursor-pointer justify-start gap-2 w-fit">
+              <input type="checkbox" name="enabledFields" value={f} checked={hasField(v.enabledFieldsList, f)} class="checkbox" onchange="updateInventoryFormVisibility()" />
+              <span class="text-sm">{t(`inventory.field.${f}`)}</span>
+            </label>
+          ))}
+        </div>
+        {errors?.enabledFields && <span class="text-error text-sm">{errors.enabledFields}</span>}
+      </div>
+
       <div data-show-cats="vehicle" class="space-y-4">
         <div class="divider">{CATEGORY_LABELS.vehicle}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -618,19 +631,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             </Field>
           </div>
         </div>
-      </div>
-
-      <div class="space-y-2">
-        <div class="divider">{t("inventory.form.fields")}</div>
-        <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields" data-preset={v.enabledFieldsList ? undefined : JSON.stringify(FIELD_PRESETS)}>
-          {INVENTORY_FIELDS.map((f) => (
-            <label class="label cursor-pointer justify-start gap-2 w-fit">
-              <input type="checkbox" name="enabledFields" value={f} checked={hasField(v.enabledFieldsList, f)} class="checkbox" onchange="updateInventoryFormVisibility()" />
-              <span class="text-sm">{t(`inventory.field.${f}`)}</span>
-            </label>
-          ))}
-        </div>
-        {errors?.enabledFields && <span class="text-error text-sm">{errors.enabledFields}</span>}
       </div>
 
       <div data-field="quantity" class="space-y-4">
@@ -787,6 +787,7 @@ async function resolveFree(values: InventoryFieldValues, stored: { fieldDefId: s
   }
   if (invalid.length > 0) return { rows, error: t("inventory.form.freeFieldInvalid", { fields: invalid.join(", ") }) };
   const locked = stored.filter((r) => r.value != null && raw[r.fieldDefId] === undefined).map((r) => byId.get(r.fieldDefId)?.name ?? "");
+  for (const r of stored) if (r.value != null && raw[r.fieldDefId] === undefined) raw[r.fieldDefId] = r.value;
   if (locked.length > 0) return { rows, error: t("inventory.form.freeFieldLocked", { fields: locked.join(", ") }) };
   return { rows };
 }
@@ -1376,6 +1377,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
       activeLoans: openLoan ? 1 : 0,
     };
     const blocked = lockedFields.filter((f) => !isFieldEmpty(f, state));
+    if (blocked.length > 0) values.enabledFieldsList = [...(values.enabledFieldsList ?? []), ...blocked];
     if (blocked.length > 0) errors.enabledFields = t("inventory.form.fieldLocked", { fields: blocked.map((f) => t(`inventory.field.${f}`)).join(", ") });
   }
 

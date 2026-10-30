@@ -774,7 +774,10 @@ describe("enabled fields lock", () => {
     itemsFindFirstResult = makeItem({ enabledFields: ["numbers"], numbers: [{ number: "A1" }] });
     const res = await post("/item1", { name: "Helm", category: "equipment" });
     expect(res.status).toBe(422);
-    expect(await res.text()).toContain(t("inventory.form.fieldLocked", { fields: t("inventory.field.numbers") }));
+    const html = await res.text();
+    expect(html).toContain(t("inventory.form.fieldLocked", { fields: t("inventory.field.numbers") }));
+    // the blocked field stays selected so the user can empty it
+    expect(html).toMatch(/name="enabledFields"[^>]*value="numbers"[^>]*checked|name="enabledFields"[^>]*checked[^>]*value="numbers"/);
     expect(updateCalls.some((c) => c.table === inventoryItems)).toBe(false);
   });
 
