@@ -5,7 +5,7 @@ import { memberRoleAssignments, memberRoles } from "./roles";
 import { donors, donations } from "./donations";
 import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues } from "./inventory";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections } from "./inventory";
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
 import { events, eventTags, eventVisibleRoles } from "./events";
 import { appRoles } from "./permissions";
@@ -53,6 +53,11 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => (
   serials: many(inventoryItemSerials),
   lendingItem: many(lendingItems),
   fieldValues: many(inventoryFieldValues),
+  inspections: many(inventoryInspections),
+}));
+
+export const inventoryInspectionsRelations = relations(inventoryInspections, ({ one }) => ({
+  item: one(inventoryItems, { fields: [inventoryInspections.inventoryItemId], references: [inventoryItems.id] }),
 }));
 
 export const inventoryFieldDefsRelations = relations(inventoryFieldDefs, ({ many }) => ({

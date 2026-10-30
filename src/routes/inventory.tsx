@@ -3,7 +3,7 @@ import { ToggleFilter } from "../components/toggle-filter.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import type { IconName } from "../components/icons.generated.js";
@@ -18,10 +18,10 @@ import { trimmed, parseTags, parseList } from "../lib/forms.js";
 import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID, tagSuggestionsJson } from "../lib/tags.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
+import { addDays, addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { generateInspectionDueItems, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -43,7 +43,8 @@ type MemberRow = typeof members.$inferSelect;
 type Person = { firstName: string; lastName: string };
 type AssignmentWithMember = typeof inventoryItemAssignments.$inferSelect & { member: MemberRow & { person: Person } };
 type FreeDef = typeof inventoryFieldDefs.$inferSelect;
-type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[]; fieldValues?: (typeof inventoryFieldValues.$inferSelect & { fieldDef: FreeDef })[] };
+type Inspection = typeof inventoryInspections.$inferSelect;
+type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[]; inspections: Inspection[]; fieldValues?: (typeof inventoryFieldValues.$inferSelect & { fieldDef: FreeDef })[] };
 
 const CATEGORY_CONFIG: { category: InventoryCategory; icon: IconName }[] = [
   { category: "vehicle", icon: "firetruck" },
@@ -101,10 +102,11 @@ export type InventoryFieldValues = {
   tagsList?: string[];
   licensePlate: string;
   yearOfManufacture: string;
-  vehicleInspectionDue: string;
   serialsList?: string[];
-  nextInspectionDue: string;
-  lastInspectionDate: string;
+  // Prüfarten (Feld "inspection"): Zeilen roh fürs Rendern, Fehler je Zeilenindex, Vorschläge fürs <datalist>.
+  inspectionRows?: InspectionFormRow[];
+  inspectionErrors?: Record<number, InspectionRowError>;
+  inspectionSuggestions?: { name: string; intervalMonths: number | null }[];
   quantity: string;
   // Single-item mode (quantity 1): one optional assignment, same UI as before.
   assignedMemberId: string;
@@ -131,9 +133,6 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     notes: trimmed(body, "notes"),
     licensePlate: trimmed(body, "licensePlate"),
     yearOfManufacture: trimmed(body, "yearOfManufacture"),
-    vehicleInspectionDue: trimmed(body, "vehicleInspectionDue"),
-    nextInspectionDue: trimmed(body, "nextInspectionDue"),
-    lastInspectionDate: trimmed(body, "lastInspectionDate"),
     quantity: trimmed(body, "quantity") || "1",
     assignedMemberId: trimmed(body, "assignedMemberId"),
     assignments: trimmed(body, "assignments") || "[]",
@@ -214,7 +213,6 @@ export function toInsertValues(values: InventoryFieldValues) {
   const enabledFields = values.enabledFieldsList ?? [];
   const hasQuantity = hasField(enabledFields, "quantity");
   const quantity = hasQuantity ? Math.max(1, Math.round(Number(values.quantity)) || 1) : 1;
-  const hasInspection = hasField(enabledFields, "inspection");
   const hasLocation = hasField(enabledFields, "location");
   return {
     name: values.name,
@@ -226,9 +224,6 @@ export function toInsertValues(values: InventoryFieldValues) {
     enabledFields: [...enabledFields],
     licensePlate: category === "vehicle" ? values.licensePlate || null : null,
     yearOfManufacture: category === "vehicle" && values.yearOfManufacture ? Number(values.yearOfManufacture) : null,
-    vehicleInspectionDue: category === "vehicle" && hasInspection ? values.vehicleInspectionDue || null : null,
-    nextInspectionDue: category !== "vehicle" && hasInspection ? values.nextInspectionDue || null : null,
-    lastInspectionDate: category !== "vehicle" && hasInspection ? values.lastInspectionDate || null : null,
     locationText: hasLocation ? values.locationText || null : null,
     latitude: hasLocation ? values.latitude || null : null,
     longitude: hasLocation ? values.longitude || null : null,
@@ -518,6 +513,47 @@ const CATEGORY_TOGGLE_SCRIPT = `
   updateInventoryFormVisibility();
 `;
 
+const INSPECTION_ROWS_SCRIPT = `
+  function addInspectionRow() {
+    document.getElementById('inspection-rows').appendChild(document.getElementById('inspection-row-template').content.cloneNode(true));
+  }
+  // "Aus Vorlage": Name aus dem <datalist> gewählt/getippt -> Standardintervall vorbelegen (nur wenn noch leer).
+  document.addEventListener('change', function(e) {
+    if (e.target.name !== 'insp_name') return;
+    var interval = e.target.closest('[data-inspection-row]').querySelector('[name=insp_interval]');
+    if (interval.value) return;
+    var wanted = e.target.value.trim().toLowerCase();
+    var opt = Array.prototype.find.call(document.querySelectorAll('#inspection-names option'), function(o) { return o.value.toLowerCase() === wanted; });
+    if (opt && opt.dataset.interval) interval.value = opt.dataset.interval;
+  });
+`;
+
+function InspectionRowFields({ row, error }: { row: InspectionFormRow; error?: InspectionRowError }) {
+  return (
+    <div data-inspection-row class="space-y-1">
+      <input type="hidden" name="insp_id" value={row.id} />
+      <div class="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-start">
+        <Field label={t("inventory.form.inspectionName")} class="col-span-2 sm:col-span-1">
+          <input type="text" name="insp_name" list="inspection-names" maxlength={INSPECTION_NAME_MAX} value={row.name} class={`input w-full${error === "name" || error === "nameLength" || error === "duplicate" ? " input-error" : ""}`} placeholder={t("inventory.form.inspectionName")} />
+        </Field>
+        <Field label={t("inventory.form.inspectionInterval")}>
+          <input type="number" name="insp_interval" min="1" max="120" value={row.interval} class={`input w-full${error === "interval" ? " input-error" : ""}`} placeholder={t("inventory.form.inspectionInterval")} />
+        </Field>
+        <Field label={t("inventory.form.inspectionLast")}>
+          <input type="date" name="insp_last" value={row.last} class={`input w-full${error === "future" ? " input-error" : ""}`} />
+        </Field>
+        <Field label={t("inventory.form.inspectionDue")}>
+          <input type="date" name="insp_due" value={row.due} class={`input w-full${error === "date" ? " input-error" : ""}`} />
+        </Field>
+        <button type="button" class="btn btn-ghost btn-square" aria-label={t("common.delete")} title={t("common.delete")} onclick="this.closest('[data-inspection-row]').remove()">
+          <Icon name="trash" class="h-5 w-5" />
+        </button>
+      </div>
+      {error && <span class="text-error text-sm">{t(`inventory.form.inspectionError.${error}`)}</span>}
+    </div>
+  );
+}
+
 export function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
   values?: Partial<InventoryFieldValues>;
   errors?: Record<string, string>;
@@ -614,23 +650,16 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <div data-field="inspection" class="space-y-4">
         <div class="divider">{t("inventory.form.sectionInspection")}</div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div data-show-cats="vehicle">
-            <Field label={t("inventory.form.vehicleInspectionDue")}>
-              <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input w-full" />
-            </Field>
-          </div>
-          <div data-show-cats="scba,equipment,ppe,other">
-            <Field label={t("inventory.form.lastInspectionDate")}>
-              <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input w-full" />
-            </Field>
-          </div>
-          <div data-show-cats="scba,equipment,ppe,other">
-            <Field label={t("inventory.form.nextInspectionDue")}>
-              <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input w-full" />
-            </Field>
-          </div>
+        {errors?.inspections && <span class="text-error text-sm">{errors.inspections}</span>}
+        <datalist id="inspection-names">
+          {(v.inspectionSuggestions ?? []).map((sug) => <option value={sug.name} data-interval={sug.intervalMonths ?? ""} />)}
+        </datalist>
+        <div id="inspection-rows" class="space-y-3">
+          {(v.inspectionRows ?? []).map((r, i) => <InspectionRowFields row={r} error={v.inspectionErrors?.[i]} />)}
         </div>
+        <template id="inspection-row-template"><InspectionRowFields row={{ id: "", name: "", interval: "", last: "", due: "" }} /></template>
+        <button type="button" class="btn btn-sm" onclick="addInspectionRow()">{t("inventory.form.addInspection")}</button>
+        <script dangerouslySetInnerHTML={{ __html: INSPECTION_ROWS_SCRIPT }} />
       </div>
 
       <div data-field="quantity" class="space-y-4">
@@ -736,7 +765,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
 async function fetchItems(): Promise<ItemWithRelations[]> {
   return db.query.inventoryItems.findMany({
-    with: { tags: true, numbers: true, serials: true, fieldValues: { with: { fieldDef: true } }, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, inspections: true, fieldValues: { with: { fieldDef: true } }, assignments: { with: { member: { with: { person: true } } } } },
     orderBy: (items, { asc }) => [asc(items.name)],
   }) as unknown as Promise<ItemWithRelations[]>;
 }
@@ -744,7 +773,7 @@ async function fetchItems(): Promise<ItemWithRelations[]> {
 async function fetchItem(id: string): Promise<ItemWithRelations | undefined> {
   return db.query.inventoryItems.findFirst({
     where: eq(inventoryItems.id, id),
-    with: { tags: true, numbers: true, serials: true, fieldValues: { with: { fieldDef: true } }, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, inspections: true, fieldValues: { with: { fieldDef: true } }, assignments: { with: { member: { with: { person: true } } } } },
   }) as unknown as Promise<ItemWithRelations | undefined>;
 }
 
@@ -757,6 +786,23 @@ async function resolveAssignmentNames(assignments: { memberId: string; quantity:
   return assignments.map((a) => ({ ...a, name: byId.get(a.memberId) ?? "" }));
 }
 
+const inspectionValues = (r: InspectionFormRow) => ({
+  name: r.name,
+  intervalMonths: r.interval ? Number(r.interval) : null,
+  inspectedAt: r.last || null,
+  dueDate: r.due || null,
+});
+
+// Vorschläge fürs Namens-<datalist>: Vorlagen (mit Standardintervall) plus bereits an Posten verwendete Namen.
+async function inspectionSuggestions(): Promise<{ name: string; intervalMonths: number | null }[]> {
+  const templates = (await db.query.inventoryInspectionTemplates.findMany()) as (typeof inventoryInspectionTemplates.$inferSelect)[];
+  const used = (await db.query.inventoryInspections.findMany({ columns: { name: true } })) as { name: string }[];
+  const byName = new Map<string, { name: string; intervalMonths: number | null }>();
+  for (const u of used) byName.set(u.name.toLowerCase(), { name: u.name, intervalMonths: null });
+  for (const tpl of templates) byName.set(tpl.name.toLowerCase(), { name: tpl.name, intervalMonths: tpl.defaultIntervalMonths });
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
+}
+
 // Freie Felder fürs Formular: aktive (nicht archivierte oder am Posten schon vorhandene) Definitionen plus aktuelle Rohwerte.
 async function withFree(values: Partial<InventoryFieldValues>, itemId?: string): Promise<Partial<InventoryFieldValues>> {
   const defs = (await db.query.inventoryFieldDefs.findMany({ orderBy: (d: any, { asc }: any) => [asc(d.name)] })) as FreeDef[];
@@ -766,7 +812,12 @@ async function withFree(values: Partial<InventoryFieldValues>, itemId?: string):
     raw = Object.fromEntries(rows.map((r: any) => [r.fieldDefId, r.value ?? ""]));
   }
   raw ??= {};
-  return { ...values, freeRaw: raw, freeDefs: defs.filter((d) => !d.archived || raw![d.id] !== undefined) };
+  let inspectionRows = values.inspectionRows;
+  if (!inspectionRows && itemId) {
+    const rows = (await db.query.inventoryInspections.findMany({ where: eq(inventoryInspections.inventoryItemId, itemId) })) as Inspection[];
+    inspectionRows = rows.sort((a, b) => a.name.localeCompare(b.name, "de")).map((r) => ({ id: r.id, name: r.name, interval: r.intervalMonths ? String(r.intervalMonths) : "", last: r.inspectedAt ?? "", due: r.dueDate ?? "" }));
+  }
+  return { ...values, freeRaw: raw, freeDefs: defs.filter((d) => !d.archived || raw![d.id] !== undefined), inspectionRows: inspectionRows ?? [], inspectionSuggestions: await inspectionSuggestions() };
 }
 
 // Abgeschickte freie Felder gegen ihre Definitionen prüfen. stored = bisherige Wertezeilen des Postens (nur beim Bearbeiten):
@@ -802,6 +853,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const q = c.req.query();
   const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const tagFilter = c.req.queries("tag") ?? [];
+  const inspectionFilter = c.req.queries("inspection") ?? [];
+  const dueFilter = parseMulti(c.req.queries("due"), ["overdue", "soon"]);
   const search = (q.q ?? "").trim();
   const showArchived = q.archived === "1";
   const canSeeLending = user.permissions.has("lending:read");
@@ -823,8 +876,19 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   }
   const allTags = [...new Set(all.flatMap((item) => item.tags.map((t) => t.tag)))].sort((a, b) => a.localeCompare(b, "de"));
 
+  const inspectionNames = distinctInspectionNames(all.flatMap((item) => item.inspections));
+  const today = new Date().toISOString().slice(0, 10);
+  const soonEnd = addDays(today, 30);
+  const wantedNames = new Set(inspectionFilter.map((n) => n.toLowerCase()));
+
   const filtered = all.filter((item) => {
     if (!showArchived && item.retiredAt) return false;
+    if (inspectionFilter.length > 0 || dueFilter.length > 0) {
+      const candidates = item.inspections.filter((r) => wantedNames.size === 0 || wantedNames.has(r.name.toLowerCase()));
+      const matches = (r: Inspection) => dueFilter.length === 0
+        || (r.dueDate != null && ((dueFilter.includes("overdue") && r.dueDate < today) || (dueFilter.includes("soon") && r.dueDate >= today && r.dueDate <= soonEnd)));
+      if (!candidates.some(matches)) return false;
+    }
     if (categoryFilter.length > 0 && !categoryFilter.includes(item.category)) return false;
     if (tagFilter.length > 0 && !tagFilter.every((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
@@ -841,10 +905,10 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const page = Math.min(reqPage, totalPages);
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, pageSize }, { page: p });
+  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, pageSize }, { page: p });
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
+    buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
   const columnCount = 7 + (canLend ? 1 : 0);
 
   return c.html(
@@ -877,6 +941,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           </label>
           {categoryFilter.map((v) => <input type="hidden" name="category" value={v} />)}
           {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
+          {inspectionFilter.map((v) => <input type="hidden" name="inspection" value={v} />)}
+          {dueFilter.map((v) => <input type="hidden" name="due" value={v} />)}
           {showArchived && <input type="hidden" name="archived" value="1" />}
           {lendableOnly && <input type="hidden" name="lendable" value="1" />}
         </form>
@@ -904,6 +970,27 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           emptyLabel={t("inventory.filter.noTags")}
         />
 
+        <MultiSelectFilter
+          param="inspection"
+          autoApply
+          options={inspectionNames.map((n) => ({ value: n, label: n }))}
+          selected={inspectionFilter}
+          allLabel={t("inventory.filter.allInspections")}
+          countLabel={(count) => t("inventory.filter.inspectionCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
+        <MultiSelectFilter
+          param="due"
+          autoApply
+          options={[{ value: "overdue", label: t("inventory.filter.dueOverdue") }, { value: "soon", label: t("inventory.filter.dueSoon") }]}
+          selected={dueFilter}
+          allLabel={t("inventory.filter.allDue")}
+          countLabel={(count) => t("inventory.filter.dueCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
+
         <ToggleFilter items={[
           { label: t("inventory.filter.showArchived"), checked: showArchived, href: qs({ archived: showArchived ? undefined : "1" }) },
           ...(canSeeLending ? [{ label: t("inventory.filter.lendable"), checked: lendableOnly, href: qs({ lendable: lendableOnly ? undefined : "1" }) }] : []),
@@ -929,14 +1016,18 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           {pageItems.length === 0 ? (
             <tr><td colspan={columnCount} class="text-center opacity-50 py-8">{t("inventory.table.empty")}</td></tr>
           ) : pageItems.map((item) => {
-            const due = item.category === "vehicle" ? item.vehicleInspectionDue : item.nextInspectionDue;
+            const open = item.inspections.filter((r) => r.dueDate).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!) || a.name.localeCompare(b.name, "de"));
+            const due = open[0];
             const lending = lendingByItem.get(item.id);
             const status = itemStatus(item, !!lending);
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}'`}>
                 <td>{item.name}</td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
-                <td class="hidden md:table-cell">{due ? formatDate(due) : "—"}</td>
+                <td class="hidden md:table-cell">
+                  {due ? <span class={due.dueDate! < today ? "text-error font-semibold" : ""}>{formatDate(due.dueDate!)} <span class="opacity-60">{due.name}</span></span> : "—"}
+                  {open.length > 1 && <span class="badge badge-ghost badge-sm ml-1">+{open.length - 1}</span>}
+                </td>
                 <td class="hidden lg:table-cell">{item.locationText || "—"}</td>
                 <td class="hidden lg:table-cell">
                   <div class="flex flex-wrap gap-1">
@@ -993,6 +1084,13 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     </Layout>
   );
 });
+
+// Erste Schreibweise je Prüfart-Name, ohne Beachtung der Groß-/Kleinschreibung, alphabetisch.
+function distinctInspectionNames(rows: { name: string }[]): string[] {
+  const byLower = new Map<string, string>();
+  for (const r of rows) if (!byLower.has(r.name.toLowerCase())) byLower.set(r.name.toLowerCase(), r.name);
+  return [...byLower.values()].sort((a, b) => a.localeCompare(b, "de"));
+}
 
 // Flat display list for an item's assignments — batch chip list and the single-
 // item picker's selected name both read from this.
@@ -1157,6 +1255,10 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   if (numbersError) errors.numbers = numbersError;
   const serialsError = validateSerials(serials, insertValues.quantity);
   if (serialsError) errors.serials = serialsError;
+  const { rows: inspectionRows, errors: inspectionErrors } = hasField(values.enabledFieldsList, "inspection")
+    ? parseInspectionRows(body, new Date().toISOString().slice(0, 10))
+    : { rows: [] as InspectionFormRow[], errors: {} as Record<number, InspectionRowError> };
+  if (Object.keys(inspectionErrors).length > 0) errors.inspections = t("inventory.form.inspectionsInvalid");
   const free = await resolveFree(values);
   if (free.error) errors.freeFields = free.error;
   const wantsLendable = trimmed(body, "lendable") === "1";
@@ -1179,7 +1281,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           title={t("inventory.newItem")}
           action="/inventory"
           formId="inventory-new-form"
-          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials })}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors })}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1204,6 +1306,9 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     if (serials.length > 0) {
       await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: item.id, serial })));
     }
+    if (inspectionRows.length > 0) {
+      await tx.insert(inventoryInspections).values(inspectionRows.map((r) => ({ inventoryItemId: item.id, ...inspectionValues(r) })));
+    }
     if (free.rows.length > 0) {
       await tx.insert(inventoryFieldValues).values(free.rows.map((r) => ({ inventoryItemId: item.id, ...r })));
     }
@@ -1223,7 +1328,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
         <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
-          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials })} errors={errors}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors })} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired })} />
       </Layout>,
       422
@@ -1291,10 +1396,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     notes: item.notes ?? "",
     licensePlate: item.licensePlate ?? "",
     yearOfManufacture: item.yearOfManufacture ? String(item.yearOfManufacture) : "",
-    vehicleInspectionDue: item.vehicleInspectionDue ?? "",
     serialsList: sortedSerials(item),
-    nextInspectionDue: item.nextInspectionDue ?? "",
-    lastInspectionDate: item.lastInspectionDate ?? "",
     quantity: String(item.quantity),
     assignedMemberId: !isBatch ? (assignmentList[0]?.memberId ?? "") : "",
     tagsList: item.tags.map((tg) => tg.tag),
@@ -1361,6 +1463,10 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   if (numbersError) errors.numbers = numbersError;
   const serialsError = validateSerials(serials, insertValues.quantity);
   if (serialsError) errors.serials = serialsError;
+  const { rows: inspectionRows, errors: inspectionErrors } = hasField(values.enabledFieldsList, "inspection")
+    ? parseInspectionRows(body, new Date().toISOString().slice(0, 10))
+    : { rows: [] as InspectionFormRow[], errors: {} as Record<number, InspectionRowError> };
+  if (Object.keys(inspectionErrors).length > 0) errors.inspections = t("inventory.form.inspectionsInvalid");
 
   // Sperre: ein Feld lässt sich nur abwählen, solange es am gespeicherten Posten leer ist (nichts geht still verloren).
   const lockedFields = INVENTORY_FIELDS.filter((f) => hasField(existing.enabledFields, f) && !hasField(insertValues.enabledFields, f));
@@ -1373,7 +1479,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     const state = {
       quantity: existing.quantity, retiredQuantity: existing.retiredQuantity, numbers: existing.numbers.length, serials: existing.serials.length,
       assignments: existing.assignments.length, locationText: existing.locationText, latitude: existing.latitude, longitude: existing.longitude,
-      vehicleInspectionDue: existing.vehicleInspectionDue, nextInspectionDue: existing.nextInspectionDue, lastInspectionDate: existing.lastInspectionDate,
+      inspections: existing.inspections.length,
       activeLoans: openLoan ? 1 : 0,
     };
     const blocked = lockedFields.filter((f) => !isFieldEmpty(f, state));
@@ -1421,7 +1527,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
           cancelHref={`/inventory/${id}`}
-          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }, id)}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors }, id)}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1450,6 +1556,10 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     if (serials.length > 0) {
       await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: id, serial })));
     }
+    const { insert, update, deleteIds } = diffInspections(existing.inspections.map((r) => r.id), inspectionRows);
+    if (deleteIds.length > 0) await tx.delete(inventoryInspections).where(inArray(inventoryInspections.id, deleteIds));
+    for (const r of update) await tx.update(inventoryInspections).set(inspectionValues(r)).where(and(eq(inventoryInspections.id, r.id), eq(inventoryInspections.inventoryItemId, id)));
+    if (insert.length > 0) await tx.insert(inventoryInspections).values(insert.map((r) => ({ inventoryItemId: id, ...inspectionValues(r) })));
     await tx.delete(inventoryFieldValues).where(eq(inventoryFieldValues.inventoryItemId, id));
     if (free.rows.length > 0) {
       await tx.insert(inventoryFieldValues).values(free.rows.map((r) => ({ inventoryItemId: id, ...r })));
@@ -1474,7 +1584,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     return c.html(
       <Layout title={existing.name} user={user}>
         <InventoryForm title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
-          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }, id)} errors={errors}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors }, id)} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames}
           lendable={lendableField(user, wantsLendable, { error: lendableError })} />
       </Layout>,
@@ -1527,20 +1637,20 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
   const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) });
   const { start, end } = range;
-  const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
+  const inspectionFilter = c.req.queries("inspection") ?? [];
 
   const all = await fetchItems();
-  // Überfällige Posten immer anzeigen, unabhängig vom Zeitraum-Filter — sonst
+  const inspectionNames = distinctInspectionNames(all.flatMap((item) => item.inspections));
+  // Überfällige Prüfarten immer anzeigen, unabhängig vom Zeitraum-Filter — sonst
   // verschwinden sie aus der Liste, sobald "start" nicht mehr in der Vergangenheit liegt.
-  const overdueItems = generateInspectionDueItems(all, "0000-01-01", today);
-  const dueInRange = generateInspectionDueItems(all, start, end);
-  const seen = new Set(overdueItems.map((d) => d.id));
-  let due = [...overdueItems, ...dueInRange.filter((d) => !seen.has(d.id))].sort(
-    (a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, "de"),
+  const overdueItems = generateInspectionDueItems(all, "0000-01-01", today, inspectionFilter);
+  const dueInRange = generateInspectionDueItems(all, start, end, inspectionFilter);
+  const seen = new Set(overdueItems.map((d) => d.inspectionId));
+  const due = [...overdueItems, ...dueInRange.filter((d) => !seen.has(d.inspectionId))].sort(
+    (a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, "de") || a.inspectionName.localeCompare(b.inspectionName, "de"),
   );
-  if (categoryFilter.length > 0) due = due.filter((d) => categoryFilter.includes(d.category));
 
-  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { ...rangeParams(range), category: categoryFilter }, extra);
+  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { ...rangeParams(range), inspection: inspectionFilter }, extra);
   const presets = rangePresets(today, "future");
 
   return c.html(
@@ -1549,15 +1659,15 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/inspections"
-          hidden={categoryFilter.map((cat): [string, string] => ["category", cat])} href={(p) => qs(p)} />
+          hidden={inspectionFilter.map((n): [string, string] => ["inspection", n])} href={(p) => qs(p)} />
         <div class="self-end">
           <MultiSelectFilter
-            param="category"
+            param="inspection"
             autoApply
-            options={CATEGORIES.filter((c) => c !== "other").map((cat) => ({ value: cat, label: CATEGORY_LABELS[cat] }))}
-            selected={categoryFilter}
-            allLabel={t("inventory.filter.allCategories")}
-            countLabel={(count) => t("inventory.filter.categoryCount", { count })}
+            options={inspectionNames.map((n) => ({ value: n, label: n }))}
+            selected={inspectionFilter}
+            allLabel={t("inventory.filter.allInspections")}
+            countLabel={(count) => t("inventory.filter.inspectionCount", { count })}
             applyLabel={t("common.apply")}
             resetLabel={t("common.reset")}
           />
@@ -1571,7 +1681,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
           <thead>
             <tr>
               <th>{t("inventory.inspections.table.item")}</th>
-              <th>{t("inventory.inspections.table.category")}</th>
+              <th>{t("inventory.inspections.table.inspection")}</th>
               <th>{t("inventory.inspections.table.dueDate")}</th>
             </tr>
           </thead>
@@ -1579,9 +1689,9 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
             {due.map((d) => {
               const overdue = d.dueDate < today;
               return (
-                <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${d.id}'`}>
+                <tr key={d.inspectionId} class="cursor-pointer hover" onclick={`window.location='/inventory/${d.id}'`}>
                   <td class={overdue ? "text-error font-semibold" : ""}>{d.name}</td>
-                  <td><CategoryBadge category={d.category} /></td>
+                  <td>{d.inspectionName}</td>
                   <td class={overdue ? "text-error font-semibold" : ""}>{formatDate(d.dueDate)} {overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
                 </tr>
               );
@@ -1642,6 +1752,86 @@ inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending
   );
 });
 
+function InspectionList({ item, canManage, today }: { item: ItemWithRelations; canManage: boolean; today: string }) {
+  const rows = item.inspections.slice().sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || a.name.localeCompare(b.name, "de"));
+  return (
+    <div class="mt-6 max-w-2xl">
+      <div class="text-sm opacity-60">{t("inventory.field.inspection")}</div>
+      <table class="table w-full">
+        <thead>
+          <tr>
+            <th>{t("inventory.form.inspectionName")}</th>
+            <th>{t("inventory.form.inspectionLast")}</th>
+            <th>{t("inventory.form.inspectionDue")}</th>
+            {canManage && <th></th>}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const overdue = r.dueDate != null && r.dueDate < today;
+            const next = nextDueDate(r.dueDate, r.intervalMonths, today) ?? "";
+            const dialogId = `inspection-done-${r.id}`;
+            return (
+              <tr>
+                <td>{r.name}{r.intervalMonths ? <span class="opacity-60 text-sm"> · {t("inventory.inspection.everyMonths", { count: r.intervalMonths })}</span> : null}</td>
+                <td>{r.inspectedAt ? formatDate(r.inspectedAt) : "—"}</td>
+                <td class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
+                {canManage && (
+                  <td class="text-right">
+                    <button type="button" class="btn btn-sm" onclick={`document.getElementById('${dialogId}').showModal()`}>{t("inventory.inspection.markDone")}</button>
+                    <dialog id={dialogId} class="modal text-left">
+                      <div class="modal-box">
+                        <h3 class="font-bold text-lg">{t("inventory.inspection.doneTitle", { name: r.name })}</h3>
+                        <form method="post" action={`/inventory/${item.id}/inspections/${r.id}/done`} class="space-y-2 mt-2">
+                          <Field label={t("inventory.inspection.doneDate")}>
+                            <input type="date" name="inspectedAt" value={today} max={today} required class="input w-full" />
+                          </Field>
+                          {r.intervalMonths && (
+                            <Field label={t("inventory.form.inspectionDue")} hint={t("inventory.inspection.dueHint")}>
+                              <input type="date" name="dueDate" value={next} class="input w-full" />
+                            </Field>
+                          )}
+                          <div class="modal-action">
+                            <button type="button" class="btn" onclick={`document.getElementById('${dialogId}').close()`}>{t("common.cancel")}</button>
+                            <button type="submit" class="btn btn-primary">{t("inventory.inspection.markDone")}</button>
+                          </div>
+                        </form>
+                      </div>
+                      <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+                    </dialog>
+                  </td>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// POST /inventory/:id/inspections/:inspectionId/done — Prüfdatum setzen, neue Fälligkeit nach nextDueDate (im Dialog überschreibbar).
+inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("inventory:manage"), async (c) => {
+  const id = c.req.param("id");
+  const inspection = await db.query.inventoryInspections.findFirst({
+    where: and(eq(inventoryInspections.id, c.req.param("inspectionId")), eq(inventoryInspections.inventoryItemId, id)),
+  });
+  if (!inspection) return c.notFound();
+  const body = await c.req.parseBody();
+  const today = new Date().toISOString().slice(0, 10);
+  const inspectedAt = trimmed(body, "inspectedAt");
+  const override = trimmed(body, "dueDate");
+  const valid = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d));
+  if (!valid(inspectedAt) || inspectedAt > today || (override && !valid(override))) {
+    setFlash(c, t("inventory.inspection.invalidDone"), "error");
+    return c.redirect(`/inventory/${id}`);
+  }
+  const dueDate = inspection.intervalMonths ? override || nextDueDate(inspection.dueDate, inspection.intervalMonths, inspectedAt) : null;
+  await db.update(inventoryInspections).set({ inspectedAt, dueDate }).where(eq(inventoryInspections.id, inspection.id));
+  setFlash(c, t("inventory.inspection.doneFlash"), "success");
+  return c.redirect(`/inventory/${id}`);
+});
+
 // Muss nach den statischen Pfaden (/inspections, /search-members) stehen.
 inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
@@ -1684,11 +1874,6 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
         {cat === "vehicle" && <>
           <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
           <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
-          {hasField(item.enabledFields, "inspection") && <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />}
-        </>}
-        {hasField(item.enabledFields, "inspection") && cat !== "vehicle" && <>
-          <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />
-          <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
         </>}
         {hasField(item.enabledFields, "location") && <>
           <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
@@ -1703,6 +1888,9 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
         />}
       </ViewGrid>
+      {hasField(item.enabledFields, "inspection") && item.inspections.length > 0 && (
+        <InspectionList item={item} canManage={canManage && !item.retiredAt} today={new Date().toISOString().slice(0, 10)} />
+      )}
       {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
       {item.tags.length > 0 && (
         <div class="mt-6 flex flex-wrap gap-1">

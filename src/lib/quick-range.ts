@@ -54,7 +54,7 @@ export const REL_UNITS: RelUnit[] = ["D", "W", "M", "Y"];
 export const REL_DIRS: RelDir[] = ["past", "future", "both"];
 const REL_RE = /^P(\d{1,3})([DWMY])$/;
 
-function addDays(dateStr: string, days: number): string {
+export function addDays(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
   return fmt(new Date(y, m - 1, d + days));
 }
