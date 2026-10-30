@@ -103,11 +103,11 @@ export function RichTextField({ name, value, editable }: { name: string; value: 
 }
 
 // Read-only-Pendant zu Field: Label + Wert (leer → „—“). Einzige Definition; Layout über ViewGrid.
-export function ViewField({ label, value }: { label: string; value: string | null | undefined }) {
+export function ViewField({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
       <div class="text-sm opacity-60">{label}</div>
-      <div class="font-medium">{value || "—"}</div>
+      <div class="font-medium">{(value || "—") as never}</div>
     </div>
   );
 }

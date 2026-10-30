@@ -8,6 +8,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
+import { DeleteDialog } from "../components/delete-dialog.js";
 import { ModalScaffold } from "./admin.js";
 import { flagAllowed, isPermutation, moveId } from "../lib/role-types.js";
 import { setFlash } from "../lib/flash.js";
@@ -94,31 +95,6 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
       <RowAction icon="arrow-up" label={t("admin.roles.moveUp")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "up" }} />
       <RowAction icon="arrow-down" label={t("admin.roles.moveDown")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "down" }} />
     </form>
-  );
-}
-
-function DeleteDialog({ id, action, title, body }: { id: string; action: string; title: string; body: string }) {
-  return (
-    <>
-      <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-${id}').showModal()`} />
-      <dialog id={`delete-${id}`} class="modal">
-        <div class="modal-box">
-          <h3 class="font-bold text-lg">{title}</h3>
-          <p class="py-2 opacity-70">{body}</p>
-          <div class="modal-action">
-            <form method="dialog">
-              <button class="btn">{t("common.cancel")}</button>
-            </form>
-            <form method="post" action={action}>
-              <button type="submit" class="btn btn-error">{t("common.delete")}</button>
-            </form>
-          </div>
-        </div>
-        <form method="dialog" class="modal-backdrop">
-          <button>{t("common.close")}</button>
-        </form>
-      </dialog>
-    </>
   );
 }
 
