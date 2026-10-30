@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldValues, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 import { testDetailPageContract } from "./detail-page-contract.js";
 import { t } from "../i18n/index.js";
@@ -12,6 +12,8 @@ let itemsFindManyResult: any[] = [];
 let itemsFindFirstResult: any = undefined;
 let membersFindManyResult: any[] = [];
 let numbersFindManyResult: any[] = [];
+let fieldDefsFindManyResult: any[] = [];
+let fieldValuesFindManyResult: any[] = [];
 let lendingItemFindFirstResult: any = undefined;
 let lendingItemsFindManyResult: any[] = [];
 let lendingLoanFindFirstResult: any = undefined;
@@ -61,6 +63,8 @@ vi.mock("../db/index.js", () => ({
       inventoryItemNumbers: {
         findMany: vi.fn(() => Promise.resolve(numbersFindManyResult)),
       },
+      inventoryFieldDefs: { findMany: vi.fn(() => Promise.resolve(fieldDefsFindManyResult)) },
+      inventoryFieldValues: { findMany: vi.fn(() => Promise.resolve(fieldValuesFindManyResult)) },
       members: {
         findMany: vi.fn(() => Promise.resolve(membersFindManyResult)),
       },
@@ -105,6 +109,8 @@ beforeEach(() => {
   itemsFindFirstResult = undefined;
   membersFindManyResult = [];
   numbersFindManyResult = [];
+  fieldDefsFindManyResult = [];
+  fieldValuesFindManyResult = [];
   lendingItemFindFirstResult = undefined;
   lendingItemsFindManyResult = [];
   lendingLoanFindFirstResult = undefined;
@@ -719,6 +725,47 @@ describe("detail view serial number", () => {
     currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
     expect(html).toContain("Seriennummer");
     expect(html).toContain("SN-4711");
+  });
+});
+
+describe("free fields", () => {
+  const def = { id: "d1", name: "Nennweite", type: "select", options: ["DN 80", "DN 100"], archived: false };
+
+  it("stores the value of a selected free field", async () => {
+    fieldDefsFindManyResult = [def];
+    const res = await post("/", { name: "Hydrant", category: "other", freeFields: "d1", ff_d1: "DN 80" });
+    expect(res.status).toBe(302);
+    expect(insertCalls.find((c) => c.table === inventoryFieldValues)?.values).toEqual([{ inventoryItemId: "new-id", fieldDefId: "d1", value: "DN 80" }]);
+  });
+
+  it("rejects a value outside the options", async () => {
+    fieldDefsFindManyResult = [def];
+    const res = await post("/", { name: "Hydrant", category: "other", freeFields: "d1", ff_d1: "DN 5" });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("inventory.form.freeFieldInvalid", { fields: "Nennweite" }));
+  });
+
+  it("ignores a newly selected archived field", async () => {
+    fieldDefsFindManyResult = [{ ...def, archived: true }];
+    const res = await post("/", { name: "Hydrant", category: "other", freeFields: "d1", ff_d1: "DN 80" });
+    expect(res.status).toBe(302);
+    expect(insertCalls.some((c) => c.table === inventoryFieldValues)).toBe(false);
+  });
+
+  it("blocks deselecting a free field that still has a value", async () => {
+    fieldDefsFindManyResult = [def];
+    fieldValuesFindManyResult = [{ fieldDefId: "d1", value: "DN 80" }];
+    itemsFindFirstResult = makeItem({});
+    const res = await post("/item1", { name: "Hydrant", category: "other" });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("inventory.form.freeFieldLocked", { fields: "Nennweite" }));
+  });
+
+  it("allows deselecting an empty free field", async () => {
+    fieldDefsFindManyResult = [def];
+    fieldValuesFindManyResult = [{ fieldDefId: "d1", value: null }];
+    itemsFindFirstResult = makeItem({});
+    expect((await post("/item1", { name: "Hydrant", category: "other" })).status).toBe(302);
   });
 });
 

@@ -103,3 +103,13 @@ export function normalizeFieldValue(type: FieldDefType, options: string[] | null
   if (type === "select") return options?.includes(v) ? { value: v } : { value: null, error: true };
   return { value: v };
 }
+
+// Auswahlwerte aus einem Textfeld (eine Zeile je Wert): getrimmt, ohne Leerzeilen und Duplikate.
+export function parseOptions(text: string): string[] {
+  return [...new Set(text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))];
+}
+
+// Verwendete Auswahlwerte dürfen nicht entfernt werden; liefert die blockierten.
+export function blockedOptionRemovals(oldOptions: string[], newOptions: string[], usedValues: (string | null)[]): string[] {
+  return oldOptions.filter((o) => !newOptions.includes(o) && usedValues.includes(o));
+}

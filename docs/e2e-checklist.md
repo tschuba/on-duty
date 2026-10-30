@@ -48,6 +48,15 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 - [ ] Seitengröße ändern (nur Mitglieder) → Liste springt auf Seite 1, Wert bleibt erhalten
 - [ ] Seitenwechsel über Nachbarseiten, erste/letzte Seite und Seitenwahl-Balloon funktioniert
 
+## Inventar-Felder
+
+- [ ] Neuer Posten: Kategorie wählen belegt „Felder" vor; Abwählen blendet den Abschnitt aus (Menge, Nummern, Seriennummern, Ort, Prüftermine, Zuweisung)
+- [ ] Posten mit Seriennummer: „Seriennummern" abwählen → Fehler „Bitte erst leeren"; nach Leeren und Speichern geht es
+- [ ] Ort mit nur einer Koordinate → Fehler; Breitengrad > 90 → Fehler
+- [ ] `/inventory/fields` (nur mit `inventory:configure`): Feld vom Typ Auswahl anlegen, umbenennen, Wert hinzufügen
+- [ ] Freies Feld am Posten aktivieren, Wert speichern; in Detailansicht sichtbar; Suche findet den Textwert
+- [ ] Verwendeten Auswahlwert entfernen / Feld mit Werten löschen → gesperrt; Archivieren blendet es nur in neuen Posten aus
+
 ## Admin
 
 - [ ] Benutzer anlegen / bearbeiten / deaktivieren (inkl. sofortige Session-Invalidierung)

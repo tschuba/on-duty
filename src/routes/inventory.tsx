@@ -26,9 +26,12 @@ import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js"
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
+import { inventoryFieldRoutes } from "./inventory-fields.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const inventoryRoutes = new Hono<{ Variables: Variables }>();
+// Vor den /:id-Routen registrieren, sonst frisst /:id den Pfad.
+inventoryRoutes.route("/fields", inventoryFieldRoutes);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,7 +42,8 @@ type ItemSerial = typeof inventoryItemSerials.$inferSelect;
 type MemberRow = typeof members.$inferSelect;
 type Person = { firstName: string; lastName: string };
 type AssignmentWithMember = typeof inventoryItemAssignments.$inferSelect & { member: MemberRow & { person: Person } };
-type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[] };
+type FreeDef = typeof inventoryFieldDefs.$inferSelect;
+type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[]; fieldValues?: (typeof inventoryFieldValues.$inferSelect & { fieldDef: FreeDef })[] };
 
 const CATEGORY_CONFIG: { category: InventoryCategory; icon: IconName }[] = [
   { category: "vehicle", icon: "firetruck" },
@@ -109,6 +113,9 @@ export type InventoryFieldValues = {
   assignments: string;
   // "Feld hinzufügen": welche festen Felder dieser Posten hat (s. INVENTORY_FIELDS).
   enabledFieldsList?: InventoryField[];
+  // Freie Felder: freeRaw[defId] vorhanden = am Posten aktiv (Wert roh, darf leer sein); freeDefs nur fürs Rendern.
+  freeRaw?: Record<string, string>;
+  freeDefs?: FreeDef[];
   locationText: string;
   latitude: string;
   longitude: string;
@@ -131,6 +138,7 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     assignedMemberId: trimmed(body, "assignedMemberId"),
     assignments: trimmed(body, "assignments") || "[]",
     enabledFieldsList,
+    freeRaw: Object.fromEntries(parseList(body, "freeFields").map((id) => [id, trimmed(body, `ff_${id}`)])),
     locationText: trimmed(body, "locationText"),
     latitude: trimmed(body, "latitude"),
     longitude: trimmed(body, "longitude"),
@@ -683,6 +691,39 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         </div>
       </div>
 
+      {(v.freeDefs ?? []).length > 0 && (
+        <div class="space-y-4">
+          <div class="divider">{t("inventory.form.freeFields")}</div>
+          {errors?.freeFields && <span class="text-error text-sm">{errors.freeFields}</span>}
+          {v.freeDefs!.map((d) => {
+            const active = v.freeRaw?.[d.id] !== undefined;
+            const val = v.freeRaw?.[d.id] ?? "";
+            const name = `ff_${d.id}`;
+            return (
+              <div data-free class="space-y-2">
+                <label class="label cursor-pointer justify-start gap-2 w-fit">
+                  <input type="checkbox" name="freeFields" value={d.id} checked={active} class="checkbox"
+                    onchange="this.closest('[data-free]').querySelector('[data-free-input]').classList.toggle('hidden', !this.checked)" />
+                  <span class="text-sm">{d.name}{d.archived && ` (${t("inventory.fields.archived")})`}</span>
+                </label>
+                <div data-free-input class={active ? "" : "hidden"}>
+                  {d.type === "boolean" || d.type === "select" ? (
+                    <select name={name} class="select w-full">
+                      <option value=""></option>
+                      {d.type === "boolean"
+                        ? <><option value="1" selected={val === "1"}>{t("common.yes")}</option><option value="0" selected={val === "0"}>{t("common.no")}</option></>
+                        : [...(d.options ?? []), ...(val && !(d.options ?? []).includes(val) ? [val] : [])].map((o) => <option value={o} selected={val === o}>{o}</option>)}
+                    </select>
+                  ) : (
+                    <input type={d.type === "date" ? "date" : "text"} inputmode={d.type === "number" ? "decimal" : undefined} name={name} value={val} class="input w-full" placeholder={d.name} />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
       <BatchAssignmentFields assignments={assignments ?? []} />
 
@@ -695,7 +736,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
 async function fetchItems(): Promise<ItemWithRelations[]> {
   return db.query.inventoryItems.findMany({
-    with: { tags: true, numbers: true, serials: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, fieldValues: { with: { fieldDef: true } }, assignments: { with: { member: { with: { person: true } } } } },
     orderBy: (items, { asc }) => [asc(items.name)],
   }) as unknown as Promise<ItemWithRelations[]>;
 }
@@ -703,7 +744,7 @@ async function fetchItems(): Promise<ItemWithRelations[]> {
 async function fetchItem(id: string): Promise<ItemWithRelations | undefined> {
   return db.query.inventoryItems.findFirst({
     where: eq(inventoryItems.id, id),
-    with: { tags: true, numbers: true, serials: true, assignments: { with: { member: { with: { person: true } } } } },
+    with: { tags: true, numbers: true, serials: true, fieldValues: { with: { fieldDef: true } }, assignments: { with: { member: { with: { person: true } } } } },
   }) as unknown as Promise<ItemWithRelations | undefined>;
 }
 
@@ -714,6 +755,40 @@ async function resolveAssignmentNames(assignments: { memberId: string; quantity:
   const rows = await db.query.members.findMany({ with: { person: true } });
   const byId = new Map(rows.map((m: any) => [m.id, `${m.person.firstName} ${m.person.lastName}`]));
   return assignments.map((a) => ({ ...a, name: byId.get(a.memberId) ?? "" }));
+}
+
+// Freie Felder fürs Formular: aktive (nicht archivierte oder am Posten schon vorhandene) Definitionen plus aktuelle Rohwerte.
+async function withFree(values: Partial<InventoryFieldValues>, itemId?: string): Promise<Partial<InventoryFieldValues>> {
+  const defs = (await db.query.inventoryFieldDefs.findMany({ orderBy: (d: any, { asc }: any) => [asc(d.name)] })) as FreeDef[];
+  let raw = values.freeRaw;
+  if (!raw && itemId) {
+    const rows = await db.query.inventoryFieldValues.findMany({ where: eq(inventoryFieldValues.inventoryItemId, itemId) });
+    raw = Object.fromEntries(rows.map((r: any) => [r.fieldDefId, r.value ?? ""]));
+  }
+  raw ??= {};
+  return { ...values, freeRaw: raw, freeDefs: defs.filter((d) => !d.archived || raw![d.id] !== undefined) };
+}
+
+// Abgeschickte freie Felder gegen ihre Definitionen prüfen. stored = bisherige Wertezeilen des Postens (nur beim Bearbeiten):
+// ein Feld mit gespeichertem Wert lässt sich nur abwählen, wenn es vorher geleert wurde; archivierte Felder sind nur noch bei Bestandsposten wählbar.
+async function resolveFree(values: InventoryFieldValues, stored: { fieldDefId: string; value: string | null }[] = []): Promise<{ rows: { fieldDefId: string; value: string | null }[]; error?: string }> {
+  const raw = values.freeRaw ?? {};
+  const defs = (await db.query.inventoryFieldDefs.findMany()) as FreeDef[];
+  const byId = new Map(defs.map((d) => [d.id, d]));
+  const had = new Set(stored.map((r) => r.fieldDefId));
+  const rows: { fieldDefId: string; value: string | null }[] = [];
+  const invalid: string[] = [];
+  for (const [id, rawValue] of Object.entries(raw)) {
+    const def = byId.get(id);
+    if (!def || (def.archived && !had.has(id))) continue;
+    const res = normalizeFieldValue(def.type as FieldDefType, def.options, rawValue);
+    if (res.error) invalid.push(def.name);
+    else rows.push({ fieldDefId: id, value: res.value });
+  }
+  if (invalid.length > 0) return { rows, error: t("inventory.form.freeFieldInvalid", { fields: invalid.join(", ") }) };
+  const locked = stored.filter((r) => r.value != null && raw[r.fieldDefId] === undefined).map((r) => byId.get(r.fieldDefId)?.name ?? "");
+  if (locked.length > 0) return { rows, error: t("inventory.form.freeFieldLocked", { fields: locked.join(", ") }) };
+  return { rows };
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -754,7 +829,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
     if (search) {
       const needle = search.toLowerCase();
-      const hay = [item.name, ...item.serials.map((n) => n.serial), ...item.numbers.map((n) => n.number)];
+      const hay = [item.name, ...item.serials.map((n) => n.serial), ...item.numbers.map((n) => n.number), item.locationText ?? "", ...(item.fieldValues ?? []).filter((fv) => fv.fieldDef.type === "text" || fv.fieldDef.type === "select").map((fv) => fv.value ?? "")];
       if (!hay.some((h) => h.toLowerCase().includes(needle))) return false;
     }
     return true;
@@ -769,12 +844,13 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
     buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
-  const columnCount = 6 + (canLend ? 1 : 0);
+  const columnCount = 7 + (canLend ? 1 : 0);
 
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
       <PageHeader title={t("inventory.title")} actions={<>
         {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
+        {user.permissions.has("inventory:configure") && <HeaderAction icon="cog-6-tooth" label={t("inventory.fields.title")} href="/inventory/fields" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 
@@ -841,6 +917,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             <th>{t("inventory.table.name")}</th>
             <th>{t("inventory.table.category")}</th>
             <th class="hidden md:table-cell">{t("inventory.table.dueDate")}</th>
+            <th class="hidden lg:table-cell">{t("inventory.table.location")}</th>
             <th class="hidden lg:table-cell">{t("inventory.table.tags")}</th>
             <th>{t("inventory.table.status")}</th>
             <th class="hidden md:table-cell">{t("inventory.table.quantity")}</th>
@@ -859,6 +936,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
                 <td>{item.name}</td>
                 <td><CategoryBadge category={item.category as InventoryCategory} /></td>
                 <td class="hidden md:table-cell">{due ? formatDate(due) : "—"}</td>
+                <td class="hidden lg:table-cell">{item.locationText || "—"}</td>
                 <td class="hidden lg:table-cell">
                   <div class="flex flex-wrap gap-1">
                     {item.tags.map((tag) => <span class="badge badge-ghost badge-sm">{tag.tag}</span>)}
@@ -1057,7 +1135,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   return c.html(
     <Layout title={t("inventory.newItem")} user={user}>
-      <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} />
+      <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} values={await withFree({})} />
     </Layout>
   );
 });
@@ -1078,6 +1156,8 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   if (numbersError) errors.numbers = numbersError;
   const serialsError = validateSerials(serials, insertValues.quantity);
   if (serialsError) errors.serials = serialsError;
+  const free = await resolveFree(values);
+  if (free.error) errors.freeFields = free.error;
   const wantsLendable = trimmed(body, "lendable") === "1";
   const canManageLending = user.permissions.has("lending:manage");
   const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
@@ -1098,7 +1178,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           title={t("inventory.newItem")}
           action="/inventory"
           formId="inventory-new-form"
-          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials })}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1123,6 +1203,9 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     if (serials.length > 0) {
       await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: item.id, serial })));
     }
+    if (free.rows.length > 0) {
+      await tx.insert(inventoryFieldValues).values(free.rows.map((r) => ({ inventoryItemId: item.id, ...r })));
+    }
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
     if (wantsLendable && user.permissions.has("lending:manage")) {
@@ -1139,7 +1222,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
         <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
-          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials })} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired })} />
       </Layout>,
       422
@@ -1243,7 +1326,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
         action={`/inventory/${item.id}`}
         formId="inventory-edit-form"
         cancelHref={`/inventory/${item.id}`}
-        values={values}
+        values={await withFree(values, item.id)}
         assignedMemberName={!isBatch ? assignmentList[0]?.name : undefined}
         assignments={isBatch ? assignmentList : []}
         lendable={lendableField(user, Boolean(lendingItem), {
@@ -1280,6 +1363,9 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
 
   // Sperre: ein Feld lässt sich nur abwählen, solange es am gespeicherten Posten leer ist (nichts geht still verloren).
   const lockedFields = INVENTORY_FIELDS.filter((f) => hasField(existing.enabledFields, f) && !hasField(insertValues.enabledFields, f));
+  const storedFree = await db.query.inventoryFieldValues.findMany({ where: eq(inventoryFieldValues.inventoryItemId, id) });
+  const free = await resolveFree(values, storedFree);
+  if (free.error) errors.freeFields = free.error;
   if (lockedFields.length > 0) {
     const stored = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, id) });
     const openLoan = stored ? await db.query.lendingLoans.findFirst({ where: and(eq(lendingLoans.lendingItemId, stored.id), isNull(lendingLoans.returnedAt)) }) : undefined;
@@ -1333,7 +1419,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
           cancelHref={`/inventory/${id}`}
-          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }, id)}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
@@ -1362,6 +1448,10 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     if (serials.length > 0) {
       await tx.insert(inventoryItemSerials).values(serials.map((serial) => ({ inventoryItemId: id, serial })));
     }
+    await tx.delete(inventoryFieldValues).where(eq(inventoryFieldValues.inventoryItemId, id));
+    if (free.rows.length > 0) {
+      await tx.insert(inventoryFieldValues).values(free.rows.map((r) => ({ inventoryItemId: id, ...r })));
+    }
     await tx.delete(inventoryItemAssignments).where(eq(inventoryItemAssignments.inventoryItemId, id));
     if (assignments.length > 0) {
       await tx.insert(inventoryItemAssignments).values(assignments.map((a) => ({ inventoryItemId: id, memberId: a.memberId, quantity: a.quantity })));
@@ -1382,7 +1472,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     return c.html(
       <Layout title={existing.name} user={user}>
         <InventoryForm title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
-          values={{ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }} errors={errors}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials }, id)} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames}
           lendable={lendableField(user, wantsLendable, { error: lendableError })} />
       </Layout>,
@@ -1602,6 +1692,9 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
           <ViewField label={t("inventory.form.coordinates")} value={item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : null} />
         </>}
+        {(item.fieldValues ?? []).slice().sort((a, b) => a.fieldDef.name.localeCompare(b.fieldDef.name, "de")).map((fv) => (
+          <ViewField label={fv.fieldDef.name} value={fv.value == null ? null : fv.fieldDef.type === "boolean" ? t(fv.value === "1" ? "common.yes" : "common.no") : fv.fieldDef.type === "date" ? formatDate(fv.value) : fv.value} />
+        ))}
         {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
         {hasField(item.enabledFields, "assignments") && <ViewField
           label={t("inventory.form.assignedMember")}

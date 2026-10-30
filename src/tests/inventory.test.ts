@@ -46,7 +46,7 @@ describe("generateInspectionDueItems", () => {
   });
 });
 
-import { isFieldEmpty, normalizeFieldValue, validateLocation } from "../lib/inventory.js";
+import { blockedOptionRemovals, isFieldEmpty, normalizeFieldValue, parseOptions, validateLocation } from "../lib/inventory.js";
 
 const empty = { quantity: 1, retiredQuantity: 0, numbers: 0, serials: 0, assignments: 0, locationText: null, latitude: null, longitude: null, vehicleInspectionDue: null, nextInspectionDue: null, lastInspectionDate: null, activeLoans: 0 };
 
@@ -92,5 +92,14 @@ describe("normalizeFieldValue", () => {
     expect(normalizeFieldValue("select", ["DN 80"], "DN 100").error).toBe(true);
     expect(normalizeFieldValue("select", ["DN 80"], "DN 80").value).toBe("DN 80");
     expect(normalizeFieldValue("text", null, " x ").value).toBe("x");
+  });
+});
+
+describe("parseOptions / blockedOptionRemovals", () => {
+  it("trims, drops blanks and duplicates", () => {
+    expect(parseOptions(" A \r\n\nB\nA")).toEqual(["A", "B"]);
+  });
+  it("blocks only removed options that are used", () => {
+    expect(blockedOptionRemovals(["A", "B", "C"], ["C"], ["A", null])).toEqual(["A"]);
   });
 });
