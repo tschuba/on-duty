@@ -61,6 +61,7 @@ const ICONS = {
   "squares-2x2": "layout-grid",
   "scuba-diving-tank": "scuba-diving-tank",
   "fire-hydrant": "fire-hydrant",
+  file: "file",
 };
 
 function attr(str, name) {

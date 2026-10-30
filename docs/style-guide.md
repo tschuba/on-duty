@@ -2,7 +2,7 @@
 
 Soll-Zustand für Layout, Farben, Typografie, Tabellen und Buttons in on-duty. Basiert auf einer Bestandsaufnahme des Codes (Stand 2026-09-30) — wo der aktuelle Code abweicht, ist das unten explizit vermerkt ("⚠️ Abweichung im Code"). Ziel: neue Views folgen diesen Regeln von Anfang an; bestehende Abweichungen werden bei Gelegenheit angeglichen (separater Task, nicht automatisch).
 
-**Nicht abgedeckt** (bewusst zurückgestellt, nicht bewusst ausgeschlossen): Modals, Cards, Dropdowns, Terminologie/Wortwahl. Ergänzung folgt bei Bedarf in einer späteren Runde.
+**Nicht abgedeckt** (bewusst zurückgestellt, nicht bewusst ausgeschlossen): Modals, Cards (außer Auswahl-Cards), Dropdowns, Terminologie/Wortwahl. Ergänzung folgt bei Bedarf in einer späteren Runde.
 
 ## Formulare & Labels
 
@@ -138,6 +138,16 @@ Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donor
 - Tag-Badges: `badge badge-sm`, neutral (`badge-ghost`) als Standard.
 - Die mitgelieferten Vorlagennamen haben feste Stile (`TAG_STYLES` in `components/tag-badges.tsx`, Name ohne Groß-/Kleinschreibung): Fahrzeug `badge-primary`, Atemschutz `badge-info`, Gerät `badge-secondary`, PSA `badge-accent`, Sonstiges `badge-neutral`, Hydrant `badge-secondary badge-outline`. Bei mehreren Treffern erscheinen alle als Badge, das Icon trägt der erste.
 - `badge-success`, `badge-warning` und `badge-error` sind dem Status vorbehalten (Prüffrist, Verleih), nie für Tags.
+
+## Auswahl-Cards
+
+Muster für „eine von wenigen Optionen wählen" (z. B. Vorlagenauswahl in `GET /inventory/new`); nicht für Listen oder Daten.
+
+- Raster: 1 Spalte, ab `sm` 2, ab `lg` 3, ab `2xl` auf `max-w-6xl` begrenzt; alle Cards gleich hoch (`h-full`), ab `sm` mindestens `min-h-28`.
+- Größe wächst mit dem Viewport: bis `sm` `p-4`, Avatar `size-10`; ab `sm` `p-5`, `size-12`, `gap-4`; ab `lg` `p-6`, `size-14`, Titel `text-lg`, Beschreibung `line-clamp-3`. Inhalt oben ausgerichtet.
+- Die ganze Card ist ein Link (`card card-border bg-base-100 border-base-300`), Hover `border-primary`, Tastaturfokus `focus-visible`-Rahmen.
+- Inhalt: `TagAvatar` (Icon + Farbe aus `TAG_STYLES`, ohne Eintrag dezent neutral) links, rechts Textblock mit `space-y-1` (ab `lg` `space-y-1.5`): Titel (`font-medium`), Beschreibung (`text-sm opacity-70 line-clamp-2`), Zählzeile (`text-sm opacity-60`, Nullteile entfallen).
+- Die Option „leer/ohne" steht zuerst und ist gestrichelt (`border-dashed`).
 
 ## Responsive Schwellen
 
