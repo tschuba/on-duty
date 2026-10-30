@@ -96,6 +96,8 @@ Nach Schema-Änderungen Migration generieren und committen:
 pnpm db:generate
 ```
 
+Reine SQL-Backfills mit `pnpm db:generate --custom --name=<name>` anlegen. `drizzle/meta/_journal.json` und die `when`-Werte nie von Hand bearbeiten: Der Migrator überspringt jede Migration, deren `when` nicht größer ist als das höchste bereits angewendete `created_at`. Bei einem Merge-Konflikt im Journal die eigene Migration samt Snapshot löschen und neu generieren. `src/tests/migration-journal.test.ts` prüft das in der CI.
+
 ## Tests
 
 Vor jedem PR:

@@ -9,3 +9,7 @@ Bei allem, was Layout, Farben, Typografie, Tabellen oder Buttons betrifft: [docs
 ## Beitragen
 
 Siehe [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Datenbankmigrationen
+
+Migrationen nur mit `pnpm db:generate` (Backfills: `--custom --name=<name>`) erzeugen. `drizzle/meta/_journal.json` und `when`-Werte nie von Hand setzen oder „hochzählen“. Bei Journal-Konflikten die eigene Migration samt Snapshot löschen und neu generieren. Details: [CONTRIBUTING.md](CONTRIBUTING.md).
