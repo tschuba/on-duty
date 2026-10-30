@@ -4,6 +4,16 @@ import { describe, it, expect } from "vitest";
 // Replay against real data was checked by hand on a scratch DB; this guards the shipped seed + copy rules.
 const sql = readFileSync("drizzle/0061_inventory_inspections.sql", "utf8");
 
+describe("drizzle journal", () => {
+  // drizzle skips a migration whose `when` is not newer than the last applied one, silently.
+  it("has strictly ascending `when` values", () => {
+    const { entries } = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { tag: string; when: number }[] };
+    // 0057 predates this guard and is older than 0056; checked from 0058 on.
+    const checked = entries.slice(57);
+    checked.slice(1).forEach((e, i) => expect(e.when, e.tag).toBeGreaterThan(checked[i].when));
+  });
+});
+
 describe("migration 0061 inventory inspections", () => {
   it("ships the four templates without a default interval", () => {
     const m = sql.match(/INSERT INTO "inventory_inspection_templates" \("name"\) VALUES (.+);/);
