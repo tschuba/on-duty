@@ -5,7 +5,7 @@ import { readDsn } from "../lib/sentry.js";
 import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
 import { countOpenReceipts } from "../lib/donations.js";
-import { countOverdueInspectionItems } from "../lib/inventory.js";
+import { countOverdueInspections } from "../lib/inventory.js";
 import { countOpenLoanRequests, countOverdueLoans } from "../lib/lending.js";
 import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
@@ -51,7 +51,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       applications: has("applications:read") ? await countOpenApplications() : 0,
       receipts: has("donations:issue-receipts") ? await countOpenReceipts() : 0,
       donors: DONORS_TAB_COUNT,
-      inspections: has("inventory:read") ? await countOverdueInspectionItems() : 0,
+      inspections: has("inventory:read") ? await countOverdueInspections() : 0,
       loans: has("lending:read") ? await countOverdueLoans() : 0,
       loanRequests: has("lending:manage") ? await countOpenLoanRequests() : 0,
       org,

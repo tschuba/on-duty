@@ -41,7 +41,7 @@ export function generateInspectionDueItems(items: InventoryItemInput[], start: s
 // avoid a circular import: that route imports Layout, Layout needs this count.
 // Same db.query.inventoryItems.findMany shape routes/inventory.tsx uses, so it
 // goes through the same mock in tests.
-export async function countOverdueInspectionItems(): Promise<number> {
+export async function countOverdueInspections(): Promise<number> {
   const rows = (await db.query.inventoryItems.findMany({
     columns: { id: true, name: true, retiredAt: true },
     with: { inspections: { columns: { id: true, name: true, dueDate: true } } },
