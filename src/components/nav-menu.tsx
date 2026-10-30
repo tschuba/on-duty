@@ -46,6 +46,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read"), children: [
         { label: t("inventory.tabs.inspectionTemplates"), href: "/inventory/inspection-templates", show: has("inventory:configure") },
         { label: t("inventory.tabs.fields"), href: "/inventory/fields", show: has("inventory:configure") },
+        { label: t("inventory.tabs.itemTemplates"), href: "/inventory/templates", show: has("inventory:configure") },
       ] },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans, tone: "badge-primary" },

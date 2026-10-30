@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 
 // Replay against legacy rows (incl. a second run) was checked by hand on a scratch DB; this guards the shipped seed + copy rules.
 const sql = readFileSync("drizzle/0063_inventory_templates_seed.sql", "utf8");
+const drop = readFileSync("drizzle/0064_inventory_drop_category.sql", "utf8");
 
 describe("migration 0063 inventory templates seed", () => {
   it("ships the six templates with their fixed fields", () => {
@@ -32,5 +33,21 @@ describe("migration 0063 inventory templates seed", () => {
   it("does not repeat the backfills of 0059/0061", () => {
     expect(sql).not.toContain("INSERT INTO \"inventory_inspections\"");
     expect(sql).not.toMatch(/UPDATE "inventory_items"/);
+  });
+});
+
+describe("migration 0064 drop category", () => {
+  // Replay on a scratch DB after 0063: items, tags and field values stayed intact.
+  it("drops the category column, its enum and the legacy inventory columns, nothing else", () => {
+    const dropped = [...drop.matchAll(/DROP COLUMN "([a-z_]+)"/g)].map((m) => m[1]);
+    expect(dropped).toEqual(["category", "license_plate", "year_of_manufacture", "vehicle_inspection_due", "next_inspection_due", "last_inspection_date"]);
+    expect(drop).toContain('DROP TYPE "public"."inventory_category"');
+    expect(drop).not.toMatch(/DELETE|TRUNCATE|DROP TABLE/);
+  });
+
+  it("runs after the seed, which still reads the dropped columns", () => {
+    const { entries } = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as { entries: { tag: string }[] };
+    const tags = entries.map((e) => e.tag);
+    expect(tags.indexOf("0063_inventory_templates_seed")).toBeLessThan(tags.indexOf("0064_inventory_drop_category"));
   });
 });

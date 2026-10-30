@@ -105,7 +105,7 @@ function makeLendingItem(overrides: Record<string, unknown> = {}) {
     inventoryItemId: "item1",
     individualTracking: true,
     inventoryItem: {
-      id: "item1", name: "Stehtisch #1", category: "other",
+      id: "item1", name: "Stehtisch #1",
       retiredAt: null, retiredReason: null, quantity: 1, retiredQuantity: 0,
       tags: [],
     },
@@ -258,14 +258,21 @@ describe("GET /inventory/lending", () => {
     expect(html).not.toContain("Offen");
   });
 
-  it("filters by category", async () => {
+  it("filters by tag, matching any of several tags", async () => {
+    const withTag = (tag: string) => makeLendingItem({ inventoryItem: { ...makeLendingItem().inventoryItem, tags: [{ id: "tg", inventoryItemId: "item1", tag }] } });
     lendingLoansFindManyResult = [
       makeLoan({ id: "l1", borrower: person("Anderer") }),
-      makeLoan({ id: "l2", borrower: person("Fahrzeug"), lendingItem: makeLendingItem({ inventoryItem: { ...makeLendingItem().inventoryItem, category: "vehicle" } }) }),
+      makeLoan({ id: "l2", borrower: person("Fahrzeug"), lendingItem: withTag("Fahrzeug") }),
+      makeLoan({ id: "l3", borrower: person("Zelt"), lendingItem: withTag("Zelt") }),
     ];
-    const html = await (await lendingRoutes.request("/?category=vehicle&start=2026-01-01&end=2026-12-31")).text();
-    expect(html).toContain("Fahrzeug");
-    expect(html).not.toContain("Anderer");
+    const one = await (await lendingRoutes.request("/?tag=Fahrzeug&start=2026-01-01&end=2026-12-31")).text();
+    expect(one).toContain("Fahrzeug");
+    expect(one).not.toContain("Anderer");
+    expect(one).not.toContain("Zelt</td>");
+    const both = await (await lendingRoutes.request("/?tag=Fahrzeug&tag=Zelt&start=2026-01-01&end=2026-12-31")).text();
+    expect(both).toContain("Fahrzeug");
+    expect(both).toContain("Zelt");
+    expect(both).not.toContain("Anderer");
   });
 
   it("only offers 'Neuer Verleihvorgang' with lending:manage", async () => {

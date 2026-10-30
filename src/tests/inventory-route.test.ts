@@ -17,6 +17,8 @@ let fieldValuesFindManyResult: any[] = [];
 let inspectionsFindManyResult: any[] = [];
 let inspectionFindFirstResult: any = undefined;
 let templatesFindManyResult: any[] = [];
+let itemTemplatesFindManyResult: any[] = [];
+let itemTemplateFindFirstResult: any = undefined;
 let lendingItemFindFirstResult: any = undefined;
 let lendingItemsFindManyResult: any[] = [];
 let lendingLoanFindFirstResult: any = undefined;
@@ -71,6 +73,10 @@ vi.mock("../db/index.js", () => ({
         findMany: vi.fn(() => Promise.resolve(inspectionsFindManyResult)),
         findFirst: vi.fn(() => Promise.resolve(inspectionFindFirstResult)),
       },
+      inventoryTemplates: {
+        findMany: vi.fn(() => Promise.resolve(itemTemplatesFindManyResult)),
+        findFirst: vi.fn(() => Promise.resolve(itemTemplateFindFirstResult)),
+      },
       inventoryInspectionTemplates: { findMany: vi.fn(() => Promise.resolve(templatesFindManyResult)) },
       inventoryFieldValues: { findMany: vi.fn(() => Promise.resolve(fieldValuesFindManyResult)) },
       members: {
@@ -122,6 +128,8 @@ beforeEach(() => {
   inspectionsFindManyResult = [];
   inspectionFindFirstResult = undefined;
   templatesFindManyResult = [];
+  itemTemplatesFindManyResult = [];
+  itemTemplateFindFirstResult = undefined;
   lendingItemFindFirstResult = undefined;
   lendingItemsFindManyResult = [];
   lendingLoanFindFirstResult = undefined;
@@ -130,10 +138,9 @@ beforeEach(() => {
 
 function makeItem(overrides: Record<string, unknown> = {}) {
   return {
-    id: "item1", name: "TSF-W", category: "vehicle",
+    id: "item1", name: "TSF-W",
     commissionedAt: null, numbers: [], purchasePrice: null, notes: null,
     retiredAt: null, retiredReason: null, quantity: 1, retiredQuantity: 0,
-    licensePlate: "ABC-123", yearOfManufacture: 2015,
     serials: [], inspections: [],
     tags: [], assignments: [],
     ...overrides,
@@ -173,12 +180,15 @@ describe("GET / pagination", () => {
 });
 
 describe("GET /", () => {
-  it("lists items with category badge", async () => {
-    itemsFindManyResult = [makeItem()];
+  it("lists items with styled tag badges (icon on the first styled tag, other tags neutral)", async () => {
+    itemsFindManyResult = [makeItem({ tags: [{ tag: "Fahrzeug" }, { tag: "Halle 2" }] })];
     const res = await inventoryRoutes.request("/");
     const html = await res.text();
     expect(html).toContain("TSF-W");
-    expect(html).toContain("Fahrzeuge");
+    expect(html).toMatch(/<span class="badge badge-sm badge-primary gap-1"><svg[^>]*>[\s\S]*?<\/svg>Fahrzeug<\/span>/);
+    expect(html).toContain('class="badge badge-sm badge-ghost">Halle 2</span>');
+    expect(html).not.toContain("inventory-category-select");
+    expect(html).not.toContain('name="category"');
   });
 
   it("hides retired items by default", async () => {
@@ -196,34 +206,38 @@ describe("GET /", () => {
     expect(html).toContain("Alt");
   });
 
-  it("filters by category", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "Fahrzeugname", category: "vehicle" }), makeItem({ id: "b", name: "Jacke", category: "ppe" })];
-    const res = await inventoryRoutes.request("/?category=ppe");
-    const html = await res.text();
+  it("ignores the removed category filter", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "Fahrzeugname" }), makeItem({ id: "b", name: "Jacke" })];
+    const html = await (await inventoryRoutes.request("/?category=ppe")).text();
+    expect(html).toContain("Fahrzeugname");
     expect(html).toContain("Jacke");
-    expect(html).not.toContain("Fahrzeugname");
   });
 
-  it("filters by tag (item must carry every selected tag)", async () => {
+  it("filters by tag (item must carry any selected tag)", async () => {
     itemsFindManyResult = [
       makeItem({ id: "a", name: "Mit Tag", tags: [{ tag: "gross" }] }),
-      makeItem({ id: "b", name: "Ohne Tag", tags: [] }),
+      makeItem({ id: "b", name: "Anderer Tag", tags: [{ tag: "klein" }] }),
+      makeItem({ id: "c", name: "Ohne Tag", tags: [] }),
     ];
-    const res = await inventoryRoutes.request("/?tag=gross");
-    const html = await res.text();
-    expect(html).toContain("Mit Tag");
-    expect(html).not.toContain("Ohne Tag");
+    const one = await (await inventoryRoutes.request("/?tag=gross")).text();
+    expect(one).toContain("Mit Tag");
+    expect(one).not.toContain("Anderer Tag");
+    expect(one).not.toContain("Ohne Tag");
+    const both = await (await inventoryRoutes.request("/?tag=gross&tag=klein")).text();
+    expect(both).toContain("Mit Tag");
+    expect(both).toContain("Anderer Tag");
+    expect(both).not.toContain("Ohne Tag");
   });
 });
 
 // ── POST / (create) ──────────────────────────────────────────────────────────
 
 describe("POST /", () => {
-  it("rejects a missing name/category", async () => {
+  it("rejects a missing name", async () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "", category: "" }),
+      body: formBody({ name: "" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
@@ -233,20 +247,20 @@ describe("POST /", () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "Helm", category: "equipment", tags: "schnell,gross" }),
+      body: formBody({ name: "Helm", tags: "schnell,gross" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls[0].table).toBe(inventoryItems);
-    expect(insertCalls[0].values).toMatchObject({ name: "Helm", category: "equipment" });
+    expect(insertCalls[0].values).toMatchObject({ name: "Helm" });
     expect(insertCalls[1].table).toBe(inventoryItemTags);
     expect(insertCalls[1].values).toEqual([{ inventoryItemId: "new-id", tag: "schnell" }, { inventoryItemId: "new-id", tag: "gross" }]);
   });
 
-  it("drops assignedMemberId for a non-ppe category (no assignment row is inserted)", async () => {
+  it("drops assignedMemberId without the assignments field (no assignment row is inserted)", async () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "Helm", category: "equipment", assignedMemberId: "m1" }),
+      body: formBody({ name: "Helm", assignedMemberId: "m1" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.some((c) => c.table === inventoryItemAssignments)).toBe(false);
@@ -256,7 +270,7 @@ describe("POST /", () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "Jacke", category: "ppe", quantity: "1", assignedMemberId: "m1", enabledFields: "assignments" }),
+      body: formBody({ name: "Jacke", quantity: "1", assignedMemberId: "m1", enabledFields: "assignments" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table === inventoryItemAssignments)?.values).toEqual([{ inventoryItemId: "new-id", memberId: "m1", quantity: 1 }]);
@@ -267,7 +281,7 @@ describe("POST /", () => {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formBody({
-        name: "Helme", category: "equipment", quantity: "3", enabledFields: ["quantity", "assignments"],
+        name: "Helme", quantity: "3", enabledFields: ["quantity", "assignments"],
         assignments: JSON.stringify([{ memberId: "m1", quantity: 2 }, { memberId: "m2", quantity: 2 }]),
       }),
     });
@@ -312,31 +326,31 @@ const post = (path: string, fields: Record<string, string | string[]>) =>
 describe("lendable flag on POST /", () => {
   it("creates a lending_items row in the same transaction, individualTracking from quantity", async () => {
     currentUser = lendingManager();
-    const res = await post("/", { name: "Helm", category: "equipment", lendable: "1" });
+    const res = await post("/", { name: "Helm", lendable: "1" });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: true, publicRequestable: false, maxRequestQuantity: 0, timesRequired: false });
   });
 
   it("stores lending config given at creation", async () => {
     currentUser = lendingManager();
-    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5", enabledFields: "quantity", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
+    await post("/", { name: "Helm", lendable: "1", quantity: "5", enabledFields: "quantity", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
     expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: false, publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
   });
 
   it("uses batch tracking for quantity > 1", async () => {
     currentUser = lendingManager();
-    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5", enabledFields: "quantity" });
+    await post("/", { name: "Helm", lendable: "1", quantity: "5", enabledFields: "quantity" });
     expect(insertCalls.find((c) => c.table === lendingItems)?.values.individualTracking).toBe(false);
   });
 
   it("ignores the flag without lending:manage (server-side)", async () => {
-    await post("/", { name: "Helm", category: "equipment", lendable: "1" });
+    await post("/", { name: "Helm", lendable: "1" });
     expect(insertCalls.find((c) => c.table === lendingItems)).toBeUndefined();
   });
 });
 
 describe("lendable flag on POST /:id", () => {
-  const base = { name: "TSF-W", category: "vehicle", licensePlate: "ABC-123", enabledFields: "quantity" };
+  const base = { name: "TSF-W", enabledFields: "quantity" };
 
   it("marks an existing item lendable", async () => {
     currentUser = lendingManager();
@@ -406,7 +420,7 @@ describe("lendable flag on POST /:id", () => {
 
   it("round-trips an unchanged maxRequestQuantity through edit GET -> POST", async () => {
     currentUser = lendingManager();
-    itemsFindFirstResult = makeItem({ category: "equipment", quantity: 5 });
+    itemsFindFirstResult = makeItem({ quantity: 5 });
     lendingItemFindFirstResult = { id: "li1", individualTracking: false, publicRequestable: true, maxRequestQuantity: 3, timesRequired: true };
     const editHtml = await (await inventoryRoutes.request("/item1/edit")).text();
     expect(editHtml).toMatch(/name="maxRequestQuantity"[^>]*value="3"/);
@@ -417,7 +431,7 @@ describe("lendable flag on POST /:id", () => {
 
   it("switches to batch tracking and enforces maxRequestQuantity when quantity grows past 1 after lending was enabled at quantity 1", async () => {
     currentUser = lendingManager();
-    itemsFindFirstResult = makeItem({ category: "equipment", quantity: 1 });
+    itemsFindFirstResult = makeItem({ quantity: 1 });
     lendingItemFindFirstResult = { id: "li1", individualTracking: true };
     lendingLoanFindFirstResult = undefined; // no loans yet — mode may still follow quantity
     const res = await post("/item1", { ...base, lendable: "1", quantity: "5", maxRequestLimited: "1", maxRequestQuantity: "3" });
@@ -427,7 +441,7 @@ describe("lendable flag on POST /:id", () => {
 
   it("keeps individualTracking fixed once a loan exists, even if quantity grows", async () => {
     currentUser = lendingManager();
-    itemsFindFirstResult = makeItem({ category: "equipment", quantity: 1 });
+    itemsFindFirstResult = makeItem({ quantity: 1 });
     lendingItemFindFirstResult = { id: "li1", individualTracking: true };
     lendingLoanFindFirstResult = { id: "loan1" };
     const res = await post("/item1", { ...base, lendable: "1", quantity: "5", maxRequestLimited: "1", maxRequestQuantity: "3" });
@@ -462,7 +476,7 @@ describe("GET /:id/edit lendable checkbox", () => {
 
   it("renders the saved maxRequestQuantity of a batch item", async () => {
     currentUser = lendingManager();
-    itemsFindFirstResult = makeItem({ category: "equipment", quantity: 5 });
+    itemsFindFirstResult = makeItem({ quantity: 5 });
     lendingItemFindFirstResult = { id: "li1", individualTracking: false, publicRequestable: false, maxRequestQuantity: 3, timesRequired: false };
     const html = await (await inventoryRoutes.request("/item1/edit")).text();
     expect(html).toMatch(/name="maxRequestLimited"[^>]*checked/);
@@ -519,19 +533,19 @@ describe("GET / lending columns", () => {
 
 describe("GET /inspections", () => {
   it("keeps range/rel/dir in the filter form and preset link resets them", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
     const html = (await (await inventoryRoutes.request("/inspections?inspection=HU&range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
     expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="rel" value="P6M"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="inspection" value="HU"/);
-    // Preset-Link: behält category, setzt range auf Preset-Id; rel/dir/start/end fallen weg
+    // Preset-Link: behält den Prüfart-Filter, setzt range auf Preset-Id; rel/dir/start/end fallen weg
     const preset = html.match(/href="(\/inventory\/inspections\?[^"]*range=3m[^"]*)"/)![1];
     expect(preset).toContain("inspection=HU");
     expect(preset).not.toMatch(/rel=|dir=|start=|end=/);
   });
 
   it("marks an overdue item", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
     const res = await inventoryRoutes.request("/inspections?start=1999-01-01&end=2100-01-01");
     const html = await res.text();
     expect(html).toContain("TÜV fällig");
@@ -539,7 +553,7 @@ describe("GET /inspections", () => {
   });
 
   it("shows an overdue item even outside the selected date range", async () => {
-    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", category: "vehicle", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
+    itemsFindManyResult = [makeItem({ id: "a", name: "TÜV fällig", inspections: [{ id: "p1", name: "HU", intervalMonths: null, inspectedAt: null, dueDate: "2000-01-01" }] })];
     // No start/end query params → route defaults to today..+12 months, which
     // would otherwise hide this item entirely.
     const res = await inventoryRoutes.request("/inspections");
@@ -581,7 +595,7 @@ describe("inspection types", () => {
   it("creates inspections with a new item, ignoring blank rows", async () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
-      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: ["", ""], insp_name: ["HU", ""], insp_interval: ["24", ""], insp_last: ["", ""], insp_due: ["2027-01-01", ""] } as any),
+      body: formBody({ name: "LF", enabledFields: "inspection", insp_id: ["", ""], insp_name: ["HU", ""], insp_interval: ["24", ""], insp_last: ["", ""], insp_due: ["2027-01-01", ""] } as any),
     });
     expect(res.status).toBe(302);
     const call = insertCalls.find((c) => c.table === inventoryInspections)!;
@@ -591,19 +605,20 @@ describe("inspection types", () => {
   it("rejects an invalid inspection row and re-renders the form", async () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
-      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: "", insp_name: "", insp_interval: "5", insp_last: "", insp_due: "" } as any),
+      body: formBody({ name: "LF", enabledFields: "inspection", insp_id: "", insp_name: "", insp_interval: "5", insp_last: "", insp_due: "" } as any),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
   });
 
   it("offers the configuration links in the item form (new tab) only with inventory:configure, and no gear in the list", async () => {
-    const plain = await (await inventoryRoutes.request("/new")).text();
+    const plain = await (await inventoryRoutes.request("/new?template=none")).text();
     expect(plain).not.toContain('href="/inventory/inspection-templates"');
     currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "inventory:configure"]), disabled: false };
-    const html = await (await inventoryRoutes.request("/new")).text();
+    const html = await (await inventoryRoutes.request("/new?template=none")).text();
     expect(html).toMatch(/href="\/inventory\/inspection-templates" target="_blank"/);
     expect(html).toMatch(/href="\/inventory\/fields" target="_blank"/);
+    expect(html).toMatch(/href="\/inventory\/templates" target="_blank"/);
     expect(await (await inventoryRoutes.request("/")).text()).not.toContain("Freie Felder");
   });
 
@@ -621,7 +636,7 @@ describe("inspection types", () => {
     itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "A", null), insp("p2", "B", null)] });
     const res = await inventoryRoutes.request("/item1", {
       method: "POST",
-      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: ["p1", "p2"], insp_name: ["B", "A"], insp_interval: ["", ""], insp_last: ["", ""], insp_due: ["", ""] } as any),
+      body: formBody({ name: "LF", enabledFields: "inspection", insp_id: ["p1", "p2"], insp_name: ["B", "A"], insp_interval: ["", ""], insp_last: ["", ""], insp_due: ["", ""] } as any),
     });
     expect(res.status).toBe(302);
     const sets = updateCalls.filter((c) => c.table === inventoryInspections).map((c) => c.set.name);
@@ -632,7 +647,7 @@ describe("inspection types", () => {
     transaction.mockRejectedValueOnce({ code: "23505", constraint: "inventory_inspections_item_name_idx" });
     const res = await inventoryRoutes.request("/", {
       method: "POST",
-      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: "", insp_name: "HU", insp_interval: "", insp_last: "", insp_due: "" } as any),
+      body: formBody({ name: "LF", enabledFields: "inspection", insp_id: "", insp_name: "HU", insp_interval: "", insp_last: "", insp_due: "" } as any),
     });
     expect(res.status).toBe(422);
     const html = await res.text();
@@ -708,18 +723,54 @@ describe("GET /search-members", () => {
 // ── New / edit pages ─────────────────────────────────────────────────────
 
 describe("GET /new", () => {
-  it("renders the empty form", async () => {
-    const res = await inventoryRoutes.request("/new");
-    const html = await res.text();
-    expect(html).toContain("Neuer Gegenstand");
+  const tpl = { id: "t1", name: "Hydrant", enabledFields: ["location", "inspection", "bogus"] };
+
+  it("starts with the template choice, including 'Ohne Vorlage'", async () => {
+    itemTemplatesFindManyResult = [{ id: "t2", name: "PSA", enabledFields: [] }, tpl];
+    const html = await (await inventoryRoutes.request("/new")).text();
+    expect(html).toContain('href="/inventory/new?template=t1"');
+    expect(html).toContain('href="/inventory/new?template=t2"');
+    expect(html).toContain('href="/inventory/new?template=none"');
+    expect(html.indexOf("Hydrant")).toBeLessThan(html.indexOf("PSA"));
+    expect(html).not.toContain('name="name"');
+    expect(html).not.toContain('name="category"');
   });
 
-  it("renders five category radios and a nameless mirror select", async () => {
-    const html = await (await inventoryRoutes.request("/new")).text();
-    expect(html.match(/<input[^>]*name="category"/g)).toHaveLength(5);
-    const select = html.match(/<select[^>]*id="inventory-category-select"[^>]*>([\s\S]*?)<\/select>/)!;
-    expect(select[0]).not.toMatch(/\sname="/);
-    expect(select[1].match(/<option value="[a-z]+"/g)).toHaveLength(5);
+  it("renders the empty form without a template", async () => {
+    const html = await (await inventoryRoutes.request("/new?template=none")).text();
+    expect(html).toContain("Neuer Gegenstand");
+    expect(html).toContain('name="name"');
+    expect(html).not.toMatch(/name="enabledFields"[^>]*checked/);
+    expect(html).not.toContain('name="category"');
+    expect(html).not.toContain("inventory-category-select");
+  });
+
+  it("copies fields, free fields, inspections and the template name as tag into the form", async () => {
+    itemTemplateFindFirstResult = {
+      ...tpl,
+      fieldDefs: [
+        { fieldDef: { id: "f1", name: "Hydrantentyp", type: "select", options: ["Unterflur"], archived: false } },
+        { fieldDef: { id: "f2", name: "Alt", type: "text", options: null, archived: true } },
+      ],
+      inspections: [{ inspectionTemplate: { name: "Jahresprüfung", defaultIntervalMonths: 12 } }],
+    };
+    fieldDefsFindManyResult = [{ id: "f1", name: "Hydrantentyp", type: "select", options: ["Unterflur"], archived: false }, { id: "f2", name: "Alt", type: "text", options: null, archived: true }];
+    const html = await (await inventoryRoutes.request("/new?template=t1")).text();
+    expect(html).toMatch(/name="enabledFields" value="location" checked/);
+    expect(html).toMatch(/name="enabledFields" value="inspection" checked/);
+    expect(html).not.toMatch(/name="enabledFields" value="quantity"[^>]*checked/);
+    expect(html).toMatch(/name="freeFields" value="f1" checked/);
+    expect(html).not.toMatch(/name="freeFields" value="f2"/);
+    expect(html).toMatch(/name="insp_name"[^>]*value="Jahresprüfung"/);
+    expect(html).toMatch(/name="insp_interval"[^>]*value="12"/);
+    expect(html).toMatch(/name="tags"[^>]*value="Hydrant"/);
+    expect(html).not.toContain("template_id");
+  });
+
+  it("falls back to the choice for an unknown template", async () => {
+    const res = await inventoryRoutes.request("/new?template=missing");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/inventory/new");
   });
 });
 
@@ -732,7 +783,7 @@ describe("GET /:id/edit", () => {
 
   it("renders the ppe assignment picker with the current member pre-filled", async () => {
     itemsFindFirstResult = makeItem({
-      category: "ppe", serials: [{ serial: "SN-1" }],
+      serials: [{ serial: "SN-1" }],
       assignments: [{ id: "a1", inventoryItemId: "item1", memberId: "m1", quantity: 1, member: { id: "m1", person: { firstName: "Anna", lastName: "Bauer" } } }],
     });
     const html = await (await inventoryRoutes.request("/item1/edit")).text();
@@ -756,7 +807,7 @@ describe("POST /:id", () => {
     const res = await inventoryRoutes.request("/missing", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "X", category: "other" }),
+      body: formBody({ name: "X" }),
     });
     expect(res.status).toBe(404);
   });
@@ -766,7 +817,7 @@ describe("POST /:id", () => {
     const res = await inventoryRoutes.request("/item1", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "", category: "vehicle" }),
+      body: formBody({ name: "" }),
     });
     expect(res.status).toBe(422);
   });
@@ -776,7 +827,7 @@ describe("POST /:id", () => {
     const res = await inventoryRoutes.request("/item1", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "TSF-W 2", category: "vehicle", tags: "neu" }),
+      body: formBody({ name: "TSF-W 2", tags: "neu" }),
     });
     expect(res.status).toBe(302);
     expect(updateCalls[0].table).toBe(inventoryItems);
@@ -790,7 +841,7 @@ describe("POST /:id", () => {
 
 describe("inventory numbers", () => {
   it("saves numbers, dropping duplicates and keeping commas/spaces", async () => {
-    const res = await post("/", { name: "Helm", category: "equipment", quantity: "3", enabledFields: ["quantity", "numbers"], numbers: ["00 211 504", "FW_12/a, x", "00 211 504"] });
+    const res = await post("/", { name: "Helm", quantity: "3", enabledFields: ["quantity", "numbers"], numbers: ["00 211 504", "FW_12/a, x", "00 211 504"] });
     expect(res.status).toBe(302);
     const ins = insertCalls.find((c) => c.table === inventoryItemNumbers)!;
     expect(ins.values).toEqual([
@@ -800,19 +851,19 @@ describe("inventory numbers", () => {
   });
 
   it("rejects more numbers than quantity", async () => {
-    const res = await post("/", { name: "Helm", category: "equipment", quantity: "1", enabledFields: ["quantity", "numbers"], numbers: ["A", "B"] });
+    const res = await post("/", { name: "Helm", quantity: "1", enabledFields: ["quantity", "numbers"], numbers: ["A", "B"] });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
   });
 
   it("rejects control characters and >100 chars", async () => {
-    expect((await post("/", { name: "H", category: "equipment", enabledFields: "numbers", numbers: "a\u0007b" })).status).toBe(422);
-    expect((await post("/", { name: "H", category: "equipment", enabledFields: "numbers", numbers: "x".repeat(101) })).status).toBe(422);
+    expect((await post("/", { name: "H", enabledFields: "numbers", numbers: "a\u0007b" })).status).toBe(422);
+    expect((await post("/", { name: "H", enabledFields: "numbers", numbers: "x".repeat(101) })).status).toBe(422);
   });
 
   it("rejects a number taken by another item, marking archived ones", async () => {
     numbersFindManyResult = [{ number: "A1", inventoryItemId: "other", item: { name: "Alt-Helm", retiredAt: "2024-01-01" } }];
-    const res = await post("/", { name: "Helm", category: "equipment", enabledFields: "numbers", numbers: "A1" });
+    const res = await post("/", { name: "Helm", enabledFields: "numbers", numbers: "A1" });
     expect(res.status).toBe(422);
     const html = await res.text();
     expect(html).toContain("A1");
@@ -823,14 +874,14 @@ describe("inventory numbers", () => {
   it("allows the item's own numbers on update and replaces them", async () => {
     itemsFindFirstResult = makeItem({ numbers: [{ number: "A1" }] });
     numbersFindManyResult = [{ number: "A1", inventoryItemId: "item1", item: { name: "x", retiredAt: null } }];
-    const res = await post("/item1", { name: "Helm", category: "equipment", numbers: "A1" });
+    const res = await post("/item1", { name: "Helm", numbers: "A1" });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === inventoryItemNumbers)).toBe(true);
   });
 
   it("rejects lowering quantity below the number count", async () => {
     itemsFindFirstResult = makeItem({});
-    const res = await post("/item1", { name: "Helm", category: "equipment", quantity: "1", enabledFields: ["quantity", "numbers"], numbers: ["A", "B"] });
+    const res = await post("/item1", { name: "Helm", quantity: "1", enabledFields: ["quantity", "numbers"], numbers: ["A", "B"] });
     expect(res.status).toBe(422);
   });
 
@@ -859,7 +910,7 @@ describe("inventory numbers", () => {
 describe("detail view serial number", () => {
   it("shows serial number for a single scba item", async () => {
     currentUser = { ...currentUser, permissions: new Set(["inventory:read"]) };
-    itemsFindFirstResult = makeItem({ category: "scba", serials: [{ serial: "SN-4711" }], quantity: 1 });
+    itemsFindFirstResult = makeItem({ serials: [{ serial: "SN-4711" }], quantity: 1 });
     const html = await (await inventoryRoutes.request("/item1")).text();
     currentUser = { ...currentUser, permissions: new Set(["inventory:read", "inventory:manage"]) };
     expect(html).toContain("Seriennummer");
@@ -872,21 +923,21 @@ describe("free fields", () => {
 
   it("stores the value of a selected free field", async () => {
     fieldDefsFindManyResult = [def];
-    const res = await post("/", { name: "Hydrant", category: "other", freeFields: "d1", ff_d1: "DN 80" });
+    const res = await post("/", { name: "Hydrant", freeFields: "d1", ff_d1: "DN 80" });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table === inventoryFieldValues)?.values).toEqual([{ inventoryItemId: "new-id", fieldDefId: "d1", value: "DN 80" }]);
   });
 
   it("rejects a value outside the options", async () => {
     fieldDefsFindManyResult = [def];
-    const res = await post("/", { name: "Hydrant", category: "other", freeFields: "d1", ff_d1: "DN 5" });
+    const res = await post("/", { name: "Hydrant", freeFields: "d1", ff_d1: "DN 5" });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain(t("inventory.form.freeFieldInvalid", { fields: "Nennweite" }));
   });
 
   it("ignores a newly selected archived field", async () => {
     fieldDefsFindManyResult = [{ ...def, archived: true }];
-    const res = await post("/", { name: "Hydrant", category: "other", freeFields: "d1", ff_d1: "DN 80" });
+    const res = await post("/", { name: "Hydrant", freeFields: "d1", ff_d1: "DN 80" });
     expect(res.status).toBe(302);
     expect(insertCalls.some((c) => c.table === inventoryFieldValues)).toBe(false);
   });
@@ -895,7 +946,7 @@ describe("free fields", () => {
     fieldDefsFindManyResult = [def];
     fieldValuesFindManyResult = [{ fieldDefId: "d1", value: "DN 80" }];
     itemsFindFirstResult = makeItem({});
-    const res = await post("/item1", { name: "Hydrant", category: "other" });
+    const res = await post("/item1", { name: "Hydrant" });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain(t("inventory.form.freeFieldLocked", { fields: "Nennweite" }));
   });
@@ -904,14 +955,14 @@ describe("free fields", () => {
     fieldDefsFindManyResult = [def];
     fieldValuesFindManyResult = [{ fieldDefId: "d1", value: null }];
     itemsFindFirstResult = makeItem({});
-    expect((await post("/item1", { name: "Hydrant", category: "other" })).status).toBe(302);
+    expect((await post("/item1", { name: "Hydrant" })).status).toBe(302);
   });
 });
 
 describe("enabled fields lock", () => {
   it("rejects deselecting a field that still holds data", async () => {
     itemsFindFirstResult = makeItem({ enabledFields: ["numbers"], numbers: [{ number: "A1" }] });
-    const res = await post("/item1", { name: "Helm", category: "equipment" });
+    const res = await post("/item1", { name: "Helm" });
     expect(res.status).toBe(422);
     const html = await res.text();
     expect(html).toContain(t("inventory.form.fieldLocked", { fields: t("inventory.field.numbers") }));
@@ -922,32 +973,32 @@ describe("enabled fields lock", () => {
 
   it("allows deselecting an empty field", async () => {
     itemsFindFirstResult = makeItem({ enabledFields: ["serials"] });
-    const res = await post("/item1", { name: "Helm", category: "equipment" });
+    const res = await post("/item1", { name: "Helm" });
     expect(res.status).toBe(302);
   });
 });
 
 describe("serial numbers", () => {
-  it("saves one serial per piece for a batch category", async () => {
-    const res = await post("/", { name: "Pager", category: "equipment", quantity: "3", enabledFields: ["quantity", "serials"], serials: ["S1", "S2", "S1"] });
+  it("saves one serial per piece for a batch", async () => {
+    const res = await post("/", { name: "Pager", quantity: "3", enabledFields: ["quantity", "serials"], serials: ["S1", "S2", "S1"] });
     expect(res.status).toBe(302);
     const ins = insertCalls.find((c) => c.table === inventoryItemSerials)!;
     expect(ins.values).toEqual([{ inventoryItemId: "new-id", serial: "S1" }, { inventoryItemId: "new-id", serial: "S2" }]);
   });
 
   it("rejects more serials than quantity", async () => {
-    const res = await post("/", { name: "Pager", category: "equipment", quantity: "1", enabledFields: ["quantity", "serials"], serials: ["S1", "S2"] });
+    const res = await post("/", { name: "Pager", quantity: "1", enabledFields: ["quantity", "serials"], serials: ["S1", "S2"] });
     expect(res.status).toBe(422);
   });
 
   it("ignores serials without the serials field", async () => {
-    await post("/", { name: "TSF", category: "vehicle", serials: "S1" });
+    await post("/", { name: "TSF", serials: "S1" });
     expect(insertCalls.some((c) => c.table === inventoryItemSerials)).toBe(false);
   });
 
   it("replaces serials on update", async () => {
-    itemsFindFirstResult = makeItem({ category: "equipment" });
-    const res = await post("/item1", { name: "Pager", category: "equipment", quantity: "2", serials: ["A", "B"] });
+    itemsFindFirstResult = makeItem();
+    const res = await post("/item1", { name: "Pager", quantity: "2", serials: ["A", "B"] });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === inventoryItemSerials)).toBe(true);
   });
@@ -956,13 +1007,13 @@ describe("serial numbers", () => {
 describe("race on unique number", () => {
   it("returns 422 instead of 500 on unique violation", async () => {
     transaction.mockRejectedValueOnce(Object.assign(new Error("dup"), { code: "23505" }));
-    const res = await post("/", { name: "Helm", category: "equipment", numbers: "A1" });
+    const res = await post("/", { name: "Helm", numbers: "A1" });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("anderweitig vergeben");
   });
   it("rethrows other errors", async () => {
     transaction.mockRejectedValueOnce(new Error("boom"));
-    const res = await post("/", { name: "Helm", category: "equipment" });
+    const res = await post("/", { name: "Helm" });
     expect(res.status).toBe(500);
   });
 });

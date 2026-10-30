@@ -3,31 +3,19 @@ import { boolean, date, index, integer, numeric, pgEnum, pgTable, primaryKey, te
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
-export const inventoryCategoryEnum = pgEnum("inventory_category", ["vehicle", "scba", "equipment", "ppe", "other"]);
-
 export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  // Nullable bis Migration B (Kategorie-Ablösung, Backlog 118) die Spalte entfernt.
-  category: inventoryCategoryEnum("category"),
   commissionedAt: date("commissioned_at"),
   purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
   notes: text("notes"),
   retiredAt: date("retired_at"),
   retiredReason: text("retired_reason"),
-  // 1 = Einzelstück (default), >1 = Batch — app-validated per category, see
-  // BATCH_CAPABLE_CATEGORIES in routes/inventory.tsx.
+  // 1 = Einzelstück (default), >1 = Batch — nur mit dem Feld "quantity" (enabledFields).
   quantity: integer("quantity").notNull().default(1),
   // Teilmengen-Ausmusterung bei Batches; retiredAt wird gesetzt sobald
   // retiredQuantity == quantity (siehe routes/inventory.tsx retire-Handler).
   retiredQuantity: integer("retired_quantity").notNull().default(0),
-  // Fahrzeuge
-  licensePlate: text("license_plate"),
-  yearOfManufacture: integer("year_of_manufacture"),
-  vehicleInspectionDue: date("vehicle_inspection_due"),
-  // SCBA / Gerät / PSA
-  nextInspectionDue: date("next_inspection_due"),
-  lastInspectionDate: date("last_inspection_date"),
   // Feste Felder, die dieser Posten hat (Schlüssel siehe INVENTORY_FIELDS in lib/inventory.ts).
   enabledFields: text("enabled_fields").array().notNull().default([]),
   // Feld "location": Standort-Text + optionale Koordinaten (nur zusammen).

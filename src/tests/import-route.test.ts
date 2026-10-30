@@ -11,7 +11,12 @@ vi.mock("../db/index.js", () => {
     get: (_t, k) => (k === "then" ? (r: any) => r([{ id: "x" }]) : txChain),
     apply: () => txChain,
   });
-  return { db: { select: () => chain, transaction: async (fn: any) => fn({ insert: () => txChain, select: () => txChain }) } };
+  const templates = [
+    { id: "t-psa", name: "PSA", enabledFields: ["quantity", "numbers"] },
+    { id: "t-geraet", name: "Gerät", enabledFields: ["quantity", "numbers", "serials"] },
+    { id: "t-sonst", name: "Sonstiges", enabledFields: ["quantity"] },
+  ];
+  return { db: { select: () => chain, query: { inventoryTemplates: { findMany: async () => [...templates] } }, transaction: async (fn: any) => fn({ insert: () => txChain, select: () => txChain }) } };
 });
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -52,7 +57,10 @@ describe("import routes", () => {
       { InventarID: 2, "Inventartyp (Voll)": "Schlauch", Bezeichnung: "B-Schlauch", "Inventarnr.": "A2", "Standort (komplett)": "Auto", Indienststellung: 42000 },
     ]));
     expect(res.status).toBe(200);
-    expect(await res.text()).toContain("B-Schlauch");
+    const html = await res.text();
+    expect(html).toContain("B-Schlauch");
+    expect(html).toContain('name="tpl_0"');
+    expect(html).toContain("Gerät");
   });
   it("rejects a file of the wrong kind when kind is set", async () => {
     const fd = upload(INV_HEAD, [{ InventarID: 1, Bezeichnung: "X" }]);
@@ -118,7 +126,7 @@ describe("import routes", () => {
       { InventarID: 4, "Inventartyp (Voll)": "Schlauchbrücke", Bezeichnung: "Brücke", "Inventarnr.": "B2" },
       { InventarID: 5, "Inventartyp (Voll)": "Schlauchbrücke", Bezeichnung: "Brücke", "Inventarnr.": "" },
     ];
-    for (const extra of [{}, { cat_0: "equipment", nob_0: "1" }, { nob_0: "" }]) {
+    for (const extra of [{}, { tpl_0: "t-geraet", nob_0: "1" }, { nob_0: "" }]) {
       const fd = upload(INV_HEAD, rows);
       for (const [k, v] of Object.entries(extra)) fd.set(k, v);
       const res = await post("/preview", fd);

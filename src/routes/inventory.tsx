@@ -3,10 +3,10 @@ import { ToggleFilter } from "../components/toggle-filter.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
-import type { IconName } from "../components/icons.generated.js";
+import { TagBadges } from "../components/tag-badges.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -21,19 +21,21 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addDays, addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { inventoryFieldRoutes } from "./inventory-fields.js";
 import { inventoryInspectionTemplateRoutes } from "./inventory-inspection-templates.js";
+import { inventoryTemplateRoutes } from "./inventory-templates.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 // Vor den /:id-Routen registrieren, sonst frisst /:id den Pfad.
 inventoryRoutes.route("/fields", inventoryFieldRoutes);
 inventoryRoutes.route("/inspection-templates", inventoryInspectionTemplateRoutes);
+inventoryRoutes.route("/templates", inventoryTemplateRoutes);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,47 +50,8 @@ type FreeDef = typeof inventoryFieldDefs.$inferSelect;
 type Inspection = typeof inventoryInspections.$inferSelect;
 type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[]; inspections: Inspection[]; fieldValues?: (typeof inventoryFieldValues.$inferSelect & { fieldDef: FreeDef })[] };
 
-const CATEGORY_CONFIG: { category: InventoryCategory; icon: IconName }[] = [
-  { category: "vehicle", icon: "firetruck" },
-  { category: "scba", icon: "scuba-diving-tank" },
-  { category: "equipment", icon: "axe" },
-  { category: "ppe", icon: "jacket" },
-  { category: "other", icon: "squares-2x2" },
-];
-export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
-// Vorbelegung des "Felder"-Blocks beim Anlegen, gleiche Mengen wie die Altdaten-Migration (Backlog 115).
-const FIELD_PRESETS: Record<InventoryCategory, InventoryField[]> = {
-  vehicle: ["numbers", "inspection"],
-  scba: ["numbers", "serials", "inspection"],
-  equipment: ["quantity", "numbers", "serials", "inspection"],
-  ppe: ["quantity", "numbers", "serials", "assignments", "inspection"],
-  other: ["quantity", "numbers"],
-};
-
-export const CATEGORY_LABELS: Record<InventoryCategory, string> = {
-  vehicle: t("inventory.category.vehicle"),
-  scba: t("inventory.category.scba"),
-  equipment: t("inventory.category.equipment"),
-  ppe: t("inventory.category.ppe"),
-  other: t("inventory.category.other"),
-};
-
-// Fixed color per category (styleguide doesn't cover badges yet) — success/warning/
-// error stay reserved for the inspection-due status, no double meaning of color.
-const CATEGORY_BADGE: Record<InventoryCategory, string> = {
-  vehicle: "badge badge-primary",
-  scba: "badge badge-info",
-  equipment: "badge badge-secondary",
-  ppe: "badge badge-accent",
-  other: "badge badge-neutral",
-};
-
 // Only members who can actually carry PSA get offered in the assignment picker.
 const ASSIGNABLE_MEMBER_STATUSES = new Set(["active", "youth"]);
-
-export function CategoryBadge({ category }: { category: InventoryCategory }) {
-  return <span class={`${CATEGORY_BADGE[category]} badge-sm`}>{CATEGORY_LABELS[category]}</span>;
-}
 
 // ── Form field parsing ───────────────────────────────────────────────────────
 
@@ -96,14 +59,11 @@ type AssignmentInput = { memberId: string; name: string; quantity: number };
 
 export type InventoryFieldValues = {
   name: string;
-  category: string;
   commissionedAt: string;
   numbersList?: string[];
   purchasePrice: string;
   notes: string;
   tagsList?: string[];
-  licensePlate: string;
-  yearOfManufacture: string;
   serialsList?: string[];
   // Prüfarten (Feld "inspection"): Zeilen roh fürs Rendern, Fehler je Zeilenindex, Vorschläge fürs <datalist>.
   inspectionRows?: InspectionFormRow[];
@@ -129,12 +89,9 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
   const enabledFieldsList = parseList(body, "enabledFields").filter((f): f is InventoryField => (INVENTORY_FIELDS as readonly string[]).includes(f));
   const values: InventoryFieldValues = {
     name: trimmed(body, "name"),
-    category: trimmed(body, "category"),
     commissionedAt: trimmed(body, "commissionedAt"),
     purchasePrice: trimmed(body, "purchasePrice"),
     notes: trimmed(body, "notes"),
-    licensePlate: trimmed(body, "licensePlate"),
-    yearOfManufacture: trimmed(body, "yearOfManufacture"),
     quantity: trimmed(body, "quantity") || "1",
     assignedMemberId: trimmed(body, "assignedMemberId"),
     assignments: trimmed(body, "assignments") || "[]",
@@ -147,12 +104,8 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
 
   const errors: Record<string, string> = {};
   if (!values.name) errors.name = t("common.required");
-  if (!(CATEGORIES as string[]).includes(values.category)) errors.category = t("common.required");
   if (values.purchasePrice && !Number.isFinite(Number(values.purchasePrice.replace(",", ".")))) {
     errors.purchasePrice = t("inventory.form.invalidNumber");
-  }
-  if (values.yearOfManufacture && !/^\d{4}$/.test(values.yearOfManufacture)) {
-    errors.yearOfManufacture = t("inventory.form.invalidYear");
   }
   const quantityNum = Number(values.quantity);
   if (hasField(enabledFieldsList, "quantity") && (!Number.isInteger(quantityNum) || quantityNum < 1)) {
@@ -189,7 +142,7 @@ function parseBatchAssignments(json: string): AssignmentInput[] {
 // Single-item mode (quantity 1) keeps the one-member picker; batch mode (quantity > 1,
 // only possible with "quantity" enabled) allows several members each holding a stated
 // quantity, capped by what's left after retiring. Neither mode needs a specific category
-// anymore — gated purely by the "assignments" field (see 115_Inventar-Felder-Baukasten).
+// — gated purely by the "assignments" field (see 115_Inventar-Felder-Baukasten).
 function resolveAssignments(
   values: InventoryFieldValues,
   enabledFields: readonly string[],
@@ -207,25 +160,19 @@ function resolveAssignments(
   return { assignments: [] };
 }
 
-// Which fixed fields are visible/stored is now purely enabledFields, not category —
-// except license plate/year/vehicle-inspection, the one remaining category exception
-// (see 115_Inventar-Felder-Baukasten "Fahrzeug-Spalten").
+// Which fixed fields are visible/stored is purely enabledFields (see 115_Inventar-Felder-Baukasten).
 export function toInsertValues(values: InventoryFieldValues) {
-  const category = values.category as InventoryCategory;
   const enabledFields = values.enabledFieldsList ?? [];
   const hasQuantity = hasField(enabledFields, "quantity");
   const quantity = hasQuantity ? Math.max(1, Math.round(Number(values.quantity)) || 1) : 1;
   const hasLocation = hasField(enabledFields, "location");
   return {
     name: values.name,
-    category,
     commissionedAt: values.commissionedAt || null,
     purchasePrice: values.purchasePrice ? values.purchasePrice.replace(",", ".") : null,
     notes: values.notes || null,
     quantity,
     enabledFields: [...enabledFields],
-    licensePlate: category === "vehicle" ? values.licensePlate || null : null,
-    yearOfManufacture: category === "vehicle" && values.yearOfManufacture ? Number(values.yearOfManufacture) : null,
     locationText: hasLocation ? values.locationText || null : null,
     latitude: hasLocation ? values.latitude || null : null,
     longitude: hasLocation ? values.longitude || null : null,
@@ -468,18 +415,16 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
   );
 }
 
-// ── Category-dependent form fields ──────────────────────────────────────────
+// ── Field-dependent form sections ───────────────────────────────────────────
 
 // No precedent in the code for dynamic show/hide of form fields — plain client-side
 // classList toggle (same idea as the pagination <select> inline script in
 // members.tsx), not an HTMX round-trip for a purely visual switch. Two toggles
-// compose here: which category is selected, and (for BATCH_CAPABLE_CATEGORIES)
-// whether the batch checkbox is on — data-show-cats/data-show-batch express both
-// without duplicating any input's `name` across categories (duplicate names would
-// silently clobber each other in FormData on submit).
-const CATEGORY_TOGGLE_SCRIPT = `
+// compose here: which fixed fields are checked, and whether quantity > 1 (batch) —
+// data-field/data-show-batch express both without duplicating any input's `name`
+// (duplicate names would silently clobber each other in FormData on submit).
+const FORM_TOGGLE_SCRIPT = `
   function updateInventoryFormVisibility() {
-    var cat = document.querySelector('input[name=category]:checked')?.value || '';
     var on = {};
     document.querySelectorAll('input[name=enabledFields]:checked').forEach(function(c) { on[c.value] = true; });
     var qtyInput = document.getElementById('inventory-quantity');
@@ -490,20 +435,11 @@ const CATEGORY_TOGGLE_SCRIPT = `
       qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     var isBatch = Boolean(on.quantity && qtyInput && Number(qtyInput.value) > 1);
-    document.querySelectorAll('[data-field], [data-show-cats]').forEach(function(el) {
-      var fieldOk = el.dataset.field === undefined || Boolean(on[el.dataset.field]);
-      var catOk = el.dataset.showCats === undefined || el.dataset.showCats.split(',').indexOf(cat) >= 0;
+    document.querySelectorAll('[data-field]').forEach(function(el) {
+      var fieldOk = Boolean(on[el.dataset.field]);
       var batchOk = el.dataset.showBatch === undefined || (el.dataset.showBatch === 'true') === isBatch;
-      el.classList.toggle('hidden', !(fieldOk && catOk && batchOk));
+      el.classList.toggle('hidden', !(fieldOk && batchOk));
     });
-  }
-  // New item: a category change pre-selects the usual fields (same sets as the legacy-data migration).
-  function applyInventoryPreset() {
-    var root = document.getElementById('inventory-fields');
-    if (!root || !root.dataset.preset) return;
-    var cat = document.querySelector('input[name=category]:checked')?.value || '';
-    var preset = JSON.parse(root.dataset.preset)[cat] || [];
-    document.querySelectorAll('input[name=enabledFields]').forEach(function(c) { c.checked = preset.indexOf(c.value) >= 0; });
   }
   updateInventoryFormVisibility();
 `;
@@ -565,43 +501,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         {errors?.name && <span class="text-error text-sm mt-1">{errors.name}</span>}
       </Field>
 
-      <Field label={t("inventory.form.category")} required floating={false}>
-        {/* Radios stay the only submitted source; the nameless <select> mirrors them on narrow containers. */}
-        <div class="@container">
-          <select
-            id="inventory-category-select"
-            class="select w-full @sm:hidden"
-            onchange="document.querySelector('input[name=category][value=' + this.value + ']').checked = true; applyInventoryPreset(); updateInventoryFormVisibility()"
-          >
-            <button type="button"><selectedcontent></selectedcontent></button>
-            <option value="" disabled selected={!v.category} hidden></option>
-            {CATEGORY_CONFIG.map(({ category, icon }) => (
-              <option value={category} selected={v.category === category}>
-                <Icon name={icon} class="size-5" />
-                {CATEGORY_LABELS[category]}
-              </option>
-            ))}
-          </select>
-          <div class="join hidden @sm:inline-flex">
-            {CATEGORY_CONFIG.map(({ category, icon }) => (
-              <label class="join-item btn has-[:checked]:btn-outline has-[:checked]:btn-primary" title={CATEGORY_LABELS[category]}>
-                <input
-                  type="radio"
-                  name="category"
-                  value={category}
-                  checked={v.category === category}
-                  class="hidden"
-                  onchange="document.getElementById('inventory-category-select').value = this.value; applyInventoryPreset(); updateInventoryFormVisibility()"
-                />
-                <Icon name={icon} class="size-5" />
-                <span class="sr-only @xl:not-sr-only">{CATEGORY_LABELS[category]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        {errors?.category && <span class="text-error text-sm mt-1">{errors.category}</span>}
-      </Field>
-
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("inventory.form.commissionedAt")}>
           <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
@@ -627,10 +526,11 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow">
               <li><a href="/inventory/inspection-templates" target="_blank" rel="noopener">{t("inventory.tabs.inspectionTemplates")}</a></li>
               <li><a href="/inventory/fields" target="_blank" rel="noopener">{t("inventory.tabs.fields")}</a></li>
+              <li><a href="/inventory/templates" target="_blank" rel="noopener">{t("inventory.tabs.itemTemplates")}</a></li>
             </ul>
           </div>
         )}
-        <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields" data-preset={v.enabledFieldsList ? undefined : JSON.stringify(FIELD_PRESETS)}>
+        <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields">
           {INVENTORY_FIELDS.map((f) => (
             <label class="label cursor-pointer justify-start gap-2 w-fit">
               <input type="checkbox" name="enabledFields" value={f} checked={hasField(v.enabledFieldsList, f)} class="checkbox" onchange="updateInventoryFormVisibility()" />
@@ -639,19 +539,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           ))}
         </div>
         {errors?.enabledFields && <span class="text-error text-sm">{errors.enabledFields}</span>}
-      </div>
-
-      <div data-show-cats="vehicle" class="space-y-4">
-        <div class="divider">{CATEGORY_LABELS.vehicle}</div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label={t("inventory.form.licensePlate")}>
-            <input type="text" name="licensePlate" value={v.licensePlate ?? ""} class="input w-full" placeholder={t("inventory.form.licensePlate")} />
-          </Field>
-          <Field label={t("inventory.form.yearOfManufacture")}>
-            <input type="text" inputmode="numeric" name="yearOfManufacture" value={v.yearOfManufacture ?? ""} class={`input w-full${errors?.yearOfManufacture ? " input-error" : ""}`} placeholder={t("inventory.form.yearOfManufacture")} />
-            {errors?.yearOfManufacture && <span class="text-error text-sm mt-1">{errors.yearOfManufacture}</span>}
-          </Field>
-        </div>
       </div>
 
       <div data-field="inspection" class="space-y-4">
@@ -762,7 +649,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
       <BatchAssignmentFields assignments={assignments ?? []} />
 
-      <script dangerouslySetInnerHTML={{ __html: CATEGORY_TOGGLE_SCRIPT }} />
+      <script dangerouslySetInnerHTML={{ __html: FORM_TOGGLE_SCRIPT }} />
     </>
   );
 }
@@ -851,13 +738,12 @@ async function resolveFree(values: InventoryFieldValues, stored: { fieldDefId: s
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
-// GET /inventory — list, category pills + tag checkbox-dropdown + archive toggle.
+// GET /inventory — list, tag checkbox-dropdown (OR) + archive toggle.
 // Loads everything and filters in JS, same reasoning as donations.tsx: the full
 // set is small and the tag filter needs the joined tags anyway.
 inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
   const q = c.req.query();
-  const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
   const tagFilter = c.req.queries("tag") ?? [];
   const inspectionFilter = c.req.queries("inspection") ?? [];
   const dueFilter = parseMulti(c.req.queries("due"), ["overdue", "soon"]);
@@ -895,8 +781,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         || (r.dueDate != null && ((dueFilter.includes("overdue") && r.dueDate < today) || (dueFilter.includes("soon") && r.dueDate >= today && r.dueDate <= soonEnd)));
       if (!candidates.some(matches)) return false;
     }
-    if (categoryFilter.length > 0 && !categoryFilter.includes(item.category)) return false;
-    if (tagFilter.length > 0 && !tagFilter.every((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
+    if (tagFilter.length > 0 && !tagFilter.some((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
     if (search) {
       const needle = search.toLowerCase();
@@ -911,11 +796,11 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const page = Math.min(reqPage, totalPages);
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, pageSize }, { page: p });
+  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, pageSize }, { page: p });
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { q: search, category: categoryFilter, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
-  const columnCount = 7 + (canLend ? 1 : 0);
+    buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
+  const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
@@ -944,23 +829,12 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
               hx-push-url="true"
             />
           </label>
-          {categoryFilter.map((v) => <input type="hidden" name="category" value={v} />)}
           {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
           {inspectionFilter.map((v) => <input type="hidden" name="inspection" value={v} />)}
           {dueFilter.map((v) => <input type="hidden" name="due" value={v} />)}
           {showArchived && <input type="hidden" name="archived" value="1" />}
           {lendableOnly && <input type="hidden" name="lendable" value="1" />}
         </form>
-        <MultiSelectFilter
-          param="category"
-          autoApply
-          options={CATEGORIES.map((cat) => ({ value: cat, label: CATEGORY_LABELS[cat] }))}
-          selected={categoryFilter}
-          allLabel={t("inventory.filter.allCategories")}
-          countLabel={(count) => t("inventory.filter.categoryCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
         <MultiSelectFilter
           param="tag"
           autoApply
@@ -1008,10 +882,9 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         <thead>
           <tr>
             <th>{t("inventory.table.name")}</th>
-            <th>{t("inventory.table.category")}</th>
+            <th>{t("inventory.table.tags")}</th>
             <th class="hidden md:table-cell">{t("inventory.table.dueDate")}</th>
             <th class="hidden lg:table-cell">{t("inventory.table.location")}</th>
-            <th class="hidden lg:table-cell">{t("inventory.table.tags")}</th>
             <th>{t("inventory.table.status")}</th>
             <th class="hidden md:table-cell">{t("inventory.table.quantity")}</th>
             {canLend && <th></th>}
@@ -1028,17 +901,12 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}'`}>
                 <td>{item.name}</td>
-                <td><CategoryBadge category={item.category as InventoryCategory} /></td>
+                <td><div class="flex flex-wrap gap-1"><TagBadges tags={item.tags.map((tg) => tg.tag)} /></div></td>
                 <td class="hidden md:table-cell">
                   {due ? <span class={due.dueDate! < today ? "text-error font-semibold" : ""}>{formatDate(due.dueDate!)} <span class="opacity-60">{due.name}</span></span> : "—"}
                   {open.length > 1 && <span class="badge badge-ghost badge-sm ml-1">+{open.length - 1}</span>}
                 </td>
                 <td class="hidden lg:table-cell">{item.locationText || "—"}</td>
-                <td class="hidden lg:table-cell">
-                  <div class="flex flex-wrap gap-1">
-                    {item.tags.map((tag) => <span class="badge badge-ghost badge-sm">{tag.tag}</span>)}
-                  </div>
-                </td>
                 <td>
                   {status === "retired" && <span class="badge badge-neutral badge-sm">{t("inventory.status.retired")}</span>}
                   {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
@@ -1235,12 +1103,47 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
   );
 }
 
-// GET /inventory/new
+// GET /inventory/new — erst die Vorlagenauswahl, dann das Formular mit kopierten Vorgaben (?template=<id>, "none" = leer).
+// Vorlagen sind nur Vorbelegung: am Posten bleibt keine Vorlagen-ID.
 inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
+  const templateId = c.req.query("template");
+  if (!templateId) {
+    const templates = ((await db.query.inventoryTemplates.findMany()) as { id: string; name: string }[]).sort((a, b) => a.name.localeCompare(b.name, "de"));
+    return c.html(
+      <Layout title={t("inventory.newItem")} user={user}>
+        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} />
+        <div id="template-choice" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl">
+          {templates.map((tpl) => (
+            <a href={`/inventory/new?template=${tpl.id}`} class="card card-border bg-base-100 border-base-300 hover:border-primary">
+              <div class="card-body p-4 flex-row items-center gap-3"><TagBadges tags={[tpl.name]} /></div>
+            </a>
+          ))}
+          <a href="/inventory/new?template=none" class="card card-border bg-base-100 border-base-300 border-dashed hover:border-primary">
+            <div class="card-body p-4"><span class="font-medium">{t("inventory.new.noTemplate")}</span></div>
+          </a>
+        </div>
+      </Layout>
+    );
+  }
+
+  let prefill: Partial<InventoryFieldValues> = {};
+  if (templateId !== "none") {
+    const tpl = (await db.query.inventoryTemplates.findFirst({
+      where: eq(inventoryTemplates.id, templateId),
+      with: { fieldDefs: { with: { fieldDef: true } }, inspections: { with: { inspectionTemplate: true } } },
+    })) as unknown as { name: string; enabledFields: string[]; fieldDefs: { fieldDef: FreeDef }[]; inspections: { inspectionTemplate: { name: string; defaultIntervalMonths: number | null } }[] } | undefined;
+    if (!tpl) return c.redirect("/inventory/new");
+    prefill = {
+      enabledFieldsList: tpl.enabledFields.filter((f): f is InventoryField => (INVENTORY_FIELDS as readonly string[]).includes(f)),
+      tagsList: [tpl.name],
+      freeRaw: Object.fromEntries(tpl.fieldDefs.filter((d) => !d.fieldDef.archived).map((d) => [d.fieldDef.id, ""])),
+      inspectionRows: tpl.inspections.map(({ inspectionTemplate: it }) => ({ id: "", name: it.name, interval: it.defaultIntervalMonths ? String(it.defaultIntervalMonths) : "", last: "", due: "" })),
+    };
+  }
   return c.html(
     <Layout title={t("inventory.newItem")} user={user}>
-      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} values={await withFree({})} />
+      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" cancelHref="/inventory/new" lendable={lendableField(user, false, {})} values={await withFree(prefill)} />
     </Layout>
   );
 });
@@ -1253,7 +1156,6 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const tags = canonicalizeTags(parseTags(body, "tags"), await tagVocabulary());
   const numbers = hasField(values.enabledFieldsList, "numbers") ? parseList(body, "numbers") : [];
   const serials = hasField(values.enabledFieldsList, "serials") ? parseList(body, "serials") : [];
-  const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, insertValues.enabledFields, insertValues.quantity);
   if (assignmentError) errors.assignments = assignmentError;
@@ -1397,12 +1299,9 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
 
   const values: Partial<InventoryFieldValues> & { tagsList?: string[] } = {
     name: item.name,
-    category: item.category,
     commissionedAt: item.commissionedAt ?? "",
     purchasePrice: item.purchasePrice ?? "",
     notes: item.notes ?? "",
-    licensePlate: item.licensePlate ?? "",
-    yearOfManufacture: item.yearOfManufacture ? String(item.yearOfManufacture) : "",
     serialsList: sortedSerials(item),
     quantity: String(item.quantity),
     assignedMemberId: !isBatch ? (assignmentList[0]?.memberId ?? "") : "",
@@ -1462,7 +1361,6 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   const tags = canonicalizeTags(parseTags(body, "tags"), await tagVocabulary());
   const numbers = hasField(values.enabledFieldsList, "numbers") ? parseList(body, "numbers") : [];
   const serials = hasField(values.enabledFieldsList, "serials") ? parseList(body, "serials") : [];
-  const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
   const { assignments, error: assignmentError } = resolveAssignments(values, insertValues.enabledFields, insertValues.quantity, existing.retiredQuantity);
   if (assignmentError) errors.assignments = assignmentError;
@@ -1861,13 +1759,12 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
     : undefined;
   const status = itemStatus(item, !!lending);
   const assigned = assignmentDisplayList(item);
-  const cat = item.category as InventoryCategory;
   const availableToRetire = item.quantity - item.retiredQuantity - assigned.reduce((sum, x) => sum + x.quantity, 0);
   const retireAction = canManage ? <RetireAction item={item} isBatch={item.quantity > 1} availableToRetire={availableToRetire} /> : undefined;
   const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
   return c.html(
     <Layout title={item.name} user={user}>
-      <PageHeader title={<>{item.name} <CategoryBadge category={cat} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
+      <PageHeader title={<>{item.name} <TagBadges tags={item.tags.map((tg) => tg.tag)} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
       {item.retiredAt && (
         <div class="alert alert-warning max-w-2xl mb-4">
           {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
@@ -1888,10 +1785,6 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
             <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
           </div>
         )}
-        {cat === "vehicle" && <>
-          <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
-          <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
-        </>}
         {hasField(item.enabledFields, "location") && <>
           <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
           <ViewField label={t("inventory.form.coordinates")} value={item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : null} />
@@ -1909,11 +1802,6 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
         <InspectionList item={item} canManage={canManage && !item.retiredAt} today={new Date().toISOString().slice(0, 10)} />
       )}
       {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
-      {item.tags.length > 0 && (
-        <div class="mt-6 flex flex-wrap gap-1">
-          {item.tags.map((tg) => <span class="badge badge-ghost badge-sm">{tg.tag}</span>)}
-        </div>
-      )}
     </Layout>
   );
 });

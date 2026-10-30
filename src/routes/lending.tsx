@@ -18,7 +18,6 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
-import { CATEGORIES, CATEGORY_LABELS } from "./inventory.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const lendingRoutes = new Hono<{ Variables: Variables }>();
@@ -138,7 +137,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const today = new Date().toISOString().slice(0, 10);
   const search = (c.req.query("q") ?? "").trim();
   const statusFilter = parseMulti(c.req.queries("status"), Object.keys(LOAN_STATUS_LABEL)) as LoanStatus[];
-  const categoryFilter = parseMulti(c.req.queries("category"), CATEGORIES);
+  const tagFilter = c.req.queries("tag") ?? [];
   // Ohne start/end in der URL gilt das Standardfenster; leere Felder heben es auf.
   const range = parseRange(c.req.query(), today, "future", { start: addDays(today, -14), end: addDays(today, 30) });
   const { start, end } = range;
@@ -149,6 +148,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const needle = search.toLowerCase();
 
   const all = await fetchAllLoans();
+  const allTags = [...new Set(all.flatMap((l) => l.lendingItem.inventoryItem.tags.map((tg) => tg.tag)))].sort((a, b) => a.localeCompare(b, "de"));
 
   const filtered = all.filter((l) => {
     if (start || end) {
@@ -160,7 +160,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
     }
     if (itemFilter && l.lendingItem.id !== itemFilter) return false;
     if (statusFilter.length > 0 && !statusFilter.includes(loanStatus(l, today))) return false;
-    if (categoryFilter.length > 0 && !categoryFilter.includes(l.lendingItem.inventoryItem.category)) return false;
+    if (tagFilter.length > 0 && !tagFilter.some((wanted) => l.lendingItem.inventoryItem.tags.some((tg) => tg.tag === wanted))) return false;
     if (member && Boolean(l.borrower.member) !== (member === "yes")) return false;
     if (needle && !`${l.lendingItem.inventoryItem.name} ${borrowerLabel(l)}`.toLowerCase().includes(needle)) return false;
     return true;
@@ -182,7 +182,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   }
 
   const presets = rangePresets(today, "future");
-  const hasFilter = Boolean(itemFilter || search || statusFilter.length || categoryFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
+  const hasFilter = Boolean(itemFilter || search || statusFilter.length || tagFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
   const canManage = user.permissions.has("lending:manage");
 
   return c.html(
@@ -201,22 +201,25 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           resetLabel={t("common.reset")}
         />
         <MultiSelectFilter
-          param="category"
-          options={CATEGORIES.map((cat) => ({ value: cat, label: CATEGORY_LABELS[cat] }))}
-          selected={categoryFilter}
-          allLabel={t("lending.filter.allCategories")}
-          countLabel={(count) => t("lending.filter.categoryCount", { count })}
+          param="tag"
+          searchable
+          options={allTags.map((tag) => ({ value: tag, label: tag }))}
+          selected={tagFilter}
+          allLabel={t("inventory.filter.allTags")}
+          countLabel={(count) => t("inventory.filter.tagCount", { count })}
           applyLabel={t("common.apply")}
           resetLabel={t("common.reset")}
+          searchPlaceholder={t("common.searchPlaceholder")}
+          emptyLabel={t("inventory.filter.noTags")}
         />
         <input type="hidden" name="member" value={member} />
         <input type="hidden" name="item" value={itemFilter} />
-        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, category: categoryFilter, member, ...rp })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
+        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, tag: tagFilter, member, ...rp })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
         <ToggleFilter items={pairToggles(member,
           [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }],
-          (m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, ...rp }, { member: m }))} />
+          (m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, tag: tagFilter, ...rp }, { member: m }))} />
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
-          href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, category: categoryFilter, member }, p)} />
+          href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, tag: tagFilter, member }, p)} />
         {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
       </form>
 
