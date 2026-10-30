@@ -127,13 +127,11 @@ Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, 
 
 Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donors, donations, admin/users, admin/permissions) öffnet zuerst read-only:
 
-- `GET /:id` = Read-only-Ansicht (`ViewGrid` + `ViewField` aus `src/components/field.tsx`, nie lokal neu definieren), `GET /:id/edit` = Formular. Ohne Schreibrecht leitet `/:id/edit` auf `/:id` um. „Neu“-Formulare öffnen direkt im Bearbeiten-Modus.
+- `GET /:id` = Read-only-Ansicht (`ViewGrid` + `ViewField` aus `src/components/field.tsx`, nie lokal neu definieren), `GET /:id/edit` = Formular. Ohne Schreibrecht leitet `/:id/edit` auf `/:id` um (entfällt bei `/inventory/fields`, `/inventory/inspection-templates`, `/inventory/templates`: ein einziges Recht `inventory:configure`, kein Leserecht). „Neu“-Formulare öffnen direkt im Bearbeiten-Modus.
 - Listen-Zeilenklick führt auf `/:id`. Nach Speichern: Redirect auf `/:id` + Toast; bei Validierungsfehler im Formular bleiben.
 - Read-only-Header: `DetailActions` (`src/components/page-header.tsx`) – „Löschen“ (`btn-outline btn-error`, nur mit Löschrecht), rechts davon „Bearbeiten“ (`btn-primary`, `pencil`, nur mit Schreibrecht).
 - Formular-Header: `FormActions` mit `cancelHref` (Abbrechen → `/:id`, Rückfrage bei Änderungen), Verwerfen, Speichern. Kein Löschen im Formular.
 - Ausgenommen: anniversary-years, applications, Einstellungsseiten ohne Datensatz (`/admin/config`, `/organisation`, `/account`).
-
-⚠️ Abweichung im Code: `/inventory/fields` und `/inventory/inspection-templates` nutzen Karten mit Mini-Formularen statt Tabelle, `RowAction`, Detailseite und Kopf-Aktionen; Angleichung siehe Backlog 123.
 
 ## Badges
 
