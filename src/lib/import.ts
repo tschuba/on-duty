@@ -3,7 +3,6 @@ import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { ageInYears } from "./status.js";
 import { isValidIban, normalizeIban } from "./iban.js";
-import type { InventoryCategory } from "./inventory.js";
 import { parseTags } from "./forms.js";
 
 // Reine Import-Logik für fwportal-xlsx-Exporte (Mitglieder- und Inventarliste). Kein DB-Zugriff.
@@ -295,19 +294,23 @@ export type ParsedItem = {
   commissionedAt: string | null; price: string | null; retiredAt: string | null; location: string | null;
 };
 
-export const BATCH_CAPABLE: ReadonlySet<InventoryCategory> = new Set(["equipment", "ppe", "other"]);
-export const CATEGORY_OPTIONS: InventoryCategory[] = ["vehicle", "scba", "equipment", "ppe", "other"];
-// Erste Stufe des Inventartyps → Kategorie; unbekannt → other.
-const CATEGORY_BY_LEVEL: Record<string, InventoryCategory> = {
-  Kleidung: "ppe",
+// Posten-Vorlage, wie der Import sie braucht (inventory_templates): Menge/Bündelung hängt nur an "quantity" in enabledFields.
+export type ImportTemplate = { id: string; name: string; enabledFields: string[] };
+// Erste Stufe des Inventartyps → Name der vorgeschlagenen Vorlage; unbekannt → "Sonstiges".
+const TEMPLATE_BY_LEVEL: Record<string, string> = {
+  Kleidung: "PSA",
   ...Object.fromEntries(
     ["Funk", "Armaturen", "Pumpe", "Schlauch", "Werkzeug", "Tragbare Leitern", "Löschgerät", "Leine", "Arbeitsgerät", "Sondergerät", "Sanitätsgerät", "Elektrogeräte"]
-      .map((l) => [l, "equipment" as const]),
+      .map((l) => [l, "Gerät"]),
   ),
-  Sonstiges: "other",
+  Sonstiges: "Sonstiges",
 };
-export const suggestCategory = (level: string): InventoryCategory => CATEGORY_BY_LEVEL[level] ?? "other";
-export const isRecognizedLevel = (level: string) => level in CATEGORY_BY_LEVEL;
+// Namensabgleich ohne Beachtung der Groß-/Kleinschreibung; ohne Treffer (Vorlage gelöscht/umbenannt) null → "Bitte wählen".
+export const suggestTemplate = (level: string, templates: ImportTemplate[]): ImportTemplate | null => {
+  const name = (TEMPLATE_BY_LEVEL[level] ?? "Sonstiges").toLowerCase();
+  return templates.find((tpl) => tpl.name.toLowerCase() === name) ?? null;
+};
+export const isRecognizedLevel = (level: string) => level in TEMPLATE_BY_LEVEL;
 
 export function parseInventory(rows: Raw[]): ParsedItem[] {
   return rows.map((r) => {
@@ -328,20 +331,21 @@ export function parseInventory(rows: Raw[]): ParsedItem[] {
 }
 
 export type Position = {
-  gid: number; items: ParsedItem[]; name: string; category: InventoryCategory; quantity: number;
+  gid: number; items: ParsedItem[]; name: string; template: ImportTemplate | null; quantity: number;
   tags: string[]; numbers: string[]; serials: string[]; commissionedAt: string | null; price: string | null;
   retiredAt: string | null; bundled: boolean; canBundle: boolean; groupSize: number; duplicateNumbers: string[];
-  typePath: string; override: InventoryCategory | null; checkCategory: boolean;
+  typePath: string; override: ImportTemplate | null; checkTemplate: boolean;
 };
-export type InventoryPlan = { positions: Position[]; levels: { level: string; category: InventoryCategory; recognized: boolean; checkCategory: boolean }[]; rowCount: number; bundledRows: number };
+export type InventoryPlan = { positions: Position[]; levels: { level: string; template: ImportTemplate | null; recognized: boolean; checkTemplate: boolean }[]; rowCount: number; bundledRows: number };
 
-export function planInventory(items: ParsedItem[], existingNumbers: Set<string>, body: Body): InventoryPlan {
+export function planInventory(items: ParsedItem[], existingNumbers: Set<string>, body: Body, templates: ImportTemplate[]): InventoryPlan {
+  const byId = (id: string | undefined) => templates.find((tpl) => tpl.id === id) ?? null;
   const levelNames = [...new Set(items.map((i) => i.levels[0] ?? ""))].sort();
   const levels = levelNames.map((level, i) => {
-    const sel = str(body, `cat_${i}`);
-    const confirmed = (CATEGORY_OPTIONS as string[]).includes(sel ?? "");
+    const confirmed = byId(str(body, `tpl_${i}`));
     const recognized = isRecognizedLevel(level);
-    return { level, category: confirmed ? (sel as InventoryCategory) : suggestCategory(level), recognized, checkCategory: !recognized && !confirmed };
+    const template = confirmed ?? suggestTemplate(level, templates);
+    return { level, template, recognized, checkTemplate: !template || (!recognized && !confirmed) };
   });
   const levelOf = new Map(levels.map((l) => [l.level, l]));
 
@@ -356,27 +360,26 @@ export function planInventory(items: ParsedItem[], existingNumbers: Set<string>,
   for (const group of groups.values()) {
     const first = group[0];
     const lv = levelOf.get(first.levels[0] ?? "")!;
-    const ov = str(body, `pcat_${first.id}`);
-    const override = (CATEGORY_OPTIONS as string[]).includes(ov ?? "") ? (ov as InventoryCategory) : null;
-    const category = override ?? lv.category;
-    const defaultTags = [...new Set([...first.levels, ...(first.location ? [first.location] : [])])];
-    const canBundle = BATCH_CAPABLE.has(category) && group.length > 1;
+    const override = byId(str(body, `ptpl_${first.id}`));
+    const template = override ?? lv.template;
+    const defaultTags = [...new Set([...first.levels, ...(first.location ? [first.location] : []), ...(template ? [template.name] : [])])];
+    const canBundle = Boolean(template?.enabledFields.includes("quantity")) && group.length > 1;
     const bundled = canBundle && str(body, `nob_${first.id}`) !== "1";
     for (const part of bundled ? [group] : group.map((g) => [g])) {
       const numbers = part.map((p) => p.number).filter((n): n is string => !!n);
       const posted = parseTags(body, `tags_${part[0].id}`);
       positions.push({
-        gid: first.id, items: part, name: first.name, category, quantity: part.length,
+        gid: first.id, items: part, name: first.name, template, quantity: part.length,
         tags: posted.length ? posted : defaultTags,
         numbers, serials: [...new Set(part.map((p) => p.serial).filter((s): s is string => !!s))],
         commissionedAt: first.commissionedAt, price: first.price, retiredAt: first.retiredAt,
         bundled, canBundle, groupSize: group.length, duplicateNumbers: numbers.filter((n) => existingNumbers.has(n)),
-        typePath: first.levels.join(" › "), override, checkCategory: !override && lv.checkCategory,
+        typePath: first.levels.join(" › "), override, checkTemplate: !override && lv.checkTemplate,
       });
     }
   }
   const natural = (a: string, b: string) => a.localeCompare(b, "de", { numeric: true });
-  positions.sort((a, b) => CATEGORY_OPTIONS.indexOf(a.category) - CATEGORY_OPTIONS.indexOf(b.category) || natural(a.typePath, b.typePath) || natural(a.name, b.name));
+  positions.sort((a, b) => natural(a.template?.name ?? "", b.template?.name ?? "") || natural(a.typePath, b.typePath) || natural(a.name, b.name));
   return { positions, levels, rowCount: items.length, bundledRows: positions.filter((p) => p.bundled).reduce((n, p) => n + p.quantity, 0) };
 }
 

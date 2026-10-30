@@ -2,7 +2,7 @@
 
 Soll-Zustand für Layout, Farben, Typografie, Tabellen und Buttons in on-duty. Basiert auf einer Bestandsaufnahme des Codes (Stand 2026-09-30) — wo der aktuelle Code abweicht, ist das unten explizit vermerkt ("⚠️ Abweichung im Code"). Ziel: neue Views folgen diesen Regeln von Anfang an; bestehende Abweichungen werden bei Gelegenheit angeglichen (separater Task, nicht automatisch).
 
-**Nicht abgedeckt** (bewusst zurückgestellt, nicht bewusst ausgeschlossen): Modals, Cards, Badges, Dropdowns, Terminologie/Wortwahl. Ergänzung folgt bei Bedarf in einer späteren Runde.
+**Nicht abgedeckt** (bewusst zurückgestellt, nicht bewusst ausgeschlossen): Modals, Cards, Dropdowns, Terminologie/Wortwahl. Ergänzung folgt bei Bedarf in einer späteren Runde.
 
 ## Formulare & Labels
 
@@ -134,6 +134,12 @@ Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donor
 - Ausgenommen: anniversary-years, applications, Einstellungsseiten ohne Datensatz (`/admin/config`, `/organisation`, `/account`).
 
 ⚠️ Abweichung im Code: `/inventory/fields` und `/inventory/inspection-templates` nutzen Karten mit Mini-Formularen statt Tabelle, `RowAction`, Detailseite und Kopf-Aktionen; Angleichung siehe Backlog 123.
+
+## Badges
+
+- Tag-Badges: `badge badge-sm`, neutral (`badge-ghost`) als Standard.
+- Die mitgelieferten Vorlagennamen haben feste Stile (`TAG_STYLES` in `components/tag-badges.tsx`, Name ohne Groß-/Kleinschreibung): Fahrzeug `badge-primary`, Atemschutz `badge-info`, Gerät `badge-secondary`, PSA `badge-accent`, Sonstiges `badge-neutral`, Hydrant `badge-secondary badge-outline`. Bei mehreren Treffern erscheinen alle als Badge, das Icon trägt der erste.
+- `badge-success`, `badge-warning` und `badge-error` sind dem Status vorbehalten (Prüffrist, Verleih), nie für Tags.
 
 ## Responsive Schwellen
 

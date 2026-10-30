@@ -1,32 +1,21 @@
 import { sql } from "drizzle-orm";
-import { boolean, date, index, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, numeric, pgEnum, pgTable, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
-export const inventoryCategoryEnum = pgEnum("inventory_category", ["vehicle", "scba", "equipment", "ppe", "other"]);
-
 export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  category: inventoryCategoryEnum("category").notNull(),
   commissionedAt: date("commissioned_at"),
   purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
   notes: text("notes"),
   retiredAt: date("retired_at"),
   retiredReason: text("retired_reason"),
-  // 1 = Einzelstück (default), >1 = Batch — app-validated per category, see
-  // BATCH_CAPABLE_CATEGORIES in routes/inventory.tsx.
+  // 1 = Einzelstück (default), >1 = Batch — nur mit dem Feld "quantity" (enabledFields).
   quantity: integer("quantity").notNull().default(1),
   // Teilmengen-Ausmusterung bei Batches; retiredAt wird gesetzt sobald
   // retiredQuantity == quantity (siehe routes/inventory.tsx retire-Handler).
   retiredQuantity: integer("retired_quantity").notNull().default(0),
-  // Fahrzeuge
-  licensePlate: text("license_plate"),
-  yearOfManufacture: integer("year_of_manufacture"),
-  vehicleInspectionDue: date("vehicle_inspection_due"),
-  // SCBA / Gerät / PSA
-  nextInspectionDue: date("next_inspection_due"),
-  lastInspectionDate: date("last_inspection_date"),
   // Feste Felder, die dieser Posten hat (Schlüssel siehe INVENTORY_FIELDS in lib/inventory.ts).
   enabledFields: text("enabled_fields").array().notNull().default([]),
   // Feld "location": Standort-Text + optionale Koordinaten (nur zusammen).
@@ -142,5 +131,35 @@ export const inventoryInspectionTemplates = pgTable(
     defaultIntervalMonths: integer("default_interval_months"),
   },
   (t) => [uniqueIndex("inventory_inspection_templates_name_idx").on(sql`lower(${t.name})`)],
+);
+
+// Posten-Vorlagen (Backlog 118): beim Anlegen kopiert, am Posten steht keine Vorlagen-ID. Löschen ist hart.
+export const inventoryTemplates = pgTable(
+  "inventory_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    // Feste Felder, Schlüssel wie inventory_items.enabled_fields.
+    enabledFields: text("enabled_fields").array().notNull().default([]),
+  },
+  (t) => [uniqueIndex("inventory_templates_name_idx").on(sql`lower(${t.name})`)],
+);
+
+export const inventoryTemplateFieldDefs = pgTable(
+  "inventory_template_field_defs",
+  {
+    templateId: uuid("template_id").notNull().references(() => inventoryTemplates.id, { onDelete: "cascade" }),
+    fieldDefId: uuid("field_def_id").notNull().references(() => inventoryFieldDefs.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.fieldDefId] })],
+);
+
+export const inventoryTemplateInspections = pgTable(
+  "inventory_template_inspections",
+  {
+    templateId: uuid("template_id").notNull().references(() => inventoryTemplates.id, { onDelete: "cascade" }),
+    inspectionTemplateId: uuid("inspection_template_id").notNull().references(() => inventoryInspectionTemplates.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.inspectionTemplateId] })],
 );
 /* v8 ignore stop */

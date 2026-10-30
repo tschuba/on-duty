@@ -1,8 +1,6 @@
 import { db } from "../db/index.js";
 import { addMonths } from "./quick-range.js";
 
-export type InventoryCategory = "vehicle" | "scba" | "equipment" | "ppe" | "other";
-
 export type InspectionDueItem = {
   id: string;
   name: string;

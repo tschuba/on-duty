@@ -60,6 +60,7 @@ const ICONS = {
   "device-phone-mobile": "device-mobile",
   "squares-2x2": "layout-grid",
   "scuba-diving-tank": "scuba-diving-tank",
+  "fire-hydrant": "fire-hydrant",
 };
 
 function attr(str, name) {

@@ -5,7 +5,7 @@ import { memberRoleAssignments, memberRoles } from "./roles";
 import { donors, donations } from "./donations";
 import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections } from "./inventory";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections, inventoryInspectionTemplates, inventoryTemplates, inventoryTemplateFieldDefs, inventoryTemplateInspections } from "./inventory";
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
 import { events, eventTags, eventVisibleRoles } from "./events";
 import { appRoles } from "./permissions";
@@ -58,6 +58,21 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => (
 
 export const inventoryInspectionsRelations = relations(inventoryInspections, ({ one }) => ({
   item: one(inventoryItems, { fields: [inventoryInspections.inventoryItemId], references: [inventoryItems.id] }),
+}));
+
+export const inventoryTemplatesRelations = relations(inventoryTemplates, ({ many }) => ({
+  fieldDefs: many(inventoryTemplateFieldDefs),
+  inspections: many(inventoryTemplateInspections),
+}));
+
+export const inventoryTemplateFieldDefsRelations = relations(inventoryTemplateFieldDefs, ({ one }) => ({
+  template: one(inventoryTemplates, { fields: [inventoryTemplateFieldDefs.templateId], references: [inventoryTemplates.id] }),
+  fieldDef: one(inventoryFieldDefs, { fields: [inventoryTemplateFieldDefs.fieldDefId], references: [inventoryFieldDefs.id] }),
+}));
+
+export const inventoryTemplateInspectionsRelations = relations(inventoryTemplateInspections, ({ one }) => ({
+  template: one(inventoryTemplates, { fields: [inventoryTemplateInspections.templateId], references: [inventoryTemplates.id] }),
+  inspectionTemplate: one(inventoryInspectionTemplates, { fields: [inventoryTemplateInspections.inspectionTemplateId], references: [inventoryInspectionTemplates.id] }),
 }));
 
 export const inventoryFieldDefsRelations = relations(inventoryFieldDefs, ({ many }) => ({

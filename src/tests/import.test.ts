@@ -167,37 +167,50 @@ describe("inventory", () => {
     irow(4, "Neu | Ding", "Ding", "00 4", "Auto", { "Seriennr.": "C Strahlrohr 1" }),
   ])).rows);
 
-  it("suggests categories and tags every level + location", () => {
-    const plan = planInventory(items, new Set(), {});
-    expect(plan.levels.map((l) => [l.level, l.category])).toEqual([["Funk", "equipment"], ["Kleidung", "ppe"], ["Neu", "other"]]);
+  const TEMPLATES = [
+    { id: "t-fz", name: "Fahrzeug", enabledFields: ["numbers", "inspection"] },
+    { id: "t-psa", name: "PSA", enabledFields: ["quantity", "numbers", "serials", "assignments", "inspection"] },
+    { id: "t-geraet", name: "Gerät", enabledFields: ["quantity", "numbers", "serials", "inspection"] },
+    { id: "t-sonst", name: "Sonstiges", enabledFields: ["quantity", "numbers"] },
+  ];
+
+  it("suggests templates by name and tags every level + location + template name", () => {
+    const plan = planInventory(items, new Set(), {}, TEMPLATES);
+    expect(plan.levels.map((l) => [l.level, l.template?.name])).toEqual([["Funk", "Gerät"], ["Kleidung", "PSA"], ["Neu", "Sonstiges"]]);
     const mikro = plan.positions.find((p) => p.name === "Mikro")!;
     expect(mikro).toMatchObject({ quantity: 2, bundled: true, numbers: ["00 1", "00 2"] });
-    expect(mikro.tags).toEqual(["Funk", "Funkgerät", "Auto"]);
+    expect(mikro.tags).toEqual(["Funk", "Funkgerät", "Auto", "Gerät"]);
     expect(plan.positions.find((p) => p.name === "Ding")!.serials).toEqual(["C Strahlrohr 1"]);
     expect(plan.positions).toHaveLength(3);
   });
 
-  it("can unbundle, honours category override, flags existing numbers", () => {
-    const plan = planInventory(items, new Set(["00 2"]), { nob_1: "1", cat_0: "ppe" });
+  it("can unbundle, honours template override, flags existing numbers", () => {
+    const plan = planInventory(items, new Set(["00 2"]), { nob_1: "1", tpl_0: "t-psa" }, TEMPLATES);
     expect(plan.positions.filter((p) => p.name === "Mikro")).toHaveLength(2);
     expect(plan.positions.find((p) => p.numbers[0] === "00 2")!.duplicateNumbers).toEqual(["00 2"]);
-    expect(plan.positions[0].category).toBe("ppe");
+    expect(plan.positions.find((p) => p.name === "Mikro")!.template?.name).toBe("PSA");
   });
 
-  it("warns only for unknown types until confirmed; per-position category and tags override", () => {
-    const plan = planInventory(items, new Set(), {});
-    expect(plan.levels.map((l) => l.checkCategory)).toEqual([false, false, true]);
-    expect(plan.positions.find((p) => p.name === "Ding")!.checkCategory).toBe(true);
-    const done = planInventory(items, new Set(), { cat_2: "other", pcat_1: "vehicle", tags_3: ["A", "b"] });
-    expect(done.levels[2].checkCategory).toBe(false);
+  it("warns only for unknown types until confirmed; per-position template and tags override", () => {
+    const plan = planInventory(items, new Set(), {}, TEMPLATES);
+    expect(plan.levels.map((l) => l.checkTemplate)).toEqual([false, false, true]);
+    expect(plan.positions.find((p) => p.name === "Ding")!.checkTemplate).toBe(true);
+    const done = planInventory(items, new Set(), { tpl_2: "t-sonst", ptpl_1: "t-fz", tags_3: ["A", "b"] }, TEMPLATES);
+    expect(done.levels[2].checkTemplate).toBe(false);
     const mikro = done.positions.filter((p) => p.name === "Mikro");
-    expect(mikro).toHaveLength(2); // vehicle cannot bundle
+    expect(mikro).toHaveLength(2); // Fahrzeug has no quantity field, so no bundling
     expect(done.positions.find((p) => p.name === "Helm")!.tags).toEqual(["A", "b"]);
   });
 
-  it("never bundles non-batch categories", () => {
+  it("asks for a template when the suggested one does not exist", () => {
+    const plan = planInventory(items, new Set(), {}, TEMPLATES.filter((t) => t.name !== "Gerät"));
+    expect(plan.levels[0]).toMatchObject({ template: null, checkTemplate: true });
+    expect(plan.positions.filter((p) => p.name === "Mikro")).toHaveLength(2); // nothing to bundle without a template
+  });
+
+  it("only bundles with a template that has the quantity field", () => {
     const veh = parseInventory(readWorkbook(book(INV_HEAD, [irow(1, "Fahrzeug | A", "A", "1"), irow(2, "Fahrzeug | A", "A", "2")])).rows);
-    const plan = planInventory(veh, new Set(), { cat_0: "vehicle" });
+    const plan = planInventory(veh, new Set(), { tpl_0: "t-fz" }, TEMPLATES);
     expect(plan.positions).toHaveLength(2);
   });
 });

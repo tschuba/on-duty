@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
 import { db } from "../db/index.js";
-import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, memberRoleAssignments, memberRoles, members, persons } from "../db/schema/index.js";
+import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, inventoryTemplates, memberRoleAssignments, memberRoles, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
@@ -14,11 +14,10 @@ import { ChipInput } from "../components/chip-input.js";
 import { Section } from "../components/section.js";
 import { HTTP_STATUS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import {
-  ASSUMED_NOTE, ACTIVE_ROLE_ID, CATEGORY_OPTIONS, ImportError, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
+  ASSUMED_NOTE, ACTIVE_ROLE_ID, ImportError, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
   parseInventory, parseMembers, planInventory, planMembers, readWorkbook, unmappedColumns,
-  type ImportKind, type InventoryPlan, type MemberPlan, type RoleOption,
+  type ImportKind, type ImportTemplate, type InventoryPlan, type MemberPlan, type RoleOption,
 } from "../lib/import.js";
-import type { InventoryCategory } from "../lib/inventory.js";
 
 export const importRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("import:run");
@@ -26,10 +25,6 @@ const guard = requireAuth("import:run");
 type Body = Record<string, string | string[] | File | undefined>;
 
 const KIND_LABEL: Record<ImportKind, string> = { members: t("import.kind.members"), inventory: t("import.kind.inventory") };
-const CATEGORY_LABEL: Record<InventoryCategory, string> = {
-  vehicle: t("inventory.category.vehicle"), scba: t("inventory.category.scba"), equipment: t("inventory.category.equipment"),
-  ppe: t("inventory.category.ppe"), other: t("inventory.category.other"),
-};
 const today = () => new Date().toISOString().slice(0, 10);
 
 const PageTitle = ({ children, backHref }: { children: string; backHref?: string }) => (
@@ -255,29 +250,29 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
   );
 }
 
-function CategorySelect({ name, value, check, blank }: { name: string; value: InventoryCategory | ""; check: boolean; blank: string }) {
+function TemplateSelect({ name, value, check, blank, templates }: { name: string; value: string; check: boolean; blank: string; templates: ImportTemplate[] }) {
   return (
-    <select name={name} style="min-width:11rem" class={`select-sm pr-8 ${check ? "select-warning" : ""}`} title={t("import.categories.selectHelp")}>
+    <select name={name} style="min-width:11rem" class={`select-sm pr-8 ${check ? "select-warning" : ""}`} title={t("import.templates.selectHelp")}>
       <option value="" selected={value === ""}>{blank}</option>
-      {CATEGORY_OPTIONS.map((c) => <option value={c} selected={c === value}>{CATEGORY_LABEL[c]}</option>)}
+      {templates.map((tpl) => <option value={tpl.id} selected={tpl.id === value}>{tpl.name}</option>)}
     </select>
   );
 }
 
-function InventoryPreview({ plan }: { plan: InventoryPlan }) {
-  const checkCount = plan.levels.filter((l) => l.checkCategory).length;
+function InventoryPreview({ plan, templates }: { plan: InventoryPlan; templates: ImportTemplate[] }) {
+  const checkCount = plan.levels.filter((l) => l.checkTemplate).length;
   const existing = plan.positions.filter((p) => p.duplicateNumbers.length).length;
   return (
     <>
       {/* Lange Tags (z. B. Fahrzeug + Beladung) umbrechen statt aus der Zelle zu laufen. */}
       <style>{`[data-chip-input] .badge{height:auto;max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left;padding-block:.125rem}`}</style>
-      <Section title={t("import.categories.heading")} badge={plan.levels.length} tone={checkCount ? "warning" : undefined} open={checkCount > 0}>
+      <Section title={t("import.templates.heading")} badge={plan.levels.length} tone={checkCount ? "warning" : undefined} open={checkCount > 0}>
         <table class="table table-zebra w-full">
-          <thead><tr><th title={t("import.col.itemTypeHelp")}>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th></tr></thead>
+          <thead><tr><th title={t("import.col.itemTypeHelp")}>{t("import.col.itemType")}</th><th>{t("import.col.template")}</th></tr></thead>
           <tbody>
             {plan.levels.map((l, i) => (
               <tr><td>{l.level || "–"}</td><td>
-                <CategorySelect name={`cat_${i}`} value={l.checkCategory ? "" : l.category} check={l.checkCategory} blank={t("import.categories.choose")} />
+                <TemplateSelect name={`tpl_${i}`} value={l.checkTemplate ? "" : l.template?.id ?? ""} check={l.checkTemplate} blank={t("import.templates.choose")} templates={templates} />
               </td></tr>
             ))}
           </tbody>
@@ -292,7 +287,7 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
         <TagSuggestions />
         <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.category")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th><th>{t("import.col.notes")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.template")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th><th>{t("import.col.notes")}</th></tr></thead>
           <tbody>
             {plan.positions.map((p) => {
               const nums = [...p.numbers].sort((a, b) => a.localeCompare(b, "de", { numeric: true }));
@@ -301,8 +296,8 @@ function InventoryPreview({ plan }: { plan: InventoryPlan }) {
                   <td class="min-w-40">{p.name}</td>
                   <td class="max-w-40 text-sm break-words" title={p.typePath}>{p.typePath || "–"}</td>
                   <td class="whitespace-nowrap">
-                    <CategorySelect name={`pcat_${p.gid}`} value={p.override ?? (p.checkCategory ? "" : p.category)} check={p.checkCategory} blank={p.checkCategory ? t("import.categories.choose") : t("import.categories.typeDefault")} />
-                    {p.checkCategory && <span class="badge badge-warning badge-sm ml-1" title={t("import.categories.otherHint")}>{t("import.badge.checkCategory")}</span>}
+                    <TemplateSelect name={`ptpl_${p.gid}`} value={p.override?.id ?? (p.checkTemplate ? "" : p.template?.id ?? "")} check={p.checkTemplate} blank={p.checkTemplate ? t("import.templates.choose") : t("import.templates.typeDefault")} templates={templates} />
+                    {p.checkTemplate && <span class="badge badge-warning badge-sm ml-1" title={t("import.templates.otherHint")}>{t("import.badge.checkTemplate")}</span>}
                   </td>
                   <td class="whitespace-nowrap">
                     {!(p.canBundle && p.items[0].id === p.gid) && p.quantity}
@@ -382,7 +377,9 @@ async function handle(c: any, run: boolean) {
       );
     }
 
-    const plan = planInventory(parseInventory(up.rows), ctx.numbers, body);
+    const templates = (await db.query.inventoryTemplates.findMany()) as ImportTemplate[];
+    templates.sort((a, b) => a.name.localeCompare(b.name, "de"));
+    const plan = planInventory(parseInventory(up.rows), ctx.numbers, body, templates);
     const canRun = plan.positions.some((p) => p.duplicateNumbers.length === 0);
     if (run) {
       if (!canRun) throw new ImportError(t("import.error.nothingNew"));
@@ -397,7 +394,7 @@ async function handle(c: any, run: boolean) {
           { label: t("import.summary.bundled"), value: plan.bundledRows },
           { label: t("import.summary.existing"), value: plan.positions.filter((p) => p.duplicateNumbers.length).length },
         ]}>
-        <InventoryPreview plan={plan} />
+        <InventoryPreview plan={plan} templates={templates} />
       </PreviewShell>,
     );
   } catch (e) {
@@ -590,7 +587,7 @@ async function runInventory(plan: InventoryPlan): Promise<Report> {
         current = p.numbers[0] ?? p.name;
         p.tags = canonicalizeTags(p.tags, existingTags);
         const [item] = await tx.insert(inventoryItems).values({
-          name: p.name, category: p.category, commissionedAt: p.commissionedAt, purchasePrice: p.price,
+          name: p.name, enabledFields: p.template?.enabledFields ?? [], commissionedAt: p.commissionedAt, purchasePrice: p.price,
           retiredAt: p.retiredAt, quantity: p.quantity, retiredQuantity: p.retiredAt ? p.quantity : 0,
         }).returning({ id: inventoryItems.id });
         if (p.numbers.length) await tx.insert(inventoryItemNumbers).values(p.numbers.map((number) => ({ inventoryItemId: item.id, number })));
@@ -600,7 +597,7 @@ async function runInventory(plan: InventoryPlan): Promise<Report> {
       const rows = todo.reduce((n, p) => n + p.quantity, 0);
       return {
         created: todo.length, skipped: plan.positions.length - todo.length, links: [], newRoles: [],
-        lines: [t("import.report.rowsToPositions", { rows, positions: todo.length }), ...plan.levels.map((l) => `${l.level || "–"} → ${CATEGORY_LABEL[l.category]}`)],
+        lines: [t("import.report.rowsToPositions", { rows, positions: todo.length }), ...plan.levels.map((l) => `${l.level || "–"} → ${l.template?.name ?? "–"}`)],
       };
     });
   } catch (e) {
