@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { ToggleFilter } from "../components/toggle-filter.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
@@ -21,7 +21,8 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, type InventoryCategory } from "../lib/inventory.js";
+import { generateInspectionDueItems, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
@@ -40,18 +41,22 @@ type Person = { firstName: string; lastName: string };
 type AssignmentWithMember = typeof inventoryItemAssignments.$inferSelect & { member: MemberRow & { person: Person } };
 type ItemWithRelations = InventoryItemRow & { tags: Tag[]; numbers: ItemNumber[]; serials: ItemSerial[]; assignments: AssignmentWithMember[] };
 
-// Which categories may be entered as a batch ("30 Helme" instead of one item per
-// piece). A plain list, not scattered if/category checks, so a future category
-// opts in with one line here.
-const CATEGORY_CONFIG: { category: InventoryCategory; batchCapable: boolean; icon: IconName }[] = [
-  { category: "vehicle", batchCapable: false, icon: "firetruck" },
-  { category: "scba", batchCapable: false, icon: "scuba-diving-tank" },
-  { category: "equipment", batchCapable: true, icon: "axe" },
-  { category: "ppe", batchCapable: true, icon: "jacket" },
-  { category: "other", batchCapable: true, icon: "squares-2x2" },
+const CATEGORY_CONFIG: { category: InventoryCategory; icon: IconName }[] = [
+  { category: "vehicle", icon: "firetruck" },
+  { category: "scba", icon: "scuba-diving-tank" },
+  { category: "equipment", icon: "axe" },
+  { category: "ppe", icon: "jacket" },
+  { category: "other", icon: "squares-2x2" },
 ];
 export const CATEGORIES: InventoryCategory[] = CATEGORY_CONFIG.map((c) => c.category);
-const BATCH_CAPABLE_CATEGORIES = new Set(CATEGORY_CONFIG.filter((c) => c.batchCapable).map((c) => c.category));
+// Vorbelegung des "Felder"-Blocks beim Anlegen, gleiche Mengen wie die Altdaten-Migration (Backlog 115).
+const FIELD_PRESETS: Record<InventoryCategory, InventoryField[]> = {
+  vehicle: ["numbers", "inspection"],
+  scba: ["numbers", "serials", "inspection"],
+  equipment: ["quantity", "numbers", "serials", "inspection"],
+  ppe: ["quantity", "numbers", "serials", "assignments", "inspection"],
+  other: ["quantity", "numbers"],
+};
 
 export const CATEGORY_LABELS: Record<InventoryCategory, string> = {
   vehicle: t("inventory.category.vehicle"),
@@ -102,9 +107,15 @@ export type InventoryFieldValues = {
   // Batch mode (quantity > 1): JSON-encoded AssignmentInput[], synced from the
   // chip list by client-side JS (same pattern as the tags hidden field).
   assignments: string;
+  // "Feld hinzufügen": welche festen Felder dieser Posten hat (s. INVENTORY_FIELDS).
+  enabledFieldsList?: InventoryField[];
+  locationText: string;
+  latitude: string;
+  longitude: string;
 };
 
 export function parseInventoryFields(body: Record<string, any>): { values: InventoryFieldValues; errors: Record<string, string> } {
+  const enabledFieldsList = parseList(body, "enabledFields").filter((f): f is InventoryField => (INVENTORY_FIELDS as readonly string[]).includes(f));
   const values: InventoryFieldValues = {
     name: trimmed(body, "name"),
     category: trimmed(body, "category"),
@@ -119,6 +130,10 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     quantity: trimmed(body, "quantity") || "1",
     assignedMemberId: trimmed(body, "assignedMemberId"),
     assignments: trimmed(body, "assignments") || "[]",
+    enabledFieldsList,
+    locationText: trimmed(body, "locationText"),
+    latitude: trimmed(body, "latitude"),
+    longitude: trimmed(body, "longitude"),
   };
 
   const errors: Record<string, string> = {};
@@ -131,13 +146,18 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     errors.yearOfManufacture = t("inventory.form.invalidYear");
   }
   const quantityNum = Number(values.quantity);
-  if (!Number.isInteger(quantityNum) || quantityNum < 1) {
+  if (hasField(enabledFieldsList, "quantity") && (!Number.isInteger(quantityNum) || quantityNum < 1)) {
     errors.quantity = t("inventory.form.invalidQuantity");
+  }
+  if (hasField(enabledFieldsList, "location")) {
+    const locErrors = validateLocation(values.latitude, values.longitude);
+    if (locErrors.latitude) errors.latitude = t("inventory.form.invalidCoordinate");
+    if (locErrors.longitude) errors.longitude = t("inventory.form.invalidCoordinate");
   }
   return { values, errors };
 }
 
-// Batch mode (quantity > 1, only for BATCH_CAPABLE_CATEGORIES): an assignment is
+// Batch mode (quantity > 1, only with the "quantity" field): an assignment is
 // "member holds N of the quantity", built from the client-side chip list.
 function parseBatchAssignments(json: string): AssignmentInput[] {
   let raw: unknown;
@@ -157,33 +177,37 @@ function parseBatchAssignments(json: string): AssignmentInput[] {
 }
 
 // Resolves the submitted assignment(s) against quantity/retiredQuantity. Single-
-// item mode (quantity 1) keeps the old ppe-only, one-member behaviour; batch mode
-// (quantity > 1, only possible for BATCH_CAPABLE_CATEGORIES) allows several
-// members each holding a stated quantity, capped by what's left after retiring.
+// Single-item mode (quantity 1) keeps the one-member picker; batch mode (quantity > 1,
+// only possible with "quantity" enabled) allows several members each holding a stated
+// quantity, capped by what's left after retiring. Neither mode needs a specific category
+// anymore — gated purely by the "assignments" field (see 115_Inventar-Felder-Baukasten).
 function resolveAssignments(
   values: InventoryFieldValues,
-  category: InventoryCategory,
+  enabledFields: readonly string[],
   quantity: number,
   retiredQuantity = 0,
 ): { assignments: { memberId: string; quantity: number }[]; error?: string } {
-  if (BATCH_CAPABLE_CATEGORIES.has(category) && quantity > 1) {
+  if (!hasField(enabledFields, "assignments")) return { assignments: [] };
+  if (hasField(enabledFields, "quantity") && quantity > 1) {
     const assignments = parseBatchAssignments(values.assignments).map(({ memberId, quantity }) => ({ memberId, quantity }));
     const assignedTotal = assignments.reduce((sum, a) => sum + a.quantity, 0);
     if (assignedTotal + retiredQuantity > quantity) return { assignments, error: t("inventory.form.assignedExceedsQuantity") };
     return { assignments };
   }
-  if (category === "ppe" && values.assignedMemberId) return { assignments: [{ memberId: values.assignedMemberId, quantity: 1 }] };
+  if (values.assignedMemberId) return { assignments: [{ memberId: values.assignedMemberId, quantity: 1 }] };
   return { assignments: [] };
 }
 
-// category=ppe is the only category allowed to carry an assignment in single-item
-// mode — anything else submitted for another category is dropped server-side,
-// not just hidden client-side (see backlog doc's "nur App-Validierung" note). In
-// batch mode (quantity > 1) any BATCH_CAPABLE_CATEGORIES category may assign.
+// Which fixed fields are visible/stored is now purely enabledFields, not category —
+// except license plate/year/vehicle-inspection, the one remaining category exception
+// (see 115_Inventar-Felder-Baukasten "Fahrzeug-Spalten").
 export function toInsertValues(values: InventoryFieldValues) {
   const category = values.category as InventoryCategory;
-  const quantity = Math.max(1, Math.round(Number(values.quantity)) || 1);
-  const isBatch = BATCH_CAPABLE_CATEGORIES.has(category) && quantity > 1;
+  const enabledFields = values.enabledFieldsList ?? [];
+  const hasQuantity = hasField(enabledFields, "quantity");
+  const quantity = hasQuantity ? Math.max(1, Math.round(Number(values.quantity)) || 1) : 1;
+  const hasInspection = hasField(enabledFields, "inspection");
+  const hasLocation = hasField(enabledFields, "location");
   return {
     name: values.name,
     category,
@@ -191,12 +215,15 @@ export function toInsertValues(values: InventoryFieldValues) {
     purchasePrice: values.purchasePrice ? values.purchasePrice.replace(",", ".") : null,
     notes: values.notes || null,
     quantity,
+    enabledFields: [...enabledFields],
     licensePlate: category === "vehicle" ? values.licensePlate || null : null,
     yearOfManufacture: category === "vehicle" && values.yearOfManufacture ? Number(values.yearOfManufacture) : null,
-    vehicleInspectionDue: category === "vehicle" ? values.vehicleInspectionDue || null : null,
-    // A batch's serial number doesn't identify one piece — dropped once quantity > 1.
-    nextInspectionDue: category === "scba" || category === "equipment" || category === "ppe" ? values.nextInspectionDue || null : null,
-    lastInspectionDate: category === "scba" ? values.lastInspectionDate || null : null,
+    vehicleInspectionDue: category === "vehicle" && hasInspection ? values.vehicleInspectionDue || null : null,
+    nextInspectionDue: category !== "vehicle" && hasInspection ? values.nextInspectionDue || null : null,
+    lastInspectionDate: category !== "vehicle" && hasInspection ? values.lastInspectionDate || null : null,
+    locationText: hasLocation ? values.locationText || null : null,
+    latitude: hasLocation ? values.latitude || null : null,
+    longitude: hasLocation ? values.longitude || null : null,
   };
 }
 
@@ -214,9 +241,7 @@ export function sortedSerials(item: { serials?: { serial: string }[] }): string[
   return (item.serials ?? []).map((n) => n.serial).sort(natural);
 }
 
-const SERIAL_CATEGORIES = new Set<string>(["scba", "equipment", "ppe"]);
-
-// Seriennummern: höchstens eine pro Stück, nicht global eindeutig. Andere Kategorien ignorieren sie.
+// Seriennummern: höchstens eine pro Stück, nicht global eindeutig. Nur mit dem Feld "serials".
 function validateSerials(serials: string[], quantity: number): string | undefined {
   if (serials.length > quantity) return t("inventory.form.serialsTooMany", { max: quantity });
   // eslint-disable-next-line no-control-regex
@@ -319,7 +344,7 @@ export function TagInput({ tags }: { tags?: string[] }) {
 function MemberPickerFields({ memberId, memberName }: { memberId?: string; memberName?: string }) {
   const showSelected = Boolean(memberId);
   return (
-    <div class="flex flex-col" data-show-cats="ppe" data-show-batch="false">
+    <div class="flex flex-col" data-field="assignments" data-show-batch="false">
       <p class="fieldset-legend">{t("inventory.form.assignedMember")}</p>
       <div id="member-picker-search" class={showSelected ? "hidden" : ""}>
         <label class="input flex items-center gap-2 w-full">
@@ -372,7 +397,7 @@ function MemberPickerFields({ memberId, memberName }: { memberId?: string; membe
 function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[] }) {
   const serialized = JSON.stringify(assignments.map(({ memberId, quantity }) => ({ memberId, quantity })));
   return (
-    <div class="flex flex-col" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
+    <div class="flex flex-col" data-field="assignments" data-show-batch="true">
       <p class="fieldset-legend">{t("inventory.form.assignedMembers")}</p>
       <div id="batch-assign-list" class="space-y-1 mb-2 empty:mb-0">
         {assignments.map((a) => (
@@ -455,29 +480,32 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
 // without duplicating any input's `name` across categories (duplicate names would
 // silently clobber each other in FormData on submit).
 const CATEGORY_TOGGLE_SCRIPT = `
-  var __inventoryBatchCats = ${JSON.stringify([...BATCH_CAPABLE_CATEGORIES])};
   function updateInventoryFormVisibility() {
     var cat = document.querySelector('input[name=category]:checked')?.value || '';
-    var batchToggle = document.getElementById('inventory-batch-toggle');
-    var isBatch = Boolean(batchToggle && batchToggle.checked);
-    document.querySelectorAll('[data-show-cats]').forEach(function(el) {
-      var cats = el.dataset.showCats.split(',');
-      var catOk = cats.indexOf(cat) >= 0;
-      var batchAttr = el.dataset.showBatch;
-      var batchOk = batchAttr === undefined || (batchAttr === 'true') === isBatch;
-      el.classList.toggle('hidden', !(catOk && batchOk));
-    });
+    var on = {};
+    document.querySelectorAll('input[name=enabledFields]:checked').forEach(function(c) { on[c.value] = true; });
     var qtyInput = document.getElementById('inventory-quantity');
-    // batch mode is derived from quantity > 1 server-side; a batch of 1 would silently save as single item
-    if (qtyInput && isBatch && __inventoryBatchCats.indexOf(cat) >= 0 && Number(qtyInput.value) < 2) {
-      qtyInput.value = '2';
-      qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    if (qtyInput && !(isBatch && __inventoryBatchCats.indexOf(cat) >= 0) && qtyInput.value !== '1') {
+    // quantity is only meaningful with the "quantity" field; without it a stale value must not leak into batch mode
+    if (qtyInput && !on.quantity && qtyInput.value !== '1') {
       qtyInput.value = '1';
       // programmatic changes fire no event; ChipInput listens for it to refresh label/counter/limit
       qtyInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    var isBatch = Boolean(on.quantity && qtyInput && Number(qtyInput.value) > 1);
+    document.querySelectorAll('[data-field], [data-show-cats]').forEach(function(el) {
+      var fieldOk = el.dataset.field === undefined || Boolean(on[el.dataset.field]);
+      var catOk = el.dataset.showCats === undefined || el.dataset.showCats.split(',').indexOf(cat) >= 0;
+      var batchOk = el.dataset.showBatch === undefined || (el.dataset.showBatch === 'true') === isBatch;
+      el.classList.toggle('hidden', !(fieldOk && catOk && batchOk));
+    });
+  }
+  // New item: a category change pre-selects the usual fields (same sets as the legacy-data migration).
+  function applyInventoryPreset() {
+    var root = document.getElementById('inventory-fields');
+    if (!root || !root.dataset.preset) return;
+    var cat = document.querySelector('input[name=category]:checked')?.value || '';
+    var preset = JSON.parse(root.dataset.preset)[cat] || [];
+    document.querySelectorAll('input[name=enabledFields]').forEach(function(c) { c.checked = preset.indexOf(c.value) >= 0; });
   }
   updateInventoryFormVisibility();
 `;
@@ -490,7 +518,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 }) {
   const v = values ?? {};
   const quantity = Number(v.quantity) || 1;
-  const isBatch = quantity > 1;
   return (
     <>
       <Field label={t("inventory.form.name")} required>
@@ -504,7 +531,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           <select
             id="inventory-category-select"
             class="select w-full @sm:hidden"
-            onchange="document.querySelector('input[name=category][value=' + this.value + ']').checked = true; updateInventoryFormVisibility()"
+            onchange="document.querySelector('input[name=category][value=' + this.value + ']').checked = true; applyInventoryPreset(); updateInventoryFormVisibility()"
           >
             <button type="button"><selectedcontent></selectedcontent></button>
             <option value="" disabled selected={!v.category} hidden></option>
@@ -524,7 +551,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
                   value={category}
                   checked={v.category === category}
                   class="hidden"
-                  onchange="document.getElementById('inventory-category-select').value = this.value; updateInventoryFormVisibility()"
+                  onchange="document.getElementById('inventory-category-select').value = this.value; applyInventoryPreset(); updateInventoryFormVisibility()"
                 />
                 <Icon name={icon} class="size-5" />
                 <span class="sr-only @xl:not-sr-only">{CATEGORY_LABELS[category]}</span>
@@ -539,7 +566,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <Field label={t("inventory.form.commissionedAt")}>
           <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
         </Field>
-        <Field label={t("inventory.form.purchasePrice")} after={<span class="block text-xs opacity-60 mt-1" data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>}>
+        <Field label={t("inventory.form.purchasePrice")} after={<span class="block text-xs opacity-60 mt-1" data-field="quantity" data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>}>
           <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input w-full${errors?.purchasePrice ? " input-error" : ""}`} placeholder={t("inventory.form.purchasePrice")} />
           {errors?.purchasePrice && <span class="text-error text-sm mt-1">{errors.purchasePrice}</span>}
         </Field>
@@ -561,31 +588,44 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             <input type="text" inputmode="numeric" name="yearOfManufacture" value={v.yearOfManufacture ?? ""} class={`input w-full${errors?.yearOfManufacture ? " input-error" : ""}`} placeholder={t("inventory.form.yearOfManufacture")} />
             {errors?.yearOfManufacture && <span class="text-error text-sm mt-1">{errors.yearOfManufacture}</span>}
           </Field>
-          <Field label={t("inventory.form.vehicleInspectionDue")}>
-            <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input w-full" />
-          </Field>
         </div>
       </div>
 
-      <div data-show-cats="scba,equipment,ppe" class="space-y-4">
+      <div data-field="inspection" class="space-y-4">
         <div class="divider">{t("inventory.form.sectionInspection")}</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label={t("inventory.form.lastInspectionDate")}>
-            <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input w-full" />
-          </Field>
-          <Field label={t("inventory.form.nextInspectionDue")}>
-            <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input w-full" />
-          </Field>
+          <div data-show-cats="vehicle">
+            <Field label={t("inventory.form.vehicleInspectionDue")}>
+              <input type="date" name="vehicleInspectionDue" value={v.vehicleInspectionDue ?? ""} class="input w-full" />
+            </Field>
+          </div>
+          <div data-show-cats="scba,equipment,ppe,other">
+            <Field label={t("inventory.form.lastInspectionDate")}>
+              <input type="date" name="lastInspectionDate" value={v.lastInspectionDate ?? ""} class="input w-full" />
+            </Field>
+          </div>
+          <div data-show-cats="scba,equipment,ppe,other">
+            <Field label={t("inventory.form.nextInspectionDue")}>
+              <input type="date" name="nextInspectionDue" value={v.nextInspectionDue ?? ""} class="input w-full" />
+            </Field>
+          </div>
         </div>
       </div>
 
-      <div data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} class="space-y-4">
-        <div class="divider">{t("inventory.form.batchToggle")}</div>
-        <label class="label cursor-pointer justify-start gap-2 w-fit">
-          <input type="checkbox" id="inventory-batch-toggle" checked={isBatch} class="checkbox" onchange="updateInventoryFormVisibility()" />
-          <span class="text-sm">{t("inventory.form.batchToggle")}</span>
-        </label>
-        <div data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
+      <div class="space-y-2">
+        <div class="divider">{t("inventory.form.fields")}</div>
+        <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields" data-preset={v.enabledFieldsList ? undefined : JSON.stringify(FIELD_PRESETS)}>
+          {INVENTORY_FIELDS.map((f) => (
+            <label class="label cursor-pointer justify-start gap-2 w-fit">
+              <input type="checkbox" name="enabledFields" value={f} checked={hasField(v.enabledFieldsList, f)} class="checkbox" onchange="updateInventoryFormVisibility()" />
+              <span class="text-sm">{t(`inventory.field.${f}`)}</span>
+            </label>
+          ))}
+        </div>
+        {errors?.enabledFields && <span class="text-error text-sm">{errors.enabledFields}</span>}
+      </div>
+
+      <div data-field="quantity" class="space-y-4">
         <Field label={t("inventory.form.quantity")} class="max-w-40">
           <input
             type="number"
@@ -593,25 +633,27 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             name="quantity"
             min="1"
             value={v.quantity ?? "1"}
+            oninput="updateInventoryFormVisibility()"
             class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("inventory.form.quantity")}
           />
           {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
         </Field>
-        </div>
       </div>
 
-      <NumberListField
-        name="numbers"
-        label={t("inventory.form.inventoryNumbers")}
-        labelSingle={t("inventory.form.inventoryNumber")}
-        placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
-        placeholderSingle={t("inventory.form.inventoryNumberPlaceholder")}
-        values={v.numbersList}
-        quantity={quantity}
-        error={errors?.numbers}
-      />
+      <div data-field="numbers">
+        <NumberListField
+          name="numbers"
+          label={t("inventory.form.inventoryNumbers")}
+          labelSingle={t("inventory.form.inventoryNumber")}
+          placeholder={t("inventory.form.inventoryNumbersPlaceholder")}
+          placeholderSingle={t("inventory.form.inventoryNumberPlaceholder")}
+          values={v.numbersList}
+          quantity={quantity}
+          error={errors?.numbers}
+        />
+      </div>
 
-      <div data-show-cats="scba,equipment,ppe">
+      <div data-field="serials">
         <NumberListField
           name="serials"
           label={t("inventory.form.serialNumbers")}
@@ -622,6 +664,23 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           quantity={quantity}
           error={errors?.serials}
         />
+      </div>
+
+      <div data-field="location" class="space-y-4">
+        <div class="divider">{t("inventory.form.sectionLocation")}</div>
+        <Field label={t("inventory.form.locationText")}>
+          <input type="text" name="locationText" value={v.locationText ?? ""} class="input w-full" placeholder={t("inventory.form.locationText")} />
+        </Field>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t("inventory.form.latitude")}>
+            <input type="text" inputmode="decimal" name="latitude" value={v.latitude ?? ""} class={`input w-full${errors?.latitude ? " input-error" : ""}`} placeholder={t("inventory.form.latitude")} />
+            {errors?.latitude && <span class="text-error text-sm mt-1">{errors.latitude}</span>}
+          </Field>
+          <Field label={t("inventory.form.longitude")}>
+            <input type="text" inputmode="decimal" name="longitude" value={v.longitude ?? ""} class={`input w-full${errors?.longitude ? " input-error" : ""}`} placeholder={t("inventory.form.longitude")} />
+            {errors?.longitude && <span class="text-error text-sm mt-1">{errors.longitude}</span>}
+          </Field>
+        </div>
       </div>
 
       <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
@@ -960,7 +1019,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                   )}
                   {/* Server ignoriert maxRequestQuantity für individualTracking-Artikel (fix seit Anlage, siehe unten) — Feld dann gar nicht erst anzeigen. */}
                   {!lendable.individualTracking && (
-                  <div data-show-cats={[...BATCH_CAPABLE_CATEGORIES].join(",")} data-show-batch="true">
+                  <div data-field="quantity" data-show-batch="true">
                     <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
                       <input type="checkbox" name="maxRequestLimited" value="1" checked={lendable.maxRequestQuantity > 0 || Boolean(lendable.errors?.maxRequestQuantity)} class="toggle toggle-success mt-0.5"
                         onchange="document.getElementById('max-request-quantity').hidden = !this.checked" />
@@ -1009,11 +1068,11 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
   const tags = canonicalizeTags(parseTags(body, "tags"), await tagVocabulary());
-  const numbers = parseList(body, "numbers");
-  const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
+  const numbers = hasField(values.enabledFieldsList, "numbers") ? parseList(body, "numbers") : [];
+  const serials = hasField(values.enabledFieldsList, "serials") ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
-  const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity);
+  const { assignments, error: assignmentError } = resolveAssignments(values, insertValues.enabledFields, insertValues.quantity);
   if (assignmentError) errors.assignments = assignmentError;
   const numbersError = await validateNumbers(numbers, insertValues.quantity);
   if (numbersError) errors.numbers = numbersError;
@@ -1156,6 +1215,10 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     assignedMemberId: !isBatch ? (assignmentList[0]?.memberId ?? "") : "",
     tagsList: item.tags.map((tg) => tg.tag),
     numbersList: sortedNumbers(item),
+    enabledFieldsList: (item.enabledFields ?? []) as InventoryField[],
+    locationText: item.locationText ?? "",
+    latitude: item.latitude ?? "",
+    longitude: item.longitude ?? "",
   };
 
   // Zurücknehmen ist nur ohne Vorgänge möglich (Cascade würde die Historie löschen).
@@ -1204,16 +1267,31 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   const body = await c.req.parseBody({ all: true });
   const { values, errors } = parseInventoryFields(body);
   const tags = canonicalizeTags(parseTags(body, "tags"), await tagVocabulary());
-  const numbers = parseList(body, "numbers");
-  const serials = SERIAL_CATEGORIES.has(values.category) ? parseList(body, "serials") : [];
+  const numbers = hasField(values.enabledFieldsList, "numbers") ? parseList(body, "numbers") : [];
+  const serials = hasField(values.enabledFieldsList, "serials") ? parseList(body, "serials") : [];
   const category = values.category as InventoryCategory;
   const insertValues = toInsertValues(values);
-  const { assignments, error: assignmentError } = resolveAssignments(values, category, insertValues.quantity, existing.retiredQuantity);
+  const { assignments, error: assignmentError } = resolveAssignments(values, insertValues.enabledFields, insertValues.quantity, existing.retiredQuantity);
   if (assignmentError) errors.assignments = assignmentError;
   const numbersError = await validateNumbers(numbers, insertValues.quantity, id);
   if (numbersError) errors.numbers = numbersError;
   const serialsError = validateSerials(serials, insertValues.quantity);
   if (serialsError) errors.serials = serialsError;
+
+  // Sperre: ein Feld lässt sich nur abwählen, solange es am gespeicherten Posten leer ist (nichts geht still verloren).
+  const lockedFields = INVENTORY_FIELDS.filter((f) => hasField(existing.enabledFields, f) && !hasField(insertValues.enabledFields, f));
+  if (lockedFields.length > 0) {
+    const stored = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, id) });
+    const openLoan = stored ? await db.query.lendingLoans.findFirst({ where: and(eq(lendingLoans.lendingItemId, stored.id), isNull(lendingLoans.returnedAt)) }) : undefined;
+    const state = {
+      quantity: existing.quantity, retiredQuantity: existing.retiredQuantity, numbers: existing.numbers.length, serials: existing.serials.length,
+      assignments: existing.assignments.length, locationText: existing.locationText, latitude: existing.latitude, longitude: existing.longitude,
+      vehicleInspectionDue: existing.vehicleInspectionDue, nextInspectionDue: existing.nextInspectionDue, lastInspectionDate: existing.lastInspectionDate,
+      activeLoans: openLoan ? 1 : 0,
+    };
+    const blocked = lockedFields.filter((f) => !isFieldEmpty(f, state));
+    if (blocked.length > 0) errors.enabledFields = t("inventory.form.fieldLocked", { fields: blocked.map((f) => t(`inventory.field.${f}`)).join(", ") });
+  }
 
   // Verleih-Flag: nur mit lending:manage, serverseitig geprüft (UI-Disabled ist nur Komfort).
   const wantsLendable = trimmed(body, "lendable") === "1";
@@ -1505,7 +1583,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
             <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
           </div>
         )}
-        {SERIAL_CATEGORIES.has(cat) && item.serials.length > 0 && (
+        {item.serials.length > 0 && (
           <div class="sm:col-span-2">
             <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.serialNumbers" : "inventory.form.serialNumber")}</div>
             <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
@@ -1514,17 +1592,21 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
         {cat === "vehicle" && <>
           <ViewField label={t("inventory.form.licensePlate")} value={item.licensePlate} />
           <ViewField label={t("inventory.form.yearOfManufacture")} value={item.yearOfManufacture ? String(item.yearOfManufacture) : null} />
-          <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />
+          {hasField(item.enabledFields, "inspection") && <ViewField label={t("inventory.form.vehicleInspectionDue")} value={item.vehicleInspectionDue ? formatDate(item.vehicleInspectionDue) : null} />}
         </>}
-        {(cat === "scba" || cat === "equipment" || cat === "ppe") && <>
-          {cat === "scba" && <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />}
+        {hasField(item.enabledFields, "inspection") && cat !== "vehicle" && <>
+          <ViewField label={t("inventory.form.lastInspectionDate")} value={item.lastInspectionDate ? formatDate(item.lastInspectionDate) : null} />
           <ViewField label={t("inventory.form.nextInspectionDue")} value={item.nextInspectionDue ? formatDate(item.nextInspectionDue) : null} />
         </>}
+        {hasField(item.enabledFields, "location") && <>
+          <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
+          <ViewField label={t("inventory.form.coordinates")} value={item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : null} />
+        </>}
         {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
-        <ViewField
+        {hasField(item.enabledFields, "assignments") && <ViewField
           label={t("inventory.form.assignedMember")}
           value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
-        />
+        />}
       </ViewGrid>
       {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
       {item.tags.length > 0 && (

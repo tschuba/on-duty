@@ -239,7 +239,7 @@ describe("POST /", () => {
     const res = await inventoryRoutes.request("/", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ name: "Jacke", category: "ppe", quantity: "1", assignedMemberId: "m1" }),
+      body: formBody({ name: "Jacke", category: "ppe", quantity: "1", assignedMemberId: "m1", enabledFields: "assignments" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table === inventoryItemAssignments)?.values).toEqual([{ inventoryItemId: "new-id", memberId: "m1", quantity: 1 }]);
@@ -250,7 +250,7 @@ describe("POST /", () => {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formBody({
-        name: "Helme", category: "equipment", quantity: "3",
+        name: "Helme", category: "equipment", quantity: "3", enabledFields: ["quantity", "assignments"],
         assignments: JSON.stringify([{ memberId: "m1", quantity: 2 }, { memberId: "m2", quantity: 2 }]),
       }),
     });
@@ -302,13 +302,13 @@ describe("lendable flag on POST /", () => {
 
   it("stores lending config given at creation", async () => {
     currentUser = lendingManager();
-    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
+    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5", enabledFields: "quantity", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
     expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: false, publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
   });
 
   it("uses batch tracking for quantity > 1", async () => {
     currentUser = lendingManager();
-    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5" });
+    await post("/", { name: "Helm", category: "equipment", lendable: "1", quantity: "5", enabledFields: "quantity" });
     expect(insertCalls.find((c) => c.table === lendingItems)?.values.individualTracking).toBe(false);
   });
 
@@ -319,7 +319,7 @@ describe("lendable flag on POST /", () => {
 });
 
 describe("lendable flag on POST /:id", () => {
-  const base = { name: "TSF-W", category: "vehicle", licensePlate: "ABC-123" };
+  const base = { name: "TSF-W", category: "vehicle", licensePlate: "ABC-123", enabledFields: "quantity" };
 
   it("marks an existing item lendable", async () => {
     currentUser = lendingManager();
@@ -645,7 +645,7 @@ describe("POST /:id", () => {
 
 describe("inventory numbers", () => {
   it("saves numbers, dropping duplicates and keeping commas/spaces", async () => {
-    const res = await post("/", { name: "Helm", category: "equipment", quantity: "3", numbers: ["00 211 504", "FW_12/a, x", "00 211 504"] });
+    const res = await post("/", { name: "Helm", category: "equipment", quantity: "3", enabledFields: ["quantity", "numbers"], numbers: ["00 211 504", "FW_12/a, x", "00 211 504"] });
     expect(res.status).toBe(302);
     const ins = insertCalls.find((c) => c.table === inventoryItemNumbers)!;
     expect(ins.values).toEqual([
@@ -655,19 +655,19 @@ describe("inventory numbers", () => {
   });
 
   it("rejects more numbers than quantity", async () => {
-    const res = await post("/", { name: "Helm", category: "equipment", quantity: "1", numbers: ["A", "B"] });
+    const res = await post("/", { name: "Helm", category: "equipment", quantity: "1", enabledFields: ["quantity", "numbers"], numbers: ["A", "B"] });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
   });
 
   it("rejects control characters and >100 chars", async () => {
-    expect((await post("/", { name: "H", category: "equipment", numbers: "a\u0007b" })).status).toBe(422);
-    expect((await post("/", { name: "H", category: "equipment", numbers: "x".repeat(101) })).status).toBe(422);
+    expect((await post("/", { name: "H", category: "equipment", enabledFields: "numbers", numbers: "a\u0007b" })).status).toBe(422);
+    expect((await post("/", { name: "H", category: "equipment", enabledFields: "numbers", numbers: "x".repeat(101) })).status).toBe(422);
   });
 
   it("rejects a number taken by another item, marking archived ones", async () => {
     numbersFindManyResult = [{ number: "A1", inventoryItemId: "other", item: { name: "Alt-Helm", retiredAt: "2024-01-01" } }];
-    const res = await post("/", { name: "Helm", category: "equipment", numbers: "A1" });
+    const res = await post("/", { name: "Helm", category: "equipment", enabledFields: "numbers", numbers: "A1" });
     expect(res.status).toBe(422);
     const html = await res.text();
     expect(html).toContain("A1");
@@ -685,7 +685,7 @@ describe("inventory numbers", () => {
 
   it("rejects lowering quantity below the number count", async () => {
     itemsFindFirstResult = makeItem({});
-    const res = await post("/item1", { name: "Helm", category: "equipment", quantity: "1", numbers: ["A", "B"] });
+    const res = await post("/item1", { name: "Helm", category: "equipment", quantity: "1", enabledFields: ["quantity", "numbers"], numbers: ["A", "B"] });
     expect(res.status).toBe(422);
   });
 
@@ -722,20 +722,36 @@ describe("detail view serial number", () => {
   });
 });
 
+describe("enabled fields lock", () => {
+  it("rejects deselecting a field that still holds data", async () => {
+    itemsFindFirstResult = makeItem({ enabledFields: ["numbers"], numbers: [{ number: "A1" }] });
+    const res = await post("/item1", { name: "Helm", category: "equipment" });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("inventory.form.fieldLocked", { fields: t("inventory.field.numbers") }));
+    expect(updateCalls.some((c) => c.table === inventoryItems)).toBe(false);
+  });
+
+  it("allows deselecting an empty field", async () => {
+    itemsFindFirstResult = makeItem({ enabledFields: ["serials"] });
+    const res = await post("/item1", { name: "Helm", category: "equipment" });
+    expect(res.status).toBe(302);
+  });
+});
+
 describe("serial numbers", () => {
   it("saves one serial per piece for a batch category", async () => {
-    const res = await post("/", { name: "Pager", category: "equipment", quantity: "3", serials: ["S1", "S2", "S1"] });
+    const res = await post("/", { name: "Pager", category: "equipment", quantity: "3", enabledFields: ["quantity", "serials"], serials: ["S1", "S2", "S1"] });
     expect(res.status).toBe(302);
     const ins = insertCalls.find((c) => c.table === inventoryItemSerials)!;
     expect(ins.values).toEqual([{ inventoryItemId: "new-id", serial: "S1" }, { inventoryItemId: "new-id", serial: "S2" }]);
   });
 
   it("rejects more serials than quantity", async () => {
-    const res = await post("/", { name: "Pager", category: "equipment", quantity: "1", serials: ["S1", "S2"] });
+    const res = await post("/", { name: "Pager", category: "equipment", quantity: "1", enabledFields: ["quantity", "serials"], serials: ["S1", "S2"] });
     expect(res.status).toBe(422);
   });
 
-  it("ignores serials for categories without them", async () => {
+  it("ignores serials without the serials field", async () => {
     await post("/", { name: "TSF", category: "vehicle", serials: "S1" });
     expect(insertCalls.some((c) => c.table === inventoryItemSerials)).toBe(false);
   });
