@@ -1792,7 +1792,8 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
                     <dialog id={dialogId} class="modal text-left">
                       <div class="modal-box">
                         <h3 class="font-bold text-lg">{t("inventory.inspection.doneTitle", { name: r.name })}</h3>
-                        <form method="post" action={`/inventory/${item.id}/inspections/${r.id}/done`} class="space-y-2 mt-2">
+                        <form method="post" action={`/inventory/${item.id}/inspections/${r.id}/done`} class="space-y-2 mt-2"
+                          onsubmit={`var d=this.elements.dueDate;return !d||!d.value||d.value>=this.elements.inspectedAt.value||confirm(${JSON.stringify(t("inventory.inspection.dueBeforeDoneConfirm"))})`}>
                           <Field label={t("inventory.inspection.doneDate")}>
                             <input type="date" name="inspectedAt" value={today} max={today} required class="input w-full" />
                           </Field>

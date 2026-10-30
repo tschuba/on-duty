@@ -607,6 +607,16 @@ describe("inspection types", () => {
     expect(await (await inventoryRoutes.request("/")).text()).not.toContain("Freie Felder");
   });
 
+  it("warns client-side before saving a due date earlier than the inspection date, server stays permissive", async () => {
+    itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "HU", "2026-06-01")] });
+    const html = await (await inventoryRoutes.request("/item1")).text();
+    expect(html).toContain(t("inventory.inspection.dueBeforeDoneConfirm").slice(0, 20));
+    inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+    itemsFindFirstResult = { retiredAt: null };
+    expect((await inventoryRoutes.request("/item1/inspections/p1/done", { method: "POST", body: formBody({ inspectedAt: "2026-05-20", dueDate: "2026-05-01" }) })).status).toBe(302);
+    expect(updateCalls.at(-1)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: "2026-05-01" });
+  });
+
   it("renames swapped inspections via a temporary name first", async () => {
     itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "A", null), insp("p2", "B", null)] });
     const res = await inventoryRoutes.request("/item1", {

@@ -1071,6 +1071,7 @@ export const de = {
   "inventory.inspection.dueHint": "Vorschlag: alte Fälligkeit plus Intervall.",
   "inventory.inspection.doneFlash": "Prüfung eingetragen.",
   "inventory.inspection.invalidDone": "Ungültiges Datum.",
+  "inventory.inspection.dueBeforeDoneConfirm": "Die Fälligkeit liegt vor dem Prüfdatum, die Prüfart wäre sofort überfällig. Trotzdem speichern?",
   "inventory.inspection.retiredItem": "Ausgemusterte Posten werden nicht mehr geprüft.",
 
   "inventory.tabs.lending": "Verleih",
