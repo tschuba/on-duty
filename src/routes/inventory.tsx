@@ -21,17 +21,19 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addDays, addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { generateInspectionDueItems, isUniqueViolation, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { inventoryFieldRoutes } from "./inventory-fields.js";
+import { inventoryInspectionTemplateRoutes } from "./inventory-inspection-templates.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 // Vor den /:id-Routen registrieren, sonst frisst /:id den Pfad.
 inventoryRoutes.route("/fields", inventoryFieldRoutes);
+inventoryRoutes.route("/inspection-templates", inventoryInspectionTemplateRoutes);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -264,13 +266,6 @@ async function validateNumbers(numbers: string[], quantity: number, selfId?: str
   if (!taken) return undefined;
   const item = (taken as any).item;
   return t("inventory.form.numberTaken", { number: taken.number, item: item.name, archived: item.retiredAt ? ` ${t("inventory.form.archivedSuffix")}` : "" });
-}
-
-// Postgres unique_violation (23505) — z. B. wenn zwischen Vorabprüfung und Insert jemand
-// dieselbe Inventarnummer vergibt. Drizzle kann den Fehler in `cause` verpacken.
-function isUniqueViolation(err: unknown): boolean {
-  const e = err as { code?: string; cause?: { code?: string } };
-  return e?.code === "23505" || e?.cause?.code === "23505";
 }
 
 // Menge 1: einfaches Textfeld; ab Menge 2: ChipInput. Beide tragen denselben Feldnamen,
@@ -554,11 +549,12 @@ function InspectionRowFields({ row, error }: { row: InspectionFormRow; error?: I
   );
 }
 
-export function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
+export function InventoryFormFields({ values, errors, assignedMemberName, assignments, canConfigure }: {
   values?: Partial<InventoryFieldValues>;
   errors?: Record<string, string>;
   assignedMemberName?: string;
   assignments?: AssignmentInput[];
+  canConfigure?: boolean;
 }) {
   const v = values ?? {};
   const quantity = Number(v.quantity) || 1;
@@ -624,6 +620,16 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <div class="space-y-2">
         <div class="divider">{t("inventory.form.fields")}</div>
+        {canConfigure && (
+          // Neuer Tab: das Formular bleibt offen, nichts wird zurückübernommen (Seite neu laden für neue Vorschläge).
+          <div class="dropdown dropdown-end float-right">
+            <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">{t("inventory.form.configureLinks")}<Icon name="chevron-down" class="h-4 w-4 opacity-60" /></div>
+            <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow">
+              <li><a href="/inventory/inspection-templates" target="_blank" rel="noopener">{t("inventory.tabs.inspectionTemplates")}</a></li>
+              <li><a href="/inventory/fields" target="_blank" rel="noopener">{t("inventory.tabs.fields")}</a></li>
+            </ul>
+          </div>
+        )}
         <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields" data-preset={v.enabledFieldsList ? undefined : JSON.stringify(FIELD_PRESETS)}>
           {INVENTORY_FIELDS.map((f) => (
             <label class="label cursor-pointer justify-start gap-2 w-fit">
@@ -915,7 +921,6 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
     <Layout title={t("inventory.title")} user={user}>
       <PageHeader title={t("inventory.title")} actions={<>
         {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
-        {user.permissions.has("inventory:configure") && <HeaderAction icon="cog-6-tooth" label={t("inventory.fields.title")} href="/inventory/fields" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 
@@ -1133,7 +1138,7 @@ function lendableField(
   };
 }
 
-function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable, cancelHref }: {
+function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable, cancelHref, canConfigure }: {
   title: string;
   action: string;
   values?: Partial<InventoryFieldValues>;
@@ -1144,12 +1149,13 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
   extraActions?: any;
   lendable?: LendableField;
   cancelHref?: string;
+  canConfigure?: boolean;
 }) {
   return (
     <>
       <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} cancelHref={cancelHref} /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
-        <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
+        <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} canConfigure={canConfigure} />
         {lendable && (
           <fieldset class="card card-border bg-base-100 border-base-300">
             <div class="card-body gap-4 p-4">
@@ -1234,7 +1240,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   return c.html(
     <Layout title={t("inventory.newItem")} user={user}>
-      <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} values={await withFree({})} />
+      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" lendable={lendableField(user, false, {})} values={await withFree({})} />
     </Layout>
   );
 });
@@ -1327,7 +1333,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
-        <InventoryForm title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
+        <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
           values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors })} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired })} />
       </Layout>,
@@ -1583,7 +1589,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={existing.name} user={user}>
-        <InventoryForm title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
+        <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={existing.name} action={`/inventory/${id}`} formId="inventory-edit-form"
           values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors }, id)} errors={errors}
           assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames}
           lendable={lendableField(user, wantsLendable, { error: lendableError })} />

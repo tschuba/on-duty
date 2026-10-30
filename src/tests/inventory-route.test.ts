@@ -597,6 +597,16 @@ describe("inspection types", () => {
     expect(insertCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
   });
 
+  it("offers the configuration links in the item form (new tab) only with inventory:configure, and no gear in the list", async () => {
+    const plain = await (await inventoryRoutes.request("/new")).text();
+    expect(plain).not.toContain('href="/inventory/inspection-templates"');
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "inventory:configure"]), disabled: false };
+    const html = await (await inventoryRoutes.request("/new")).text();
+    expect(html).toMatch(/href="\/inventory\/inspection-templates" target="_blank"/);
+    expect(html).toMatch(/href="\/inventory\/fields" target="_blank"/);
+    expect(await (await inventoryRoutes.request("/")).text()).not.toContain("Freie Felder");
+  });
+
   describe("POST /:id/inspections/:inspectionId/done", () => {
     const post = (fields: Record<string, string>) => inventoryRoutes.request("/item1/inspections/p1/done", { method: "POST", body: formBody(fields) });
 

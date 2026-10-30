@@ -47,6 +47,8 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans, tone: "badge-primary" },
       { label: t("lend.requests.title"), href: "/inventory/requests", show: has("lending:manage"), count: c.loanRequests },
+      { label: t("inventory.tabs.inspectionTemplates"), href: "/inventory/inspection-templates", show: has("inventory:configure") },
+      { label: t("inventory.tabs.fields"), href: "/inventory/fields", show: has("inventory:configure") },
     ] },
     { icon: "building-office", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), count: c.org },

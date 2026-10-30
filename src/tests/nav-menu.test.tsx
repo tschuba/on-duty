@@ -73,6 +73,13 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
     expect(html).not.toContain("Import");
   });
 
+  it("offers the inventory configuration entries only with inventory:configure", async () => {
+    const withConf = await renderAt("/", "inventory:configure");
+    expect(withConf).toContain('href="/inventory/inspection-templates"');
+    expect(withConf).toContain('href="/inventory/fields"');
+    expect(await renderAt("/", "members:read")).not.toContain('href="/inventory/fields"');
+  });
+
   it("offers the error tracker only with ERROR_TRACKER_URL", async () => {
     expect(await renderAt("/", "system:admin")).not.toContain("Fehlerberichte");
   });

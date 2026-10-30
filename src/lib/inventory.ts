@@ -58,7 +58,24 @@ export function nextDueDate(oldDue: string | null, intervalMonths: number | null
   return anchored && anchored > inspectedAt ? anchored : addMonths(inspectedAt, intervalMonths);
 }
 
+// Postgres unique_violation (23505) — z. B. wenn zwischen Vorabprüfung und Insert jemand
+// dieselbe Inventarnummer vergibt. Drizzle kann den Fehler in `cause` verpacken.
+export function isUniqueViolation(err: unknown): boolean {
+  const e = err as { code?: string; cause?: { code?: string } };
+  return e?.code === "23505" || e?.cause?.code === "23505";
+}
+
+
 // ── Prüfarten im Posten-Formular ─────────────────────────────────────────────
+
+// Vorlage (Verwaltungsseite): Name Pflicht und höchstens 60 Zeichen, Standardintervall leer oder 1–120.
+export function validateTemplate(name: string, interval: string): { error?: "name" | "nameLength" | "interval"; intervalMonths: number | null } {
+  const n = Number(interval);
+  if (!name) return { error: "name", intervalMonths: null };
+  if (name.length > INSPECTION_NAME_MAX) return { error: "nameLength", intervalMonths: null };
+  if (interval && !(/^\d+$/.test(interval) && n >= 1 && n <= 120)) return { error: "interval", intervalMonths: null };
+  return { intervalMonths: interval ? n : null };
+}
 
 export type InspectionFormRow = { id: string; name: string; interval: string; last: string; due: string };
 export type InspectionRowError = "name" | "nameLength" | "interval" | "date" | "future" | "duplicate";
