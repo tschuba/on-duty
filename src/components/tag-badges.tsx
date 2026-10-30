@@ -12,16 +12,17 @@ export const TAG_STYLES: Record<string, { icon: IconName; badge: string }> = {
   hydrant: { icon: "fire-hydrant", badge: "badge-secondary badge-outline" },
 };
 
-// Alle Tags als Badge; das Icon trägt nur der erste Tag mit eigenem Stil.
+// Alle Tags als Badge, Tags mit eigenem Stil zuerst (stabil); das Icon trägt der erste von ihnen.
 export function TagBadges({ tags }: { tags: string[] }) {
-  const iconTag = tags.find((tag) => TAG_STYLES[tag.toLowerCase()]);
+  const styled = (tag: string) => Boolean(TAG_STYLES[tag.toLowerCase()]);
+  const sorted = [...tags.filter(styled), ...tags.filter((tag) => !styled(tag))];
   return (
     <>
-      {tags.map((tag) => {
+      {sorted.map((tag, i) => {
         const style = TAG_STYLES[tag.toLowerCase()];
         return (
-          <span class={`badge badge-sm ${style?.badge ?? "badge-ghost"}${tag === iconTag ? " gap-1" : ""}`}>
-            {tag === iconTag && style && <Icon name={style.icon} class="size-3.5" />}
+          <span class={`badge badge-sm ${style?.badge ?? "badge-ghost"}${i === 0 && style ? " gap-1" : ""}`}>
+            {i === 0 && style && <Icon name={style.icon} class="size-3.5" />}
             {tag}
           </span>
         );

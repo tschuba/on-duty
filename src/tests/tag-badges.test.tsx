@@ -10,11 +10,12 @@ describe("TagBadges", () => {
     expect(html.match(/badge-ghost/g)).toHaveLength(2);
   });
 
-  it("shows the icon of the first styled tag only", () => {
-    const html = render(["Halle", "hydrant", "Fahrzeug"]);
+  it("puts styled tags first, keeps the order otherwise, and shows the icon on the first one only", () => {
+    const html = render(["Halle", "hydrant", "Fahrzeug", "Keller"]);
+    const order = ["hydrant", "Fahrzeug", "Halle", "Keller"].map((t) => html.indexOf(`${t}</span>`));
+    expect(order).toEqual([...order].sort((x, y) => x - y));
     expect(html.match(/<svg/g)).toHaveLength(1);
-    expect(html.indexOf("<svg")).toBeGreaterThan(html.indexOf("Halle"));
-    expect(html.indexOf("<svg")).toBeLessThan(html.indexOf("hydrant"));
+    expect(html.indexOf("<svg")).toBeLessThan(html.indexOf("hydrant</span>"));
     expect(html).toContain("badge-primary"); // Fahrzeug keeps its color, just no icon
   });
 
