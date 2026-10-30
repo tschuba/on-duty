@@ -81,7 +81,7 @@ export type InspectionFormRow = { id: string; name: string; interval: string; la
 export type InspectionRowError = "name" | "nameLength" | "interval" | "date" | "future" | "duplicate";
 export const INSPECTION_NAME_MAX = 60;
 
-const isIsoDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
+export const isIsoDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
 
 // Zeilen kommen als parallele Felder (insp_id/insp_name/insp_interval/insp_last/insp_due); komplett leere Zeilen
 // entfallen, die Fehler-Indizes beziehen sich auf die verbleibenden Zeilen.

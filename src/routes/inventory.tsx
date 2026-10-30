@@ -21,7 +21,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addDays, addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, isUniqueViolation, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { generateInspectionDueItems, isIsoDate, isUniqueViolation, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -1827,7 +1827,7 @@ inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("invento
   const today = new Date().toISOString().slice(0, 10);
   const inspectedAt = trimmed(body, "inspectedAt");
   const override = trimmed(body, "dueDate");
-  const valid = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(d));
+  const valid = isIsoDate;
   if (!valid(inspectedAt) || inspectedAt > today || (override && !valid(override))) {
     setFlash(c, t("inventory.inspection.invalidDone"), "error");
     return c.redirect(`/inventory/${id}`);
