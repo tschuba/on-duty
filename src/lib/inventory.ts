@@ -203,3 +203,10 @@ export function parseOptions(text: string): string[] {
 export function blockedOptionRemovals(oldOptions: string[], newOptions: string[], usedValues: (string | null)[]): string[] {
   return oldOptions.filter((o) => !newOptions.includes(o) && usedValues.includes(o));
 }
+
+// Kopfaktionen eines freien Felds: verwendete Felder nur archivieren, unverwendete zusätzlich löschen.
+export type FieldAction = "archive" | "unarchive" | "delete";
+export function fieldActions({ archived, usage }: { archived: boolean; usage: number }): FieldAction[] {
+  if (!archived) return usage > 0 ? ["archive"] : ["delete"];
+  return usage > 0 ? ["unarchive"] : ["unarchive", "delete"];
+}
