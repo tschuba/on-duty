@@ -51,3 +51,14 @@ describe("migration 0064 drop category", () => {
     expect(tags.indexOf("0063_inventory_templates_seed")).toBeLessThan(tags.indexOf("0064_inventory_drop_category"));
   });
 });
+
+describe("migration 0065 template descriptions", () => {
+  const add = readFileSync("drizzle/0065_foamy_smiling_tiger.sql", "utf8");
+
+  it("describes each shipped template within 120 characters and never overwrites an entered text", () => {
+    const rows = [...add.matchAll(/^\s+\('([^']+)', '([^']+)'\),?$/gm)].map((m) => m);
+    expect(rows.map((m) => m[1])).toEqual(["Fahrzeug", "Atemschutz", "Gerät", "PSA", "Sonstiges", "Hydrant"]);
+    rows.forEach((m) => expect(m[2].length, m[1]).toBeLessThanOrEqual(120));
+    expect(add).toContain(`t."description" IS NULL`);
+  });
+});
