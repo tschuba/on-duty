@@ -697,8 +697,8 @@ describe("inspection types", () => {
 describe("GET /search-members", () => {
   it("only returns aktiv/jugend members matching the query", async () => {
     membersFindManyResult = [
-      { id: "m1", exitDate: null, deathDate: null, birthDate: "1990-01-01", person: { firstName: "Anna", lastName: "Aktiv" }, assignments: [{ to: null, role: { grantsActiveStatus: true } }] },
-      { id: "m2", exitDate: "2020-01-01", deathDate: null, birthDate: "1990-01-01", person: { firstName: "Anna", lastName: "Archiviert" }, assignments: [] },
+      { id: "m1", exitDate: null, deathDate: null, person: { firstName: "Anna", lastName: "Aktiv", birthDate: "1990-01-01" }, assignments: [{ to: null, role: { grantsActiveStatus: true } }] },
+      { id: "m2", exitDate: "2020-01-01", deathDate: null, person: { firstName: "Anna", lastName: "Archiviert", birthDate: "1990-01-01" }, assignments: [] },
     ];
     const res = await inventoryRoutes.request("/search-members?q=anna");
     const html = await res.text();
