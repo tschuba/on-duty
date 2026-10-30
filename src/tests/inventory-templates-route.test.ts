@@ -43,6 +43,7 @@ vi.mock("../lib/org-config.js", async () => ({
 }));
 
 const { inventoryTemplateRoutes } = await import("../routes/inventory-templates.js");
+const get = (path: string) => inventoryTemplateRoutes.request(path);
 const post = (path: string, fields: Record<string, string | string[]>) => inventoryTemplateRoutes.request(path, { method: "POST", body: formBody(fields) });
 
 beforeEach(() => {
@@ -52,20 +53,53 @@ beforeEach(() => {
 });
 
 describe("item templates", () => {
-  it("lists templates with fixed fields, active free fields and inspection templates as choices", async () => {
-    const html = await (await inventoryTemplateRoutes.request("/")).text();
+  it("lists templates with counts, rows linking to the detail page", async () => {
+    const html = await (await get("/")).text();
     expect(html).toContain("Hydrant");
-    expect(html).toMatch(/name="enabledFields" value="location" checked/);
-    expect(html).toMatch(/name="freeFields" value="f1" checked/);
-    expect(html).not.toContain('value="f2"'); // archived free fields are not offered
+    expect(html).toContain("/inventory/templates/t1");
+  });
+
+  it("offers fixed fields, active free fields and inspection templates on /new, but not archived free fields", async () => {
+    const html = await (await get("/new")).text();
+    expect(html).toContain('name="enabledFields" value="location"');
+    expect(html).toContain('name="freeFields" value="f1"');
+    expect(html).not.toContain('value="f2"');
     expect(html).toContain('name="inspections" value="i1"');
+    expect(html).toContain('name="description"');
+  });
+
+  it("shows a read-only detail and keeps an archived, already chosen field checked in the edit form", async () => {
+    findFirstResult = { id: "t1", name: "Hydrant", description: "Unterflur", enabledFields: ["location"], fieldDefs: [{ fieldDefId: "f2" }], inspections: [{ inspectionTemplateId: "i1" }] };
+    const view = await (await get("/t1")).text();
+    expect(view).toContain("Unterflur");
+    expect(view).toContain("Altfeld (archiviert)");
+    expect(view).toContain("Jahresprüfung");
+    expect(view).not.toContain("<form id=");
+    const edit = await (await get("/t1/edit")).text();
+    expect(edit).toMatch(/name="freeFields" value="f2" checked/);
+    expect(edit).toContain("Altfeld (archiviert)");
+  });
+
+  it("re-renders a 422 with the submitted input, including archived fields", async () => {
+    const res = await post("/", { name: "", description: "Rest", freeFields: ["f2"], inspections: ["i1"] });
+    expect(res.status).toBe(422);
+    const html = await res.text();
+    expect(html).toContain('value="Rest"');
+    expect(html).toMatch(/name="freeFields" value="f2" checked/);
+    expect(html).toMatch(/name="inspections" value="i1" checked/);
+  });
+
+  it("keeps an archived free field when saving a template that has it checked", async () => {
+    findFirstResult = { id: "t1" };
+    expect((await post("/t1", { name: "Hydrant", freeFields: ["f2"] })).status).toBe(302);
+    expect(inserts.find((i) => i.table === inventoryTemplateFieldDefs)?.v).toEqual([{ templateId: "t1", fieldDefId: "f2" }]);
   });
 
   it("creates a template with its links, dropping unknown fixed fields", async () => {
-    const res = await post("/", { name: " Hydrant ", enabledFields: ["location", "bogus"], freeFields: ["f1"], inspections: ["i1"] });
+    const res = await post("/", { name: " Hydrant ", description: " Unterflur ", enabledFields: ["location", "bogus"], freeFields: ["f1"], inspections: ["i1"] });
     expect(res.status).toBe(302);
     expect(inserts.map((i) => [i.table, i.v])).toEqual([
-      [inventoryTemplates, { name: "Hydrant", enabledFields: ["location"] }],
+      [inventoryTemplates, { name: "Hydrant", description: "Unterflur", enabledFields: ["location"] }],
       [inventoryTemplateFieldDefs, [{ templateId: "new-id", fieldDefId: "f1" }]],
       [inventoryTemplateInspections, [{ templateId: "new-id", inspectionTemplateId: "i1" }]],
     ]);
@@ -74,6 +108,7 @@ describe("item templates", () => {
   it("rejects an empty or too long name and reports a duplicate (case-insensitive unique index)", async () => {
     expect((await post("/", { name: "" })).status).toBe(422);
     expect((await post("/", { name: "x".repeat(61) })).status).toBe(422);
+    expect((await post("/", { name: "A", description: "x".repeat(121) })).status).toBe(422);
     expect(inserts.length).toBe(0);
     insertError = { code: "23505" };
     expect((await post("/", { name: "hydrant" })).status).toBe(422);
@@ -83,7 +118,7 @@ describe("item templates", () => {
     expect((await post("/t1", { name: "Hydrant" })).status).toBe(404);
     findFirstResult = { id: "t1" };
     expect((await post("/t1", { name: "Hydrant neu", enabledFields: "quantity" })).status).toBe(302);
-    expect(updates[0]).toEqual({ name: "Hydrant neu", enabledFields: ["quantity"] });
+    expect(updates[0]).toEqual({ name: "Hydrant neu", description: null, enabledFields: ["quantity"] });
     expect(deletes).toEqual([inventoryTemplateFieldDefs, inventoryTemplateInspections]);
     expect(inserts.length).toBe(0);
   });

@@ -139,6 +139,7 @@ export const inventoryTemplates = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
+    description: text("description"), // max. 120 Zeichen, in der Route geprüft
     // Feste Felder, Schlüssel wie inventory_items.enabled_fields.
     enabledFields: text("enabled_fields").array().notNull().default([]),
   },

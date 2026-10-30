@@ -84,6 +84,7 @@ export function validateTemplate(name: string, interval: string): { error?: "nam
 export type InspectionFormRow = { id: string; name: string; interval: string; last: string; due: string };
 export type InspectionRowError = "name" | "nameLength" | "interval" | "date" | "future" | "duplicate";
 export const INSPECTION_NAME_MAX = 60;
+export const TEMPLATE_DESCRIPTION_MAX = 120;
 
 export const isIsoDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && new Date(`${s}T00:00:00Z`).toISOString().slice(0, 10) === s;
 

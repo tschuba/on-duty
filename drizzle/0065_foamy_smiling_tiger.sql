@@ -1,0 +1,1 @@
+ALTER TABLE "inventory_templates" ADD COLUMN "description" text;
