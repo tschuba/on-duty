@@ -21,7 +21,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addDays, addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, isIsoDate, isUniqueViolation, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, type InventoryCategory, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -1329,7 +1329,8 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   });
   } catch (err) {
     if (!isUniqueViolation(err)) throw err;
-    errors.numbers = t("inventory.form.numberRace");
+    if (isInspectionNameViolation(err)) errors.inspections = t("inventory.form.inspectionError.duplicate");
+    else errors.numbers = t("inventory.form.numberRace");
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
@@ -1564,6 +1565,8 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     }
     const { insert, update, deleteIds } = diffInspections(existing.inspections.map((r) => r.id), inspectionRows);
     if (deleteIds.length > 0) await tx.delete(inventoryInspections).where(inArray(inventoryInspections.id, deleteIds));
+    // Namenstausch: betroffene Zeilen erst auf einen freien Zwischennamen, dann auf die Zielnamen (Unique-Index prüft je UPDATE).
+    for (const rid of renamedInspectionIds(existing.inspections, update)) await tx.update(inventoryInspections).set({ name: `__tmp_${rid}` }).where(eq(inventoryInspections.id, rid));
     for (const r of update) await tx.update(inventoryInspections).set(inspectionValues(r)).where(and(eq(inventoryInspections.id, r.id), eq(inventoryInspections.inventoryItemId, id)));
     if (insert.length > 0) await tx.insert(inventoryInspections).values(insert.map((r) => ({ inventoryItemId: id, ...inspectionValues(r) })));
     await tx.delete(inventoryFieldValues).where(eq(inventoryFieldValues.inventoryItemId, id));
@@ -1585,7 +1588,8 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   });
   } catch (err) {
     if (!isUniqueViolation(err)) throw err;
-    errors.numbers = t("inventory.form.numberRace");
+    if (isInspectionNameViolation(err)) errors.inspections = t("inventory.form.inspectionError.duplicate");
+    else errors.numbers = t("inventory.form.numberRace");
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={existing.name} user={user}>

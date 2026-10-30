@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffInspections, generateInspectionDueItems, nextDueDate, parseInspectionRows } from "../lib/inventory.js";
+import { diffInspections, generateInspectionDueItems, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows } from "../lib/inventory.js";
 
 describe("generateInspectionDueItems", () => {
   const item = (id: string, name: string, inspections: { id: string; name: string; dueDate: string | null }[], retiredAt: string | null = null) => ({ id, name, retiredAt, inspections });
@@ -125,5 +125,23 @@ describe("diffInspections", () => {
   it("inserts unknown ids, updates known ones and deletes the rest", () => {
     const rows = [{ id: "a" }, { id: "" }, { id: "zzz" }];
     expect(diffInspections(["a", "b"], rows)).toEqual({ insert: [{ id: "" }, { id: "zzz" }], update: [{ id: "a" }], deleteIds: ["b"] });
+  });
+});
+
+describe("renamedInspectionIds", () => {
+  it("flags real renames and swaps, ignores case-only changes, new rows and unchanged rows", () => {
+    const existing = [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }, { id: "d", name: "D" }];
+    const rows = [{ id: "a", name: "B" }, { id: "b", name: "A" }, { id: "c", name: "c" }, { id: "d", name: "D" }, { id: "", name: "Neu" }];
+    expect(renamedInspectionIds(existing, rows)).toEqual(["a", "b"]);
+  });
+});
+
+describe("isInspectionNameViolation", () => {
+  it("matches only the inspection name index, directly or wrapped in cause", () => {
+    const idx = "inventory_inspections_item_name_idx";
+    expect(isInspectionNameViolation({ code: "23505", constraint: idx })).toBe(true);
+    expect(isInspectionNameViolation({ cause: { code: "23505", constraint: idx } })).toBe(true);
+    expect(isInspectionNameViolation({ code: "23505", constraint: "inventory_item_numbers_number_idx" })).toBe(false);
+    expect(isInspectionNameViolation({ code: "23502", constraint: idx })).toBe(false);
   });
 });

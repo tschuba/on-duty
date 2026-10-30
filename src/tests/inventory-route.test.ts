@@ -607,6 +607,29 @@ describe("inspection types", () => {
     expect(await (await inventoryRoutes.request("/")).text()).not.toContain("Freie Felder");
   });
 
+  it("renames swapped inspections via a temporary name first", async () => {
+    itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "A", null), insp("p2", "B", null)] });
+    const res = await inventoryRoutes.request("/item1", {
+      method: "POST",
+      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: ["p1", "p2"], insp_name: ["B", "A"], insp_interval: ["", ""], insp_last: ["", ""], insp_due: ["", ""] } as any),
+    });
+    expect(res.status).toBe(302);
+    const sets = updateCalls.filter((c) => c.table === inventoryInspections).map((c) => c.set.name);
+    expect(sets).toEqual(["__tmp_p1", "__tmp_p2", "B", "A"]);
+  });
+
+  it("names a duplicate inspection collision instead of blaming the inventory number", async () => {
+    transaction.mockRejectedValueOnce({ code: "23505", constraint: "inventory_inspections_item_name_idx" });
+    const res = await inventoryRoutes.request("/", {
+      method: "POST",
+      body: formBody({ name: "LF", category: "vehicle", enabledFields: "inspection", insp_id: "", insp_name: "HU", insp_interval: "", insp_last: "", insp_due: "" } as any),
+    });
+    expect(res.status).toBe(422);
+    const html = await res.text();
+    expect(html).toContain(t("inventory.form.inspectionError.duplicate"));
+    expect(html).not.toContain(t("inventory.form.numberRace"));
+  });
+
   describe("POST /:id/inspections/:inspectionId/done", () => {
     const post = (fields: Record<string, string>) => inventoryRoutes.request("/item1/inspections/p1/done", { method: "POST", body: formBody(fields) });
 

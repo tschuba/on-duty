@@ -66,6 +66,12 @@ export function isUniqueViolation(err: unknown): boolean {
 }
 
 
+// Der Unique-Index auf (Posten, lower(Name)) wirft für Prüfart-Namen denselben Code 23505 wie die Inventarnummern; am Namen des Index unterscheidbar.
+export function isInspectionNameViolation(err: unknown): boolean {
+  const e = err as { constraint?: string; cause?: { constraint?: string } };
+  return isUniqueViolation(err) && (e?.constraint ?? e?.cause?.constraint) === "inventory_inspections_item_name_idx";
+}
+
 // ── Prüfarten im Posten-Formular ─────────────────────────────────────────────
 
 // Vorlage (Verwaltungsseite): Name Pflicht und höchstens 60 Zeichen, Standardintervall leer oder 1–120.
@@ -116,6 +122,13 @@ export function parseInspectionRows(body: Record<string, any>, today: string): {
 }
 
 // Abgleich mit dem Bestand wie bei Nummern/Seriennummern: Zeile mit bekannter id ändern, ohne id anlegen, fehlende löschen.
+// Prüfarten, deren Name sich (über die Schreibweise hinaus) ändert. Der Unique-Index prüft nach jedem UPDATE, ein Tausch
+// A<->B kollidiert sonst; diese Zeilen werden vorab auf einen freien Zwischennamen gesetzt.
+export function renamedInspectionIds(existing: { id: string; name: string }[], rows: { id: string; name: string }[]): string[] {
+  const old = new Map(existing.map((r) => [r.id, r.name.toLowerCase()]));
+  return rows.filter((r) => old.has(r.id) && old.get(r.id) !== r.name.toLowerCase()).map((r) => r.id);
+}
+
 export function diffInspections<T extends { id: string }>(existingIds: string[], rows: T[]): { insert: T[]; update: T[]; deleteIds: string[] } {
   const known = new Set(existingIds);
   const kept = new Set(rows.filter((r) => known.has(r.id)).map((r) => r.id));
