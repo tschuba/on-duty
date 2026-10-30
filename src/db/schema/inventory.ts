@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, date, index, integer, numeric, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, numeric, pgEnum, pgTable, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
@@ -8,7 +8,8 @@ export const inventoryCategoryEnum = pgEnum("inventory_category", ["vehicle", "s
 export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
-  category: inventoryCategoryEnum("category").notNull(),
+  // Nullable bis Migration B (Kategorie-Ablösung, Backlog 118) die Spalte entfernt.
+  category: inventoryCategoryEnum("category"),
   commissionedAt: date("commissioned_at"),
   purchasePrice: numeric("purchase_price", { precision: 10, scale: 2 }),
   notes: text("notes"),
@@ -142,5 +143,35 @@ export const inventoryInspectionTemplates = pgTable(
     defaultIntervalMonths: integer("default_interval_months"),
   },
   (t) => [uniqueIndex("inventory_inspection_templates_name_idx").on(sql`lower(${t.name})`)],
+);
+
+// Posten-Vorlagen (Backlog 118): beim Anlegen kopiert, am Posten steht keine Vorlagen-ID. Löschen ist hart.
+export const inventoryTemplates = pgTable(
+  "inventory_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    // Feste Felder, Schlüssel wie inventory_items.enabled_fields.
+    enabledFields: text("enabled_fields").array().notNull().default([]),
+  },
+  (t) => [uniqueIndex("inventory_templates_name_idx").on(sql`lower(${t.name})`)],
+);
+
+export const inventoryTemplateFieldDefs = pgTable(
+  "inventory_template_field_defs",
+  {
+    templateId: uuid("template_id").notNull().references(() => inventoryTemplates.id, { onDelete: "cascade" }),
+    fieldDefId: uuid("field_def_id").notNull().references(() => inventoryFieldDefs.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.fieldDefId] })],
+);
+
+export const inventoryTemplateInspections = pgTable(
+  "inventory_template_inspections",
+  {
+    templateId: uuid("template_id").notNull().references(() => inventoryTemplates.id, { onDelete: "cascade" }),
+    inspectionTemplateId: uuid("inspection_template_id").notNull().references(() => inventoryInspectionTemplates.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.templateId, t.inspectionTemplateId] })],
 );
 /* v8 ignore stop */
