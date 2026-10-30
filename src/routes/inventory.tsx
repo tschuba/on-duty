@@ -6,7 +6,7 @@ import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
-import { TagBadges } from "../components/tag-badges.js";
+import { TagAvatar, TagBadges } from "../components/tag-badges.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -1109,19 +1109,42 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   const templateId = c.req.query("template");
   if (!templateId) {
-    const templates = ((await db.query.inventoryTemplates.findMany()) as { id: string; name: string }[]).sort((a, b) => a.name.localeCompare(b.name, "de"));
+    type PickerTemplate = { id: string; name: string; description: string | null; enabledFields: string[]; fieldDefs: { fieldDef: { archived: boolean } }[]; inspections: unknown[] };
+    const templates = ((await db.query.inventoryTemplates.findMany({
+      with: { fieldDefs: { with: { fieldDef: true } }, inspections: true },
+    })) as unknown as PickerTemplate[]).sort((a, b) => a.name.localeCompare(b.name, "de"));
+    if (templates.length === 0) return c.redirect("/inventory/new?template=none");
+    const plural = (n: number, key: "fieldCount" | "inspectionCount") => t(`inventory.new.${key}.${n === 1 ? "one" : "other"}`, { count: n });
+    const card = "card card-border bg-base-100 border-base-300 hover:border-primary h-full sm:min-h-28 focus-visible:outline-2 focus-visible:outline-primary";
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
-        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} />
-        <div id="template-choice" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-3xl">
-          {templates.map((tpl) => (
-            <a href={`/inventory/new?template=${tpl.id}`} class="card card-border bg-base-100 border-base-300 hover:border-primary">
-              <div class="card-body p-4 flex-row items-center gap-3"><TagBadges tags={[tpl.name]} /></div>
-            </a>
-          ))}
-          <a href="/inventory/new?template=none" class="card card-border bg-base-100 border-base-300 border-dashed hover:border-primary">
-            <div class="card-body p-4"><span class="font-medium">{t("inventory.new.noTemplate")}</span></div>
+        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="cog-6-tooth" label={t("inventory.new.manageTemplates")} href="/inventory/templates" />} />
+        <div id="template-choice" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 2xl:max-w-6xl">
+          <a href="/inventory/new?template=none" class={`${card} border-dashed`}>
+            <div class="card-body p-4 sm:p-5 lg:p-6 flex-row items-start gap-3 sm:gap-4">
+              <TagAvatar fallbackIcon="file" />
+              <div class="min-w-0 space-y-1 lg:space-y-1.5">
+                <div class="font-medium lg:text-lg">{t("inventory.new.noTemplate")}</div>
+                <p class="text-sm opacity-70 line-clamp-2 lg:line-clamp-3">{t("inventory.new.noTemplateHint")}</p>
+              </div>
+            </div>
           </a>
+          {templates.map((tpl) => {
+            const fields = tpl.enabledFields.filter((f) => (INVENTORY_FIELDS as readonly string[]).includes(f)).length + tpl.fieldDefs.filter((d) => !d.fieldDef.archived).length;
+            const counts = [fields && plural(fields, "fieldCount"), tpl.inspections.length && plural(tpl.inspections.length, "inspectionCount")].filter(Boolean).join(" · ");
+            return (
+              <a href={`/inventory/new?template=${tpl.id}`} class={card}>
+                <div class="card-body p-4 sm:p-5 lg:p-6 flex-row items-start gap-3 sm:gap-4">
+                  <TagAvatar tag={tpl.name} />
+                  <div class="min-w-0 space-y-1 lg:space-y-1.5">
+                    <div class="font-medium lg:text-lg">{tpl.name}</div>
+                    {tpl.description && <p class="text-sm opacity-70 line-clamp-2 lg:line-clamp-3">{tpl.description}</p>}
+                    {counts && <p class="text-sm opacity-60">{counts}</p>}
+                  </div>
+                </div>
+              </a>
+            );
+          })}
         </div>
       </Layout>
     );
@@ -1141,9 +1164,11 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
       inspectionRows: tpl.inspections.map(({ inspectionTemplate: it }) => ({ id: "", name: it.name, interval: it.defaultIntervalMonths ? String(it.defaultIntervalMonths) : "", last: "", due: "" })),
     };
   }
+  // Ohne Vorlagen gibt es keine Auswahl, zu der Abbrechen zurückführen könnte (sie leitet wieder hierher um).
+  const hasTemplates = (await db.query.inventoryTemplates.findMany({ columns: { id: true }, limit: 1 })).length > 0;
   return c.html(
     <Layout title={t("inventory.newItem")} user={user}>
-      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" cancelHref="/inventory/new" lendable={lendableField(user, false, {})} values={await withFree(prefill)} />
+      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" cancelHref={hasTemplates ? "/inventory/new" : "/inventory"} lendable={lendableField(user, false, {})} values={await withFree(prefill)} />
     </Layout>
   );
 });

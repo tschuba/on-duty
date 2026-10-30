@@ -726,14 +726,27 @@ describe("GET /new", () => {
   const tpl = { id: "t1", name: "Hydrant", enabledFields: ["location", "inspection", "bogus"] };
 
   it("starts with the template choice, including 'Ohne Vorlage'", async () => {
-    itemTemplatesFindManyResult = [{ id: "t2", name: "PSA", enabledFields: [] }, tpl];
+    itemTemplatesFindManyResult = [
+      { id: "t2", name: "PSA", description: "Persönliche Schutzausrüstung", enabledFields: [], fieldDefs: [], inspections: [] },
+      { ...tpl, description: null, fieldDefs: [{ fieldDef: { archived: false } }, { fieldDef: { archived: true } }], inspections: [{}, {}] },
+    ];
     const html = await (await inventoryRoutes.request("/new")).text();
     expect(html).toContain('href="/inventory/new?template=t1"');
     expect(html).toContain('href="/inventory/new?template=t2"');
     expect(html).toContain('href="/inventory/new?template=none"');
     expect(html.indexOf("Hydrant")).toBeLessThan(html.indexOf("PSA"));
+    expect(html.indexOf("template=none")).toBeLessThan(html.indexOf("template=t1"));
+    expect(html).toContain("3 Felder · 2 Prüfungen"); // 2 gültige feste (bogus zählt nicht) + 1 freies, 2 Prüfungen
+    expect(html).toContain("Persönliche Schutzausrüstung");
     expect(html).not.toContain('name="name"');
     expect(html).not.toContain('name="category"');
+  });
+
+  it("skips the choice when there are no templates", async () => {
+    itemTemplatesFindManyResult = [];
+    const res = await inventoryRoutes.request("/new");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/inventory/new?template=none");
   });
 
   it("renders the empty form without a template", async () => {
