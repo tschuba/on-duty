@@ -306,8 +306,8 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
           )}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {(["plannedFrom", "plannedTo", "pickedUpAt", "returnedAt"] as const).map((f) => (
-              <Field label={t(`lending.loans.form.${f}`)}>
-                <input type="date" name={f} value={loan[f] ?? ""} class="input w-full" />
+              <Field label={t(`lending.loans.form.${f}`)} required={f === "plannedFrom" || f === "plannedTo"}>
+                <input type="date" name={f} value={loan[f] ?? ""} required={f === "plannedFrom" || f === "plannedTo"} class="input w-full" />
               </Field>
             ))}
             <Field label={t("lend.form.plannedFromTime")}>
