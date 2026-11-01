@@ -106,6 +106,7 @@ describe("Sidebar — Aktiv-Erkennung und Zähler", () => {
     const other = await renderAt("/events", "donations:issue-receipts");
     expect(other).not.toMatch(/<details[^>]* open/);
     expect(other).toContain('badge-warning ml-1">1<');
+    expect(other).toContain("group-open:hidden");
   });
 
   it("never queries the DB for a user without the permission", async () => {
