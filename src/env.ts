@@ -1,5 +1,6 @@
 import { logger } from "./lib/logger.js";
 import { DEFAULT_ACTIVE_AGE_LIMIT } from "./lib/status.js";
+import { mailLabel } from "./lib/mail-label.js";
 const REQUIRED = [
   "DATABASE_URL",
   "ORG_NAME",
@@ -29,6 +30,17 @@ export function validateEnv(): void {
   if (childrenLimit >= youthLimit) {
     logger.fatal({ childrenLimit, youthLimit }, "CHILDREN_AGE_LIMIT must be less than YOUTH_AGE_LIMIT");
     process.exit(1);
+  }
+
+  // ORG_NAME geht ins Mail-Betreff-Schema "[<ORG_NAME>|<Typ>]" (docs/mails.md); mailLabel() bereinigt es ohnehin,
+  // aber mit SMTP-Versand soll ein kaputtes Präfix nicht leise passieren.
+  const orgName = process.env.ORG_NAME ?? "";
+  if (mailLabel(orgName) !== orgName) {
+    if (process.env.SMTP_HOST && process.env.SMTP_FROM) {
+      logger.fatal({ orgName }, "ORG_NAME enthält Zeichen, die im Mail-Betreff-Schema nicht erlaubt sind (|, [, ], Zeilenumbruch)");
+      process.exit(1);
+    }
+    logger.warn({ orgName }, "ORG_NAME enthält Zeichen, die im Mail-Betreff ersetzt werden (|, [, ], Zeilenumbruch)");
   }
 
   const tz = process.env.APP_TIMEZONE ?? "Europe/Berlin";

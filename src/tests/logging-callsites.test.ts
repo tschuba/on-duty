@@ -38,6 +38,23 @@ describe("validateEnv logging", () => {
     expect(fatal).toHaveBeenCalledWith({ childrenLimit: 20, youthLimit: 18 }, expect.any(String));
   });
 
+  it("warns on an invalid ORG_NAME without SMTP configured", () => {
+    vi.stubEnv("ORG_NAME", "FF [Alten|hammer]");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    validateEnv();
+    expect(warn).toHaveBeenCalledWith({ orgName: "FF [Alten|hammer]" }, expect.any(String));
+  });
+
+  it("logs fatal on an invalid ORG_NAME with SMTP configured", () => {
+    vi.stubEnv("ORG_NAME", "FF [Alten|hammer]");
+    vi.stubEnv("SMTP_HOST", "smtp.example.com");
+    vi.stubEnv("SMTP_FROM", "noreply@example.com");
+    const fatal = vi.spyOn(logger, "fatal").mockImplementation(() => {});
+    validateEnv();
+    expect(fatal).toHaveBeenCalledWith({ orgName: "FF [Alten|hammer]" }, expect.any(String));
+    expect(process.exit).toHaveBeenCalledWith(1);
+  });
+
 });
 
 describe("sendMail logging", () => {
@@ -45,7 +62,7 @@ describe("sendMail logging", () => {
 
   it("warns without logging the recipient when SMTP is not configured", async () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
-    expect(await sendMail("a@b.de", "Betreff", "x")).toEqual({ sent: false });
+    expect(await sendMail({ to: "a@b.de", category: "lend", event: "x", audience: "staff", subject: "Betreff", text: "x" })).toEqual({ sent: false });
     expect(JSON.stringify(warn.mock.calls)).not.toContain("a@b.de");
   });
 });

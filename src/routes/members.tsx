@@ -1598,7 +1598,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
 
   if (applicationId && notifyApplicant && personFields.email) {
     const bodyKey = linkMemberId && linkedWasArchived ? "applications.mail.approvedBodyRejoin" : "applications.mail.approvedBody";
-    await sendMail(personFields.email, t("applications.mail.approvedSubject"), t(bodyKey));
+    await sendMail({ to: personFields.email, category: "membership", event: "application-approved", audience: "applicant", subject: t("applications.mail.approvedSubject"), text: t(bodyKey) });
   }
 
   setFlash(c, t("members.flash.created"), "success");

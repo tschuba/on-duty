@@ -233,7 +233,14 @@ async function notifyDecision(request: NonNullable<Awaited<ReturnType<typeof fet
   const subject = approved ? t("lend.mail.approvedSubject") : t("lend.mail.rejectedSubject");
   const body = approved ? t("lend.mail.approvedBody") : t("lend.mail.rejectedBody");
   const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`;
-  const result = await sendMail(request.person.email, subject, `${body}\n\n${statusUrl}`, { "X-On-Duty-Type": "lend-request" });
+  const result = await sendMail({
+    to: request.person.email,
+    category: "lend",
+    event: approved ? "lend-approved" : "lend-rejected",
+    audience: "applicant",
+    subject,
+    text: `${body}\n\n${statusUrl}`,
+  });
   return { notified: result.sent, contact };
 }
 
