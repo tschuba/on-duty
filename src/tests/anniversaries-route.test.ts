@@ -215,7 +215,7 @@ describe("mod filter with multiple values", () => {
     const res = await anniversaryRoutes.request(`/export?${query}`);
     const wb = XLSX.read(Buffer.from(await res.arrayBuffer()));
     const rows = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 }).slice(1);
-    expect(rows.map((r) => r[6]).filter(Boolean)).toEqual(["T5", "T10"]); // birthdays have no title
+    expect(rows.map((r) => r[7]).filter(Boolean)).toEqual(["T5", "T10"]); // birthdays have no title
   });
 });
 
@@ -244,6 +244,6 @@ describe("status badge", () => {
     const res = await anniversaryRoutes.request(`/export?${q}`);
     const wb = XLSX.read(Buffer.from(await res.arrayBuffer()));
     const rows = XLSX.utils.sheet_to_json<any[]>(wb.Sheets[wb.SheetNames[0]], { header: 1 }).slice(1);
-    expect(rows[0][3]).toBe("Fördernd");
+    expect(rows[0][4]).toBe("Fördernd");
   });
 });

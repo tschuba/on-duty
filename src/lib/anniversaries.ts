@@ -5,8 +5,9 @@ export type EventKind = "birthday" | "anniversary";
 export type AnniversaryType = "service" | "membership";
 
 export type AnniversaryEvent = {
-  date: string;      // YYYY-MM-DD
-  refDate?: string;  // anniversaries only: ceremony year + entry day/month, shown in the table
+  date: string;      // YYYY-MM-DD; day of the birthday/anniversary (filter, sort, grouping)
+  ceremonyDate?: string; // anniversaries only: first cutoff on/after the anniversary day
+  days?: string[];   // merged rows only (see mergeEvents): all anniversary days, ascending; days[0] === date
   kind: EventKind;
   memberId: string;
   firstName: string;
@@ -38,6 +39,14 @@ export function getCeremonyYear(entryDate: string, cutoff: string, anniversaryCo
   return entryYear + adjustment + anniversaryCount;
 }
 
+// Day of the n-th recurrence of base (YYYY-MM-DD); Feb 29 falls on Mar 1 in non-leap years (BGB).
+export function recurrenceDate(base: string, n: number): string {
+  const y = parseInt(base.slice(0, 4), 10) + n;
+  const md = base.slice(5);
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  return md === "02-29" && !leap ? `${y}-03-01` : `${y}-${md}`;
+}
+
 // Returns all events in [start, end] (YYYY-MM-DD strings, inclusive), sorted by date then lastName.
 export function generateEvents(
   members: MemberInput[],
@@ -54,10 +63,9 @@ export function generateEvents(
     if (isFormer(m.status)) continue;
 
     // Birthdays: all members who have not left
-    const birthMD = m.birthDate.slice(5);
     const birthYear = parseInt(m.birthDate.slice(0, 4), 10);
     for (let y = startYear; y <= endYear; y++) {
-      const date = `${y}-${birthMD}`;
+      const date = recurrenceDate(m.birthDate, y - birthYear);
       if (date >= start && date <= end) {
         events.push({ date, kind: "birthday", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: y - birthYear });
       }
@@ -73,7 +81,7 @@ export function generateEvents(
     for (const { type, base } of bases) {
       for (const ay of anniversaryYears) {
         if (ay.kind !== type) continue;
-        const date = `${getCeremonyYear(base, cutoff, ay.year)}-${cutoff}`;
+        const date = recurrenceDate(base, ay.year);
         if (date < start || date > end) continue;
         const key = `${date}|${ay.year}`;
         const prev = found.get(key);
@@ -81,7 +89,7 @@ export function generateEvents(
           prev.types!.push(type);
           if (ay.title && ay.title !== prev.title) prev.title = prev.title ? `${prev.title} / ${ay.title}` : ay.title;
         } else {
-          found.set(key, { date, refDate: `${date.slice(0, 4)}-${base.slice(5)}`, kind: "anniversary", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: ay.year, title: ay.title ?? undefined, types: [type] });
+          found.set(key, { date, ceremonyDate: `${getCeremonyYear(base, cutoff, ay.year)}-${cutoff}`, kind: "anniversary", memberId: m.id, firstName: m.firstName, lastName: m.lastName, status: m.status, years: ay.year, title: ay.title ?? undefined, types: [type] });
         }
       }
     }
@@ -90,6 +98,22 @@ export function generateEvents(
 
   events.sort((a, b) => a.date.localeCompare(b.date) || a.lastName.localeCompare(b.lastName, "de"));
   return events;
+}
+
+// Merges service and membership events of one person (same ceremony and years, different
+// anniversary days) into one row when directly adjacent in the already filtered, sorted list.
+export function mergeEvents(events: AnniversaryEvent[]): AnniversaryEvent[] {
+  const out: AnniversaryEvent[] = [];
+  for (const e of events) {
+    const p = out[out.length - 1];
+    if (p && e.kind === "anniversary" && p.kind === "anniversary" && p.memberId === e.memberId
+      && p.ceremonyDate === e.ceremonyDate && p.years === e.years) {
+      p.days = [...(p.days ?? [p.date]), e.date];
+      p.types = [...new Set([...p.types!, ...e.types!])];
+      if (e.title && e.title !== p.title) p.title = p.title ? `${p.title} / ${e.title}` : e.title;
+    } else out.push({ ...e });
+  }
+  return out;
 }
 
 // Mindestjahre und Halbrund/Rund (OR über die gewählten Werte, leer = keine Einschränkung).

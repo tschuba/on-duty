@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getCeremonyYear, generateEvents, anniversaryFilterLabel, filterByYears } from "../lib/anniversaries.js";
+import { getCeremonyYear, generateEvents, anniversaryFilterLabel, filterByYears, recurrenceDate, mergeEvents } from "../lib/anniversaries.js";
 
 const CUTOFF = "01-06"; // January 6
 
@@ -81,13 +81,13 @@ describe("generateEvents scope filtering", () => {
   it("firstEntryDate shifts service, separate rows", () => {
     const m = { ...mkMember("active"), firstEntryDate: "1990-06-15" };
     const a = generateEvents([m], ay, CUTOFF, "1990-01-01", "2027-12-31").filter(e => e.kind === "anniversary");
-    expect(a.map(e => [e.date, e.types])).toEqual([["2016-01-06", ["service"]], ["2026-01-06", ["membership"]]]);
+    expect(a.map(e => [e.date, e.types])).toEqual([["2015-06-15", ["service"]], ["2025-06-15", ["membership"]]]);
   });
 
   it("cutoff applies per base date", () => {
     const m = { ...mkMember("active"), firstEntryDate: "1990-01-05" }; // on/before cutoff → no +1
     const a = generateEvents([m], ay, CUTOFF, "2000-01-01", "2027-12-31").filter(e => e.types?.[0] === "service");
-    expect(a[0].date).toBe("2015-01-06");
+    expect([a[0].date, a[0].ceremonyDate]).toEqual(["2015-01-05", "2015-01-06"]);
   });
 
   it("same date but different years or titles", () => {
@@ -116,11 +116,11 @@ describe("generateEvents scope filtering", () => {
   });
 
   it("out-of-range events not included", () => {
-    // ceremony year for entry Jun 15 = 2026, birthday Jun 15
-    const evs = generateEvents([mkMember("active")], ay, CUTOFF, "2025-01-01", "2025-12-31");
-    // anniversary in 2026 → not included; birthday in 2025 → included
+    // anniversary day 2025-06-15 (ceremony 2026-01-06) lies in 2025 → filtered by anniversary day
+    const evs = generateEvents([mkMember("active")], ay, CUTOFF, "2026-01-01", "2026-12-31");
+    // anniversary in 2025 → not included; birthday in 2026 → included
     expect(evs.every(e => e.kind === "birthday")).toBe(true);
-    expect(evs.some(e => e.date.startsWith("2025"))).toBe(true);
+    expect(evs.some(e => e.date.startsWith("2026"))).toBe(true);
   });
 
   it("sorted by date then lastName", () => {
@@ -138,18 +138,39 @@ describe("generateEvents scope filtering", () => {
 describe("generateEvents ceremony date", () => {
   const ay = [{ kind: "service" as const, year: 25, title: null }];
   const mk = (entryDate: string) => ({ id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate, status: "active" as const });
-  it.each([["2000-07-01", "2026-01-06"], ["1977-01-01", "2002-01-06"]])("entry %s → %s", (entry, expected) => {
+  it.each([["2000-07-01", "2025-07-01", "2026-01-06"], ["1977-01-01", "2002-01-01", "2002-01-06"]])("entry %s → %s, ceremony %s", (entry, expected, cer) => {
     const a = generateEvents([mk(entry)], ay, CUTOFF, "1990-01-01", "2060-12-31").filter(e => e.kind === "anniversary");
-    expect(a.map(e => e.date)).toEqual([expected]);
+    expect(a.map(e => [e.date, e.ceremonyDate])).toEqual([[expected, cer]]);
   });
 });
 
-describe("generateEvents refDate", () => {
-  it("keeps entry day/month for display, date is ceremony", () => {
-    const m = { id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate: "2000-07-01", status: "active" as const };
-    const [e] = generateEvents([m], [{ kind: "service", year: 25, title: null }], CUTOFF, "2026-01-01", "2026-12-31").filter(e => e.kind === "anniversary");
-    expect([e.date, e.refDate]).toEqual(["2026-01-06", "2026-07-01"]);
-    expect(e.date).toBe("2026-01-06");
+describe("anniversary day vs. ceremony", () => {
+  const m = { id: "x", firstName: "A", lastName: "B", birthDate: "1950-03-03", entryDate: "2001-03-01", status: "passive" as const };
+  const ay25 = [{ kind: "membership" as const, year: 25, title: null }];
+  it("date is anniversary day, ceremony next cutoff", () => {
+    const [e] = generateEvents([m], ay25, CUTOFF, "2026-01-01", "2026-12-31").filter(e => e.kind === "anniversary");
+    expect([e.date, e.ceremonyDate]).toEqual(["2026-03-01", "2027-01-06"]);
+  });
+  it("range filters by anniversary day, not ceremony", () => {
+    expect(generateEvents([m], ay25, CUTOFF, "2027-01-06", "2027-01-06").filter(e => e.kind === "anniversary")).toHaveLength(0);
+  });
+  it("Feb 29 → Mar 1 in non-leap years, also birthdays", () => {
+    expect(recurrenceDate("2000-02-29", 25)).toBe("2025-03-01");
+    expect(recurrenceDate("2000-02-29", 24)).toBe("2024-02-29");
+    const b = generateEvents([{ ...m, birthDate: "1996-02-29" }], [], CUTOFF, "2025-01-01", "2025-12-31");
+    expect(b.map(e => e.date)).toEqual(["2025-03-01"]);
+  });
+  it("mergeEvents merges adjacent service+membership of same ceremony, not across others", () => {
+    const a = { ...m, status: "active" as const, firstEntryDate: "2001-02-01" };
+    const ays = [{ kind: "service" as const, year: 25, title: null }, ...ay25];
+    const evs = generateEvents([a], ays, CUTOFF, "2026-01-01", "2026-12-31").filter(e => e.kind === "anniversary");
+    const merged = mergeEvents(evs);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].days).toEqual(["2026-02-01", "2026-03-01"]);
+    expect(merged[0].types).toEqual(["service", "membership"]);
+    // a birthday in between keeps two rows
+    const between = generateEvents([{ ...a, birthDate: "1950-02-15" }], ays, CUTOFF, "2026-01-01", "2026-12-31");
+    expect(mergeEvents(between).map(e => e.kind)).toEqual(["anniversary", "birthday", "anniversary"]);
   });
 });
 
