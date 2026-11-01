@@ -249,3 +249,6 @@ form trix-toolbar .trix-button-group.trix-button-group--file-tools { display: no
 /* Toolbar-Icons sind schwarze SVGs; im Dark-Theme invertieren. */
 :root[data-theme="dark"] trix-toolbar .trix-button--icon::before { filter: invert(1); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) trix-toolbar .trix-button--icon::before { filter: invert(1); } }
+
+/* Neu aktiviertes Feld im Inventarformular: dezenter Rand bis zum Speichern. */
+.field-new { box-shadow: inset 4px 0 0 var(--color-primary); }

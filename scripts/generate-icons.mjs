@@ -21,6 +21,7 @@ const ICONS = {
   "magnifying-glass": "search",
   "clipboard-document": "clipboard",
   "cog-6-tooth": "settings",
+  lock: "lock",
   users: "users",
   "users-plus": "users-plus",
   "mood-boy": "mood-boy",

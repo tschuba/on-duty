@@ -80,6 +80,8 @@ export type InventoryFieldValues = {
   // Freie Felder: freeRaw[defId] vorhanden = am Posten aktiv (Wert roh, darf leer sein); freeDefs nur fürs Rendern.
   freeRaw?: Record<string, string>;
   freeDefs?: FreeDef[];
+  // Sperrgrund je festem Feld bzw. freier Felddefinition (nur Bearbeiten): gefüllte Felder lassen sich nicht abwählen.
+  fieldLocks?: Record<string, string>;
   locationText: string;
   latitude: string;
   longitude: string;
@@ -426,7 +428,7 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
 const FORM_TOGGLE_SCRIPT = `
   function updateInventoryFormVisibility() {
     var on = {};
-    document.querySelectorAll('input[name=enabledFields]:checked').forEach(function(c) { on[c.value] = true; });
+    document.querySelectorAll('input[name=enabledFields]:checked, input[type=hidden][name=enabledFields]').forEach(function(c) { on[c.value] = true; });
     var qtyInput = document.getElementById('inventory-quantity');
     // quantity is only meaningful with the "quantity" field; without it a stale value must not leak into batch mode
     if (qtyInput && !on.quantity && qtyInput.value !== '1') {
@@ -442,6 +444,14 @@ const FORM_TOGGLE_SCRIPT = `
     });
   }
   updateInventoryFormVisibility();
+  // Neu aktivierte Bereiche bis zum Speichern dezent markieren (kein Auto-Scroll); freie Felder werden hier ein-/ausgeblendet.
+  function fieldToggled(cb) {
+    updateInventoryFormVisibility();
+    document.querySelectorAll('[data-section="' + cb.dataset.key + '"]').forEach(function(el) {
+      if (cb.dataset.free) el.classList.toggle('hidden', !cb.checked);
+      el.classList.toggle('field-new', cb.checked && !cb.defaultChecked);
+    });
+  }
 `;
 
 const INSPECTION_ROWS_SCRIPT = `
@@ -485,12 +495,83 @@ function InspectionRowFields({ row, error }: { row: InspectionFormRow; error?: I
   );
 }
 
-export function InventoryFormFields({ values, errors, assignedMemberName, assignments, canConfigure }: {
+function SectionCard({ field, children }: { field: InventoryField; children: unknown }) {
+  return (
+    <div data-field={field} data-section={field} class="card card-border bg-base-100 border-base-300">
+      <div class="card-body gap-4 p-4">
+        <h2 class="font-semibold">{t(`inventory.field.${field}`)}</h2>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Schalter für feste und freie Felder in der Kopfzeile (Popover wie die Filter in /members).
+// Checkboxen liegen außerhalb des <form>: form= bindet sie. Gesperrte (gefüllte) Felder sind disabled und
+// schicken ihren Wert über ein verstecktes Feld mit, sonst gälten sie beim Speichern als abgewählt.
+function FieldConfigurator({ formId, values, canConfigure }: { formId: string; values?: Partial<InventoryFieldValues>; canConfigure?: boolean }) {
+  const id = "fields-popover";
+  const locks = values?.fieldLocks ?? {};
+  const row = (key: string, name: string, value: string, label: string, desc: string, checked: boolean, free = false) => {
+    const lock = locks[key];
+    return (
+      <label class="flex items-start gap-3 min-h-11 py-1 cursor-pointer">
+        <input type="checkbox" class="toggle toggle-primary mt-0.5" name={name} value={value} checked={checked} form={formId} disabled={Boolean(lock)}
+          data-key={key} data-free={free ? "1" : undefined} onchange="fieldToggled(this)" />
+        {lock && checked && <input type="hidden" name={name} value={value} form={formId} />}
+        <span class="flex flex-col">
+          <span class="font-medium">{label}</span>
+          <span class="text-xs opacity-70 flex items-center gap-1">{lock && <Icon name="lock" class="h-3.5 w-3.5 shrink-0" />}{lock ?? desc}</span>
+        </span>
+      </label>
+    );
+  };
+  return (
+    <div class="inline-block">
+      <HeaderAction icon="cog-6-tooth" label={t("inventory.form.configureFields")} attrs={{ popovertarget: id }} />
+      <div id={id} popover="auto" class="qrf-popup qrf-editor bg-base-100 border border-base-300 rounded-box shadow-lg p-4 m-0 w-96 max-w-full">
+        <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100 max-sm:hidden" aria-hidden="true" />
+        <h3 class="font-bold mb-2">{t("inventory.form.configureFields")}</h3>
+        <div class="max-sm:max-h-none max-h-[60dvh] overflow-y-auto">
+          {INVENTORY_FIELDS.map((f) => row(f, "enabledFields", f, t(`inventory.field.${f}`), t(`inventory.field.desc.${f}`), hasField(values?.enabledFieldsList, f)))}
+          {(values?.freeDefs ?? []).map((d) => row(d.id, "freeFields", d.id, `${d.name}${d.archived ? ` (${t("inventory.fields.archived")})` : ""}`, t(`inventory.fields.type.${d.type}` as any), values?.freeRaw?.[d.id] !== undefined, true))}
+        </div>
+        {canConfigure && (
+          <div class="mt-2 flex flex-col">
+            <a href="/inventory/inspection-templates" target="_blank" rel="noopener" class="btn btn-ghost justify-start min-h-11">{t("inventory.tabs.inspectionTemplates")}</a>
+            <a href="/inventory/templates" target="_blank" rel="noopener" class="btn btn-ghost justify-start min-h-11">{t("inventory.tabs.itemTemplates")}</a>
+            <a href="/inventory/fields" target="_blank" rel="noopener" class="btn btn-ghost justify-start gap-2 min-h-11"><Icon name="cog-6-tooth" class="h-5 w-5" />{t("inventory.form.manageFields")}</a>
+          </div>
+        )}
+        <div class="mt-3 sm:hidden">
+          <button type="button" class="btn btn-primary w-full min-h-11" popovertarget={id} popovertargetaction="hide">{t("common.done")}</button>
+        </div>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function(){
+          var pop=document.getElementById('${id}'), btn=document.querySelector('button[popovertarget="${id}"]');
+          // Popup unter dem Button; der Zeiger zeigt auf die Button-Mitte (unter sm: Bottom-Sheet per CSS).
+          pop.addEventListener('toggle',function(e){
+            if(e.newState!=='open'||window.innerWidth<640) return;
+            var r=btn.getBoundingClientRect(), m=4;
+            pop.style.position='fixed'; pop.style.inset='auto';
+            pop.style.top=(r.bottom+8)+'px';
+            var left=Math.max(m,Math.min(r.left,window.innerWidth-pop.offsetWidth-m));
+            pop.style.left=left+'px';
+            var a=pop.querySelector('[data-arrow]');
+            if(a) a.style.left=Math.max(8,Math.min(pop.offsetWidth-20,r.left+r.width/2-left-6))+'px';
+          });
+        })();
+      ` }} />
+    </div>
+  );
+}
+
+export function InventoryFormFields({ values, errors, assignedMemberName, assignments }: {
   values?: Partial<InventoryFieldValues>;
   errors?: Record<string, string>;
   assignedMemberName?: string;
   assignments?: AssignmentInput[];
-  canConfigure?: boolean;
 }) {
   const v = values ?? {};
   const quantity = Number(v.quantity) || 1;
@@ -517,32 +598,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
 
       <TagInput tags={v.tagsList} />
 
-      <div class="space-y-2">
-        <div class="divider">{t("inventory.form.fields")}</div>
-        {canConfigure && (
-          // Neuer Tab: das Formular bleibt offen, nichts wird zurückübernommen (Seite neu laden für neue Vorschläge).
-          <div class="dropdown dropdown-end float-right">
-            <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1">{t("inventory.form.configureLinks")}<Icon name="chevron-down" class="h-4 w-4 opacity-60" /></div>
-            <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow">
-              <li><a href="/inventory/inspection-templates" target="_blank" rel="noopener">{t("inventory.tabs.inspectionTemplates")}</a></li>
-              <li><a href="/inventory/fields" target="_blank" rel="noopener">{t("inventory.tabs.fields")}</a></li>
-              <li><a href="/inventory/templates" target="_blank" rel="noopener">{t("inventory.tabs.itemTemplates")}</a></li>
-            </ul>
-          </div>
-        )}
-        <div class="flex flex-wrap gap-x-4 gap-y-2" id="inventory-fields">
-          {INVENTORY_FIELDS.map((f) => (
-            <label class="label cursor-pointer justify-start gap-2 w-fit">
-              <input type="checkbox" name="enabledFields" value={f} checked={hasField(v.enabledFieldsList, f)} class="checkbox" onchange="updateInventoryFormVisibility()" />
-              <span class="text-sm">{t(`inventory.field.${f}`)}</span>
-            </label>
-          ))}
-        </div>
-        {errors?.enabledFields && <span class="text-error text-sm">{errors.enabledFields}</span>}
-      </div>
+      {(errors?.enabledFields || errors?.freeFields) && <div class="text-error text-sm">{errors.enabledFields}{" "}{errors.freeFields}</div>}
 
-      <div data-field="inspection" class="space-y-4">
-        <div class="divider">{t("inventory.form.sectionInspection")}</div>
+      <SectionCard field="inspection">
         {errors?.inspections && <span class="text-error text-sm">{errors.inspections}</span>}
         <datalist id="inspection-names">
           {(v.inspectionSuggestions ?? []).map((sug) => <option value={sug.name} data-interval={sug.intervalMonths ?? ""} />)}
@@ -553,9 +611,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <template id="inspection-row-template"><InspectionRowFields row={{ id: "", name: "", interval: "", last: "", due: "" }} /></template>
         <button type="button" class="btn btn-sm" onclick="addInspectionRow()">{t("inventory.form.addInspection")}</button>
         <script dangerouslySetInnerHTML={{ __html: INSPECTION_ROWS_SCRIPT }} />
-      </div>
+      </SectionCard>
 
-      <div data-field="quantity" class="space-y-4">
+      <div data-field="quantity" data-section="quantity" class="space-y-4">
         <Field label={t("inventory.form.quantity")} class="max-w-40">
           <input
             type="number"
@@ -570,7 +628,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         </Field>
       </div>
 
-      <div data-field="numbers">
+      <SectionCard field="numbers">
         <NumberListField
           name="numbers"
           label={t("inventory.form.inventoryNumbers")}
@@ -581,9 +639,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           quantity={quantity}
           error={errors?.numbers}
         />
-      </div>
+      </SectionCard>
 
-      <div data-field="serials">
+      <SectionCard field="serials">
         <NumberListField
           name="serials"
           label={t("inventory.form.serialNumbers")}
@@ -594,10 +652,9 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           quantity={quantity}
           error={errors?.serials}
         />
-      </div>
+      </SectionCard>
 
-      <div data-field="location" class="space-y-4">
-        <div class="divider">{t("inventory.form.sectionLocation")}</div>
+      <SectionCard field="location">
         <Field label={t("inventory.form.locationText")}>
           <input type="text" name="locationText" value={v.locationText ?? ""} class="input w-full" placeholder={t("inventory.form.locationText")} />
         </Field>
@@ -611,43 +668,34 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
             {errors?.longitude && <span class="text-error text-sm mt-1">{errors.longitude}</span>}
           </Field>
         </div>
-      </div>
+      </SectionCard>
 
-      {(v.freeDefs ?? []).length > 0 && (
-        <div class="space-y-4">
-          <div class="divider">{t("inventory.form.freeFields")}</div>
-          {errors?.freeFields && <span class="text-error text-sm">{errors.freeFields}</span>}
-          {v.freeDefs!.map((d) => {
-            const active = v.freeRaw?.[d.id] !== undefined;
-            const val = v.freeRaw?.[d.id] ?? "";
-            const name = `ff_${d.id}`;
-            return (
-              <div data-free class="space-y-2">
-                <label class="label cursor-pointer justify-start gap-2 w-fit">
-                  <input type="checkbox" name="freeFields" value={d.id} checked={active} class="checkbox"
-                    onchange="this.closest('[data-free]').querySelector('[data-free-input]').classList.toggle('hidden', !this.checked)" />
-                  <span class="text-sm">{d.name}{d.archived && ` (${t("inventory.fields.archived")})`}</span>
-                </label>
-                <div data-free-input class={active ? "" : "hidden"}>
-                  {d.type === "boolean" || d.type === "select" ? (
-                    <select name={name} class="select w-full">
-                      <option value=""></option>
-                      {d.type === "boolean"
-                        ? <><option value="1" selected={val === "1"}>{t("common.yes")}</option><option value="0" selected={val === "0"}>{t("common.no")}</option></>
-                        : [...(d.options ?? []), ...(val && !(d.options ?? []).includes(val) ? [val] : [])].map((o) => <option value={o} selected={val === o}>{o}</option>)}
-                    </select>
-                  ) : (
-                    <input type={d.type === "date" ? "date" : "text"} inputmode={d.type === "number" ? "decimal" : undefined} name={name} value={val} class="input w-full" placeholder={d.name} />
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {(v.freeDefs ?? []).map((d) => {
+        const active = v.freeRaw?.[d.id] !== undefined;
+        const val = v.freeRaw?.[d.id] ?? "";
+        const label = `${d.name}${d.archived ? ` (${t("inventory.fields.archived")})` : ""}`;
+        return (
+          <div data-section={d.id} class={active ? "" : "hidden"}>
+            <Field label={label} floating={d.type !== "date"}>
+              {d.type === "boolean" || d.type === "select" ? (
+                <select name={`ff_${d.id}`} class="select w-full">
+                  <option value=""></option>
+                  {d.type === "boolean"
+                    ? <><option value="1" selected={val === "1"}>{t("common.yes")}</option><option value="0" selected={val === "0"}>{t("common.no")}</option></>
+                    : [...(d.options ?? []), ...(val && !(d.options ?? []).includes(val) ? [val] : [])].map((o) => <option value={o} selected={val === o}>{o}</option>)}
+                </select>
+              ) : (
+                <input type={d.type === "date" ? "date" : "text"} inputmode={d.type === "number" ? "decimal" : undefined} name={`ff_${d.id}`} value={val} class="input w-full" placeholder={label} />
+              )}
+            </Field>
+          </div>
+        );
+      })}
 
-      <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
-      <BatchAssignmentFields assignments={assignments ?? []} />
+      <SectionCard field="assignments">
+        <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
+        <BatchAssignmentFields assignments={assignments ?? []} />
+      </SectionCard>
 
       <script dangerouslySetInnerHTML={{ __html: FORM_TOGGLE_SCRIPT }} />
     </>
@@ -734,6 +782,25 @@ async function resolveFree(values: InventoryFieldValues, stored: { fieldDefId: s
   for (const r of stored) if (r.value != null && raw[r.fieldDefId] === undefined) raw[r.fieldDefId] = r.value;
   if (locked.length > 0) return { rows, error: t("inventory.form.freeFieldLocked", { fields: locked.join(", ") }) };
   return { rows };
+}
+
+// Sperrgründe fürs Bearbeiten: feste Felder über isFieldEmpty, freie Felder mit gespeichertem Wert. Server prüft beim Speichern weiter.
+async function fieldLocks(item: ItemWithRelations): Promise<Record<string, string>> {
+  const li = await db.query.lendingItems.findFirst({ where: eq(lendingItems.inventoryItemId, item.id) });
+  const openLoan = li ? await db.query.lendingLoans.findFirst({ where: and(eq(lendingLoans.lendingItemId, li.id), isNull(lendingLoans.returnedAt)) }) : undefined;
+  const counts = { numbers: item.numbers.length, serials: item.serials.length, inspection: item.inspections.length, assignments: item.assignments.length };
+  const state = {
+    quantity: item.quantity, retiredQuantity: item.retiredQuantity, ...counts, assignments: counts.assignments,
+    locationText: item.locationText, latitude: item.latitude, longitude: item.longitude, inspections: counts.inspection, activeLoans: openLoan ? 1 : 0,
+  };
+  const locks: Record<string, string> = {};
+  for (const f of INVENTORY_FIELDS) {
+    if (!hasField(item.enabledFields, f) || isFieldEmpty(f, state)) continue;
+    const n = f === "inspection" ? counts.inspection : counts[f as keyof typeof counts];
+    locks[f] = t(`inventory.lock.${f === "quantity" && item.quantity <= 1 ? "quantityBusy" : f}` as any, { n: n ?? 0 });
+  }
+  for (const fv of (item.fieldValues ?? []) as { fieldDefId: string; value: string | null }[]) if (fv.value != null) locks[fv.fieldDefId] = t("inventory.lock.free");
+  return locks;
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
@@ -1021,9 +1088,9 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
 }) {
   return (
     <>
-      <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FormActions formId={formId} cancelHref={cancelHref} /></>} />
+      <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FieldConfigurator formId={formId} values={values} canConfigure={canConfigure} /><FormActions formId={formId} cancelHref={cancelHref} /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
-        <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} canConfigure={canConfigure} />
+        <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
           <fieldset class="card card-border bg-base-100 border-base-300">
             <div class="card-body gap-4 p-4">
@@ -1360,7 +1427,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
         action={`/inventory/${item.id}`}
         formId="inventory-edit-form"
         cancelHref={`/inventory/${item.id}`}
-        values={await withFree(values, item.id)}
+        values={await withFree({ ...values, fieldLocks: await fieldLocks(item) }, item.id)}
         assignedMemberName={!isBatch ? assignmentList[0]?.name : undefined}
         assignments={isBatch ? assignmentList : []}
         lendable={lendableField(user, Boolean(lendingItem), {
@@ -1457,7 +1524,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           action={`/inventory/${id}`}
           formId="inventory-edit-form"
           cancelHref={`/inventory/${id}`}
-          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors }, id)}
+          values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors, fieldLocks: await fieldLocks(existing) }, id)}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
