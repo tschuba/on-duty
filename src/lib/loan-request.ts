@@ -42,7 +42,6 @@ export function validateRequest(v: RequestValues, rules: RequestItemRules, now =
   if (!v.email && !v.phone) errors.contact = t("apply.error.contactRequired");
   else if (v.email && !isValidEmail(v.email)) errors.contact = t("lend.error.invalidEmail");
   else if (v.phone && !isValidPhone(v.phone)) errors.contact = t("lend.error.invalidPhone");
-  if (!v.message) errors.message = t("common.required");
 
   const today = ymd(now);
   const limit = ymd(addMonths(now, 12));

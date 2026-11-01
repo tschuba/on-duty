@@ -761,7 +761,7 @@ export const de = {
   "lend.form.summary": "Leihzeit",
   "lend.form.maxQuantityHint": "Maximal {max} verfügbar.",
   "lend.form.noWithdraw": "Um deine Anfrage zu stornieren, melde dich bei uns.",
-  "lend.form.message": "Nachricht / Motivation",
+  "lend.form.message": "Nachricht (optional)",
   "lend.form.organization": "Organisation (Verein, Firma …)",
   "lend.form.private": "Privatperson",
   "lend.form.contactHint": "Bitte E-Mail oder Telefon angeben (mindestens eines ist Pflicht).",

@@ -132,7 +132,7 @@ describe("POST /lend/:itemId", () => {
     const res = await lendRoutes.request("/item-1", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
-      body: formBody(validBody({ message: "" })),
+      body: formBody(validBody({ lastName: "" })),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);

@@ -155,7 +155,7 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
           <ReadField class="sm:col-span-2" label={t("lend.form.summary")} value={formatPeriod(request)} />
           {request.quantity > 1 && <ReadField label={t("lending.loans.form.quantity")} value={String(request.quantity)} />}
           {openOthers > 0 && <ReadField label={t("lend.requests.otherOpen")} value={String(openOthers)} />}
-          <ReadField class="sm:col-span-2" label={t("apply.form.message")} value={request.message ?? ""} />
+          <ReadField class="sm:col-span-2" label={t("lend.form.message")} value={request.message ?? ""} />
         </div>
         {request.notifiedAt === null && <p class="text-warning text-sm mb-4">{t("lend.requests.notNotified")}</p>}
 

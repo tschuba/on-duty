@@ -83,7 +83,7 @@ function RequestForm({ item, values, errors, maxQuantity }: {
           {errors.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
         </Field>
       )}
-      <Field label={t("lend.form.message")} required>
+      <Field label={t("lend.form.message")}>
         <textarea name="message" class={`textarea w-full${errors.message ? " textarea-error" : ""}`} rows={3}>{values.message}</textarea>
       </Field>
       <PrivacyNotice />

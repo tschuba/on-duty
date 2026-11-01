@@ -8,9 +8,9 @@ const run = (o: Record<string, string> = {}, r = rules) => validateRequest(parse
 
 describe("validateRequest", () => {
   it("accepts a valid request", () => expect(run().errors).toEqual({}));
-  it("requires message, names and contact", () => {
+  it("requires names and contact; message is optional", () => {
     const e = run({ message: "", firstName: "", lastName: "", email: "" }).errors;
-    expect(Object.keys(e).sort()).toEqual(["contact", "firstName", "lastName", "message"]);
+    expect(Object.keys(e).sort()).toEqual(["contact", "firstName", "lastName"]);
   });
   it("accepts private instead of organization", () => {
     expect(run({ organization: "", isPrivate: "1" }).errors).toEqual({});
