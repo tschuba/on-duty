@@ -116,7 +116,7 @@ loanRequestRoutes.get("/", guard, async (c) => {
             ) : rows.map((r) => (
               <tr key={r.id} class="cursor-pointer hover" onclick={`window.location='/inventory/requests/${r.id}'`}>
                 <td>{r.lendingItem.inventoryItem.name}</td>
-                <td>{r.person.lastName}, {r.person.firstName}</td>
+                <td>{r.person.lastName}, {r.person.firstName}{r.person.companyName && ` (${r.person.companyName})`}</td>
                 <td>{periodLabel(r)}</td>
                 <td>{formatDate(r.submittedAt.toISOString().slice(0, 10))}</td>
                 <td><span class={STATUS_BADGE_CLASS[r.status]}>{STATUS_LABEL[r.status]}</span></td>
@@ -147,7 +147,7 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
       />
       <div class="max-w-2xl">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <ReadField label={t("apply.form.firstName")} value={`${request.person.firstName} ${request.person.lastName}`} />
+          <ReadField label={t("apply.form.firstName")} value={`${request.person.firstName} ${request.person.lastName}${request.person.companyName ? ` (${request.person.companyName})` : ""}`} />
           <ReadField label={t("lend.status.submittedAt")} value={formatDate(request.submittedAt.toISOString().slice(0, 10))} />
           {request.person.email && <ReadField label={t("apply.form.email")} value={request.person.email} />}
           {request.person.phone && <ReadField label={t("apply.form.phone")} value={request.person.phone} />}
@@ -155,7 +155,7 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
           <ReadField class="sm:col-span-2" label={t("lend.form.summary")} value={formatPeriod(request)} />
           {request.quantity > 1 && <ReadField label={t("lending.loans.form.quantity")} value={String(request.quantity)} />}
           {openOthers > 0 && <ReadField label={t("lend.requests.otherOpen")} value={String(openOthers)} />}
-          <ReadField class="sm:col-span-2" label={t("apply.form.message")} value={request.message ?? ""} />
+          <ReadField class="sm:col-span-2" label={t("lend.form.message")} value={request.message ?? ""} />
         </div>
         {request.notifiedAt === null && <p class="text-warning text-sm mb-4">{t("lend.requests.notNotified")}</p>}
 
@@ -262,7 +262,7 @@ loanRequestRoutes.post("/:id/approve", guard, async (c) => {
   await db.transaction(async (tx) => {
     const personId = chosenPersonId || (await tx.insert(persons).values({
       firstName: request.person.firstName, lastName: request.person.lastName,
-      email: request.person.email, phone: request.person.phone,
+      email: request.person.email, phone: request.person.phone, companyName: request.person.companyName,
     }).returning({ id: persons.id }))[0].id;
 
     const [loan] = await tx.insert(lendingLoans).values({

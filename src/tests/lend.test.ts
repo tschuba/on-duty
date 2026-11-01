@@ -56,7 +56,7 @@ function requestableItem(overrides: Record<string, any> = {}) {
 
 function validBody(overrides: Record<string, string> = {}) {
   return {
-    firstName: "Max", lastName: "Muster", email: "max@example.com",
+    firstName: "Max", lastName: "Muster", organization: "FF Beispiel", email: "max@example.com",
     plannedFrom: FUTURE_FROM, plannedTo: FUTURE_TO, message: "Brauche den Anhänger.",
     ...overrides,
   };
@@ -132,7 +132,7 @@ describe("POST /lend/:itemId", () => {
     const res = await lendRoutes.request("/item-1", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
-      body: formBody(validBody({ message: "" })),
+      body: formBody(validBody({ lastName: "" })),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);

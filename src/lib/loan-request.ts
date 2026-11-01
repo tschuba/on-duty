@@ -3,6 +3,7 @@ import { isValidEmail, isValidPhone } from "./contact.js";
 
 export type RequestValues = {
   firstName: string; lastName: string; email: string; phone: string;
+  organization: string; isPrivate: boolean;
   plannedFrom: string; plannedTo: string; plannedFromTime: string; plannedToTime: string;
   quantity: string; message: string;
 };
@@ -16,6 +17,7 @@ export function parseRequestValues(body: Record<string, any>): RequestValues {
   const s = (k: string) => String(body[k] ?? "").trim();
   return {
     firstName: s("firstName"), lastName: s("lastName"), email: s("email"), phone: s("phone"),
+    organization: s("organization"), isPrivate: s("isPrivate") !== "",
     plannedFrom: s("plannedFrom"), plannedTo: s("plannedTo"),
     plannedFromTime: s("plannedFromTime"), plannedToTime: s("plannedToTime"),
     quantity: s("quantity"), message: s("message"),
@@ -36,10 +38,10 @@ export function validateRequest(v: RequestValues, rules: RequestItemRules, now =
   const errors: Record<string, string> = {};
   if (!v.firstName) errors.firstName = t("common.required");
   if (!v.lastName) errors.lastName = t("common.required");
+  if (!v.isPrivate && !v.organization) errors.organization = t("common.required");
   if (!v.email && !v.phone) errors.contact = t("apply.error.contactRequired");
   else if (v.email && !isValidEmail(v.email)) errors.contact = t("lend.error.invalidEmail");
   else if (v.phone && !isValidPhone(v.phone)) errors.contact = t("lend.error.invalidPhone");
-  if (!v.message) errors.message = t("common.required");
 
   const today = ymd(now);
   const limit = ymd(addMonths(now, 12));

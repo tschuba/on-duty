@@ -53,7 +53,7 @@ export const loanRequests = pgTable("loan_requests", {
   plannedTo: date("planned_to").notNull(),
   plannedFromTime: time("planned_from_time"),
   plannedToTime: time("planned_to_time"),
-  message: text("message").notNull(),
+  message: text("message"),
   status: loanRequestStatusEnum("status").notNull().default("open"),
   statusToken: text("status_token").notNull().unique(),
   loanId: uuid("loan_id").references(() => lendingLoans.id, { onDelete: "set null" }),
