@@ -37,6 +37,9 @@ export function checkUpload(name: string, buf: Buffer): void {
   if (buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) throw new ImportError(t("import.error.notZip"));
 }
 
+// fwportal hat Spalten umbenannt (neu → alt); intern gilt weiter der alte Name.
+const HEADER_ALIASES: Record<string, string> = { "Inventar-ID": "InventarID", Inventarnummer: "Inventarnr.", Seriennummer: "Seriennr." };
+
 /** Liest das erste Blatt; Kopfzeile = erste Zeile mit `mID` bzw. `InventarID`. */
 export function readWorkbook(buf: Buffer): { kind: ImportKind; headers: string[]; rows: Raw[] } {
   let aoa: unknown[][];
@@ -46,6 +49,7 @@ export function readWorkbook(buf: Buffer): { kind: ImportKind; headers: string[]
   } catch {
     throw new ImportError(t("import.error.unreadable"));
   }
+  aoa = aoa.map((r) => r.map((h) => (typeof h === "string" ? HEADER_ALIASES[h.trim()] ?? h : h)));
   const headIdx = aoa.findIndex((r) => r.includes("mID") || r.includes("InventarID"));
   if (headIdx < 0) throw new ImportError(t("import.error.noHeader"));
   const headers = aoa[headIdx].map((h) => (h == null ? "" : String(h).trim()));
