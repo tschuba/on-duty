@@ -1,3 +1,4 @@
+import { RolePopover } from "./role-popover.js";
 import { Icon } from "./icon.js";
 import type { IconName } from "./icons.generated.js";
 
@@ -13,7 +14,8 @@ export const TAG_STYLES: Record<string, { icon: IconName; badge: string; avatar:
 };
 
 // Alle Tags als Badge, Tags mit eigenem Stil zuerst (stabil); das Icon trägt der erste von ihnen.
-export function TagBadges({ tags }: { tags: string[] }) {
+// compact: unter lg nur der erste Tag plus „+N“, ab lg alle (reines CSS).
+export function TagBadges({ tags, compact = false }: { tags: string[]; compact?: boolean }) {
   const styled = (tag: string) => Boolean(TAG_STYLES[tag.toLowerCase()]);
   const sorted = [...tags.filter(styled), ...tags.filter((tag) => !styled(tag))];
   return (
@@ -21,12 +23,13 @@ export function TagBadges({ tags }: { tags: string[] }) {
       {sorted.map((tag, i) => {
         const style = TAG_STYLES[tag.toLowerCase()];
         return (
-          <span class={`badge badge-sm ${style?.badge ?? "badge-ghost"}${i === 0 && style ? " gap-1" : ""}`}>
+          <span class={`badge badge-sm ${style?.badge ?? "badge-ghost"}${i === 0 && style ? " gap-1" : ""}${compact && i > 0 ? " hidden lg:inline-flex" : ""}`}>
             {i === 0 && style && <Icon name={style.icon} class="size-3.5" />}
             {tag}
           </span>
         );
       })}
+      {compact && sorted.length > 1 && <RolePopover class="lg:hidden" roles={sorted.slice(1)} label={`+${sorted.length - 1}`} />}
     </>
   );
 }
