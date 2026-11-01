@@ -1890,6 +1890,15 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           label={t("inventory.form.assignedMember")}
           value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
         />}
+        {lending?.publicRequestable && !item.retiredAt && (() => {
+          const href = new URL(`/lend/${lending.id}`, env.OIDC_APP_URL).toString();
+          return (
+            <div class="sm:col-span-2">
+              <div class="text-sm opacity-60">{t("lend.form.requestLink")}</div>
+              <a href={href} class="link link-primary break-all">{href}</a>
+            </div>
+          );
+        })()}
       </ViewGrid>
       {hasField(item.enabledFields, "inspection") && item.inspections.length > 0 && (
         <InspectionList item={item} canManage={canManage && !item.retiredAt} today={new Date().toISOString().slice(0, 10)} />
