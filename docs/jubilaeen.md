@@ -19,7 +19,7 @@ Dienstjubiläen gibt es nur für aktive Mitglieder, Mitgliedsjubiläen für alle
 
    `Ehrungsjahr = Eintrittsjahr + n + (Tag/Monat des Eintritts > Ehrungstermin ? 1 : 0)`
 
-3. Das **Datum des Events** ist `Ehrungsjahr-ANNIVERSARY_CUTOFF`. Danach laufen Filterung, Sortierung und Gruppierung.
+3. Das **Datum des Events** ist der Jubiläumstag (`Eintrittsjahr + n`, Tag/Monat des Eintritts; 29.02. → 01.03. in Nicht-Schaltjahren, auch bei Geburtstagen). Danach laufen Filterung, Sortierung und Gruppierung. Der Ehrungstermin (`Ehrungsjahr-ANNIVERSARY_CUTOFF`) ist Zusatzinfo (`ceremonyDate`).
 
 Das Schaltjahr-Problem (29.02.) entfällt, weil das Datum nie aus dem Eintrittstag berechnet wird.
 
@@ -37,4 +37,4 @@ Dienst und Mitgliedschaft: Mitglied seit 15.06.1990 in der Feuerwehr, bei uns se
 ## Anzeige
 
 - **Liste, Export, Druckansicht** filtern und sortieren nach dem Ehrungstermin. Mehrere Mitglieder mit demselben Termin werden nach Nachname sortiert.
-- **Erste Spalte der Liste** zeigt das Referenzdatum (Tag/Monat des Eintritts im Ehrungsjahr, z. B. 01.07.2026), darunter in grau den Ehrungstermin (06.01.2026). Dafür hat das Event zwei Felder: `date` (Ehrungstermin) und `refDate` (Referenzdatum).
+- **Erste Spalte der Liste** zeigt den Jubiläumstag, darunter in grau den Ehrungstermin. Dienst- und Mitgliedsjubiläum derselben Person (gleicher Ehrungstermin und gleiche Jahre) werden zu einer Zeile mit zwei Tagen verschmolzen, wenn sie in der gefilterten Liste direkt aufeinander folgen. Ausgegraut wird nach Ehrungstermin. Der Export hat eine Zeile je Ereignis mit Spalte „Ehrungstermin“.

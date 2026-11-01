@@ -20,13 +20,14 @@ export function ApplyButton({ full = false }: { full?: boolean }) {
 // Zeitraum-Filter: Presets (Links, wenden sofort an), "Relativ" und "Benutzerdefiniert" (Felder + Anzeigen).
 // Die Komponente rendert das GET-Formular; `hidden` trägt Sortierung/Filter der Seite. `href(params)` baut Preset-Links
 // (ohne Datums-/Range-Parameter der Seite). `names` = Datumsparameter (start/end bzw. from/to).
-export function QuickRangeFilter({ presets, range, dir, action, hidden = [], names = { start: "start", end: "end" }, bare = false, href, cutoff = false }: {
+export function QuickRangeFilter({ presets, range, dir, action, hidden = [], names = { start: "start", end: "end" }, bare = false, href, cutoff = false, note }: {
   presets: RangePreset[];
   range: ParsedRange;
   dir: "future" | "past";
   action: string;
   hidden?: [string, string][];
   names?: { start: string; end: string };
+  note?: string; // Hinweis unter den Presets und im Editor
   cutoff?: boolean; // page has an anniversary cutoff: offer ceremony years
   bare?: boolean; // true: kein eigenes <form>, Felder landen im umgebenden Formular der Seite
   href: (params: Record<string, string>) => string;
@@ -89,6 +90,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             <li><button type="button" data-qrf-mode="rel" data-qrf-text={t("filter.quick.relative")} class={`${item}${on(showRel)}`}>{mark(showRel)}{t("filter.quick.relative")}<span class="ml-auto opacity-60" aria-hidden="true">›</span></button></li>
             <li><button type="button" data-qrf-mode="custom" data-qrf-text={t("filter.quick.custom")} class={`${item}${on(showCustom)}`}>{mark(showCustom)}{t("filter.quick.custom")}<span class="ml-auto opacity-60" aria-hidden="true">›</span></button></li>
           </ul>
+          {note && <p class="text-xs opacity-70 pl-8 pr-2 py-2">{note}</p>}
         </div>
       </div>
       {/* Editor: Popup am Button (Desktop), Bottom-Sheet (< sm) */}
@@ -131,6 +133,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
             <input type="date" name={names.end} value={range.end} class="input w-full min-h-11 text-base" placeholder={t("filter.quick.to")} disabled={!showCustom} />
           </Field>
         </div>
+        {note && <p class="text-xs opacity-70 mt-3">{note}</p>}
         <div class="flex gap-2 justify-end mt-4 max-sm:flex-col-reverse [&>*]:max-sm:w-full [&>*]:max-sm:min-h-11">
           <button type="button" class="btn btn-ghost" popovertarget={eid} popovertargetaction="hide">{t("common.cancel")}</button>
           <ApplyButton full />

@@ -8,7 +8,7 @@ import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { setFlash } from "../lib/flash.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
-import { filterByYears, generateEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
+import { filterByYears, generateEvents, mergeEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { AnniversaryFilter } from "../components/anniversary-filter.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
@@ -87,8 +87,8 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
   return (
     <tr class={past ? "opacity-40" : ""}>
       <td class={`whitespace-nowrap text-sm pl-6 max-sm:pl-2${border}`}>
-        {formatDate(e.refDate ?? e.date)}
-        {e.kind === "anniversary" && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.date) })}</div>}
+        {(e.days ?? [e.date]).map((d) => <div>{formatDate(d)}</div>)}
+        {e.ceremonyDate && <div class="text-xs text-base-content/60">{t("anniversaries.event.jubDate", { date: formatDate(e.ceremonyDate) })}</div>}
       </td>
       <td class={`max-sm:px-2${border}`}>
         <a href={`/members/${e.memberId}`} class="link link-hover font-medium">
@@ -105,7 +105,7 @@ function EventRow({ event: e, past, divider }: { event: AnniversaryEvent; past: 
 }
 
 function EventList({ events, today, filters }: { events: AnniversaryEvent[]; today: string; filters: string[] }) {
-  const filtered = filterEvents(events, filters);
+  const filtered = mergeEvents(filterEvents(events, filters));
 
   if (!filtered.length) {
     return <p class="text-base-content/60 py-8">{t("anniversaries.empty")}</p>;
@@ -130,7 +130,7 @@ function EventList({ events, today, filters }: { events: AnniversaryEvent[]; tod
               </td>
             </tr>
             {evs.map((e, i) => (
-              <EventRow event={e} past={e.date < today} divider={i > 0} />
+              <EventRow event={e} past={(e.ceremonyDate ?? e.date) < today} divider={i > 0} />
             ))}
             {gi < all.length - 1 && (
               <tr aria-hidden="true" class="!bg-transparent"><td colspan={5} class="h-8 p-0"></td></tr>
@@ -243,7 +243,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
 
         {/* Controls */}
         <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-          <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries" cutoff
+          <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries" cutoff note={t("anniversaries.rangeHint")}
             hidden={[...kindsParam.map((f): [string, string] => ["filter", f]), ...mods.map((m): [string, string] => ["mod", m]), ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])]}
             href={(p) => qs(p)} />
 
@@ -295,7 +295,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const memberMap = new Map(flatMembers.map((m) => [m.id, m]));
 
   const header: string[] = [
-    t("anniversaries.export.colDate"), t("members.form.lastName"), t("members.form.firstName"),
+    t("anniversaries.export.colDate"), t("anniversaries.export.colCeremony"), t("members.form.lastName"), t("members.form.firstName"),
     t("members.table.status"), t("anniversaries.export.colEventType"), t("anniversaries.export.colYears"), t("anniversaries.export.colTitle"),
   ];
   if (inclContact) header.push(t("members.form.phone"), t("members.form.mobile"), t("members.form.email"));
@@ -304,6 +304,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
   const rows = events.map((e) => {
     const row: (string | Date | number | null)[] = [
       new Date(e.date + "T00:00:00"),
+      e.ceremonyDate ? new Date(e.ceremonyDate + "T00:00:00") : "",
       e.lastName,
       e.firstName,
       STATUS_LABELS[e.status],
