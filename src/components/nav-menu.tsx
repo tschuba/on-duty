@@ -12,16 +12,28 @@ export type NavCounts = {
   inspections: number;
   loans: number;
   loanRequests: number;
-  org: number;
+  org: boolean;
   pendingUsers: number;
 };
 
 type Tone = "badge-warning" | "badge-primary";
-type Leaf = { label: string; href: string; show: boolean; count?: number; tone?: Tone; external?: boolean; children?: Leaf[] };
+type Leaf = { label: string; href: string; show: boolean; count?: number; dot?: boolean; tone?: Tone; external?: boolean; children?: Leaf[] };
 type Group = { icon: IconName; label: string; items: Leaf[] };
 
 export function CountBadge({ count, tone = "badge-warning" }: { count: number; tone?: Tone }) {
   return count > 0 ? <span class={`badge badge-sm ${tone} ml-1`}>{count}</span> : null;
+}
+
+function DotBadge() {
+  const label = t("common.nav.organisationIncomplete");
+  return <span class="badge badge-warning badge-xs ml-1" title={label} aria-label={label} role="img" />;
+}
+
+// Zahl nur bei Zählerpunkten (Summe inkl. 1 je Punkt), sonst nur der Punkt.
+function GroupBadge({ items, tone }: { items: Leaf[]; tone?: Tone }) {
+  const counted = items.reduce((n, i) => n + (i.count ?? 0), 0);
+  const dots = items.filter((i) => i.dot).length;
+  return counted > 0 ? <CountBadge count={counted + dots} tone={tone} /> : dots > 0 ? <DotBadge /> : null;
 }
 
 function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
@@ -53,7 +65,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("lend.requests.title"), href: "/inventory/requests", show: has("lending:manage"), count: c.loanRequests },
     ] },
     { icon: "building-office", label: t("common.nav.organisation"), items: [
-      { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), count: c.org },
+      { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
     ] },
     { icon: "arrow-down-tray", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
     { icon: "cog-6-tooth", label: t("common.nav.admin"), items: [
@@ -136,7 +148,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
         </button>
       </li>
       {groups.map((g) => {
-        const sum = g.items.reduce((n, i) => n + (i.count ?? 0), 0);
+        const sum = g.items.reduce((n, i) => n + (i.count ?? 0) + (i.dot ? 1 : 0), 0);
         const label = <span class="is-drawer-close:hidden">{g.label}</span>;
         if (g.items.length === 1) {
           const i = g.items[0];
@@ -146,7 +158,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
               <a href={i.href} class={`is-drawer-close:tooltip is-drawer-close:tooltip-right ${isActive ? "menu-active" : ""}`} data-tip={g.label} data-label={lc(g.label)}>
                 <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{!isActive && sum > 0 && <span class="indicator-item badge badge-warning badge-xs is-drawer-open:hidden" />}</span>
                 {label}
-                {!isActive && <span class="is-drawer-close:hidden"><CountBadge count={sum} tone={i.tone} /></span>}
+                {!isActive && <span class="is-drawer-close:hidden"><GroupBadge items={g.items} tone={i.tone} /></span>}
               </a>
             </li>
           );
@@ -158,7 +170,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
               <summary class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={g.label}>
                 <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{!open && sum > 0 && <span class="indicator-item badge badge-warning badge-xs is-drawer-open:hidden" />}</span>
                 <span class={`is-drawer-close:hidden ${open ? "font-semibold" : ""}`}>{g.label}</span>
-                {!open && <span class="is-drawer-close:hidden"><CountBadge count={sum} /></span>}
+                {!open && <span class="is-drawer-close:hidden"><GroupBadge items={g.items} /></span>}
               </summary>
               <ul class="is-drawer-close:hidden">
                 {g.items.map((i) => {
@@ -168,7 +180,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
                       <a href={i.href} class={i.href === active ? "menu-active" : ""} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
                         {i.label as Child}
                         {i.external && <Icon name="arrow-top-right-on-square" class="h-4 w-4" />}
-                        <CountBadge count={i.count ?? 0} tone={i.tone} />
+                        {i.dot ? <DotBadge /> : <CountBadge count={i.count ?? 0} tone={i.tone} />}
                       </a>
                       {showKids && (
                         <ul>

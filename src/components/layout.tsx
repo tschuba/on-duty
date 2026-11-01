@@ -42,10 +42,10 @@ export const Layout = async ({ title, children, user, path }: Props) => {
   if (!path) { try { reqPath = getContext().req.path; } catch { /* kein Hono-Kontext */ } }
   let counts: NavCounts | undefined;
   if (user) {
-    let org = 0;
+    let org = false;
     if (["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"].some(has)) {
       const missing = missingReceiptFields(await loadOrgConfig());
-      org = (["master", "tax"] as OrgTab[]).filter((tab) => canReadOrgTab(user.permissions, tab)).reduce((n, tab) => n + missing[tab].length, 0);
+      org = (["master", "tax"] as OrgTab[]).filter((tab) => canReadOrgTab(user.permissions, tab)).some((tab) => missing[tab].length > 0);
     }
     counts = {
       applications: has("applications:read") ? await countOpenApplications() : 0,
