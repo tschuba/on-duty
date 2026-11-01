@@ -59,7 +59,7 @@ describe("inspection templates", () => {
     const view = await (await get("/t1")).text();
     expect(view).not.toContain("<form id=");
     expect(view).toContain('href="/inventory/templates/p1"');
-    expect(view).toContain("Wird aus 1 Posten-Vorlagen entfernt.");
+    expect(view).toContain("Wird aus 1 Gegenstandsvorlagen entfernt.");
     expect(await (await get("/t1/edit")).text()).toMatch(/name="name"[^>]*value="HU"|value="HU"[^>]*name="name"/);
   });
 

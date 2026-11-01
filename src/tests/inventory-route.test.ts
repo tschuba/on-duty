@@ -616,9 +616,9 @@ describe("inspection types", () => {
     expect(plain).not.toContain('href="/inventory/inspection-templates"');
     currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "inventory:configure"]), disabled: false };
     const html = await (await inventoryRoutes.request("/new?template=none")).text();
-    expect(html).toMatch(/href="\/inventory\/inspection-templates" target="_blank"/);
     expect(html).toMatch(/href="\/inventory\/fields" target="_blank"/);
-    expect(html).toMatch(/href="\/inventory\/templates" target="_blank"/);
+    expect(html).not.toContain('href="/inventory/inspection-templates"');
+    expect(html).not.toContain('href="/inventory/templates"');
     expect(await (await inventoryRoutes.request("/")).text()).not.toContain("Freie Felder");
   });
 
