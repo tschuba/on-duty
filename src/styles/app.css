@@ -212,6 +212,9 @@ details:not([open]) > summary .section-actions {
   .menu :where(a, button, summary) {
     min-height: 2.75rem;
   }
+  .menu :where(a, button, summary) {
+    align-content: center;
+  }
   .row-action,
   .btn-square,
   .btn-circle {
