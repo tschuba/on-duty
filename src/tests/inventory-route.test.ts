@@ -186,7 +186,8 @@ describe("GET /", () => {
     const html = await res.text();
     expect(html).toContain("TSF-W");
     expect(html).toMatch(/<span class="badge badge-sm badge-primary gap-1"><svg[^>]*>[\s\S]*?<\/svg>Fahrzeug<\/span>/);
-    expect(html).toContain('class="badge badge-sm badge-ghost">Halle 2</span>');
+    expect(html).toContain('class="badge badge-sm badge-ghost hidden lg:inline-flex">Halle 2</span>');
+    expect(html).toContain('lg:hidden');
     expect(html).not.toContain("inventory-category-select");
     expect(html).not.toContain('name="category"');
   });
