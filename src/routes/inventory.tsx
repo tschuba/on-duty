@@ -551,8 +551,9 @@ function FieldConfigurator({ formId, values, canConfigure }: { formId: string; v
         (function(){
           var pop=document.getElementById('${id}'), btn=document.querySelector('button[popovertarget="${id}"]');
           // Popup unter dem Button; der Zeiger zeigt auf die Button-Mitte (unter sm: Bottom-Sheet per CSS).
-          pop.addEventListener('toggle',function(e){
-            if(e.newState!=='open'||window.innerWidth<640) return;
+          function place(){
+            if(!pop.matches(':popover-open')) return;
+            if(window.innerWidth<640){ pop.removeAttribute('style'); return; } // Bottom-Sheet per CSS
             var r=btn.getBoundingClientRect(), m=4;
             pop.style.position='fixed'; pop.style.inset='auto';
             pop.style.top=(r.bottom+8)+'px';
@@ -560,7 +561,9 @@ function FieldConfigurator({ formId, values, canConfigure }: { formId: string; v
             pop.style.left=left+'px';
             var a=pop.querySelector('[data-arrow]');
             if(a) a.style.left=Math.max(8,Math.min(pop.offsetWidth-20,r.left+r.width/2-left-6))+'px';
-          });
+          }
+          pop.addEventListener('toggle',function(e){ if(e.newState==='open') place(); });
+          window.addEventListener('resize',place);
         })();
       ` }} />
     </div>
