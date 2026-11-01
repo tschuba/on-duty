@@ -1895,7 +1895,12 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           return (
             <div class="sm:col-span-2">
               <div class="text-sm opacity-60">{t("lend.form.requestLink")}</div>
-              <a href={href} class="link link-primary break-all">{href}</a>
+              <div class="flex items-center gap-2">
+                <a href={href} target="_blank" rel="noopener" class="link link-primary break-all">{href}</a>
+                <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={href} onclick="navigator.clipboard.writeText(this.dataset.url)">
+                  <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                </button>
+              </div>
             </div>
           );
         })()}
