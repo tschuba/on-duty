@@ -1,5 +1,5 @@
 import { Hono, type Context } from "hono";
-import { eq, ne } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -192,11 +192,28 @@ loanRequestRoutes.get("/:id/approve", guard, async (c) => {
   const request = await fetchRequest(c.req.param("id"));
   if (!request || request.status !== "open") return c.notFound();
 
-  const pool = await db
-    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, phone: persons.phone })
-    .from(persons)
-    .where(ne(persons.id, request.person.id));
+  const [memberPersonIds, borrowerPersonIds] = await Promise.all([
+    db.select({ personId: members.personId }).from(members),
+    db.select({ personId: lendingLoans.borrowerPersonId }).from(lendingLoans),
+  ]);
+  const memberIds = new Set(memberPersonIds.map((m) => m.personId));
+  const relevantIds = new Set([...memberIds, ...borrowerPersonIds.map((l) => l.personId)]);
+  relevantIds.delete(request.person.id);
+
+  const pool =
+    relevantIds.size === 0
+      ? []
+      : (
+          await db
+            .select({
+              id: persons.id, firstName: persons.firstName, lastName: persons.lastName,
+              email: persons.email, phone: persons.phone, mobile: persons.mobile, companyName: persons.companyName,
+            })
+            .from(persons)
+            .where(inArray(persons.id, [...relevantIds]))
+        ).map((p) => ({ ...p, isMember: memberIds.has(p.id) }));
   const candidates = matchCandidates(request.person, pool);
+  const preselect = candidates.length === 1 && candidates[0].strength === "strong";
 
   return c.html(
     <Layout title={t("lend.requests.approveTitle")} user={user}>
@@ -205,15 +222,25 @@ loanRequestRoutes.get("/:id/approve", guard, async (c) => {
         <p class="text-sm opacity-70">{t("lend.requests.requestedBy", { name: `${request.person.firstName} ${request.person.lastName}` })}</p>
         {candidates.length > 0 ? (
           <fieldset class="fieldset">
-            {candidates.map((cand, i) => (
-              <label key={cand.id} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
-                <input type="radio" name="personId" value={cand.id} class="radio" checked={i === 0} />
-                <span>{cand.firstName} {cand.lastName} {cand.email ? `· ${cand.email}` : ""} {cand.phone ? `· ${cand.phone}` : ""}</span>
-                {cand.strength === "weak" && <span class="badge badge-sm badge-ghost">{t("lend.requests.weakMatch")}</span>}
-              </label>
-            ))}
+            {candidates.map((cand, i) => {
+              const company = cand.companyName === "Privat" ? "privat" : cand.companyName;
+              const contact = cand.phone || cand.mobile;
+              return (
+                <label key={cand.id} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
+                  <input type="radio" name="personId" value={cand.id} class="radio" required checked={preselect && i === 0} />
+                  <span>
+                    {cand.firstName} {cand.lastName}
+                    {company ? ` · ${company}` : ""}
+                    {cand.email ? ` · ${cand.email}` : ""}
+                    {contact ? ` · ${contact}` : ""}
+                  </span>
+                  {cand.isMember && <span class="badge badge-sm badge-ghost">{t("lend.requests.memberBadge")}</span>}
+                  {cand.strength === "weak" && <span class="badge badge-sm badge-ghost">{t("lend.requests.weakMatch")}</span>}
+                </label>
+              );
+            })}
             <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
-              <input type="radio" name="personId" value="" class="radio" />
+              <input type="radio" name="personId" value="" class="radio" required />
               <span>{t("lend.requests.createNew")}</span>
             </label>
           </fieldset>

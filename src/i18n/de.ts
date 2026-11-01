@@ -796,6 +796,7 @@ export const de = {
   "lend.requests.internalReason": "Interner Grund",
   "lend.requests.approveTitle": "Anfrage genehmigen",
   "lend.requests.requestedBy": "Angefragt von {name}.",
+  "lend.requests.memberBadge": "Mitglied",
   "lend.requests.weakMatch": "ähnlicher Name",
   "lend.requests.createNew": "Neu anlegen",
   "lend.requests.confirmApprove": "Diese Person verwenden",
