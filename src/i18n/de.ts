@@ -44,6 +44,7 @@ export const de = {
   "common.nav.search": "Menü durchsuchen",
   "common.nav.noResults": "Keine Treffer",
   "common.nav.toggleSidebar": "Menü ein-/ausklappen",
+  "common.nav.organisationIncomplete": "Pflichtangaben fehlen",
   "common.nav.anniversaries": "Jubiläen & Geburtstage",
   "common.nav.donations": "Spenden",
   "donations.tabs.donations": "Spenden",
