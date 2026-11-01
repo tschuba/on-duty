@@ -19,10 +19,10 @@ if (!window.__rolePopoverBound) {
   document.addEventListener('focusout', (e) => toggle(e, false));
 }`;
 
-export function RolePopover({ roles, label }: { roles: string[]; label: string }) {
+export function RolePopover({ roles, label, class: cls }: { roles: string[]; label: string; class?: string }) {
   const id = `role-popover-${++popoverSeq}`;
   return (
-    <div onclick="event.stopPropagation()">
+    <div class={cls} onclick="event.stopPropagation()">
       <div
         tabindex={0}
         role="button"
@@ -33,8 +33,8 @@ export function RolePopover({ roles, label }: { roles: string[]; label: string }
         {label}
       </div>
       <div id={id} popover="manual" class="role-popover bg-base-100 border border-base-300 rounded-box shadow p-2" style={`position-anchor:--${id}`}>
-        <div class="flex flex-wrap gap-1 max-w-48">
-          {roles.map((r) => <span class="badge badge-outline badge-sm whitespace-nowrap">{r}</span>)}
+        <div class="flex flex-wrap gap-1 max-w-[min(20rem,90vw)]">
+          {roles.map((r) => <span class="badge badge-outline badge-sm h-auto py-0.5 whitespace-normal text-left">{r}</span>)}
         </div>
       </div>
       <script dangerouslySetInnerHTML={{ __html: HOVER_SCRIPT }} />

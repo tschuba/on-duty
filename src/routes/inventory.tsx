@@ -969,7 +969,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}'`}>
                 <td>{item.name}</td>
-                <td><div class="flex flex-wrap gap-1"><TagBadges tags={item.tags.map((tg) => tg.tag)} /></div></td>
+                <td><div class="flex flex-wrap gap-1"><TagBadges compact tags={item.tags.map((tg) => tg.tag)} /></div></td>
                 <td class="hidden md:table-cell">
                   {due ? <span class={due.dueDate! < today ? "text-error font-semibold" : ""}>{formatDate(due.dueDate!)} <span class="opacity-60">{due.name}</span></span> : "—"}
                   {open.length > 1 && <span class="badge badge-ghost badge-sm ml-1">+{open.length - 1}</span>}
