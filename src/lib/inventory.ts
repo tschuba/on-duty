@@ -16,8 +16,8 @@ type InventoryItemInput = {
   inspections: { id: string; name: string; dueDate: string | null }[];
 };
 
-// Prüffristen kommen aus den Prüfarten der Posten (inventory_inspections) — eine Zeile je offener Prüfart,
-// kein eigener Event-Store. Ausgemusterte Posten werden nicht mehr geprüft; ohne dueDate ist eine Prüfart erledigt.
+// Prüffristen kommen aus den Prüfarten der Gegenstände (inventory_inspections) — eine Zeile je offener Prüfart,
+// kein eigener Event-Store. Ausgemusterte Gegenstände werden nicht mehr geprüft; ohne dueDate ist eine Prüfart erledigt.
 // `names` (optional) beschränkt auf bestimmte Prüfart-Namen, ohne Beachtung der Groß-/Kleinschreibung.
 export function generateInspectionDueItems(items: InventoryItemInput[], start: string, end: string, names?: string[]): InspectionDueItem[] {
   const wanted = names?.length ? new Set(names.map((n) => n.toLowerCase())) : null;
