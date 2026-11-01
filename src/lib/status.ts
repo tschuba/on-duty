@@ -74,7 +74,7 @@ export function deriveMemberStatus(
 
   const cutoff = ageLimitDate(member.birthDate, activeAgeLimit);
   const wasActiveAtCutoff = assignments.some(
-    (a) => a.role.grantsActiveStatus && a.from <= cutoff && (!a.to || a.to >= cutoff)
+    (a) => a.role.grantsActiveStatus && (a.from == null || a.from <= cutoff) && (!a.to || a.to >= cutoff)
   );
   return wasActiveAtCutoff ? "passive" : "supporting";
 }

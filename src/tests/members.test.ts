@@ -636,7 +636,7 @@ describe("POST /new", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("rejects a role assignment missing its from-date", async () => {
+  it("accepts a role assignment without from-date (shown with a warning)", async () => {
     const res = await memberRoutes.request("/new", {
       method: "POST",
       body: formBody({
@@ -644,8 +644,8 @@ describe("POST /new", () => {
         "assignment_role[]": roleAktiv.id, "assignment_from[]": "", "assignment_to[]": "",
       }),
     });
-    expect(res.status).toBe(422);
-    expect(insert).not.toHaveBeenCalled();
+    expect(res.status).not.toBe(422);
+    expect(insert).toHaveBeenCalled();
   });
 
   it("rejects a role assignment missing its role", async () => {

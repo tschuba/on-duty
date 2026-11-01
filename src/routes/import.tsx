@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
 import { db } from "../db/index.js";
+import { FromMissingBadge } from "./members.js";
 import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, inventoryTemplates, memberRoleAssignments, memberRoles, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
@@ -237,7 +238,8 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                 </td>
                 <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input-sm" disabled={a.skipped} /></td>
                 <td>
-                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from} class="input-sm" disabled={a.skipped} />
+                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from ?? ""} class="input-sm" disabled={a.skipped} />
+                  {!a.from && !a.skipped && <FromMissingBadge />}
                   {a.assumed && <span class="badge badge-warning badge-sm ml-1">{t("import.badge.assumed")}</span>}
                 </td>
                 <td><input type="checkbox" name={`ause_${m.mid}_${a.key}`} value="1" class="toggle toggle-sm" checked={!a.skipped} /></td>

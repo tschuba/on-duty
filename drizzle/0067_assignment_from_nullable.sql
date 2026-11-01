@@ -1,0 +1,1 @@
+ALTER TABLE "member_role_assignments" ALTER COLUMN "from" DROP NOT NULL;

@@ -327,13 +327,17 @@ const normalizeNote = (v?: string) => v?.replace(/\r\n?/g, "\n").trim().slice(0,
 const singleLine = (v: string) => v.replace(/\s*\n\s*/g, " ");
 const roleLabel = (title: string, note?: string | null) => (note ? `${title} (${singleLine(note)})` : title);
 
-type AssignmentRowData = { id: string; roleId: string; roleTitle: string; from: string; to: string | null; note: string | null; idx?: string };
+type AssignmentRowData = { id: string; roleId: string; roleTitle: string; from: string | null; to: string | null; note: string | null; idx?: string };
 
 const toRowData = (a: Assignment): AssignmentRowData => ({ id: a.id, roleId: a.memberRoleId, roleTitle: a.role.title, from: a.from, to: a.to, note: a.note });
 // Offene (ohne „bis“) zuerst, danach „von“ absteigend.
-const sortRows = (rows: AssignmentRowData[]) => [...rows].sort((a, b) => (a.to ? 1 : 0) - (b.to ? 1 : 0) || b.from.localeCompare(a.from));
+const sortRows = (rows: AssignmentRowData[]) => [...rows].sort((a, b) => (a.to ? 1 : 0) - (b.to ? 1 : 0) || (b.from ?? "").localeCompare(a.from ?? ""));
 
 const ADD_CLICK = "if(event.detail.successful){var d=document.getElementById('assignment-modal');d.showModal();setTimeout(function(){var f=d.querySelector('.role-picker-search');if(f)f.focus()},50)}";
+
+export function FromMissingBadge() {
+  return <span class="badge badge-warning badge-sm" title={t("members.assignment.fromMissingHint")}>{t("members.assignment.fromMissing")}</span>;
+}
 
 // Eine Zeile der read-only Tabelle. Neuanlage (kein memberId): Werte stecken als Hidden-Inputs im Hauptformular.
 function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData; memberId?: string; index?: string; readOnly?: boolean }) {
@@ -346,14 +350,14 @@ function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData;
               <input type="hidden" name="assignment_idx[]" value={index} />
               <input type="hidden" name="assignment_id[]" value="" />
               <input type="hidden" name="assignment_role[]" value={r.roleId} />
-              <input type="hidden" name="assignment_from[]" value={r.from} />
+              <input type="hidden" name="assignment_from[]" value={r.from ?? ""} />
               <input type="hidden" name="assignment_to[]" value={r.to ?? ""} />
               <input type="hidden" name="assignment_note[]" value={r.note ?? ""} />
             </>
           )}
           {r.roleTitle}
         </td>
-        <td class="assignment-from">{formatDate(r.from)}</td>
+        <td class="assignment-from">{r.from ? formatDate(r.from) : <FromMissingBadge />}</td>
         <td>{r.to ? formatDate(r.to) : ""}</td>
         <td class="whitespace-pre-line">{r.note}</td>
         <td class="text-right whitespace-nowrap">
@@ -427,7 +431,7 @@ function AssignmentModalScaffold() {
   );
 }
 
-type AssignmentFormValues = { roleId?: string; from?: string; to?: string | null; note?: string | null };
+type AssignmentFormValues = { roleId?: string; from?: string | null; to?: string | null; note?: string | null };
 
 export function AssignmentModalForm({ roles, action, values = {}, error, title, collect }: { roles: Role[]; action: string; values?: AssignmentFormValues; error?: string; title: string; collect?: boolean }) {
   const selectedId = values.roleId;
@@ -465,8 +469,8 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         </div>
       </Field>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("members.form.from")} required>
-          <input type="date" name="from" class="input w-full" value={values.from ?? ""} required />
+        <Field label={t("members.form.from")}>
+          <input type="date" name="from" class="input w-full" value={values.from ?? ""} />
         </Field>
         <Field label={t("members.form.to")}>
           <input type="date" name="to" class="input w-full" value={values.to ?? ""} />
@@ -620,7 +624,7 @@ function parseFormAssignments(body: Record<string, any>, allRoles: Role[]): (Ass
   const idxs = [body["assignment_idx[]"]].flat() as string[];
   return roles.flatMap((r, i) => {
     const role = allRoles.find((x) => x.id === r);
-    return role && froms[i] ? [{ from: froms[i], to: tos[i] || null, role, rowIdx: idxs[i] } as Assignment & { rowIdx?: string }] : [];
+    return role ? [{ from: froms[i] || null, to: tos[i] || null, role, rowIdx: idxs[i] } as Assignment & { rowIdx?: string }] : [];
   });
 }
 
@@ -1347,25 +1351,25 @@ function rowsFromBody(body: Record<string, any>, allRoles: Role[]): AssignmentRo
   const [ids, roleIds, froms, tos, notes, idxs] = ["id", "role", "from", "to", "note", "idx"].map(col);
   return roleIds.flatMap((roleId, i) => {
     const role = allRoles.find((r) => r.id === roleId);
-    return role && froms[i] ? [{ id: ids[i] ?? "", roleId, roleTitle: role.title, from: froms[i], to: tos[i] || null, note: notes[i] || null, idx: idxs[i] ?? String(i) }] : [];
+    return role ? [{ id: ids[i] ?? "", roleId, roleTitle: role.title, from: froms[i] || null, to: tos[i] || null, note: notes[i] || null, idx: idxs[i] ?? String(i) }] : [];
   });
 }
 
 // Gemeinsame Validierung (Neuanlage und Edit): Pflichtfelder, bis ≥ von, keine zwei offenen Zuweisungen derselben Funktion.
 function validateAssignment(
-  v: { id?: string; roleId: string; from: string; to?: string | null },
+  v: { id?: string; roleId: string; from?: string | null; to?: string | null },
   others: { id?: string; roleId: string; to?: string | null }[],
   roles: { id: string; title: string }[],
 ): string | undefined {
-  if (!v.roleId || !v.from) return t("members.error.assignmentIncomplete");
-  if (v.to && v.to < v.from) return t("members.error.assignmentRange");
+  if (!v.roleId) return t("members.error.assignmentIncomplete");
+  if (v.from && v.to && v.to < v.from) return t("members.error.assignmentRange");
   if (!v.to && others.some((o) => o.roleId === v.roleId && !o.to && (!v.id || o.id !== v.id))) {
     return t("members.error.duplicateRole", { role: roles.find((r) => r.id === v.roleId)?.title ?? v.roleId });
   }
 }
 
 function parseAssignmentForm(body: Record<string, any>) {
-  return { roleId: trimmed(body, "role"), from: trimmed(body, "from"), to: trimmed(body, "to") || null, note: normalizeNote(trimmed(body, "note")) };
+  return { roleId: trimmed(body, "role"), from: trimmed(body, "from") || null, to: trimmed(body, "to") || null, note: normalizeNote(trimmed(body, "note")) };
 }
 
 // Modal-Antwort nach Speichern: Tabelle (+ Badge im Edit) und je nach Button Modal schließen oder leeres Formular.
@@ -1458,7 +1462,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     const allRoles = await db.select().from(memberRoles);
     const planned = assignmentRoles.flatMap((r, i) => {
       const role = allRoles.find((x) => x.id === r);
-      return role && assignmentFroms[i] ? [{ from: assignmentFroms[i], to: assignmentTos[i] || null, role } as Assignment] : [];
+      return role ? [{ from: assignmentFroms[i] || null, to: assignmentTos[i] || null, role } as Assignment] : [];
     });
     const exitDate = (body.exitDate as string) || null;
     const deathDate = (body.deathDate as string) || null;
@@ -1579,7 +1583,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
       await tx.insert(memberRoleAssignments).values({
         memberId,
         memberRoleId: assignmentRoles[i],
-        from: assignmentFroms[i],
+        from: assignmentFroms[i] || null,
         to: assignmentTos[i] || null,
         note: normalizeNote(assignmentNotes[i]),
       });
@@ -1760,7 +1764,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         <Section title={t("members.view.activeFunctions")} open>
           <div class="flex flex-wrap gap-2">
             {openRoles.map((a) => (
-              <span class="badge badge-outline">{roleLabel(a.role.title, a.note)} {t("members.view.sinceDate", { date: formatDate(a.from) })}</span>
+              <span class="inline-flex items-center gap-1"><span class="badge badge-outline">{roleLabel(a.role.title, a.note)}{a.from ? ` ${t("members.view.sinceDate", { date: formatDate(a.from) })}` : ""}</span>{!a.from && <FromMissingBadge />}</span>
             ))}
           </div>
         </Section>
@@ -1983,7 +1987,7 @@ memberRoutes.get("/:id/assignments/:aid/edit", requireAuth("members:write"), asy
   const id = c.req.param("id");
   const a = (await fetchMember(id))?.assignments.find((x) => x.id === c.req.param("aid"));
   if (!a) return c.notFound();
-  return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments/${a.id}`} title={t("members.assignment.titleEdit")} values={{ roleId: a.memberRoleId, from: a.from, to: a.to ?? "", note: a.note ?? "" }} />);
+  return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments/${a.id}`} title={t("members.assignment.titleEdit")} values={{ roleId: a.memberRoleId, from: a.from ?? undefined, to: a.to ?? "", note: a.note ?? "" }} />);
 });
 
 async function saveAssignment(c: Context<{ Variables: Variables }>, aid?: string) {

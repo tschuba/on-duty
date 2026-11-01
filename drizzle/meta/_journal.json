@@ -470,6 +470,13 @@
       "when": 1794600000002,
       "tag": "0066_loan_request_message_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1794600000003,
+      "tag": "0067_assignment_from_nullable",
+      "breakpoints": true
     }
   ]
 }

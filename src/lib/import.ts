@@ -195,7 +195,7 @@ export type TitleDecision = { title: string; kind: "function" | "rank"; count: n
 const sameChoice = (a: RoleChoice, b: RoleChoice) => a.kind === b.kind && (a.kind !== "role" || a.roleId === (b as { roleId: string }).roleId);
 export type PlannedAssignment = {
   key: string; title: string; kind: "function" | "rank"; roleChoice: RoleChoice; grants: boolean;
-  from: string; note: string | null; assumed: boolean; skipped: boolean; suggested: boolean;
+  from: string | null; note: string | null; assumed: boolean; skipped: boolean; suggested: boolean;
 };
 export type MemberRowPlan = {
   m: ParsedMember; included: boolean; duplicate: boolean; errors: string[]; warnings: string[];
@@ -256,7 +256,7 @@ export function planMembers(
         const d = decision.get(title)!;
         if (d.ignored) return;
         const rankDate = kind === "rank" ? m.rankDate : null;
-        const defaultFrom = kind === "function" ? today : (rankDate ?? m.entryDate!);
+        const defaultFrom = kind === "function" ? null : (rankDate ?? m.entryDate!);
         const from = toIsoDate(str(body, `from_${m.mid}_${k}`)) ?? defaultFrom;
         const noteIn = str(body, `note_${m.mid}_${k}`);
         const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : suggestRole(title, roles).note;
@@ -266,19 +266,19 @@ export function planMembers(
         const skipped = posted && str(body, `ause_${m.mid}_${k}`) !== "1";
         const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : d.grants;
         if (!skipped && !m.active && grants && !(m.birthDate && ageInYears(m.birthDate) >= env.ACTIVE_AGE_LIMIT)) warnings.push(t("import.row.activeWarning", { title: title }));
-        // Angenommen: Funktionsbeginn (fwportal liefert keins), fehlendes Beförderungsdatum.
-        assignments.push({ key: String(k), title, kind, roleChoice, grants, from, note, assumed: !skipped && (kind === "function" || !rankDate), skipped, suggested: sameChoice(roleChoice, d.choice) });
+        // Angenommen: fehlendes Beförderungsdatum. Funktionen ohne Von bleiben leer (Warnung „Von fehlt“).
+        assignments.push({ key: String(k), title, kind, roleChoice, grants, from, note, assumed: !skipped && kind === "rank" && !rankDate, skipped, suggested: sameChoice(roleChoice, d.choice) });
       });
       // Basisrolle nur als Fallback, wenn keine (nicht ausgelassene) Zuweisung den aktiven Status vergibt. Wie jede andere Zuweisung pro Mitglied überschreibbar.
       if (m.active && !assignments.some((x) => !x.skipped && x.grants)) {
         const rolePick = str(body, `arole_${m.mid}_a`);
         const roleChoice: RoleChoice = !rolePick ? { kind: "role", roleId: ACTIVE_ROLE_ID } : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
         const skipped = posted && str(body, `ause_${m.mid}_a`) !== "1";
-        const from = toIsoDate(str(body, `from_${m.mid}_a`)) ?? m.entryDate!;
+        const from = toIsoDate(str(body, `from_${m.mid}_a`)) ?? m.firstEntryDate ?? m.entryDate!;
         const noteIn = str(body, `note_${m.mid}_a`);
         const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : null;
         const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : true;
-        assignments.unshift({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice, grants, from, note, assumed: false, skipped, suggested: sameChoice(roleChoice, { kind: "role", roleId: ACTIVE_ROLE_ID }) });
+        assignments.unshift({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice, grants, from, note, assumed: !skipped, skipped, suggested: sameChoice(roleChoice, { kind: "role", roleId: ACTIVE_ROLE_ID }) });
       }
     }
     return { m, included, duplicate, errors, warnings, assignments };
