@@ -1,0 +1,1 @@
+ALTER TABLE "loan_requests" ALTER COLUMN "message" DROP NOT NULL;

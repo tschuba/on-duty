@@ -369,7 +369,7 @@ lendRoutes.post("/:itemId", async (c) => {
       plannedTo: values.plannedTo,
       plannedFromTime: values.plannedFromTime || null,
       plannedToTime: values.plannedToTime || null,
-      message: values.message,
+      message: values.message || null,
       statusToken: token,
     }).returning({ id: loanRequests.id });
     requestId = req.id;
