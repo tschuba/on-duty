@@ -623,7 +623,7 @@ applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
     .where(eq(applications.id, id));
 
   if (notifyApplicant && app.person.email) {
-    await sendMail(app.person.email, t("applications.mail.rejectedSubject"), t("applications.mail.rejectedBody"));
+    await sendMail({ to: app.person.email, category: "membership", event: "application-rejected", audience: "applicant", subject: t("applications.mail.rejectedSubject"), text: t("applications.mail.rejectedBody") });
   }
 
   setFlash(c, t("applications.flash.rejected"), "success");

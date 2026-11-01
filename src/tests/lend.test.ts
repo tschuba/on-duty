@@ -170,7 +170,7 @@ describe("POST /lend/:itemId", () => {
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validBody()),
     });
-    expect(sendMail).toHaveBeenCalledWith("verwalter@example.com", expect.any(String), expect.any(String), { "X-On-Duty-Type": "lend-request" });
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "verwalter@example.com", category: "lend", event: "lend-notify", audience: "staff" }));
   });
 
   it("skips the manager mail when notificationEmail is unset", async () => {
@@ -181,7 +181,7 @@ describe("POST /lend/:itemId", () => {
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validBody()),
     });
-    expect(sendMail).not.toHaveBeenCalledWith("verwalter@example.com", expect.any(String), expect.any(String), expect.anything());
+    expect(sendMail).not.toHaveBeenCalledWith(expect.objectContaining({ to: "verwalter@example.com" }));
   });
 
   it("sends a submission confirmation to the applicant's email", async () => {
@@ -191,7 +191,7 @@ describe("POST /lend/:itemId", () => {
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validBody()),
     });
-    expect(sendMail).toHaveBeenCalledWith("max@example.com", expect.any(String), expect.any(String), { "X-On-Duty-Type": "lend-request" });
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@example.com", category: "lend", event: "lend-submitted", audience: "applicant" }));
   });
 
   it("skips the confirmation mail when no email was given", async () => {

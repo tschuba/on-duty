@@ -16,6 +16,8 @@ const DIR = "/zitadel/bootstrap";
 const ADMIN_DIR = "/zitadel/admin";
 const OUT = `${DIR}/oidc.env`;
 const WEBHOOK_SECRET_FILE = `${DIR}/webhook.secret`;
+// Kopie von src/lib/mail-label.ts — synchron halten.
+const mailLabel = (n) => (n ?? "").replace(/[|[\]\r\n]/g, " ").replace(/\s+/g, " ").trim() || "on-duty";
 const PHASE = process.argv[2] ?? "oidc";
 const PAT_FILE = `${ADMIN_DIR}/admin.pat`;
 const { ZITADEL_DOMAIN, APP_DOMAIN, LOGIN_DOMAIN, WEBHOOK_URL, OIDC_CLIENT_ID, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
@@ -260,6 +262,20 @@ if (PHASE === "oidc") {
     } catch (e) {
       console.warn("[zitadel-init] SMTP konnte nicht synchronisiert werden (optional):", e.message);
     }
+  }
+
+  // Einheitliches Betreff-Schema (docs/mails.md): Zitadel-Mails bekommen "[<ORG_NAME>|Benutzerkonto] " vorangestellt.
+  // Nur der Betreff wird gesetzt, übrige Texte bleiben wie sie sind; idempotent (altes Präfix wird ersetzt). Nur Deutsch.
+  try {
+    for (const type of ["init", "passwordreset", "verifyemail", "verifyphone", "domainclaim", "passwordchange", "inviteuser"]) {
+      const cur = (await api("GET", `/admin/v1/text/message/${type}/de`)).customText;
+      if (!cur?.subject) continue;
+      const subject = `[${mailLabel(process.env.ORG_NAME)}|Benutzerkonto] ${cur.subject.replace(/^\[[^\]|]*\|Benutzerkonto\]\s*/, "")}`;
+      if (subject !== cur.subject) await api("PUT", `/admin/v1/text/message/${type}/de`, { ...cur, subject });
+    }
+    console.log("[zitadel-init] Mail-Betreffs in Zitadel angeglichen.");
+  } catch (e) {
+    console.warn("[zitadel-init] Mail-Betreffs konnten nicht angeglichen werden (optional):", e.message);
   }
 
   // The login UI v2 base URL is an instance default seeded on first start; it does not follow the env afterwards.

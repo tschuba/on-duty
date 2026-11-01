@@ -66,7 +66,7 @@ describe("registration", () => {
     results.push([], [{ email: "a@x.de" }, { email: "local@admin.invalid" }]);
     await onUserRegistered({ id: "u", name: "N", email: "n@x.de" });
     expect(sendMail).toHaveBeenCalledTimes(1);
-    expect(sendMail.mock.calls[0][0]).toBe("a@x.de");
+    expect(sendMail.mock.calls[0][0]).toMatchObject({ to: "a@x.de", category: "registration", audience: "staff" });
   });
   it("countPendingUsers", async () => {
     results.push([{ email: "a@x.de", disabled: false, emailVerified: true, lastLoginAt: new Date(), roleId: null }]);

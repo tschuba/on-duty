@@ -38,11 +38,14 @@ export async function onUserRegistered(user: { id: string; name: string; email: 
   const recipients = admins.map((a) => a.email).filter((e) => !e.endsWith(".invalid"));
   await Promise.all(
     recipients.map((to) =>
-      sendMail(
+      sendMail({
         to,
-        "on-duty: neue Registrierung wartet auf Freigabe",
-        `${user.name} (${user.email}) hat sich registriert und wartet auf Freigabe.\n\n${env.OIDC_APP_URL}/admin/users`,
-      ),
+        category: "registration",
+        event: "registration-pending",
+        audience: "staff",
+        subject: "Neue Registrierung wartet auf Freigabe",
+        text: `${user.name} (${user.email}) hat sich registriert und wartet auf Freigabe.\n\n${env.OIDC_APP_URL}/admin/users`,
+      }),
     ),
   );
 }

@@ -255,12 +255,14 @@ async function notifySubmission(name: string) {
   const config = await loadOrgConfig();
   const to = notificationRecipient(config);
   if (!to) return;
-  await sendMail(
+  await sendMail({
     to,
-    t("applications.mail.submitNotifySubject", { name }),
-    `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
-    { "X-On-Duty-Type": "membership-application" },
-  );
+    category: "membership",
+    event: "application-submitted",
+    audience: "staff",
+    subject: t("applications.mail.submitNotifySubject", { name }),
+    text: `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
+  });
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────────
