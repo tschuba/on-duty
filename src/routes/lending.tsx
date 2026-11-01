@@ -388,6 +388,7 @@ function BorrowerPickerFields({ personId, values, errors }: {
       </div>
       <input type="hidden" id="borrower-personId" name="borrowerPersonId" value={personId ?? ""} />
       <div id="borrower-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
+        <p class="text-sm opacity-70">{t("lending.loans.form.borrowerHint")}</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {field("lastName", t("members.form.lastName"))}
           {field("firstName", t("members.form.firstName"))}
