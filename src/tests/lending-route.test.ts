@@ -296,7 +296,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer" }),
     });
     expect(res.status).toBe(404);
   });
@@ -318,7 +318,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
@@ -330,7 +330,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table === lendingLoans)?.values).toMatchObject({ lendingItemId: "li1", quantity: 1, borrowerPersonId: "new-id" });
@@ -342,7 +342,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", quantity: "2", plannedFrom: "2026-01-05", plannedTo: "2026-01-06" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", quantity: "2", plannedFrom: "2026-01-05", plannedTo: "2026-01-06" }),
     });
     expect(res.status).toBe(422);
   });
@@ -353,7 +353,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", quantity: "5" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", quantity: "5" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.find((c) => c.table === lendingLoans)).toBeUndefined();
@@ -391,7 +391,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Extern", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Extern", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table !== lendingLoans)?.values).toMatchObject({ lastName: "Extern", phone: "0171 1", email: null });
@@ -403,7 +403,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "X", phone: "1", plannedFrom: "2026-01-05", plannedTo: "2026-01-06", returnedAt: "2026-01-06" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "X", phone: "1", plannedFrom: "2026-01-05", plannedTo: "2026-01-06", returnedAt: "2026-01-06" }),
     });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain('<p class="text-error text-sm" role="alert">Rückgabe ohne Abholdatum nicht möglich.</p>');
@@ -414,7 +414,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "X", phone: "1", plannedFrom: "2026-01-10", plannedTo: "2026-01-05" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "X", phone: "1", plannedFrom: "2026-01-10", plannedTo: "2026-01-05" }),
     });
     expect(res.status).toBe(422);
     expect(await res.text()).toContain("liegt vor");
@@ -426,7 +426,7 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     const send = (fields: Record<string, string>) => lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "X", phone: "1", ...fields }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "X", phone: "1", ...fields }),
     });
     expect((await send({})).status).toBe(422);
     expect((await send({ plannedTo: "2026-01-05", pickedUpAt: "2026-01-01" })).status).toBe(422);
@@ -435,19 +435,20 @@ describe("POST /inventory/lending/loans (item given as field)", () => {
     expect((await send({ plannedFrom: "2026-01-05", plannedTo: "2026-01-06" })).status).toBe(302);
   });
 
-  it("requires email or phone for a new person, but not for an existing one", async () => {
+  it("requires organization or full name; contact is optional", async () => {
     lendingItemsFindFirstResult = makeLendingItem();
     const send = (fields: Record<string, string>) => lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formBody({ lendingItemId: "li1", plannedFrom: "2026-01-05", plannedTo: "2026-01-06", ...fields }),
     });
-    const res = await send({ lastName: "Neu" });
-    expect(res.status).toBe(422);
-    expect(await res.text()).toContain("E-Mail oder Telefon angeben.");
+    expect((await send({ lastName: "Neu" })).status).toBe(422);
+    expect((await send({ firstName: "Neu" })).status).toBe(422);
+    expect((await send({})).status).toBe(422);
     expect(insertCalls.length).toBe(0);
-    expect((await send({ lastName: "Neu", email: "a@b.de" })).status).toBe(302);
-    expect((await send({ borrowerPersonId: "p1", lastName: "Alt" })).status).toBe(302);
+    expect((await send({ firstName: "A", lastName: "Neu" })).status).toBe(302);
+    expect((await send({ companyName: "FF Beispiel" })).status).toBe(302);
+    expect((await send({ borrowerPersonId: "p1", firstName: "A", lastName: "Alt" })).status).toBe(302);
   });
 
   it("requires a last name once a person is being entered", async () => {
@@ -512,7 +513,7 @@ describe("POST /inventory/lending/loans", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lastName: "Externer" }),
+      body: formBody({ firstName: "Er", lastName: "Externer" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
@@ -523,7 +524,7 @@ describe("POST /inventory/lending/loans", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/inventory/lending?item=li1&start=&end=");
@@ -536,7 +537,7 @@ describe("POST /inventory/lending/loans", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-15" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
@@ -547,7 +548,7 @@ describe("POST /inventory/lending/loans", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "08:00", plannedToTime: "12:00" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "08:00", plannedToTime: "12:00" }),
     });
     expect(res.status).toBe(302);
     expect(insertCalls.find((c) => c.table === lendingLoans)?.values).toMatchObject({ plannedFromTime: "08:00", plannedToTime: "12:00" });
@@ -558,7 +559,7 @@ describe("POST /inventory/lending/loans", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "08:00" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "08:00" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);
@@ -569,7 +570,7 @@ describe("POST /inventory/lending/loans", () => {
     const res = await lendingRoutes.request("/loans", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formBody({ lendingItemId: "li1", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "12:00", plannedToTime: "08:00" }),
+      body: formBody({ lendingItemId: "li1", firstName: "Er", lastName: "Externer", phone: "0171 1", plannedFrom: "2026-01-05", plannedTo: "2026-01-05", plannedFromTime: "12:00", plannedToTime: "08:00" }),
     });
     expect(res.status).toBe(422);
     expect(insertCalls.length).toBe(0);

@@ -124,8 +124,11 @@ function BorrowerContact({ person, inline }: { person: { email: string | null; p
   return inline ? links : <div class="text-sm opacity-60">{links}</div>;
 }
 
-function personName(p: { firstName: string; lastName: string }): string {
-  return `${p.firstName} ${p.lastName}`.trim();
+// Name, Organisation oder "Name (Organisation)"; reine Organisation bleibt lesbar.
+function personName(p: { firstName: string; lastName: string; companyName?: string | null }): string {
+  const name = `${p.firstName} ${p.lastName}`.trim();
+  if (!p.companyName) return name;
+  return name ? `${name} (${p.companyName})` : p.companyName;
 }
 
 function borrowerLabel(l: LoanWithBorrower): string {
@@ -340,7 +343,7 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
 // Wie DonorPickerFields: Suche über Personen (Mitglieder und frühere Ausleiher),
 // Treffer oder "neu erfassen" öffnen dieselben editierbaren Felder; Kontaktdaten
 // werden so an der Person ergänzt oder korrigiert.
-type BorrowerValues = Partial<Record<"firstName" | "lastName" | "email" | "phone", string>>;
+type BorrowerValues = Partial<Record<"firstName" | "lastName" | "companyName" | "email" | "phone", string>>;
 
 function BorrowerPickerFields({ personId, values, errors }: {
   personId?: string;
@@ -386,20 +389,20 @@ function BorrowerPickerFields({ personId, values, errors }: {
       <input type="hidden" id="borrower-personId" name="borrowerPersonId" value={personId ?? ""} />
       <div id="borrower-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {field("lastName", t("members.form.lastName"), "text", true)}
+          {field("lastName", t("members.form.lastName"))}
           {field("firstName", t("members.form.firstName"))}
         </div>
+        {field("companyName", t("lend.form.organization"))}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {field("email", t("members.form.email"), "email")}
           {field("phone", t("members.form.phone"), "tel")}
         </div>
-        {errors?.contact && <p class="text-error text-sm" role="alert">{errors.contact}</p>}
         <button type="button" class="btn btn-ghost borrower-change-selection">{t("lending.loans.form.borrowerChangeSelection")}</button>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
         if (!window.__borrowerPickerBound) {
           window.__borrowerPickerBound = true;
-          var fields = ['firstName', 'lastName', 'email', 'phone'];
+          var fields = ['firstName', 'lastName', 'companyName', 'email', 'phone'];
           var $ = function(id) { return document.getElementById(id); };
           var fill = function(d) {
             $('borrower-personId').value = d.id || '';
@@ -410,7 +413,7 @@ function BorrowerPickerFields({ personId, values, errors }: {
           document.body.addEventListener('click', function(e) {
             var resEl = e.target.closest('.borrower-result');
             if (resEl) { fill(resEl.dataset); return; }
-            if (e.target.closest('.borrower-create-new')) { fill({}); $('borrower-lastName').focus(); return; }
+            if (e.target.closest('.borrower-create-new')) { fill({}); $('borrower-companyName').focus(); return; }
             if (e.target.closest('.borrower-change-selection')) {
               $('borrower-personId').value = '';
               $('borrower-fields').classList.add('hidden');
@@ -542,6 +545,7 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
   const person = {
     firstName: trimmed(body, "firstName"),
     lastName: trimmed(body, "lastName"),
+    companyName: trimmed(body, "companyName"),
     email: trimmed(body, "email"),
     phone: trimmed(body, "phone"),
   };
@@ -556,11 +560,13 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
 
   const errors: Record<string, string> = {};
   if (!item) errors.item = t("lending.loans.error.itemRequired");
-  const hasPerson = Boolean(borrowerPersonId || person.lastName || person.firstName);
+  // Organisation oder Name; ein Name braucht immer Vor- und Nachname. Kontakt ist optional.
+  const hasPerson = Boolean(borrowerPersonId || person.companyName || person.lastName || person.firstName);
   if (!hasPerson) errors.borrower = t("lending.loans.error.borrowerRequired");
-  else if (!person.lastName) errors.lastName = t("common.required");
-  // Neue Person: ohne Kontakt ist der Ausleiher nicht erreichbar. Bestehende (z.B. Mitglieder) bleiben ausgenommen.
-  if (hasPerson && !borrowerPersonId && !person.email && !person.phone) errors.contact = t("lending.loans.error.contactRequired");
+  else if (person.firstName || person.lastName) {
+    if (!person.lastName) errors.lastName = t("common.required");
+    if (!person.firstName) errors.firstName = t("common.required");
+  }
   if (item && !item.individualTracking && (!Number.isInteger(quantity) || quantity < 1)) errors.quantity = t("lending.loans.error.invalidQuantity");
   if (!plannedFrom) errors.plannedFrom = t("common.required");
   if (!plannedTo) errors.plannedTo = t("common.required");
@@ -594,7 +600,7 @@ async function createLoan(c: Context<{ Variables: Variables }>, itemId: string) 
   await db.transaction(async (tx) => {
     // Gewählte Person: Kontakt/Name wie im Spender-Formular direkt an der Person korrigieren.
     let personId = borrowerPersonId;
-    const columns = { firstName: person.firstName, lastName: person.lastName, email: person.email || null, phone: person.phone || null };
+    const columns = { firstName: person.firstName, lastName: person.lastName, companyName: person.companyName || null, email: person.email || null, phone: person.phone || null };
     if (personId) await tx.update(persons).set(columns).where(eq(persons.id, personId));
     else [{ id: personId }] = await tx.insert(persons).values(columns).returning({ id: persons.id });
     await tx.insert(lendingLoans).values({
@@ -622,10 +628,10 @@ lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) =>
 
   const needle = `%${q}%`;
   const results = await db
-    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, phone: persons.phone })
+    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, phone: persons.phone, companyName: persons.companyName })
     .from(persons)
     .where(and(
-      or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)),
+      or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(persons.companyName, needle)),
       or(
         exists(db.select({ x: members.id }).from(members).where(eq(members.personId, persons.id))),
         exists(db.select({ x: lendingLoans.id }).from(lendingLoans).where(eq(lendingLoans.borrowerPersonId, persons.id))),
@@ -656,6 +662,7 @@ lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) =>
           data-id={p.id}
           data-first-name={p.firstName}
           data-last-name={p.lastName}
+          data-company-name={p.companyName ?? ""}
           data-email={p.email ?? ""}
           data-phone={p.phone ?? ""}
         >

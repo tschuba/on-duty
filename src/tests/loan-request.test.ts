@@ -3,7 +3,7 @@ import { parseRequestValues, validateRequest } from "../lib/loan-request.js";
 
 const now = new Date(2026, 5, 10, 12, 0);
 const rules = { individualTracking: true, timesRequired: false, maxQuantity: 1 };
-const ok = { firstName: "A", lastName: "B", email: "a@b.de", plannedFrom: "2026-06-12", plannedTo: "2026-06-13", message: "hi" };
+const ok = { firstName: "A", lastName: "B", organization: "FF", email: "a@b.de", plannedFrom: "2026-06-12", plannedTo: "2026-06-13", message: "hi" };
 const run = (o: Record<string, string> = {}, r = rules) => validateRequest(parseRequestValues({ ...ok, ...o }), r, now);
 
 describe("validateRequest", () => {
@@ -11,6 +11,10 @@ describe("validateRequest", () => {
   it("requires message, names and contact", () => {
     const e = run({ message: "", firstName: "", lastName: "", email: "" }).errors;
     expect(Object.keys(e).sort()).toEqual(["contact", "firstName", "lastName", "message"]);
+  });
+  it("accepts private instead of organization", () => {
+    expect(run({ organization: "", isPrivate: "1" }).errors).toEqual({});
+    expect(run({ organization: "" }).errors.organization).toBeTruthy();
   });
   it("rejects bad email/phone", () => {
     expect(run({ email: "x" }).errors.contact).toBeDefined();

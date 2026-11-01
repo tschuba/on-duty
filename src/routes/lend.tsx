@@ -49,6 +49,14 @@ function RequestForm({ item, values, errors, maxQuantity }: {
           <input type="text" name="lastName" value={values.lastName} class={`input w-full${errors.lastName ? " input-error" : ""}`} />
         </Field>
       </div>
+      <Field label={t("lend.form.organization")} required>
+        <input type="text" id="lend-organization" name="organization" value={values.organization} class={`input w-full${errors.organization ? " input-error" : ""}`} disabled={values.isPrivate} />
+      </Field>
+      <label class="label cursor-pointer justify-start gap-2">
+        <input type="checkbox" name="isPrivate" value="1" class="checkbox" checked={values.isPrivate}
+          onchange="var o=document.getElementById('lend-organization');o.disabled=this.checked;if(this.checked)o.value=''" />
+        <span>{t("lend.form.private")}</span>
+      </label>
       <p class="text-sm opacity-70">{t("lend.form.contactHint")}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <EmailInput name="email" placeholder={t("apply.form.email")} value={values.email} error={!!errors.contact} />
@@ -269,7 +277,7 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 async function emptyValues(): Promise<RequestValues> {
-  return { firstName: "", lastName: "", email: "", phone: "", plannedFrom: "", plannedTo: "", plannedFromTime: "", plannedToTime: "", quantity: "1", message: "" };
+  return { firstName: "", lastName: "", email: "", phone: "", organization: "", isPrivate: false, plannedFrom: "", plannedTo: "", plannedFromTime: "", plannedToTime: "", quantity: "1", message: "" };
 }
 
 function maxQuantityFor(item: NonNullable<Awaited<ReturnType<typeof fetchRequestableItem>>>): number {
@@ -351,6 +359,7 @@ lendRoutes.post("/:itemId", async (c) => {
     const [person] = await tx.insert(persons).values({
       firstName: values.firstName, lastName: values.lastName,
       email: values.email || null, phone: values.phone || null,
+      companyName: values.isPrivate ? "Privat" : values.organization,
     }).returning({ id: persons.id });
     const [req] = await tx.insert(loanRequests).values({
       lendingItemId: item.id,

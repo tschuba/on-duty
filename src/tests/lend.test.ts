@@ -56,7 +56,7 @@ function requestableItem(overrides: Record<string, any> = {}) {
 
 function validBody(overrides: Record<string, string> = {}) {
   return {
-    firstName: "Max", lastName: "Muster", email: "max@example.com",
+    firstName: "Max", lastName: "Muster", organization: "FF Beispiel", email: "max@example.com",
     plannedFrom: FUTURE_FROM, plannedTo: FUTURE_TO, message: "Brauche den Anhänger.",
     ...overrides,
   };
