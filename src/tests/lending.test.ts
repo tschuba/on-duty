@@ -134,9 +134,9 @@ import { matchCandidates } from "../lib/lending.js";
 
 describe("matchCandidates", () => {
   const pool = [
-    { id: "p1", firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null },
-    { id: "p2", firstName: "Max", lastName: "Muster", email: "other@example.com", phone: "0928112345" },
-    { id: "p3", firstName: "Anna", lastName: "Muster", email: null, phone: null },
+    { id: "p1", firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null, mobile: null, companyName: null, isMember: false },
+    { id: "p2", firstName: "Max", lastName: "Muster", email: "other@example.com", phone: "0928112345", mobile: null, companyName: null, isMember: false },
+    { id: "p3", firstName: "Anna", lastName: "Muster", email: null, phone: null, mobile: null, companyName: null, isMember: false },
   ];
   const request = { firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null };
 
@@ -154,5 +154,14 @@ describe("matchCandidates", () => {
 
   it("returns nothing for no overlap", () => {
     expect(matchCandidates({ firstName: "Nobody", lastName: "Here", email: null, phone: null }, pool)).toEqual([]);
+  });
+
+  it("dedupes multiple pool rows of the same person, preferring the member row", () => {
+    const dupePool = [
+      { id: "r1", firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null, mobile: null, companyName: "Privat", isMember: false },
+      { id: "r2", firstName: "Max", lastName: "Muster", email: "max@example.com", phone: null, mobile: null, companyName: null, isMember: true },
+    ];
+    const result = matchCandidates(request, dupePool);
+    expect(result).toEqual([{ ...dupePool[1], strength: "strong" }]);
   });
 });

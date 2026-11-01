@@ -202,11 +202,23 @@ export function checkAvailability(
   return { conflict: used + candidate.quantity > item.stock };
 }
 
-export type CandidatePerson = { id: string; firstName: string; lastName: string; email: string | null; phone: string | null };
+export type CandidatePerson = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  companyName: string | null;
+  isMember: boolean;
+};
 
 // Kandidaten für die Personenzuordnung beim Genehmigen (Mitglied oder früherer
 // Entleiher): stark = gleiche E-Mail oder normalisierte Telefonnummer, sonst
 // schwach = gleicher Vor-/Nachname (case-insensitiv). Starke vor schwachen Treffern.
+// Mehrere Pool-Zeilen derselben realen Person (z. B. Mitglied + früherer
+// Entleiher-Datensatz mit gleicher E-Mail/Telefon) werden zu einem Kandidaten
+// zusammengefasst; Mitglied gewinnt, sonst die erste Zeile.
 export function matchCandidates(
   request: { firstName: string; lastName: string; email: string | null; phone: string | null },
   pool: CandidatePerson[],
@@ -216,5 +228,19 @@ export function matchCandidates(
   const name = (p: CandidatePerson) => p.firstName.toLowerCase() === request.firstName.toLowerCase() && p.lastName.toLowerCase() === request.lastName.toLowerCase();
   const strong = pool.filter((p) => (email && p.email?.toLowerCase() === email) || (phone && p.phone && normalizePhone(p.phone) === phone));
   const weak = pool.filter((p) => !strong.includes(p) && name(p));
-  return [...strong.map((p) => ({ ...p, strength: "strong" as const })), ...weak.map((p) => ({ ...p, strength: "weak" as const }))];
+  const matches = [...strong.map((p) => ({ ...p, strength: "strong" as const })), ...weak.map((p) => ({ ...p, strength: "weak" as const }))];
+
+  const dedupeKey = (p: CandidatePerson) => {
+    const normPhone = p.phone ? normalizePhone(p.phone) : null;
+    if (p.email) return `email:${p.email.toLowerCase()}`;
+    if (normPhone) return `phone:${normPhone}`;
+    return `name:${p.firstName.toLowerCase()}:${p.lastName.toLowerCase()}:${p.companyName?.toLowerCase() ?? ""}`;
+  };
+  const byKey = new Map<string, (typeof matches)[number]>();
+  for (const m of matches) {
+    const key = dedupeKey(m);
+    const existing = byKey.get(key);
+    if (!existing || (m.isMember && !existing.isMember)) byKey.set(key, m);
+  }
+  return [...byKey.values()];
 }
