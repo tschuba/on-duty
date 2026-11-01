@@ -99,7 +99,7 @@ describe("members", () => {
     const plan = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
     const a = plan.rows[0].assignments;
     expect(a.map((x) => x.title)).toEqual(["1. Kommandant", "Löschmeister"]); // Löschmeister grants → no base role
-    expect(a[0]).toMatchObject({ note: "1.", from: "2026-01-01", assumed: true });
+    expect(a[0]).toMatchObject({ note: "1.", from: null, assumed: false });
     expect(a[1].assumed).toBe(true); // no Datum Beförderung → from = Eintritt, flagged
     expect(plan.rows[2].assignments.map((x) => x.title)).toEqual(["Feuerwehr-Anwärter"]); // active, nothing else → base role
     expect(plan.rows[1].assignments).toEqual([]); // passive: no role
@@ -153,7 +153,7 @@ describe("per-assignment overrides", () => {
     expect(planMembers(rows, roles, new Set(), { ...base, arole_5_0: "new" }, "2026-01-01").rows[0].assignments[1].roleChoice).toEqual({ kind: "new" });
     const skipped = planMembers(rows, roles, new Set(), { _seen: "1", inc: ["5"], use_0: "1", ause_5_a: "1" }, "2026-01-01");
     expect(skipped.rows[0].assignments[1].skipped).toBe(true);
-    expect(skipped.assumedCount).toBe(0);
+    expect(skipped.assumedCount).toBe(1); // only the Basisrolle (Eintrittsdatum) is assumed
   });
 });
 

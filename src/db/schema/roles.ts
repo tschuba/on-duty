@@ -30,7 +30,7 @@ export const memberRoleAssignments = pgTable("member_role_assignments", {
   memberRoleId: uuid("member_role_id")
     .notNull()
     .references(() => memberRoles.id),
-  from: date("from").notNull(),
+  from: date("from"),
   to: date("to"),
   autoClosed: boolean("auto_closed").notNull().default(false),
   note: text("note"),

@@ -629,6 +629,17 @@ describe("firstEntryDate", () => {
   });
 });
 
+describe("assignment without from-date", () => {
+  it("shows the warning badge in the detail view instead of 'seit'", async () => {
+    currentUser = { id: "u1", permissions: new Set(), disabled: false };
+    findFirstResult = memberWithAssignments({}, [makeAssignment({ from: null })]);
+    const html = await (await memberRoutes.request("/m1")).text();
+    expect(html).toContain("Von fehlt");
+    findFirstResult = memberWithAssignments({}, [makeAssignment({ from: "2010-01-01" })]);
+    expect(await (await memberRoutes.request("/m1")).text()).not.toContain("Von fehlt");
+  });
+});
+
 describe("POST /new", () => {
   it("re-renders the form with 422 when required fields are missing", async () => {
     const res = await memberRoutes.request("/new", { method: "POST", body: formBody({ lastName: "" }) });
@@ -636,7 +647,7 @@ describe("POST /new", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("rejects a role assignment missing its from-date", async () => {
+  it("accepts a role assignment without from-date (shown with a warning)", async () => {
     const res = await memberRoutes.request("/new", {
       method: "POST",
       body: formBody({
@@ -644,8 +655,8 @@ describe("POST /new", () => {
         "assignment_role[]": roleAktiv.id, "assignment_from[]": "", "assignment_to[]": "",
       }),
     });
-    expect(res.status).toBe(422);
-    expect(insert).not.toHaveBeenCalled();
+    expect(res.status).not.toBe(422);
+    expect(insert).toHaveBeenCalled();
   });
 
   it("rejects a role assignment missing its role", async () => {
