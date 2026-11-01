@@ -538,8 +538,6 @@ function FieldConfigurator({ formId, values, canConfigure }: { formId: string; v
         </div>
         {canConfigure && (
           <div class="mt-2 flex flex-col">
-            <a href="/inventory/inspection-templates" target="_blank" rel="noopener" class="btn btn-ghost justify-start min-h-11">{t("inventory.tabs.inspectionTemplates")}</a>
-            <a href="/inventory/templates" target="_blank" rel="noopener" class="btn btn-ghost justify-start min-h-11">{t("inventory.tabs.itemTemplates")}</a>
             <a href="/inventory/fields" target="_blank" rel="noopener" class="btn btn-ghost justify-start gap-2 min-h-11"><Icon name="cog-6-tooth" class="h-5 w-5" />{t("inventory.form.manageFields")}</a>
           </div>
         )}
