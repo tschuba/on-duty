@@ -32,11 +32,11 @@ publicApiRoutes.use("*", async (c, next) => {
 
 publicApiRoutes.get("/stats", async (c) => {
   const rows = await db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } });
-  const members = { active: 0, youth: 0, children: 0 };
+  const members = { active: 0, youth: 0, children: 0, supporting: 0 };
   for (const { person, ...m } of rows) {
     const member = { ...person, ...m } as unknown as Args[0];
     const status = deriveMemberStatus(member, m.assignments as unknown as Args[1], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
-    if (status === "active" || status === "youth" || status === "children") members[status]++;
+    if (status === "active" || status === "youth" || status === "children" || status === "supporting") members[status]++;
   }
   return c.json({ members });
 });
