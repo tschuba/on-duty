@@ -21,6 +21,7 @@ describe("public api", () => {
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=300");
     const { members } = await res.json();
     expect(members.active + members.youth + members.children).toBe(3);
+    expect(members.supporting).toBe(0);
   });
 
   it("rejects invalid limit", async () => {
