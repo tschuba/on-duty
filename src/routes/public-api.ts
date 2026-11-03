@@ -26,7 +26,7 @@ publicApiRoutes.use("*", async (c, next) => {
   const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (publicApiRateLimited(ip)) return c.json({ error: "rate_limited" }, 429);
   await next();
-  c.header("Cache-Control", "public, max-age=300");
+  if (c.res.ok) c.header("Cache-Control", "public, max-age=300");
 });
 
 publicApiRoutes.get("/stats", async (c) => {
@@ -54,4 +54,4 @@ publicApiRoutes.get("/events", async (c) => {
   return c.json({ events: rows });
 });
 
-publicApiRoutes.notFound((c) => c.json({ error: "not_found" }, 404));
+publicApiRoutes.all("*", (c) => c.json({ error: "not_found" }, 404));
