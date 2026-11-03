@@ -1,8 +1,9 @@
 import { Hono } from "hono";
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, gte } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events } from "../db/schema/index.js";
 import { env } from "../env.js";
+import { visibilityCondition } from "../lib/events.js";
 import { deriveMemberStatus } from "../lib/status.js";
 type Args = Parameters<typeof deriveMemberStatus>;
 
@@ -47,7 +48,7 @@ publicApiRoutes.get("/events", async (c) => {
   const rows = await db
     .select({ id: events.id, title: events.title, startsAt: events.startsAt, endsAt: events.endsAt, allDay: events.allDay, location: events.location, description: events.description })
     .from(events)
-    .where(and(eq(events.visibility, "public"), gte(events.endsAt, new Date())))
+    .where(and(visibilityCondition(undefined), gte(events.endsAt, new Date())))
     .orderBy(asc(events.startsAt))
     .limit(limit);
   // Date → ISO-8601 (UTC "Z") via JSON serialization.
