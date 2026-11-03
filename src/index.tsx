@@ -36,6 +36,7 @@ import { sentryTunnelRoutes } from "./routes/sentry-tunnel.js";
 import { readDsn } from "./lib/sentry.js";
 import { healthRoutes } from "./routes/health.js";
 import { pwaRoutes } from "./routes/pwa.js";
+import { publicApiRoutes } from "./routes/public-api.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
@@ -51,6 +52,7 @@ app.use("*", requestLog());
 
 app.route("/", healthRoutes);
 app.route("/", pwaRoutes);
+app.route("/api/public/v1", publicApiRoutes);
 
 // Static assets
 app.use("/css/*", serveStatic({ root: "./public" }));
