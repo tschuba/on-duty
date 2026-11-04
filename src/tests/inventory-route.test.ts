@@ -462,6 +462,55 @@ describe("lendable flag on POST /:id", () => {
   });
 });
 
+describe("GET /map", () => {
+  const located = (o: Record<string, unknown> = {}) => makeItem({ latitude: "49.5", longitude: "11.2", ...o });
+  const markersOf = (html: string) => JSON.parse(html.match(/data-markers="([^"]*)"/)![1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'"));
+
+  it("renders markers with popup, status and icon", async () => {
+    itemsFindManyResult = [located({
+      id: "a", name: "Pumpe", locationText: "Halle 1", tags: [{ tag: "Fahrzeug" }, { tag: "Halle 2" }],
+      numbers: [{ number: "N1" }, { number: "N2" }],
+      inspections: [
+        { id: "i1", name: "Jahresprüfung", dueDate: "2000-01-01" },
+        { id: "i2", name: "Sichtprüfung", dueDate: "2999-01-01" },
+        { id: "i3", name: "Erledigt", dueDate: null },
+      ],
+    })];
+    const html = await (await inventoryRoutes.request("/map")).text();
+    const [m] = markersOf(html);
+    expect(m).toMatchObject({ id: "a", name: "Pumpe", lat: 49.5, lng: 11.2, status: "overdue" });
+    expect(m.icon).toContain("<svg");
+    expect(m.popup).toContain('href="/inventory/a"');
+    expect(m.popup).toContain("Halle 1");
+    expect(m.popup).toContain("N1 +1");
+    expect(m.popup).toContain("Jahresprüfung");
+    expect(m.popup).toContain("badge-error");
+    expect(html).not.toContain("inventory.map.");
+  });
+
+  it("shows no-inspection popup, falls back to the neutral pin and omits optional rows", async () => {
+    itemsFindManyResult = [located({ id: "b", name: "Helm" })];
+    const [m] = markersOf(await (await inventoryRoutes.request("/map")).text());
+    expect(m.status).toBe("none");
+    expect(m.popup).toContain("badge-ghost");
+    expect(m.popup).not.toContain("text-sm\">");
+  });
+
+  it("links to the list for items without coordinates and keeps the tag filter", async () => {
+    itemsFindManyResult = [located({ id: "a", tags: [{ tag: "Fahrzeug" }] }), makeItem({ id: "c", name: "Ohne", enabledFields: ["location"], tags: [{ tag: "Fahrzeug" }] })];
+    const html = await (await inventoryRoutes.request("/map?tag=Fahrzeug")).text();
+    expect(markersOf(html)).toHaveLength(1);
+    expect(html).toMatch(/href="\/inventory\?[^"]*nocoords=1/);
+    expect(html).toMatch(/href="\/inventory\?[^"]*tag=Fahrzeug/);
+  });
+
+  it("hides the no-coordinates notice when every item has coordinates", async () => {
+    itemsFindManyResult = [located()];
+    const html = await (await inventoryRoutes.request("/map")).text();
+    expect(html).not.toContain("nocoords=1");
+  });
+});
+
 describe("GET /:id/edit lendable checkbox", () => {
   it("is editable for lending:manage and read-only (disabled) otherwise", async () => {
     itemsFindFirstResult = makeItem();
