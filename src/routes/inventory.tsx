@@ -1974,7 +1974,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
                   <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={coords} onclick="navigator.clipboard.writeText(this.dataset.url)">
                     <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
                   </button>
-                  <div class="dropdown">
+                  <div class="dropdown dropdown-end">
                     <div tabindex={0} role="button" class="btn btn-ghost btn-sm min-h-11">{t("inventory.location.openIn")} <Icon name="chevron-down" class="h-4 w-4" /></div>
                     <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
                       <li><a href={`geo:${item.latitude},${item.longitude}`}>{t("inventory.location.navigate")}</a></li>
