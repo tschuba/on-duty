@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dueStatus, earliestDueStatus, worstDueStatus, dueText, diffInspections, generateInspectionDueItems, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows } from "../lib/inventory.js";
+import { matchesTagFilter, splitByCoordinates, dueStatus, earliestDueStatus, worstDueStatus, dueText, diffInspections, generateInspectionDueItems, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows } from "../lib/inventory.js";
 
 describe("generateInspectionDueItems", () => {
   const item = (id: string, name: string, inspections: { id: string; name: string; dueDate: string | null }[], retiredAt: string | null = null) => ({ id, name, retiredAt, inspections });
@@ -172,5 +172,35 @@ describe("Marker-Farblogik", () => {
     expect(dueText("2026-05-31", today)).toBe("überfällig seit 1 Tag");
     expect(dueText(today, today)).toBe("heute fällig (01.06.2026)");
     expect(dueText(null, today)).toBe("keine Frist");
+  });
+});
+
+describe("matchesTagFilter", () => {
+  const tags = [{ tag: "Hydrant" }, { tag: "Gerät" }];
+  it("ohne Filter passt alles, sonst ODER", () => {
+    expect(matchesTagFilter(tags, [])).toBe(true);
+    expect(matchesTagFilter(tags, ["Fahrzeug", "Hydrant"])).toBe(true);
+    expect(matchesTagFilter(tags, ["Fahrzeug"])).toBe(false);
+  });
+});
+
+describe("splitByCoordinates", () => {
+  const base = { retiredAt: null, tags: [{ tag: "Hydrant" }], enabledFields: ["location"], latitude: "48.1", longitude: "11.5" };
+  const items = [
+    { id: "a", ...base },
+    { id: "b", ...base, latitude: null, longitude: null },
+    { id: "c", ...base, enabledFields: [], latitude: null, longitude: null },
+    { id: "d", ...base, retiredAt: new Date() },
+    { id: "e", ...base, tags: [{ tag: "Gerät" }], latitude: null },
+  ];
+  it("zählt nur aktive Posten mit Ort-Feld ohne Koordinaten", () => {
+    const r = splitByCoordinates(items, []);
+    expect(r.located.map((i) => i.id)).toEqual(["a"]);
+    expect(r.missing).toBe(2);
+  });
+  it("wendet den Tag-Filter an", () => {
+    const r = splitByCoordinates(items, ["Hydrant"]);
+    expect(r.located.map((i) => i.id)).toEqual(["a"]);
+    expect(r.missing).toBe(1);
   });
 });

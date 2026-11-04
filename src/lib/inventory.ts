@@ -247,3 +247,17 @@ export function dueText(dueDate: string | null | undefined, today: string): stri
   const kind = n < 0 ? "overdue" : "future";
   return t(`inventory.due.${kind}.${Math.abs(n) === 1 ? "one" : "other"}`, { date, count: Math.abs(n) });
 }
+
+/** Tag-Filter der Liste (ODER über die gewählten Tags); gemeinsam mit der Kartenseite. */
+export const matchesTagFilter = (itemTags: { tag: string }[], wanted: string[]) =>
+  wanted.length === 0 || wanted.some((w) => itemTags.some((t) => t.tag === w));
+
+type MapItem = { retiredAt: Date | string | null; tags: { tag: string }[]; enabledFields: readonly string[] | null; latitude: string | null; longitude: string | null };
+
+/** Kartenposten: aktive Posten (Tag-Filter) mit Koordinaten; `missing` zählt nur Posten mit aktivem Feld „Ort“ ohne Koordinaten. */
+export function splitByCoordinates<T extends MapItem>(items: T[], tagFilter: string[]): { located: T[]; missing: number } {
+  const active = items.filter((i) => !i.retiredAt && matchesTagFilter(i.tags, tagFilter));
+  const hasCoords = (i: T) => i.latitude != null && i.longitude != null && !Number.isNaN(Number(i.latitude)) && !Number.isNaN(Number(i.longitude));
+  const located = active.filter(hasCoords);
+  return { located, missing: active.filter((i) => hasField(i.enabledFields, "location") && !hasCoords(i)).length };
+}
