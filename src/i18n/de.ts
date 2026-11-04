@@ -59,6 +59,8 @@ export const de = {
   "common.nav.organisation": "Organisation",
   "common.nav.events": "Termine",
   "organisation.tabs.master": "Stammdaten",
+  "privacy.maps": "Karten",
+  "privacy.mapsText": "Kartenkacheln werden über unseren Server von OpenStreetMap geladen. An OpenStreetMap gehen nur die Kachelkoordinaten, weder Ihre IP-Adresse noch andere Nutzerdaten. Die Standortbestimmung des Geräts läuft nur auf Klick, Koordinaten werden nicht ohne Speichern übertragen.",
   "organisation.tabs.privacy": "Datenschutzerklärung",
   "organisation.tabs.tax": "Steuerdaten",
   "organisation.receiptRequired": "Pflichtangabe für Zuwendungsbestätigungen",

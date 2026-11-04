@@ -33,6 +33,7 @@ import { loanRequestRoutes } from "./routes/loan-requests.js";
 import { importRoutes } from "./routes/import.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { sentryTunnelRoutes } from "./routes/sentry-tunnel.js";
+import { tilesRoutes, startTilePruning } from "./routes/tiles.js";
 import { readDsn } from "./lib/sentry.js";
 import { healthRoutes } from "./routes/health.js";
 import { pwaRoutes } from "./routes/pwa.js";
@@ -65,6 +66,7 @@ for (const f of ["manifest.webmanifest", "offline.html", "icon-192.png", "icon-5
 /* v8 ignore stop */
 
 if (readDsn()) app.route("/", sentryTunnelRoutes);
+app.route("/tiles", tilesRoutes);
 
 // Auth + password routes
 app.route("/", loginRoutes);
@@ -186,6 +188,7 @@ app.onError(async (err, c) => {
   );
 });
 
+startTilePruning();
 serve({ fetch: app.fetch, port: 3000 }, () => {
   logger.info({ org: env.ORG_NAME }, "listening on http://localhost:3000");
 });

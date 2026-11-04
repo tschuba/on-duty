@@ -43,6 +43,8 @@ Optional (Defaults in der App):
 | `POSTGRES_DB` | `onduty` | DB-Name |
 | `SESSION_LIFETIME` | `7d` | Session-Gültigkeitsdauer |
 | `ANNIVERSARY_CUTOFF` | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
+| `TILE_CACHE_DIR` | `./tile-cache` | Verzeichnis für den Kartenkachel-Cache (Compose: Volume `tile-cache`, höchstens 500 MB) |
+| `TILE_UPSTREAM_HOST` | `tile.openstreetmap.org` | Kachelserver für die Inventarkarte (z. B. eigener Tileserver) |
 | `SMTP_HOST` | — | SMTP-Server für E-Mail-Benachrichtigungen bei Anträgen (leer = Versand deaktiviert) |
 | `SMTP_PORT` | `587` | SMTP-Port |
 | `SMTP_USER` | — | SMTP-Benutzername |
