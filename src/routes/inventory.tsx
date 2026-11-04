@@ -1954,10 +1954,29 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
             <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
           </div>
         )}
-        {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && <>
-          <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
-          <ViewField label={t("inventory.form.coordinates")} value={item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : null} />
-        </>}
+        {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && (() => {
+          const hasCoords = item.latitude != null && item.longitude != null;
+          const coords = hasCoords ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : null;
+          return (
+            <div class="sm:col-span-2 space-y-2">
+              <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
+              {hasCoords && <>
+                <link rel="stylesheet" href="/css/leaflet.css" />
+                <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
+                <script src="/js/inventory-location-view.min.js" defer></script>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span>{coords}</span>
+                  <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={coords} onclick="navigator.clipboard.writeText(this.dataset.url)">
+                    <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                  </button>
+                  <a class="link link-primary" href={`geo:${item.latitude},${item.longitude}`}>{t("inventory.location.navigate")}</a>
+                  <a class="link link-primary" href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=18/${item.latitude}/${item.longitude}`} target="_blank" rel="noopener noreferrer">{t("inventory.location.osm")}</a>
+                  {!item.retiredAt && <a class="link link-primary" href={`/inventory/map?focus=${item.id}`}>{t("inventory.location.showOnMap")}</a>}
+                </div>
+              </>}
+            </div>
+          );
+        })()}
         {(item.fieldValues ?? []).slice().sort((a, b) => a.fieldDef.name.localeCompare(b.fieldDef.name, "de")).map((fv) => (
           <ViewField label={fv.fieldDef.name} value={fv.value == null ? null : fv.fieldDef.type === "boolean" ? t(fv.value === "1" ? "common.yes" : "common.no") : fv.fieldDef.type === "date" ? formatDate(fv.value) : fv.value} />
         ))}
