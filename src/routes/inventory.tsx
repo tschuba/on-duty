@@ -1834,6 +1834,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
   return (
     <div class="mt-6 max-w-2xl">
       <div class="text-sm opacity-60">{t("inventory.field.inspection")}</div>
+      <div class="overflow-x-auto">
       <table class="table w-full">
         <thead>
           <tr>
@@ -1855,7 +1856,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
                 <td class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
                 {canManage && (
                   <td class="text-right">
-                    <button type="button" class="btn btn-sm" onclick={`document.getElementById('${dialogId}').showModal()`}>{t("inventory.inspection.markDone")}</button>
+                    <button type="button" class="btn btn-sm" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="check" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
                     <dialog id={dialogId} class="modal text-left">
                       <div class="modal-box">
                         <h3 class="font-bold text-lg">{t("inventory.inspection.doneTitle", { name: r.name })}</h3>
@@ -1884,6 +1885,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
