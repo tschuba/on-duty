@@ -1655,7 +1655,7 @@ inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
     const tone = { none: "badge-ghost", ok: "badge-success", soon: "badge-warning", overdue: "badge-error" }[status];
     const popup = (
       <div class="space-y-1">
-        <div class="flex items-baseline justify-between gap-2 flex-wrap">
+        <div class="flex items-start justify-between gap-x-2 gap-y-2 flex-wrap">
           <a href={`/inventory/${item.id}`} class="link font-semibold">{item.name}</a>
           {open.length > 0 && <span class={`badge badge-sm ${tone}`}>{`${open[0].name} · ${dueText(open[0].dueDate, today)}`}</span>}
         </div>
