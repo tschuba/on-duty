@@ -117,6 +117,8 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `REGISTRATION_DEFAULT_ROLE_ID` | — | — | Startwert (einmalig): Rollen-ID für automatisch freigegebene Nutzer |
 | `YOUTH_AGE_LIMIT` | — | `18` | Altersgrenze Jugendfeuerwehr (Jahre) |
 | `ANNIVERSARY_CUTOFF` | — | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
+| `TILE_CACHE_DIR` | — | `./tile-cache` | Cache für Kartenkacheln (höchstens 500 MB) |
+| `TILE_UPSTREAM_HOST` | — | `tile.openstreetmap.org` | Kachelserver der Inventarkarte |
 | `BACKUP_STATUS_FILE` | — | — | Pfad zur `status.json` des Backup-Containers (leer = Überwachung aus) |
 | `BACKUP_STATUS_MAX_AGE_HOURS` | — | `26` | Nach so vielen Stunden ohne erfolgreiches Backup wird gewarnt |
 | `SMTP_HOST` | — | — | SMTP-Server für E-Mail-Benachrichtigungen |
