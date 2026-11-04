@@ -275,3 +275,38 @@ testDetailPageContract({
   writePermissions: ["events:manage"],
   ensureRecord: () => { eventFindFirstResult = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], visibleRoles: [] }; },
 });
+
+describe("GET /events/new visibility cards", () => {
+  const k = (s: string) => t(`events.form.visibility.public.${s}` as any);
+  async function render(enabled: string, indexing: boolean) {
+    const { env } = await import("../env.js");
+    publicEnabled = enabled;
+    (env as any).EVENTS_PUBLIC_INDEXING = indexing;
+    const body = await (await eventRoutes.request("/new")).text();
+    publicEnabled = "true";
+    (env as any).EVENTS_PUBLIC_INDEXING = false;
+    return body;
+  }
+  it("orders cards loggedIn, roles, public with loggedIn preselected", async () => {
+    const body = await render("true", false);
+    const order = ["loggedIn", "roles", "public"].map((v) => body.indexOf(`value="${v}"`));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(body).toMatch(/value="loggedIn"[^>]*checked/);
+  });
+  it("shows enabled text, personal-data note, no indexing by default", async () => {
+    const body = await render("true", false);
+    expect(body).toContain(k("warnEnabled"));
+    expect(body).toContain(k("warnPersonal"));
+    expect(body).not.toContain(k("warnDisabled"));
+    expect(body).not.toContain(k("warnIndexing"));
+  });
+  it("shows indexing note only with enabled calendar and indexing", async () => {
+    expect(await render("true", true)).toContain(k("warnIndexing"));
+    expect(await render("false", true)).not.toContain(k("warnIndexing"));
+  });
+  it("shows disabled text when calendar is off", async () => {
+    const body = await render("false", false);
+    expect(body).toContain(k("warnDisabled"));
+    expect(body).not.toContain(k("warnEnabled"));
+  });
+});
