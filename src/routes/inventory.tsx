@@ -1969,9 +1969,14 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
                   <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={coords} onclick="navigator.clipboard.writeText(this.dataset.url)">
                     <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
                   </button>
-                  <a class="link link-primary" href={`geo:${item.latitude},${item.longitude}`}>{t("inventory.location.navigate")}</a>
-                  <a class="link link-primary" href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=18/${item.latitude}/${item.longitude}`} target="_blank" rel="noopener noreferrer">{t("inventory.location.osm")}</a>
-                  {!item.retiredAt && <a class="link link-primary" href={`/inventory/map?focus=${item.id}`}>{t("inventory.location.showOnMap")}</a>}
+                  <div class="dropdown">
+                    <div tabindex={0} role="button" class="btn btn-ghost btn-sm min-h-11">{t("inventory.location.openIn")} <Icon name="chevron-down" class="h-4 w-4" /></div>
+                    <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
+                      <li><a href={`geo:${item.latitude},${item.longitude}`}>{t("inventory.location.navigate")}</a></li>
+                      <li><a href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=18/${item.latitude}/${item.longitude}`} target="_blank" rel="noopener noreferrer">{t("inventory.location.osm")}</a></li>
+                      {!item.retiredAt && <li><a href={`/inventory/map?focus=${item.id}`}>{t("inventory.location.showOnMap")}</a></li>}
+                    </ul>
+                  </div>
                 </div>
               </>}
             </div>
