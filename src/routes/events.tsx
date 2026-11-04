@@ -441,9 +441,11 @@ async function TagSuggestions(user: AuthedUser) {
   return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson([...EVENT_TAGS.map((d) => eventTagLabel(d.key)), ...(await eventTagVocabulary(user))]) }} />;
 }
 
-function EventForm({ values, errors, roles, tz }: {
+async function EventForm({ values, errors, roles, tz }: {
   values: EventFormValues; errors: Record<string, string>; roles: { id: string; name: string }[]; tz: string;
 }) {
+  const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
+  const indexing = publicEnabled && !!env.EVENTS_PUBLIC_INDEXING;
   return (
     <form id="event-form" method="post" class="space-y-4 max-w-2xl">
       <Field label={t("events.form.title")} required after={errors.title && <span class="text-error text-sm">{errors.title}</span>}>
@@ -480,12 +482,25 @@ function EventForm({ values, errors, roles, tz }: {
 
       <FieldGroup legend={t("events.form.visibility")}>
         <div class="flex flex-col gap-2">
-          {(["public", "loggedIn", "roles"] as const).map((v) => (
-            <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
-              <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio" id={v === "roles" ? "event-visibility-roles" : undefined} />
-              <span>{t(`events.form.visibility.${v}`)}</span>
-            </label>
-          ))}
+          {(["loggedIn", "roles", "public"] as const).map((v) => {
+            const pub = v === "public";
+            return (
+              <label class={`group flex items-start gap-3 rounded-box border border-base-300 p-3 cursor-pointer pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
+                <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "roles" ? "event-visibility-roles" : undefined} />
+                <span class="flex flex-col gap-1">
+                  <span class="font-medium">{t(`events.form.visibility.${v}`)}</span>
+                  <span class="text-sm text-base-content/70">{t(`events.form.visibility.${v}.desc`)}</span>
+                  {pub && (
+                    <span class="hidden group-has-[:checked]:flex flex-col gap-1 text-sm">
+                      <span>{t(publicEnabled ? "events.form.visibility.public.warnEnabled" : "events.form.visibility.public.warnDisabled")}</span>
+                      {indexing && <span>{t("events.form.visibility.public.warnIndexing")}</span>}
+                      <span>{t("events.form.visibility.public.warnPersonal")}</span>
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
         </div>
       </FieldGroup>
 
