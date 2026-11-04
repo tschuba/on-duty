@@ -340,6 +340,9 @@ export const de = {
   "admin.users.modal.edit": "Benutzer bearbeiten",
   "admin.users.modal.nameLabel": "Name",
   "admin.users.modal.emailLabel": "E-Mail",
+  "admin.users.modal.personLabel": "Person",
+  "admin.users.modal.personHint": "Optional: verknüpft den Login mit einer Person (z. B. für Vorbelegungen).",
+  "admin.users.modal.personNone": "– keine –",
   "admin.users.modal.roleLabel": "Rollen",
   "admin.users.modal.emailOidcLocked": "Die E-Mail stammt aus der OIDC-Anmeldung und kann nicht geändert werden.",
   "admin.users.modal.effectivePermissions": "Effektive Berechtigungen",
@@ -349,6 +352,7 @@ export const de = {
   "admin.users.flash.activated": "Benutzer aktiviert.",
   "admin.users.flash.deleted": "Benutzer gelöscht.",
   "admin.users.flash.missingFields": "Name und E-Mail sind Pflichtfelder.",
+  "admin.users.flash.personTaken": "Diese Person ist bereits einem anderen Benutzer zugeordnet.",
   "admin.users.flash.emailExists": "Ein Benutzer mit dieser E-Mail-Adresse existiert bereits.",
 
   // ── Admin – Permissions (Berechtigungen / app roles) ────────────────────────

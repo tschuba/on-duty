@@ -5,6 +5,7 @@ import { eq, and, count, asc, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   users,
+  persons,
   sessions,
   accounts,
   anniversaryYears,
@@ -353,7 +354,7 @@ f.addEventListener('change',function(e){if(e.target.name==='roles')render()});})
   );
 }
 
-type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; error?: string };
+type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; personId?: string; error?: string };
 
 // Vollseite für Anlegen/Bearbeiten; bei Validierungsfehlern mit 422 und den eingegebenen Werten erneut gerendert.
 async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormState, status: 200 | 422 = 200) {
@@ -367,6 +368,9 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
     const [link] = await db.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.userId, f.id), eq(accounts.providerId, "oidc")));
     f.oidcLinked = !!link;
   }
+  const personOptions = f.id
+    ? await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName }).from(persons).orderBy(asc(persons.lastName), asc(persons.firstName))
+    : [];
   const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
     <Layout title={title} user={c.get("user")}>
@@ -380,6 +384,16 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
           <EmailField label={t("admin.users.modal.emailLabel")} hint={t("admin.users.modal.emailOidcLocked")} value={f.email} disabled />
         ) : (
           <EmailField label={t("admin.users.modal.emailLabel")} name="email" value={f.email} required />
+        )}
+        {f.id && (
+          <Field label={t("admin.users.modal.personLabel")} hint={t("admin.users.modal.personHint")}>
+            <select name="personId" class="select w-full">
+              <option value="">{t("admin.users.modal.personNone")}</option>
+              {personOptions.map((p) => (
+                <option value={p.id} selected={p.id === f.personId}>{p.lastName}, {p.firstName}</option>
+              ))}
+            </select>
+          </Field>
         )}
         <FieldGroup legend={t("admin.users.modal.roleLabel")}>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
@@ -405,6 +419,7 @@ adminRoutes.get("/users/:id", guard, async (c) => {
     .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId))
     .where(eq(userAppRoles.userId, id))
     .orderBy(asc(appRoles.name));
+  const [linked] = await db.select({ firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(eq(persons.userId, id));
   return c.html(
     <Layout title={u.name} user={c.get("user")}>
       {/* /users/:id/edit sits behind the same system:admin guard as /:id, so "Bearbeiten" is unconditional. */}
@@ -412,6 +427,7 @@ adminRoutes.get("/users/:id", guard, async (c) => {
       <ViewGrid>
         <ViewField label={t("admin.users.modal.nameLabel")} value={u.name} />
         <ViewField label={t("admin.users.modal.emailLabel")} value={u.email} />
+        <ViewField label={t("admin.users.modal.personLabel")} value={linked ? `${linked.lastName}, ${linked.firstName}` : ""} />
         <ViewField label={t("admin.users.modal.roleLabel")} value={assigned.map((r) => r.name).join(", ")} />
       </ViewGrid>
     </Layout>
@@ -423,7 +439,8 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const [u] = await db.select().from(users).where(eq(users.id, id));
   if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
   const assigned = await db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id));
-  return renderUserForm(c, { id, name: u.name, email: u.email, checkedIds: new Set(assigned.map((a) => a.roleId)) });
+  const [linked] = await db.select({ id: persons.id }).from(persons).where(eq(persons.userId, id));
+  return renderUserForm(c, { id, name: u.name, email: u.email, checkedIds: new Set(assigned.map((a) => a.roleId)), personId: linked?.id });
 });
 
 async function validRoleIds(requested: string[]): Promise<string[]> {
@@ -482,15 +499,23 @@ adminRoutes.post("/users/:id", guard, async (c) => {
   // OIDC-linked users: email is owned by the IdP, ignore any submitted value.
   const email = oidcLink ? existing.email : String(body.email ?? "").trim().toLowerCase();
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
+  const personId = String(body.personId ?? "") || undefined;
 
   if (!name || !email) {
-    return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
+    return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.missingFields") }, 422);
+  }
+
+  if (personId) {
+    const [taken] = await db.select({ userId: persons.userId }).from(persons).where(eq(persons.id, personId));
+    if (taken?.userId && taken.userId !== id) {
+      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.personTaken") }, 422);
+    }
   }
 
   if (email !== existing.email) {
     const dupe = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (dupe.length > 0) {
-      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
+      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.emailExists") }, 422);
     }
   }
 
@@ -498,6 +523,9 @@ adminRoutes.post("/users/:id", guard, async (c) => {
     .update(users)
     .set({ name, email, updatedAt: new Date() })
     .where(eq(users.id, id));
+
+  await db.update(persons).set({ userId: null }).where(eq(persons.userId, id));
+  if (personId) await db.update(persons).set({ userId: id }).where(eq(persons.id, personId));
 
   await db.delete(userAppRoles).where(eq(userAppRoles.userId, id));
   if (roleIds.length > 0) {

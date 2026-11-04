@@ -1,4 +1,5 @@
 import { pgEnum, pgTable, text, date, uuid } from "drizzle-orm/pg-core";
+import { users } from "./auth";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const genderEnum = pgEnum("gender", ["male", "female"]);
@@ -20,5 +21,7 @@ export const persons = pgTable("persons", {
   phone: text("phone"),
   mobile: text("mobile"),
   email: text("email"),
+  // Optional login link; set only by admins in the user form.
+  userId: text("user_id").unique().references(() => users.id, { onDelete: "set null" }),
 });
 /* v8 ignore stop */
