@@ -668,15 +668,11 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         {errors?.coordinates && <span class="text-error text-sm">{errors.coordinates}</span>}
         <link rel="stylesheet" href="/css/leaflet.css" />
         {/* Ohne JS bleibt nur das Textfeld sichtbar: Karte und Buttons werden vom Skript eingeblendet. */}
-        <div id="location-picker" class="hidden flex-col gap-2" data-geo-error={t("inventory.form.geoError")} data-attribution={t("inventory.map.attribution")}>
-          <div class="flex flex-wrap gap-2">
-            <button type="button" data-act="locate" class="btn btn-sm"><Icon name="current-location" class="size-4" />{t("inventory.form.useLocation")}</button>
-            <button type="button" data-act="apply" class="btn btn-sm btn-primary" disabled>{t("inventory.form.applyCoordinates")}</button>
-            <button type="button" data-act="clear" class="btn btn-sm btn-ghost">{t("inventory.form.clearCoordinates")}</button>
-            <button type="button" data-act="reset" class="btn btn-sm btn-ghost">{t("inventory.form.resetCoordinates")}</button>
-          </div>
+        <div id="location-picker" class="hidden flex-col gap-2" data-geo-error={t("inventory.form.geoError")} data-locate-label={t("inventory.form.useLocation")} data-attribution={t("inventory.map.attribution")}>
+          <template><Icon name="current-location" class="size-5" /></template>
           <p data-role="status" class="text-sm text-error" role="status" />
           <div id="location-map" role="region" aria-label={t("inventory.form.mapAria")} class="h-72 rounded-box border border-base-300 z-0" />
+          <button type="button" data-act="apply" class="btn btn-sm btn-primary self-start" disabled>{t("inventory.form.applyCoordinates")}</button>
         </div>
         <script src="/js/inventory-location.min.js" defer></script>
       </SectionCard>
