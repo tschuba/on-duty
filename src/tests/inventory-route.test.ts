@@ -1101,6 +1101,38 @@ describe("GET / inventory toggles", () => {
   });
 });
 
+describe("GET /:id location section", () => {
+  const view = async (o: Record<string, unknown>) => {
+    itemsFindFirstResult = makeItem(o);
+    return (await inventoryRoutes.request("/item1")).text();
+  };
+
+  it("shows map, formatted coordinates, copy and open-in links with status colour", async () => {
+    const html = await view({ locationText: "Halle 1", latitude: "49.5", longitude: "11.2", inspections: [{ id: "i1", name: "P", dueDate: "2000-01-01" }] });
+    expect(html).toContain("Halle 1");
+    expect(html).toContain('id="location-view-map"');
+    expect(html).toContain('data-status="overdue"');
+    expect(html).toContain("49.500000");
+    expect(html).toContain('data-url="49.500000, 11.200000"');
+    expect(html).toContain("geo:49.5,11.2");
+    expect(html).toContain("openstreetmap.org");
+    expect(html).toContain("/inventory/map?focus=item1");
+  });
+
+  it("shows only the text without coordinates", async () => {
+    const html = await view({ locationText: "Halle 1" });
+    expect(html).toContain("Halle 1");
+    expect(html).not.toContain("location-view-map");
+    expect(html).not.toContain("focus=");
+  });
+
+  it("hides the map link for retired items", async () => {
+    const html = await view({ latitude: "49.5", longitude: "11.2", retiredAt: "2024-01-01" });
+    expect(html).toContain("location-view-map");
+    expect(html).not.toContain("focus=");
+  });
+});
+
 testDetailPageContract({
   name: "inventory",
   request: (path) => inventoryRoutes.request(path),
