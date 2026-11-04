@@ -485,7 +485,7 @@ async function EventForm({ values, errors, roles, tz }: {
           {(["loggedIn", "roles", "public"] as const).map((v) => {
             const pub = v === "public";
             return (
-              <label class={`group flex items-start gap-3 rounded-box border border-base-300 p-3 cursor-pointer pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
+              <label class={`group flex items-start gap-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-base-content/40 rounded-box border border-base-300 p-3 cursor-pointer pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
                 <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "roles" ? "event-visibility-roles" : undefined} />
                 <span class="flex flex-col gap-1">
                   <span class="font-medium">{t(`events.form.visibility.${v}`)}</span>
