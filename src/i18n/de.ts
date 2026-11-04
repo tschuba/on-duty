@@ -954,6 +954,8 @@ export const de = {
   "inventory.form.fields": "Felder",
   "inventory.form.locationText": "Standort",
   "inventory.form.coordinates": "Koordinaten",
+  "inventory.location.latitude": "Breitengrad",
+  "inventory.location.longitude": "Längengrad",
   "inventory.location.openIn": "Öffnen in",
   "inventory.location.navigate": "Navigation (Karten-App)",
   "inventory.location.osm": "In OpenStreetMap öffnen",
