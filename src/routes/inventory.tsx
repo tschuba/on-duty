@@ -21,7 +21,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { matchesTagFilter, splitByCoordinates, earliestDueStatus, dueText, type DueStatus, dueSoonEnd, generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { matchesTagFilter, splitByCoordinates, earliestDueStatus, dueText, type DueStatus, dueSoonEnd, generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, parseCoordinates, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -83,6 +83,7 @@ export type InventoryFieldValues = {
   // Sperrgrund je festem Feld bzw. freier Felddefinition (nur Bearbeiten): gefüllte Felder lassen sich nicht abwählen.
   fieldLocks?: Record<string, string>;
   locationText: string;
+  coordinates: string; // ein Feld "lat, lng"; latitude/longitude werden daraus abgeleitet
   latitude: string;
   longitude: string;
 };
@@ -100,9 +101,13 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     enabledFieldsList,
     freeRaw: Object.fromEntries(parseList(body, "freeFields").map((id) => [id, trimmed(body, `ff_${id}`)])),
     locationText: trimmed(body, "locationText"),
-    latitude: trimmed(body, "latitude"),
-    longitude: trimmed(body, "longitude"),
+    coordinates: trimmed(body, "coordinates"),
+    latitude: "",
+    longitude: "",
   };
+  const coords = parseCoordinates(values.coordinates);
+  values.latitude = coords.latitude;
+  values.longitude = coords.longitude;
 
   const errors: Record<string, string> = {};
   if (!values.name) errors.name = t("common.required");
@@ -114,9 +119,7 @@ export function parseInventoryFields(body: Record<string, any>): { values: Inven
     errors.quantity = t("inventory.form.invalidQuantity");
   }
   if (hasField(enabledFieldsList, "location")) {
-    const locErrors = validateLocation(values.latitude, values.longitude);
-    if (locErrors.latitude) errors.latitude = t("inventory.form.invalidCoordinate");
-    if (locErrors.longitude) errors.longitude = t("inventory.form.invalidCoordinate");
+    if (coords.error) errors.coordinates = t("inventory.form.invalidCoordinate");
   }
   return { values, errors };
 }
@@ -659,16 +662,23 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <Field label={t("inventory.form.locationText")}>
           <input type="text" name="locationText" value={v.locationText ?? ""} class="input w-full" placeholder={t("inventory.form.locationText")} />
         </Field>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label={t("inventory.form.latitude")}>
-            <input type="text" inputmode="decimal" name="latitude" value={v.latitude ?? ""} class={`input w-full${errors?.latitude ? " input-error" : ""}`} placeholder={t("inventory.form.latitude")} />
-            {errors?.latitude && <span class="text-error text-sm mt-1">{errors.latitude}</span>}
-          </Field>
-          <Field label={t("inventory.form.longitude")}>
-            <input type="text" inputmode="decimal" name="longitude" value={v.longitude ?? ""} class={`input w-full${errors?.longitude ? " input-error" : ""}`} placeholder={t("inventory.form.longitude")} />
-            {errors?.longitude && <span class="text-error text-sm mt-1">{errors.longitude}</span>}
-          </Field>
+        <Field label={t("inventory.form.coordinates")} hint={t("inventory.form.coordinatesHint")}>
+          <input type="text" id="coordinates" name="coordinates" value={v.coordinates ?? ""} class={`input w-full${errors?.coordinates ? " input-error" : ""}`} placeholder="48.137154, 11.576124" autocomplete="off" />
+        </Field>
+        {errors?.coordinates && <span class="text-error text-sm">{errors.coordinates}</span>}
+        <link rel="stylesheet" href="/css/leaflet.css" />
+        {/* Ohne JS bleibt nur das Textfeld sichtbar: Karte und Buttons werden vom Skript eingeblendet. */}
+        <div id="location-picker" class="hidden flex-col gap-2" data-geo-error={t("inventory.form.geoError")} data-attribution={t("inventory.map.attribution")}>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" data-act="locate" class="btn btn-sm"><Icon name="current-location" class="size-4" />{t("inventory.form.useLocation")}</button>
+            <button type="button" data-act="apply" class="btn btn-sm btn-primary" disabled>{t("inventory.form.applyCoordinates")}</button>
+            <button type="button" data-act="clear" class="btn btn-sm btn-ghost">{t("inventory.form.clearCoordinates")}</button>
+            <button type="button" data-act="reset" class="btn btn-sm btn-ghost">{t("inventory.form.resetCoordinates")}</button>
+          </div>
+          <p data-role="status" class="text-sm text-error" role="status" />
+          <div id="location-map" role="region" aria-label={t("inventory.form.mapAria")} class="h-72 rounded-box border border-base-300 z-0" />
         </div>
+        <script src="/js/inventory-location.min.js" defer></script>
       </SectionCard>
 
       {(v.freeDefs ?? []).map((d) => {
@@ -1406,6 +1416,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
     numbersList: sortedNumbers(item),
     enabledFieldsList: (item.enabledFields ?? []) as InventoryField[],
     locationText: item.locationText ?? "",
+    coordinates: item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : "",
     latitude: item.latitude ?? "",
     longitude: item.longitude ?? "",
   };

@@ -171,18 +171,7 @@ export function isFieldEmpty(f: InventoryField, s: LockState): boolean {
   }
 }
 
-// Koordinaten nur zusammen; Strings, weil sie roh aus dem Formular bzw. numeric-Spalte kommen.
-export function validateLocation(latitude: string, longitude: string): { latitude?: "invalid" | "pair"; longitude?: "invalid" | "pair" } {
-  const parse = (v: string, max: number) => {
-    const n = Number(v.replace(",", "."));
-    return Number.isFinite(n) && Math.abs(n) <= max;
-  };
-  const errors: { latitude?: "invalid" | "pair"; longitude?: "invalid" | "pair" } = {};
-  if (latitude && !parse(latitude, 90)) errors.latitude = "invalid";
-  if (longitude && !parse(longitude, 180)) errors.longitude = "invalid";
-  if (!latitude !== !longitude) errors[latitude ? "longitude" : "latitude"] ??= "pair";
-  return errors;
-}
+export { validateLocation, parseCoordinates } from "./coordinates.js";
 
 export type FieldDefType = "text" | "number" | "date" | "boolean" | "select";
 
