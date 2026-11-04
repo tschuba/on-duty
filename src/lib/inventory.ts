@@ -1,5 +1,6 @@
 import { db } from "../db/index.js";
 import { addDays, addMonths } from "./quick-range.js";
+import { t } from "../i18n/index.js";
 import { formatDate } from "./format.js";
 
 export type InspectionDueItem = {
@@ -238,12 +239,11 @@ export function worstDueStatus(statuses: DueStatus[]): DueStatus {
 }
 
 const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
-const plural = (n: number) => `${n} ${n === 1 ? "Tag" : "Tagen"}`;
-
 export function dueText(dueDate: string | null | undefined, today: string): string {
-  if (!dueDate) return "keine Frist";
+  if (!dueDate) return t("inventory.due.none");
   const n = dayDiff(today, dueDate);
-  if (n < 0) return `überfällig seit ${plural(-n)}`;
-  if (n === 0) return `fällig ${formatDate(dueDate)} (heute)`;
-  return `fällig ${formatDate(dueDate)} (in ${plural(n)})`;
+  const date = formatDate(dueDate);
+  if (n === 0) return t("inventory.due.today", { date });
+  const kind = n < 0 ? "overdue" : "future";
+  return t(`inventory.due.${kind}.${Math.abs(n) === 1 ? "one" : "other"}`, { date, count: Math.abs(n) });
 }

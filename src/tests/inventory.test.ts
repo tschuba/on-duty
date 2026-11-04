@@ -170,7 +170,7 @@ describe("Marker-Farblogik", () => {
     expect(dueText("2026-06-21", today)).toBe("fällig 21.06.2026 (in 20 Tagen)");
     expect(dueText("2026-05-29", today)).toBe("überfällig seit 3 Tagen");
     expect(dueText("2026-05-31", today)).toBe("überfällig seit 1 Tag");
-    expect(dueText(today, today)).toBe("fällig 01.06.2026 (heute)");
+    expect(dueText(today, today)).toBe("heute fällig (01.06.2026)");
     expect(dueText(null, today)).toBe("keine Frist");
   });
 });
