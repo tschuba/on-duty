@@ -1958,13 +1958,16 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
         )}
         {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && (() => {
           const hasCoords = item.latitude != null && item.longitude != null;
+          const status = earliestDueStatus(item.inspections.map((r) => r.dueDate), new Date().toISOString().slice(0, 10));
+          const styleTag = item.tags.map((x) => x.tag).find((x) => TAG_STYLES[x.toLowerCase()]);
+          const pinIcon = (<Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "map-pin"} />).toString();
           const coords = hasCoords ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : null;
           return (
             <div class="sm:col-span-2 space-y-2">
               <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
               {hasCoords && <>
                 <link rel="stylesheet" href="/css/leaflet.css" />
-                <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
+                <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-status={status} data-icon={pinIcon} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
                 <script src="/js/inventory-location-view.min.js" defer></script>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <div class="flex flex-col gap-1 md:flex-row md:gap-4">
