@@ -1655,17 +1655,14 @@ inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
     const tone = { none: "badge-ghost", ok: "badge-success", soon: "badge-warning", overdue: "badge-error" }[status];
     const popup = (
       <div class="space-y-1">
-        <a href={`/inventory/${item.id}`} class="link font-semibold">{item.name}</a>
+        <div class="flex items-baseline justify-between gap-2 flex-wrap">
+          <a href={`/inventory/${item.id}`} class="link font-semibold">{item.name}</a>
+          {open.length > 0 && <span class={`badge badge-sm ${tone}`}>{`${open[0].name} · ${dueText(open[0].dueDate, today)}`}</span>}
+        </div>
         {tagNames.length > 0 && <div class="flex flex-wrap gap-1"><TagBadges tags={tagNames} /></div>}
         {numbers.length > 0 && <div class="text-sm">{numbers[0]}{numbers.length > 1 ? ` +${numbers.length - 1}` : ""}</div>}
         {item.locationText && <div class="text-sm">{item.locationText}</div>}
-        <div>
-          <span class={`badge badge-sm ${tone}`}>
-            {open.length === 0 ? t("inventory.map.noInspection") : `${open[0].name} · ${dueText(open[0].dueDate, today)}`}
-          </span>
-          {open.length > 1 && <span class="text-xs ml-1">{t("inventory.map.moreInspections", { count: open.length - 1 })}</span>}
-        </div>
-        <a href={`/inventory/${item.id}`} class="btn btn-primary btn-sm mt-1">{t("inventory.map.details")}</a>
+        {open.length > 1 && <div class="text-xs">{t("inventory.map.moreInspections", { count: open.length - 1 })}</div>}
       </div>
     );
     return { id: item.id, name: item.name, lat: Number(item.latitude), lng: Number(item.longitude), status, icon: icon.toString(), popup: popup.toString() };

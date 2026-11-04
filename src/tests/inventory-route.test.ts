@@ -488,11 +488,11 @@ describe("GET /map", () => {
     expect(html).not.toContain("inventory.map.");
   });
 
-  it("shows no-inspection popup, falls back to the neutral pin and omits optional rows", async () => {
+  it("omits the badge and optional rows when there is no due inspection", async () => {
     itemsFindManyResult = [located({ id: "b", name: "Helm" })];
     const [m] = markersOf(await (await inventoryRoutes.request("/map")).text());
     expect(m.status).toBe("none");
-    expect(m.popup).toContain("badge-ghost");
+    expect(m.popup).not.toContain("badge-");
     expect(m.popup).not.toContain("text-sm\">");
   });
 
