@@ -1,7 +1,7 @@
 import { RowAction } from "../components/row-action.js";
 import { EmailField, Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Hono, type Context } from "hono";
-import { eq, and, count, asc, inArray } from "drizzle-orm";
+import { eq, and, or, count, asc, inArray, ilike, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   users,
@@ -26,7 +26,7 @@ import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
 import { setFlash } from "../lib/flash.js";
-import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SEARCH_DEBOUNCE_MS, SOURCE_REPO_URL } from "../lib/constants.js";
 import { isPendingUser } from "../lib/registration.js";
 import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
@@ -356,6 +356,82 @@ f.addEventListener('change',function(e){if(e.target.name==='roles')render()});})
 
 type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; personId?: string; error?: string };
 
+// Optional person link; same search-and-select UX as the inventory member picker (htmx live search, no create).
+function PersonPicker({ personId, personName }: { personId?: string; personName?: string }) {
+  const sel = Boolean(personId);
+  return (
+    <div class="flex flex-col" id="user-person-picker">
+      <p class="fieldset-legend">{t("admin.users.modal.personLabel")}</p>
+      <div data-part="search" class={sel ? "hidden" : ""}>
+        <label class="input flex items-center gap-2 w-full">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="text"
+            autocomplete="off"
+            placeholder={t("admin.users.modal.personSearchPlaceholder")}
+            class="grow min-w-0"
+            name="q"
+            hx-get="/admin/users/search-persons"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-target="#user-person-results"
+            hx-vals={`js:{userId: location.pathname.split('/')[3]}`}
+          />
+        </label>
+        <div id="user-person-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+      </div>
+      <input type="hidden" name="personId" value={personId ?? ""} />
+      <div data-part="selected" class={sel ? "flex items-center gap-2" : "hidden flex items-center gap-2"}>
+        <span data-part="name">{personName ?? ""}</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-action="clear">{t("admin.users.modal.personClear")}</button>
+      </div>
+      <p class="label text-xs opacity-70 whitespace-normal">{t("admin.users.modal.personHint")}</p>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function(){
+          var root=document.getElementById('user-person-picker');
+          var $=function(p){return root.querySelector('[data-part="'+p+'"]')};
+          var id=root.querySelector('input[name=personId]');
+          root.addEventListener('click',function(e){
+            var r=e.target.closest('.person-result');
+            if(r){id.value=r.dataset.id;$('name').textContent=r.dataset.name;$('selected').classList.remove('hidden');$('search').classList.add('hidden');return}
+            if(e.target.closest('[data-action=clear]')){
+              id.value='';$('selected').classList.add('hidden');$('search').classList.remove('hidden');
+              document.getElementById('user-person-results').innerHTML='';
+              var i=$('search').querySelector('input');i.value='';i.focus();
+            }
+          });
+        })();
+      ` }} />
+    </div>
+  );
+}
+
+// GET /admin/users/search-persons — persons not yet linked to another user.
+adminRoutes.get("/users/search-persons", guard, async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+  const userId = c.req.query("userId") ?? "";
+  const needle = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+  const results = await db
+    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName })
+    .from(persons)
+    .where(and(
+      or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(sql`${persons.firstName} || ' ' || ${persons.lastName}`, needle)),
+      or(isNull(persons.userId), eq(persons.userId, userId)),
+    ))
+    .orderBy(asc(persons.lastName), asc(persons.firstName))
+    .limit(10);
+  if (results.length === 0) return c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
+  return c.html(
+    <>
+      {results.map((p) => (
+        <div key={p.id} class="person-result p-2 hover:bg-base-200 cursor-pointer text-sm" data-id={p.id} data-name={`${p.firstName} ${p.lastName}`}>
+          {p.firstName} {p.lastName}
+        </div>
+      ))}
+    </>
+  );
+});
+
 // Vollseite für Anlegen/Bearbeiten; bei Validierungsfehlern mit 422 und den eingegebenen Werten erneut gerendert.
 async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormState, status: 200 | 422 = 200) {
   const [allRoles, permRows] = await Promise.all([
@@ -368,8 +444,8 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
     const [link] = await db.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.userId, f.id), eq(accounts.providerId, "oidc")));
     f.oidcLinked = !!link;
   }
-  const personOptions = f.id
-    ? await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName }).from(persons).orderBy(asc(persons.lastName), asc(persons.firstName))
+  const [selectedPerson] = f.personId
+    ? await db.select({ firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(eq(persons.id, f.personId))
     : [];
   const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
@@ -385,16 +461,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
         ) : (
           <EmailField label={t("admin.users.modal.emailLabel")} name="email" value={f.email} required />
         )}
-        {f.id && (
-          <Field label={t("admin.users.modal.personLabel")} hint={t("admin.users.modal.personHint")}>
-            <select name="personId" class="select w-full">
-              <option value="">{t("admin.users.modal.personNone")}</option>
-              {personOptions.map((p) => (
-                <option value={p.id} selected={p.id === f.personId}>{p.lastName}, {p.firstName}</option>
-              ))}
-            </select>
-          </Field>
-        )}
+        {f.id && <PersonPicker personId={selectedPerson ? f.personId : undefined} personName={selectedPerson ? `${selectedPerson.firstName} ${selectedPerson.lastName}` : undefined} />}
         <FieldGroup legend={t("admin.users.modal.roleLabel")}>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </FieldGroup>
