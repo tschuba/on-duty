@@ -1,5 +1,6 @@
 import { db } from "../db/index.js";
-import { addMonths } from "./quick-range.js";
+import { addDays, addMonths } from "./quick-range.js";
+import { formatDate } from "./format.js";
 
 export type InspectionDueItem = {
   id: string;
@@ -210,4 +211,39 @@ export type FieldAction = "archive" | "unarchive" | "delete";
 export function fieldActions({ archived, usage }: { archived: boolean; usage: number }): FieldAction[] {
   if (!archived) return usage > 0 ? ["archive"] : ["delete"];
   return usage > 0 ? ["unarchive"] : ["unarchive", "delete"];
+}
+
+// Schwelle für „bald fällig“ – gemeinsam für Listenfilter und Kartenmarker.
+export const DUE_SOON_DAYS = 30;
+export const dueSoonEnd = (today: string) => addDays(today, DUE_SOON_DAYS);
+
+export type DueStatus = "none" | "ok" | "soon" | "overdue";
+const DUE_RANK: Record<DueStatus, number> = { none: 0, ok: 1, soon: 2, overdue: 3 };
+
+export function dueStatus(dueDate: string | null | undefined, today: string): DueStatus {
+  if (!dueDate) return "none";
+  if (dueDate < today) return "overdue";
+  return dueDate <= dueSoonEnd(today) ? "soon" : "ok";
+}
+
+/** Status der frühesten offenen Frist (Datum null = keine Frist). */
+export function earliestDueStatus(dueDates: (string | null | undefined)[], today: string): DueStatus {
+  const open = dueDates.filter((d): d is string => !!d).sort();
+  return dueStatus(open[0], today);
+}
+
+/** Cluster-Status: schlimmster Status gewinnt (überfällig > bald > ok > keine). */
+export function worstDueStatus(statuses: DueStatus[]): DueStatus {
+  return statuses.reduce<DueStatus>((a, b) => (DUE_RANK[b] > DUE_RANK[a] ? b : a), "none");
+}
+
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+const plural = (n: number) => `${n} ${n === 1 ? "Tag" : "Tagen"}`;
+
+export function dueText(dueDate: string | null | undefined, today: string): string {
+  if (!dueDate) return "keine Frist";
+  const n = dayDiff(today, dueDate);
+  if (n < 0) return `überfällig seit ${plural(-n)}`;
+  if (n === 0) return `fällig ${formatDate(dueDate)} (heute)`;
+  return `fällig ${formatDate(dueDate)} (in ${plural(n)})`;
 }
