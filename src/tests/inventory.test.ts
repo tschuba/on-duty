@@ -40,7 +40,7 @@ describe("nextDueDate", () => {
   it("clears the due date without an interval", () => expect(nextDueDate("2026-06-01", null, "2026-06-20")).toBeNull());
 });
 
-import { blockedOptionRemovals, isFieldEmpty, normalizeFieldValue, parseOptions, validateLocation } from "../lib/inventory.js";
+import { blockedOptionRemovals, isFieldEmpty, normalizeFieldValue, parseOptions, parseCoordinates, validateLocation } from "../lib/inventory.js";
 
 const empty = { quantity: 1, retiredQuantity: 0, numbers: 0, serials: 0, assignments: 0, locationText: null, latitude: null, longitude: null, inspections: 0, activeLoans: 0 };
 
@@ -61,6 +61,19 @@ describe("isFieldEmpty", () => {
   });
 });
 
+describe("parseCoordinates", () => {
+  it("parses common formats to 6 decimals", () => {
+    expect(parseCoordinates("")).toEqual({ latitude: "", longitude: "" });
+    expect(parseCoordinates("48.1371549, 11.5761")).toEqual({ latitude: "48.137155", longitude: "11.576100" });
+    expect(parseCoordinates("48,13 -11,5")).toEqual({ latitude: "48.130000", longitude: "-11.500000" });
+    expect(parseCoordinates("48.1;11.5")).toEqual({ latitude: "48.100000", longitude: "11.500000" });
+  });
+  it("rejects junk, single values and range limits", () => {
+    for (const v of ["48.1", "abc", "91, 0", "0, 180.000001", "1;2;3"]) expect(parseCoordinates(v).error).toBe(true);
+    expect(parseCoordinates("90, -180")).toEqual({ latitude: "90.000000", longitude: "-180.000000" });
+  });
+});
+
 describe("validateLocation", () => {
   it("accepts none or both coordinates in range", () => {
     expect(validateLocation("", "")).toEqual({});
@@ -70,6 +83,10 @@ describe("validateLocation", () => {
     expect(validateLocation("91", "0").latitude).toBe("invalid");
     expect(validateLocation("0", "181").longitude).toBe("invalid");
     expect(validateLocation("x", "0").latitude).toBe("invalid");
+    expect(validateLocation("90", "180")).toEqual({});
+    expect(validateLocation("-90", "-180")).toEqual({});
+    expect(validateLocation("-90.1", "0").latitude).toBe("invalid");
+    expect(validateLocation("0", "-180.1").longitude).toBe("invalid");
     expect(validateLocation("48", "").longitude).toBe("pair");
     expect(validateLocation("", "11").latitude).toBe("pair");
   });

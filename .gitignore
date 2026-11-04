@@ -17,6 +17,10 @@ coverage/
 public/js/sentry.min.js
 public/js/leaflet*.js
 public/js/inventory-map.min.js
+public/js/inventory-location.min.js
 tile-cache/
 .dev-stack/
 .dev-stack-ca/
+
+# Mock-Hilfsdatei
+docs/mockups/mock.css
