@@ -59,6 +59,8 @@ const ICONS = {
   "map-pin": "map-pin",
   "map-2": "map-2",
   "current-location": "current-location",
+  "world-latitude": "world-latitude",
+  "world-longitude": "world-longitude",
   "clipboard-list": "clipboard-list",
   phone: "phone",
   "device-phone-mobile": "device-mobile",

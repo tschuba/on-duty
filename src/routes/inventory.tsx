@@ -1834,6 +1834,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
   return (
     <div class="mt-6 max-w-2xl">
       <div class="text-sm opacity-60">{t("inventory.field.inspection")}</div>
+      <div class="overflow-x-auto">
       <table class="table w-full">
         <thead>
           <tr>
@@ -1855,7 +1856,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
                 <td class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
                 {canManage && (
                   <td class="text-right">
-                    <button type="button" class="btn btn-sm" onclick={`document.getElementById('${dialogId}').showModal()`}>{t("inventory.inspection.markDone")}</button>
+                    <button type="button" class="btn btn-sm" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="check" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
                     <dialog id={dialogId} class="modal text-left">
                       <div class="modal-box">
                         <h3 class="font-bold text-lg">{t("inventory.inspection.doneTitle", { name: r.name })}</h3>
@@ -1884,6 +1885,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -1954,10 +1956,40 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
             <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
           </div>
         )}
-        {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && <>
-          <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
-          <ViewField label={t("inventory.form.coordinates")} value={item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : null} />
-        </>}
+        {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && (() => {
+          const hasCoords = item.latitude != null && item.longitude != null;
+          const status = earliestDueStatus(item.inspections.map((r) => r.dueDate), new Date().toISOString().slice(0, 10));
+          const styleTag = item.tags.map((x) => x.tag).find((x) => TAG_STYLES[x.toLowerCase()]);
+          const pinIcon = (<Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "map-pin"} />).toString();
+          const coords = hasCoords ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : null;
+          return (
+            <div class="sm:col-span-2 space-y-2">
+              <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
+              {hasCoords && <>
+                <link rel="stylesheet" href="/css/leaflet.css" />
+                <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-status={status} data-icon={pinIcon} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
+                <script src="/js/inventory-location-view.min.js" defer></script>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <div class="flex flex-col gap-1 md:flex-row md:gap-4">
+                    <span class="inline-flex items-center gap-1" title={t("inventory.location.latitude")}><Icon name="world-latitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.latitude")}: </span>{Number(item.latitude).toFixed(6)}</span>
+                    <span class="inline-flex items-center gap-1" title={t("inventory.location.longitude")}><Icon name="world-longitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.longitude")}: </span>{Number(item.longitude).toFixed(6)}</span>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={coords} onclick="navigator.clipboard.writeText(this.dataset.url)">
+                    <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                  </button>
+                  <div class="dropdown dropdown-end">
+                    <div tabindex={0} role="button" class="btn btn-ghost btn-sm min-h-11">{t("inventory.location.openIn")} <Icon name="chevron-down" class="h-4 w-4" /></div>
+                    <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
+                      <li class="hidden pointer-coarse:flex"><a href={`geo:${item.latitude},${item.longitude}`}>{t("inventory.location.navigate")}</a></li>
+                      <li><a href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=18/${item.latitude}/${item.longitude}`} target="_blank" rel="noopener noreferrer">{t("inventory.location.osm")}</a></li>
+                      {!item.retiredAt && <li><a href={`/inventory/map?focus=${item.id}`}>{t("inventory.location.showOnMap")}</a></li>}
+                    </ul>
+                  </div>
+                </div>
+              </>}
+            </div>
+          );
+        })()}
         {(item.fieldValues ?? []).slice().sort((a, b) => a.fieldDef.name.localeCompare(b.fieldDef.name, "de")).map((fv) => (
           <ViewField label={fv.fieldDef.name} value={fv.value == null ? null : fv.fieldDef.type === "boolean" ? t(fv.value === "1" ? "common.yes" : "common.no") : fv.fieldDef.type === "date" ? formatDate(fv.value) : fv.value} />
         ))}

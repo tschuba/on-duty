@@ -24,3 +24,4 @@ tile-cache/
 
 # Mock-Hilfsdatei
 docs/mockups/mock.css
+public/js/inventory-location-view.min.js
