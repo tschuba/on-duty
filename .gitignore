@@ -15,5 +15,6 @@ data/
 coverage/
 .vitest/
 public/js/sentry.min.js
+public/js/leaflet*.js
 .dev-stack/
 .dev-stack-ca/

@@ -15,6 +15,7 @@ datenschutzRoutes.get("/", async (c) => {
   const isHtml = /<[a-z][\s\S]*>/i.test(text);
   return c.html(<LegalPage title={t("privacy.title")} current="privacy">
     <LegalSection label={t("privacy.controller")}><OrgAddress cfg={cfg} /><OrgContact cfg={cfg} /></LegalSection>
+    <LegalSection label={t("privacy.maps")}><p>{t("privacy.mapsText")}</p></LegalSection>
     <div class={isHtml ? "richtext-content" : "whitespace-pre-wrap"}>{isHtml ? raw(text) : text}</div>
   </LegalPage>);
 });

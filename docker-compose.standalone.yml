@@ -51,6 +51,8 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
       BACKUP_STATUS_FILE: /backup-status/status.json
+      TILE_CACHE_DIR: /tile-cache
+      TILE_UPSTREAM_HOST: ${TILE_UPSTREAM_HOST:-tile.openstreetmap.org}
       BACKUP_STATUS_MAX_AGE_HOURS: ${BACKUP_STATUS_MAX_AGE_HOURS:-26}
       # One-time start values for the registration settings (only applied while unset in the DB).
       # Role ID = built-in role "Leser" (src/db/seed.ts).
@@ -65,6 +67,7 @@ services:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
       - bugsink-bootstrap:/bugsink:ro
       - backup-status:/backup-status:ro
+      - tile-cache:/tile-cache
     depends_on:
       db:
         condition: service_healthy
@@ -341,6 +344,7 @@ services:
 
 volumes:
   backup-status:
+  tile-cache:
   bugsink-data:
   bugsink-bootstrap:
   pgdata:
