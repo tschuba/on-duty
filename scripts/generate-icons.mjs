@@ -57,6 +57,8 @@ const ICONS = {
   jacket: "jacket",
   envelope: "mail",
   "map-pin": "map-pin",
+  "map-2": "map-2",
+  "clipboard-list": "clipboard-list",
   phone: "phone",
   "device-phone-mobile": "device-mobile",
   "squares-2x2": "layout-grid",

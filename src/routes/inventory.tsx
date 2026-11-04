@@ -6,7 +6,7 @@ import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
-import { TagAvatar, TagBadges } from "../components/tag-badges.js";
+import { TAG_STYLES, TagAvatar, TagBadges } from "../components/tag-badges.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -21,7 +21,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { dueSoonEnd, generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { matchesTagFilter, splitByCoordinates, earliestDueStatus, dueText, type DueStatus, dueSoonEnd, generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -820,6 +820,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const canSeeLending = user.permissions.has("lending:read");
   const canLend = user.permissions.has("lending:manage");
   const lendableOnly = canSeeLending && q.lendable === "1";
+  const noCoordsOnly = q.nocoords === "1"; // Link „N Posten ohne Koordinaten“ der Karte
 
   const all = await fetchItems();
 
@@ -849,7 +850,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         || (r.dueDate != null && ((dueFilter.includes("overdue") && r.dueDate < today) || (dueFilter.includes("soon") && r.dueDate >= today && r.dueDate <= soonEnd)));
       if (!candidates.some(matches)) return false;
     }
-    if (tagFilter.length > 0 && !tagFilter.some((wanted) => item.tags.some((t) => t.tag === wanted))) return false;
+    if (!matchesTagFilter(item.tags, tagFilter)) return false;
+    if (noCoordsOnly && !(hasField(item.enabledFields, "location") && (item.latitude == null || item.longitude == null))) return false;
     if (lendableOnly && !lendingByItem.has(item.id)) return false;
     if (search) {
       const needle = search.toLowerCase();
@@ -864,15 +866,16 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const page = Math.min(reqPage, totalPages);
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, pageSize }, { page: p });
+  const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined, pageSize }, { page: p });
 
   const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined }, extra);
+    buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined }, extra);
   const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
       <PageHeader title={t("inventory.title")} actions={<>
+        <HeaderAction icon="map-2" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} />
         {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
@@ -902,6 +905,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           {dueFilter.map((v) => <input type="hidden" name="due" value={v} />)}
           {showArchived && <input type="hidden" name="archived" value="1" />}
           {lendableOnly && <input type="hidden" name="lendable" value="1" />}
+          {noCoordsOnly && <input type="hidden" name="nocoords" value="1" />}
         </form>
         <MultiSelectFilter
           param="tag"
@@ -1632,6 +1636,71 @@ inventoryRoutes.post("/:id/reactivate", requireAuth("inventory:manage"), async (
 });
 
 // GET /inventory/inspections — Prüffristen-Übersicht, filter-UX identisch zu /anniversaries.
+// Karte: aktive Posten mit Koordinaten, Tag-Filter wie die Liste. Vor "/:id" registrieren.
+inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
+  const user = c.get("user")!;
+  const tagFilter = c.req.queries("tag") ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const all = await fetchItems();
+  const { located, missing } = splitByCoordinates(all, tagFilter);
+  const allTags = [...new Set(all.flatMap((i) => i.tags.map((x) => x.tag)))].sort((a, b) => a.localeCompare(b, "de"));
+
+  const markers = located.map((item) => {
+    const open = item.inspections.filter((r) => r.dueDate).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!));
+    const status: DueStatus = earliestDueStatus(open.map((r) => r.dueDate), today);
+    const tagNames = item.tags.map((x) => x.tag);
+    const styleTag = tagNames.find((x) => TAG_STYLES[x.toLowerCase()]);
+    const icon = <Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "map-pin"} />;
+    const numbers = item.numbers.map((n) => n.number);
+    const tone = { none: "badge-ghost", ok: "badge-success", soon: "badge-warning", overdue: "badge-error" }[status];
+    const popup = (
+      <div class="space-y-1">
+        <div class="flex items-start justify-between gap-x-2 gap-y-2 flex-wrap">
+          <a href={`/inventory/${item.id}`} class="link font-semibold">{item.name}</a>
+          {open.length > 0 && <span class={`badge badge-sm ${tone}`}>{`${open[0].name} · ${dueText(open[0].dueDate, today)}`}</span>}
+        </div>
+        {tagNames.length > 0 && <div class="flex flex-wrap gap-1"><TagBadges tags={tagNames} /></div>}
+        {numbers.length > 0 && <div class="text-sm">{numbers[0]}{numbers.length > 1 ? ` +${numbers.length - 1}` : ""}</div>}
+        {item.locationText && <div class="text-sm">{item.locationText}</div>}
+        {open.length > 1 && <div class="text-xs">{t("inventory.map.moreInspections", { count: open.length - 1 })}</div>}
+      </div>
+    );
+    return { id: item.id, name: item.name, lat: Number(item.latitude), lng: Number(item.longitude), status, icon: icon.toString(), popup: popup.toString() };
+  });
+  const legend: [DueStatus, string][] = [["none", "badge-ghost"], ["ok", "badge-success"], ["soon", "badge-warning"], ["overdue", "badge-error"]];
+
+  return c.html(
+    <Layout title={t("inventory.map.title")} user={user}>
+      <PageHeader title={t("inventory.map.title")} actions={<HeaderAction icon="clipboard-list" label={t("inventory.map.toList")} href={buildListUrl("/inventory", { tag: tagFilter })} />} />
+      <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
+        <MultiSelectFilter
+          param="tag"
+          autoApply
+          searchable
+          options={allTags.map((tag) => ({ value: tag, label: tag }))}
+          selected={tagFilter}
+          allLabel={t("inventory.filter.allTags")}
+          countLabel={(count) => t("inventory.filter.tagCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
+        <div class="flex flex-wrap items-center gap-2 text-sm" aria-label={t("inventory.map.legend")}>
+          {legend.map(([s, cls]) => <span class={`badge ${cls}`}>{t(`inventory.map.legend.${s}`)}</span>)}
+        </div>
+        {missing > 0 && (
+          <a href={buildListUrl("/inventory", { tag: tagFilter, nocoords: "1" })} class="link text-sm">
+            {t(`inventory.map.noCoords.${missing === 1 ? "one" : "other"}`, { count: missing })}
+          </a>
+        )}
+      </div>
+      <link rel="stylesheet" href="/css/leaflet.css" />
+      <link rel="stylesheet" href="/css/MarkerCluster.css" />
+      <div id="inventory-map" role="region" aria-label={t("inventory.map.aria")} data-markers={JSON.stringify(markers)} data-attribution={t("inventory.map.attribution")} class="flex-1 min-h-[24rem] rounded-box border border-base-300 z-0" />
+      <script src="/js/inventory-map.min.js"></script>
+    </Layout>,
+  );
+});
+
 inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
@@ -1878,7 +1947,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
             <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
           </div>
         )}
-        {hasField(item.enabledFields, "location") && <>
+        {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && <>
           <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
           <ViewField label={t("inventory.form.coordinates")} value={item.latitude != null && item.longitude != null ? `${item.latitude}, ${item.longitude}` : null} />
         </>}
