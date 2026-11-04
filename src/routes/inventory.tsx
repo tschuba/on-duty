@@ -1965,8 +1965,8 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
                 <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
                 <script src="/js/inventory-location-view.min.js" defer></script>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span class="inline-flex items-center gap-1" title={t("inventory.location.latitude")}><Icon name="arrows-vertical" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.latitude")}: </span>{Number(item.latitude).toFixed(6)}</span>
-                  <span class="inline-flex items-center gap-1" title={t("inventory.location.longitude")}><Icon name="arrows-horizontal" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.longitude")}: </span>{Number(item.longitude).toFixed(6)}</span>
+                  <span class="inline-flex items-center gap-1" title={t("inventory.location.latitude")}><Icon name="world-latitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.latitude")}: </span>{Number(item.latitude).toFixed(6)}</span>
+                  <span class="inline-flex items-center gap-1" title={t("inventory.location.longitude")}><Icon name="world-longitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.longitude")}: </span>{Number(item.longitude).toFixed(6)}</span>
                   <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={coords} onclick="navigator.clipboard.writeText(this.dataset.url)">
                     <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
                   </button>
