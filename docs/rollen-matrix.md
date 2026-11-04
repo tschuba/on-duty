@@ -22,6 +22,8 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `inventory:read`           |   |   | ✔ | ✔ | ✔ |   |
 | `inventory:manage`         |   |   |   | ✔ | ✔ |   |
 | `inventory:configure`      |   |   |   | ✔ | ✔ |   |
+| `inventory:inspect`        |   |   |   | ✔ | ✔ |   |
+| `inventory:inspection:delete` |   |   |   | ✔ | ✔ |   |
 | `lending:read`             |   |   | ✔ | ✔ | ✔ |   |
 | `lending:manage`           |   |   |   | ✔ |   |   |
 | `org:read`                 |   |   | ✔ | ✔ | ✔ | ✔ |

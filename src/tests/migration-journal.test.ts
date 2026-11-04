@@ -11,7 +11,8 @@ const { entries } = JSON.parse(readFileSync(join(dir, "meta/_journal.json"), "ut
 // 0065 (#123) is set one tick behind 0064 for the same reason; drop this once the clock passes those timestamps.
 // 0066 is set one tick behind 0065 for the same reason.
 // 0067 (#68) likewise.
-const LEGACY_MAX_IDX = 67;
+// 0068-0069 (#122) likewise.
+const LEGACY_MAX_IDX = 69;
 
 describe("drizzle journal", () => {
   it("has gapless idx and a SQL file per tag", () => {

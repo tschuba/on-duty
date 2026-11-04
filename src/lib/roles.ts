@@ -19,6 +19,8 @@ export const PERMISSIONS = [
   "inventory:read",
   "inventory:manage",
   "inventory:configure",
+  "inventory:inspect",
+  "inventory:inspection:delete",
   "lending:read",
   "lending:manage",
   "org:read",

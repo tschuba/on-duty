@@ -137,6 +137,7 @@ Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donor
 
 - Tag-Badges: `badge badge-sm`, neutral (`badge-ghost`) als Standard.
 - Die mitgelieferten Vorlagennamen haben feste Stile (`TAG_STYLES` in `components/tag-badges.tsx`, Name ohne Groß-/Kleinschreibung): Fahrzeug `badge-primary`, Atemschutz `badge-info`, Gerät `badge-secondary`, PSA `badge-accent`, Sonstiges `badge-neutral`, Hydrant `badge-secondary badge-outline`. Bei mehreren Treffern erscheinen alle als Badge, das Icon trägt der erste.
+- Ergebnis-Anzeige (z. B. Prüfergebnis): daisyUI-`status`-Punkt (`status status-success` / `status-error` / `status-neutral`) mit Klartext daneben, kein Badge.
 - `badge-success`, `badge-warning` und `badge-error` sind dem Status vorbehalten (Prüffrist, Verleih), nie für Tags.
 
 ## Auswahl-Cards
