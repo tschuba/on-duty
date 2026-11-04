@@ -18,10 +18,10 @@ import { trimmed, parseTags, parseList } from "../lib/forms.js";
 import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID, tagSuggestionsJson } from "../lib/tags.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { addDays, addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
+import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
-import { generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
+import { dueSoonEnd, generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, validateLocation, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
@@ -838,7 +838,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   const inspectionNames = distinctInspectionNames(all.flatMap((item) => item.inspections));
   const today = new Date().toISOString().slice(0, 10);
-  const soonEnd = addDays(today, 30);
+  const soonEnd = dueSoonEnd(today);
   const wantedNames = new Set(inspectionFilter.map((n) => n.toLowerCase()));
 
   const filtered = all.filter((item) => {

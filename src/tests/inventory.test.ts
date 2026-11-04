@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffInspections, generateInspectionDueItems, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows } from "../lib/inventory.js";
+import { dueStatus, earliestDueStatus, worstDueStatus, dueText, diffInspections, generateInspectionDueItems, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows } from "../lib/inventory.js";
 
 describe("generateInspectionDueItems", () => {
   const item = (id: string, name: string, inspections: { id: string; name: string; dueDate: string | null }[], retiredAt: string | null = null) => ({ id, name, retiredAt, inspections });
@@ -143,5 +143,34 @@ describe("isInspectionNameViolation", () => {
     expect(isInspectionNameViolation({ cause: { code: "23505", constraint: idx } })).toBe(true);
     expect(isInspectionNameViolation({ code: "23505", constraint: "inventory_item_numbers_number_idx" })).toBe(false);
     expect(isInspectionNameViolation({ code: "23502", constraint: idx })).toBe(false);
+  });
+});
+
+describe("Marker-Farblogik", () => {
+  const today = "2026-06-01";
+  it("dueStatus", () => {
+    expect(dueStatus(null, today)).toBe("none");
+    expect(dueStatus("2026-05-31", today)).toBe("overdue");
+    expect(dueStatus(today, today)).toBe("soon");
+    expect(dueStatus("2026-07-01", today)).toBe("soon");
+    expect(dueStatus("2026-07-02", today)).toBe("ok");
+  });
+  it("earliestDueStatus nimmt die früheste offene Frist", () => {
+    expect(earliestDueStatus([null, "2027-01-01", "2026-06-10"], today)).toBe("soon");
+    expect(earliestDueStatus([null], today)).toBe("none");
+    expect(earliestDueStatus([], today)).toBe("none");
+  });
+  it("worstDueStatus Rangfolge", () => {
+    expect(worstDueStatus([])).toBe("none");
+    expect(worstDueStatus(["ok", "none"])).toBe("ok");
+    expect(worstDueStatus(["ok", "soon", "none"])).toBe("soon");
+    expect(worstDueStatus(["soon", "overdue", "ok"])).toBe("overdue");
+  });
+  it("dueText", () => {
+    expect(dueText("2026-06-21", today)).toBe("fällig 21.06.2026 (in 20 Tagen)");
+    expect(dueText("2026-05-29", today)).toBe("überfällig seit 3 Tagen");
+    expect(dueText("2026-05-31", today)).toBe("überfällig seit 1 Tag");
+    expect(dueText(today, today)).toBe("heute fällig (01.06.2026)");
+    expect(dueText(null, today)).toBe("keine Frist");
   });
 });
