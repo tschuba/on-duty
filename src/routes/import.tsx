@@ -250,6 +250,23 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
           </tbody>
         </table>
       </Section>
+
+      {plan.newTrainings + plan.existingTrainings > 0 && (
+        <Section title={t("import.trainings.heading")} badge={plan.newTrainings} open>
+          <table class="table table-zebra w-full">
+            <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th><th></th></tr></thead>
+            <tbody>
+              {plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => trainings.map((x) => (
+                <tr class={x.exists ? "opacity-50 italic" : undefined}>
+                  <td>{m.lastName}, {m.firstName}</td><td>{x.title}</td>
+                  <td>{x.completedAt ? formatDate(x.completedAt) : ""}</td><td>{x.expiresAt ? formatDate(x.expiresAt) : ""}</td>
+                  <td>{x.exists && <span class="badge badge-info badge-sm not-italic">{t("import.badge.existing")}</span>}</td>
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </Section>
+      )}
     </>
   );
 }
