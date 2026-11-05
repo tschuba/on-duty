@@ -3,43 +3,43 @@
 Quelle der Wahrheit: `APP_ROLES` in `src/db/seed.ts`, Permission-Liste in `src/lib/roles.ts`.
 Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus dem Seed.
 
-| Permission                 | Administrator | Bearbeiter | Leser | Vorstand | Führung | Finanzen |
-|----------------------------|:---:|:---:|:---:|:---:|:---:|:---:|
-| `members:read`             |   | ✔ | ✔ | ✔ | ✔ | ✔ |
-| `members:write`            |   | ✔ |   | ✔ | ✔ |   |
-| `members:bank-data:read`   |   |   |   |   |   |  ✔ |
-| `members:bank-data:write`  |   |   |   |   |   |  ✔ |
-| `members:delete`           |   |   |   | ✔ | ✔ |   |
-| `system:admin`             | ✔ |   |   |   |   |   |
-| `donations:read`           |   | ✔ |   | ✔ |   |   |
-| `donations:record`         |   | ✔ |   | ✔ |   |   |
-| `donations:delete`         |   |   |   | ✔ |   |   |
-| `donations:issue-receipts` |   |   |   | ✔ |   |   |
-| `applications:read`        |   | ✔ |   | ✔ |   |   |
-| `applications:record`      |   | ✔ |   | ✔ |   |   |
-| `applications:review`      |   |   |   | ✔ |   |   |
-| `applications:manage-forms`| ✔ | ✔ |   | ✔ |   |   |
-| `inventory:read`           |   |   | ✔ | ✔ | ✔ |   |
-| `inventory:manage`         |   |   |   | ✔ | ✔ |   |
-| `inventory:configure`      |   |   |   | ✔ | ✔ |   |
-| `inventory:inspect`        |   |   |   | ✔ | ✔ |   |
-| `inventory:inspection:delete` |   |   |   | ✔ | ✔ |   |
-| `lending:read`             |   |   | ✔ | ✔ | ✔ |   |
-| `lending:manage`           |   |   |   | ✔ |   |   |
-| `org:read`                 |   |   | ✔ | ✔ | ✔ | ✔ |
-| `org:write`                |   | ✔ |   | ✔ | ✔ |   |
-| `org:tax-data:read`        |   |   |   | ✔ |   | ✔ |
-| `org:tax-data:write`       |   |   |   |   |   | ✔ |
-| `import:run`               | ✔ |   |   |   |   |   |
-| `member-roles:read`        | ✔ | ✔ |   | ✔ | ✔ |   |
-| `member-roles:write`       | ✔ | ✔ |   |   |   |   |
-| `member-roles:delete`      | ✔ |   |   |   |   |   |
-| `member-role-types:read`   | ✔ | ✔ |   | ✔ | ✔ |   |
-| `member-role-types:write`  | ✔ |   |   |   |   |   |
-| `member-role-types:delete` | ✔ |   |   |   |   |   |
-| `anniversary-years:read`   | ✔ | ✔ |   | ✔ | ✔ |   |
-| `anniversary-years:write`  | ✔ | ✔ |   |   |   |   |
-| `anniversary-years:delete` | ✔ |   |   |   |   |   |
+| Permission                 | Administrator | Bearbeiter | Leser | Vorstand | Führung | Finanzen | Ausbildung |
+|----------------------------|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| `members:read`             |   | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
+| `members:write`            |   | ✔ |   | ✔ | ✔ |   |   |
+| `members:bank-data:read`   |   |   |   |   |   |  ✔ |   |
+| `members:bank-data:write`  |   |   |   |   |   |  ✔ |   |
+| `members:delete`           |   |   |   | ✔ | ✔ |   |   |
+| `system:admin`             | ✔ |   |   |   |   |   |   |
+| `donations:read`           |   | ✔ |   | ✔ |   |   |   |
+| `donations:record`         |   | ✔ |   | ✔ |   |   |   |
+| `donations:delete`         |   |   |   | ✔ |   |   |   |
+| `donations:issue-receipts` |   |   |   | ✔ |   |   |   |
+| `applications:read`        |   | ✔ |   | ✔ |   |   |   |
+| `applications:record`      |   | ✔ |   | ✔ |   |   |   |
+| `applications:review`      |   |   |   | ✔ |   |   |   |
+| `applications:manage-forms`| ✔ | ✔ |   | ✔ |   |   |   |
+| `inventory:read`           |   |   | ✔ | ✔ | ✔ |   |   |
+| `inventory:manage`         |   |   |   | ✔ | ✔ |   |   |
+| `inventory:configure`      |   |   |   | ✔ | ✔ |   |   |
+| `inventory:inspect`        |   |   |   | ✔ | ✔ |   |   |
+| `inventory:inspection:delete` |   |   |   | ✔ | ✔ |   |   |
+| `lending:read`             |   |   | ✔ | ✔ | ✔ |   |   |
+| `lending:manage`           |   |   |   | ✔ |   |   |   |
+| `org:read`                 |   |   | ✔ | ✔ | ✔ | ✔ |   |
+| `org:write`                |   | ✔ |   | ✔ | ✔ |   |   |
+| `org:tax-data:read`        |   |   |   | ✔ |   | ✔ |   |
+| `org:tax-data:write`       |   |   |   |   |   | ✔ |   |
+| `import:run`               | ✔ |   |   |   |   |   |   |
+| `member-roles:read`        | ✔ | ✔ |   | ✔ | ✔ |   |   |
+| `member-roles:write`       | ✔ | ✔ |   |   |   |   |   |
+| `member-roles:delete`      | ✔ |   |   |   |   |   |   |
+| `member-role-types:read`   | ✔ | ✔ |   | ✔ | ✔ |   |   |
+| `member-role-types:write`  | ✔ |   |   |   |   |   |   |
+| `member-role-types:delete` | ✔ |   |   |   |   |   |   |
+| `anniversary-years:read`   | ✔ | ✔ |   | ✔ | ✔ |   |   |
+| `anniversary-years:write`  | ✔ | ✔ |   |   |   |   |   |
+| `anniversary-years:delete` | ✔ |   |   |   |   |   |   |
 
 ## Hinweis
 

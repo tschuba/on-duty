@@ -59,7 +59,14 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Führung",
     description: "Kann das Inventar vollständig verwalten",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "inventory:read", "inventory:manage", "inventory:configure", "lending:read", "org:read", "org:write", "member-roles:read", "member-role-types:read", "anniversary-years:read", "events:manage"],
+    permissions: ["members:read", "members:write", "members:delete", "inventory:read", "inventory:manage", "inventory:configure", "lending:read", "org:read", "org:write", "member-roles:read", "member-role-types:read", "anniversary-years:read", "events:manage", "training:read", "training:write", "training:delete"],
+  },
+  {
+    id: "e5f6a7b8-9c0d-4e1f-8a2b-3c4d5e6f7a8b",
+    name: "Ausbildung",
+    description: "Pflegt Ausbildungen und Lehrgänge der Mitglieder",
+    isProtected: true,
+    permissions: ["members:read", "training:read", "training:write", "training:delete"],
   },
 ];
 
