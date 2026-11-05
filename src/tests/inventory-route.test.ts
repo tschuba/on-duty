@@ -633,6 +633,39 @@ describe("GET /inspections", () => {
   });
 });
 
+describe("GET /inspections history", () => {
+  const rec = (id: string, inspectedAt: string) => ({ id, inspectionId: "p1", inspectedAt, result: "passed", inspectorPersonId: null, recordedBy: "u", note: null, createdAt: new Date(), inspector: null, recorder: null, inspection: { name: "HU", item: { id: "a", name: "LF 10" } } });
+  const open = { id: "p1", name: "HU", intervalMonths: null, inspectedAt: null };
+
+  it("orders overdue, upcoming ascending, done descending and links item and record", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "LF 10", inspections: [{ ...open, id: "p1", dueDate: "2099-01-01" }, { ...open, id: "p2", name: "UVV", dueDate: "2000-01-01" }, { ...open, id: "p3", name: "Funk", dueDate: "2098-01-01" }] })];
+    inspectionRecordsFindManyResult = [rec("r1", "2024-01-01"), rec("r2", "2025-01-01")];
+    const html = await (await inventoryRoutes.request("/inspections?range=custom&start=1990-01-01&end=2100-12-31")).text();
+    const pos = ["überfällig", "2098", "2099", "01.01.2025", "01.01.2024"].map((s) => html.indexOf(s, html.indexOf("<tbody")));
+    expect(pos.every((p) => p > 0)).toBe(true);
+    expect([...pos].sort((x, y) => x - y)).toEqual(pos);
+    expect(html).toContain('href="/inventory/a/inspections/r2"');
+    expect(html).toContain('href="/inventory/a"');
+  });
+
+  it("status filter hides the other part", async () => {
+    itemsFindManyResult = [makeItem({ id: "a", name: "LF 10", inspections: [{ ...open, dueDate: "2099-01-01" }] })];
+    inspectionRecordsFindManyResult = [rec("r1", "2024-01-01")];
+    const q = "range=custom&start=1990-01-01&end=2100-12-31";
+    const done = await (await inventoryRoutes.request(`/inspections?${q}&status=done`)).text();
+    expect(done).toContain("/inspections/r1");
+    expect(done).not.toContain("Anstehend</td>");
+    const up = await (await inventoryRoutes.request(`/inspections?${q}&status=upcoming`)).text();
+    expect(up).not.toContain("/inspections/r1");
+    expect(up).toContain("Anstehend</td>");
+  });
+
+  it("shows empty state", async () => {
+    itemsFindManyResult = [];
+    expect(await (await inventoryRoutes.request("/inspections")).text()).toContain("Keine Prüfungen im gewählten Zeitraum.");
+  });
+});
+
 describe("inspection types", () => {
   const insp = (id: string, name: string, dueDate: string | null) => ({ id, name, intervalMonths: 12, inspectedAt: null, dueDate });
 

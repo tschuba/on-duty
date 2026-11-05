@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { ToggleFilter } from "../components/toggle-filter.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
-import { and, asc, eq, ilike, inArray, isNull, max, or } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
@@ -1720,7 +1720,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
 
-  const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) });
+  const range = parseRange(c.req.query(), today, "future", { start: addMonths(today, -12), end: addMonths(today, 12) });
   const { start, end } = range;
   const inspectionFilter = c.req.queries("inspection") ?? [];
 
@@ -1735,8 +1735,21 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
     (a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name, "de") || a.inspectionName.localeCompare(b.inspectionName, "de"),
   );
 
-  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { ...rangeParams(range), inspection: inspectionFilter }, extra);
+  const status = ["upcoming", "done"].includes(c.req.query("status") ?? "") ? c.req.query("status")! : "all";
+  const qs = (extra: Record<string, string | undefined>) => buildListUrl("/inventory/inspections", { ...rangeParams(range), inspection: inspectionFilter, status: status === "all" ? undefined : status }, extra);
   const presets = rangePresets(today, "future");
+
+  // Zwei Abfragen, eine Zeilenform: Fristen (überfällig, dann aufsteigend) vor Historie (absteigend).
+  const dueRows = status === "done" ? [] : due.map((d) => ({ key: d.inspectionId, date: d.dueDate, itemId: d.id, itemName: d.name, inspectionName: d.inspectionName, overdue: d.dueDate < today, record: undefined as undefined | InspectionRecordRow }));
+  const records = status === "upcoming" ? [] : ((await db.query.inventoryInspectionRecords.findMany({
+    where: and(gte(inventoryInspectionRecords.inspectedAt, start), lte(inventoryInspectionRecords.inspectedAt, end)),
+    with: { inspection: { with: { item: true } }, inspector: true, recorder: true },
+  })) as (InspectionRecordRow & { inspection: { name: string; item: { id: string; name: string } } })[]);
+  const doneRows = records
+    .filter((r) => inspectionFilter.length === 0 || inspectionFilter.includes(r.inspection.name))
+    .sort((x, y) => y.inspectedAt.localeCompare(x.inspectedAt) || +y.createdAt - +x.createdAt)
+    .map((r) => ({ key: r.id, date: r.inspectedAt, itemId: r.inspection.item.id, itemName: r.inspection.item.name, inspectionName: r.inspection.name, overdue: false, record: r }));
+  const rows = [...dueRows, ...doneRows];
 
   return c.html(
     <Layout title={t("inventory.inspections.title")} user={user}>
@@ -1744,7 +1757,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/inspections"
-          hidden={inspectionFilter.map((n): [string, string] => ["inspection", n])} href={(p) => qs(p)} />
+          hidden={[...inspectionFilter.map((n): [string, string] => ["inspection", n]), ...(status === "all" ? [] : [["status", status] as [string, string]])]} href={(p) => qs(p)} />
         <div class="self-end">
           <MultiSelectFilter
             param="inspection"
@@ -1757,33 +1770,42 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
             resetLabel={t("common.reset")}
           />
         </div>
+        <div class="join self-end" role="group" aria-label={t("inventory.inspections.table.status")}>
+          {(["all", "upcoming", "done"] as const).map((s) => (
+            <a class={`btn join-item ${status === s ? "btn-active" : ""}`} href={qs({ status: s === "all" ? undefined : s })}>{t(`inventory.inspections.status.${s}`)}</a>
+          ))}
+        </div>
       </div>
 
-      {due.length === 0 ? (
-        <p class="text-base-content/60 py-8">{t("inventory.inspections.empty")}</p>
-      ) : (
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th>{t("inventory.inspections.table.item")}</th>
-              <th>{t("inventory.inspections.table.inspection")}</th>
-              <th>{t("inventory.inspections.table.dueDate")}</th>
+      <table class="table table-zebra w-full">
+        <thead>
+          <tr>
+            <th>{t("inventory.inspections.table.date")}</th>
+            <th>{t("inventory.inspections.table.item")}</th>
+            <th>{t("inventory.inspections.table.inspection")}</th>
+            <th>{t("inventory.inspections.table.status")}</th>
+            <th>{t("inventory.inspection.result")}</th>
+            <th>{t("inventory.inspection.inspector")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && <tr><td colspan={6} class="text-center opacity-50 py-8">{t("inventory.inspections.empty")}</td></tr>}
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td class={r.overdue ? "text-error font-semibold" : ""}>
+                {r.record ? <a class="link" href={`/inventory/${r.itemId}/inspections/${r.record.id}`}>{formatDate(r.date)}</a> : formatDate(r.date)}
+              </td>
+              <td><a class="link" href={`/inventory/${r.itemId}`}>{r.itemName}</a></td>
+              <td>{r.inspectionName}</td>
+              <td>
+                {r.record ? t("inventory.inspections.status.done") : r.overdue ? <span class="badge badge-error badge-sm">{t("inventory.inspections.overdue")}</span> : t("inventory.inspections.status.upcoming")}
+              </td>
+              <td>{r.record ? <ResultDot result={r.record.result} legacy={isLegacyRecord(r.record)} /> : null}</td>
+              <td>{r.record?.inspector ? personName(r.record.inspector) : null}</td>
             </tr>
-          </thead>
-          <tbody>
-            {due.map((d) => {
-              const overdue = d.dueDate < today;
-              return (
-                <tr key={d.inspectionId} class="cursor-pointer hover" onclick={`window.location='/inventory/${d.id}'`}>
-                  <td class={overdue ? "text-error font-semibold" : ""}>{d.name}</td>
-                  <td>{d.inspectionName}</td>
-                  <td class={overdue ? "text-error font-semibold" : ""}>{formatDate(d.dueDate)} {overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+          ))}
+        </tbody>
+      </table>
     </Layout>
   );
 });
