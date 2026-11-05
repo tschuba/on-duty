@@ -50,3 +50,26 @@ export function parseTrainingInput(body: Record<string, unknown>, today: string)
   if (completedAt && expiresAt && expiresAt < completedAt) return { error: "order" };
   return { value: { title, completedAt, expiresAt, organizer: str("organizer") || null, notes: str("notes") || null } };
 }
+
+export const TRAINING_SORT_KEYS = ["member", "title", "completedAt", "expiresAt", "organizer"] as const;
+export type TrainingSortKey = (typeof TRAINING_SORT_KEYS)[number];
+export type SortDir = "asc" | "desc";
+type SortFields = Record<TrainingSortKey, string | null>;
+
+export const parseTrainingSort = (v?: string): TrainingSortKey | undefined => TRAINING_SORT_KEYS.find((k) => k === v);
+export const defaultTrainingDir = (k: TrainingSortKey): SortDir => (k === "completedAt" || k === "expiresAt" ? "desc" : "asc");
+export const nextTrainingDir = (col: TrainingSortKey, sort: TrainingSortKey | undefined, dir: SortDir): SortDir =>
+  sort === col ? (dir === "asc" ? "desc" : "asc") : defaultTrainingDir(col);
+
+// Leere Werte stehen immer zuletzt, unabhängig von der Richtung.
+const cmp = (a: string | null, b: string | null, dir: SortDir) =>
+  a === b || (!a && !b) ? 0 : !a ? 1 : !b ? -1 : (dir === "asc" ? 1 : -1) * a.localeCompare(b, "de");
+
+/** Standard: Ablaufdatum ↓, Abschlussdatum ↓, Bezeichnung. Eine gewählte Spalte steht davor, der Standard bleibt Tiebreaker. */
+export function sortTrainings<T>(rows: T[], f: (x: T) => SortFields, sort?: TrainingSortKey, dir?: SortDir): T[] {
+  const base = (a: SortFields, b: SortFields) => cmp(a.expiresAt, b.expiresAt, "desc") || cmp(a.completedAt, b.completedAt, "desc") || cmp(a.title, b.title, "asc");
+  return [...rows].sort((x, y) => {
+    const a = f(x), b = f(y);
+    return (sort && cmp(a[sort], b[sort], dir ?? defaultTrainingDir(sort))) || base(a, b);
+  });
+}

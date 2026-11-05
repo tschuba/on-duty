@@ -1,9 +1,10 @@
+import { sortTrainings } from "../lib/training.js";
 import { Hono } from "hono";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
 import { db } from "../db/index.js";
 import { FromMissingBadge } from "./members.js";
-import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, inventoryTemplates, memberRoleAssignments, memberRoles, members, persons } from "../db/schema/index.js";
+import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, inventoryTemplates, memberRoleAssignments, memberRoles, members, persons, trainingRecords } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
@@ -15,7 +16,7 @@ import { ChipInput } from "../components/chip-input.js";
 import { Section } from "../components/section.js";
 import { HTTP_STATUS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import {
-  ASSUMED_NOTE, ACTIVE_ROLE_ID, ImportError, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
+  ASSUMED_NOTE, ACTIVE_ROLE_ID, ImportError, courseColumns, trainingKey, TRAINING_SPECIAL, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
   parseInventory, parseMembers, planInventory, planMembers, readWorkbook, unmappedColumns,
   type ImportKind, type ImportTemplate, type InventoryPlan, type MemberPlan, type RoleOption,
 } from "../lib/import.js";
@@ -118,10 +119,12 @@ importRoutes.get("/", guard, (c) => c.html(<UploadPage user={c.get("user")} kind
 async function loadContext() {
   const roles: RoleOption[] = (await db.select({ id: memberRoles.id, title: memberRoles.title, grantsActiveStatus: memberRoles.grantsActiveStatus }).from(memberRoles))
     .sort((x, y) => x.title.localeCompare(y.title, "de"));
-  const people = await db.select({ lastName: persons.lastName, firstName: persons.firstName, birthDate: persons.birthDate }).from(persons).innerJoin(members, eq(members.personId, persons.id)).where(isNotNull(persons.birthDate));
+  const people = await db.select({ id: members.id, lastName: persons.lastName, firstName: persons.firstName, birthDate: persons.birthDate }).from(persons).innerJoin(members, eq(members.personId, persons.id)).where(isNotNull(persons.birthDate));
   const existingKeys = new Set(people.map(memberKey));
+  const memberIds = new Map(people.map((p) => [memberKey(p), p.id]));
+  const trainingKeys = new Set((await db.select().from(trainingRecords)).map((r) => trainingKey(r.memberId, r)));
   const numbers = new Set((await db.select({ n: inventoryItemNumbers.number }).from(inventoryItemNumbers)).map((r) => r.n));
-  return { roles, existingKeys, numbers };
+  return { roles, existingKeys, numbers, training: { memberIds, keys: trainingKeys } };
 }
 
 async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer; name: string; kind: ImportKind; headers: string[]; rows: ReturnType<typeof readWorkbook>["rows"] }> {
@@ -248,6 +251,23 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
           </tbody>
         </table>
       </Section>
+
+      {plan.newTrainings + plan.existingTrainings > 0 && (
+        <Section title={t("import.trainings.heading")} badge={plan.newTrainings} open>
+          <table class="table table-zebra w-full">
+            <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th><th></th></tr></thead>
+            <tbody>
+              {plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => sortTrainings(trainings, (x) => ({ ...x, member: null, organizer: null })).map((x) => (
+                <tr class={x.exists ? "opacity-50 italic" : undefined}>
+                  <td>{m.lastName}, {m.firstName}</td><td>{x.title}</td>
+                  <td>{x.completedAt ? formatDate(x.completedAt) : ""}</td><td>{x.expiresAt ? formatDate(x.expiresAt) : ""}</td>
+                  <td>{x.exists && <span class="badge badge-info badge-sm not-italic">{t("import.badge.existing")}</span>}</td>
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </Section>
+      )}
     </>
   );
 }
@@ -340,7 +360,10 @@ async function handle(c: any, run: boolean) {
   try {
     const up = await readUpload(body, only);
     const ctx = await loadContext();
-    const unmapped = unmappedColumns(up.kind, up.headers, up.rows);
+    const canTraining = user.permissions.has("training:write");
+    const courses = up.kind === "members" && canTraining ? courseColumns(up.headers, up.rows) : null;
+    const handled = new Set([...(courses ?? []), ...(canTraining ? TRAINING_SPECIAL : [])]);
+    const unmapped = unmappedColumns(up.kind, up.headers, up.rows).filter((u) => !handled.has(u.column));
     const fp = String(body.fp ?? "");
     const dataB64 = up.buf.toString("base64");
     const hidden = (
@@ -355,10 +378,10 @@ async function handle(c: any, run: boolean) {
     );
 
     if (up.kind === "members") {
-      const plan = planMembers(parseMembers(up.rows), ctx.roles, ctx.existingKeys, body, today());
+      const plan = planMembers(parseMembers(up.rows, courses, today()), ctx.roles, ctx.existingKeys, body, today(), courses ? ctx.training : null);
       const needsActive = plan.rows.some((r) => r.included && r.m.active && !r.m.deathDate);
       const activeMissing = needsActive && !ctx.roles.some((r) => r.id === ACTIVE_ROLE_ID);
-      const canRun = plan.blockers === 0 && !activeMissing && (plan.assumedCount === 0 || body.assumed_ok === "1") && plan.rows.some((r) => r.included);
+      const canRun = plan.blockers === 0 && !activeMissing && (plan.assumedCount === 0 || body.assumed_ok === "1") && plan.rows.some((r) => r.included || (courses && r.trainings.some((x) => !x.exists)));
       if (run) {
         if (!canRun) throw new ImportError(activeMissing ? t("import.error.activeRoleMissing") : t("import.error.previewIncomplete"));
         const report = await runMembers(plan, ctx.roles, user);
@@ -372,8 +395,9 @@ async function handle(c: any, run: boolean) {
             { label: t("import.summary.existing"), value: plan.rows.filter((r) => r.duplicate).length },
             { label: t("import.summary.errors"), value: plan.blockers, tone: "error" },
             { label: t("import.summary.assumed"), value: plan.assumedCount, tone: "warning" },
+            ...(courses ? [{ label: t("import.summary.trainings"), value: plan.newTrainings }, { label: t("import.summary.trainingsExisting"), value: plan.existingTrainings }] : []),
           ]}
-          notices={[activeMissing && t("import.notice.activeRoleMissing"), plan.blockers > 0 && t("import.notice.incompleteRows", { count: plan.blockers }), plan.assumedCount > 0 && body.assumed_ok !== "1" && { text: t("import.notice.confirmAssumed"), href: "#assignments" }]}>
+          notices={[!canTraining && up.kind === "members" && t("import.notice.noTraining"), activeMissing && t("import.notice.activeRoleMissing"), plan.blockers > 0 && t("import.notice.incompleteRows", { count: plan.blockers }), plan.assumedCount > 0 && body.assumed_ok !== "1" && { text: t("import.notice.confirmAssumed"), href: "#assignments" }]}>
           <MemberPreview plan={plan} roles={ctx.roles} confirmed={body.assumed_ok === "1"} />
         </PreviewShell>,
       );
@@ -530,8 +554,14 @@ function ReportPage({ kind, only, report, unmapped, user }: { kind: ImportKind; 
   );
 }
 
+async function insertTrainings(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], memberId: string, list: { title: string; completedAt: string | null; expiresAt: string | null; exists: boolean }[]) {
+  const todo = list.filter((x) => !x.exists).map(({ title, completedAt, expiresAt }) => ({ memberId, title: title.slice(0, 200), completedAt, expiresAt }));
+  if (todo.length) await tx.insert(trainingRecords).values(todo);
+}
+
 async function runMembers(plan: MemberPlan, roles: RoleOption[], _user: unknown): Promise<Report> {
   const rows = plan.rows.filter((r) => r.included);
+  const knownTrainings = plan.rows.filter((r) => !r.included && r.existingMemberId && r.trainings.some((x) => !x.exists));
   let current = "";
   try {
     return await db.transaction(async (tx) => {
@@ -549,7 +579,7 @@ async function runMembers(plan: MemberPlan, roles: RoleOption[], _user: unknown)
           newRoles.push(`${a.title}${a.grants ? t("import.report.grantsActiveSuffix") : ""}`);
         }
       }
-      for (const { m, assignments } of rows) {
+      for (const { m, assignments, trainings } of rows) {
         current = `${m.lastName}, ${m.firstName}`;
         const iban = m.iban ? normalizeIban(m.iban) : null;
         const [person] = await tx.insert(persons).values({
@@ -569,10 +599,15 @@ async function runMembers(plan: MemberPlan, roles: RoleOption[], _user: unknown)
           });
         }
         if (assumed) links.push({ id: member.id, label: current });
+        await insertTrainings(tx, member.id, trainings);
+      }
+      for (const { m, existingMemberId, trainings } of knownTrainings) {
+        current = `${m.lastName}, ${m.firstName}`;
+        await insertTrainings(tx, existingMemberId!, trainings);
       }
       void roles;
       const skipped = plan.rows.length - rows.length;
-      return { created: rows.length, skipped, lines: [t("import.report.rowsRead", { count: plan.rows.length })], links, newRoles };
+      return { created: rows.length, skipped, lines: [t("import.report.rowsRead", { count: plan.rows.length }), ...(plan.newTrainings ? [t("import.report.trainings", { count: plan.newTrainings })] : [])], links, newRoles };
     });
   } catch (e) {
     throw new ImportError(t("import.error.rolledBack", { item: current, message: (e as Error).message }));
