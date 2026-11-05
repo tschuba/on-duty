@@ -1770,11 +1770,14 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
             resetLabel={t("common.reset")}
           />
         </div>
-        <div class="join self-end" role="group" aria-label={t("inventory.inspections.table.status")}>
-          {(["all", "upcoming", "done"] as const).map((s) => (
-            <a class={`btn join-item ${status === s ? "btn-active" : ""}`} href={qs({ status: s === "all" ? undefined : s })}>{t(`inventory.inspections.status.${s}`)}</a>
+        <form method="get" action="/inventory/inspections" class="filter self-end" aria-label={t("inventory.inspections.table.status")}>
+          {Object.entries(rangeParams(range)).filter(([, v]) => v !== undefined).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
+          {inspectionFilter.map((n) => <input type="hidden" name="inspection" value={n} />)}
+          <input class="btn btn-square filter-reset" type="radio" name="status" value="" aria-label={t("inventory.inspections.status.all")} checked={status === "all"} onchange="this.form.submit()" />
+          {(["upcoming", "done"] as const).map((s) => (
+            <input class="btn" type="radio" name="status" value={s} aria-label={t(`inventory.inspections.status.${s}`)} checked={status === s} onchange="this.form.submit()" />
           ))}
-        </div>
+        </form>
       </div>
 
       <table class="table table-zebra w-full">
