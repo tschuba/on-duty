@@ -216,10 +216,10 @@ trainingRoutes.get("/training", read, async (c) => {
       <form method="get" action="/training" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
         <input type="search" name="member" class="input" placeholder={t("training.filter.member")} value={q.member ?? ""} />
         <input type="search" name="title" class="input" placeholder={t("training.filter.title")} value={q.title ?? ""} />
-        <select name="status" class="select" onchange="this.form.submit()">
-          <option value="">{t("training.filter.statusAll")}</option>
-          {LIST_STATUSES.map((s) => <option value={s} selected={s === statusQ}>{t(`training.status.${s}`)}</option>)}
-        </select>
+        <div class="filter self-end" role="radiogroup" aria-label={t("training.filter.statusLabel")}>
+          <input class="btn btn-square filter-reset" type="radio" name="status" value="" aria-label={t("training.filter.statusAll")} checked={!statusQ} onchange="this.form.submit()" />
+          {LIST_STATUSES.map((s) => <input class="btn" type="radio" name="status" value={s} aria-label={t(`training.status.${s}`)} checked={s === statusQ} onchange="this.form.submit()" />)}
+        </div>
         <label class="flex items-center gap-2 min-h-11 cursor-pointer">
           <input type="checkbox" name="former" value="1" class="toggle toggle-primary" checked={withFormer} onchange="this.form.submit()" />
           <span class="text-sm">{t("training.filter.former")}</span>
