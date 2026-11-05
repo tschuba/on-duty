@@ -6,6 +6,7 @@ import { db } from "../db/index.js";
 import {
   users,
   persons,
+  members,
   sessions,
   accounts,
   anniversaryYears,
@@ -25,6 +26,7 @@ import { logger } from "../lib/logger.js";
 import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
+import { formatDate } from "../lib/format.js";
 import { setFlash } from "../lib/flash.js";
 import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SEARCH_DEBOUNCE_MS, SOURCE_REPO_URL } from "../lib/constants.js";
 import { isPendingUser } from "../lib/registration.js";
@@ -418,8 +420,9 @@ adminRoutes.get("/users/search-persons", guard, async (c) => {
   const fullName = sql`${persons.firstName} || ' ' || ${persons.lastName}`;
   const score = sql<number>`greatest(case when ${email} <> '' and lower(${persons.email}) = ${email} then 1 else 0 end, similarity(${fullName}, ${name}))`;
   const needle = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-  const results = await db
-    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName })
+  const isMember = sql<boolean>`exists (select 1 from ${members} where ${members.personId} = ${persons.id})`;
+  const rows = await db
+    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, birthDate: persons.birthDate })
     .from(persons)
     .where(and(
       suggest
@@ -427,8 +430,18 @@ adminRoutes.get("/users/search-persons", guard, async (c) => {
         : or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(fullName, needle)),
       or(isNull(persons.userId), eq(persons.userId, userId)),
     ))
-    .orderBy(desc(score), asc(persons.lastName), asc(persons.firstName))
-    .limit(suggest ? 3 : 10);
+    .orderBy(desc(score), desc(isMember), asc(persons.lastName), asc(persons.firstName))
+    .limit(50);
+  // Same name + email = same real person (e.g. repeated /lend requests, #140); the first row wins, members sort first.
+  const seen = new Set<string>();
+  const results = rows
+    .filter((p) => { const k = `${p.firstName}|${p.lastName}|${p.email?.toLowerCase() ?? ""}`.toLowerCase(); return !seen.has(k) && !!seen.add(k); })
+    .slice(0, suggest ? 3 : 10);
+  const nameCount = new Map<string, number>();
+  for (const p of results) { const k = `${p.firstName} ${p.lastName}`.toLowerCase(); nameCount.set(k, (nameCount.get(k) ?? 0) + 1); }
+  // Only same-named entries get a hint, so the list stays clean otherwise.
+  const hint = (p: (typeof results)[number]) =>
+    (nameCount.get(`${p.firstName} ${p.lastName}`.toLowerCase()) ?? 0) > 1 ? [p.birthDate && formatDate(p.birthDate), p.email].filter(Boolean).join(" · ") : "";
   if (results.length === 0) return suggest ? c.html("") : c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
   return c.html(
     <>
@@ -436,6 +449,7 @@ adminRoutes.get("/users/search-persons", guard, async (c) => {
       {results.map((p) => (
         <div key={p.id} class="person-result p-2 hover:bg-base-200 cursor-pointer text-sm" data-id={p.id} data-name={`${p.firstName} ${p.lastName}`}>
           {p.firstName} {p.lastName}
+          {hint(p) && <span class="opacity-60"> ({hint(p)})</span>}
         </div>
       ))}
     </>
