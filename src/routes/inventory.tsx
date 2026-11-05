@@ -8,6 +8,7 @@ import { Icon } from "../components/icon.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { TAG_STYLES, TagAvatar, TagBadges } from "../components/tag-badges.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { DeleteDialog } from "../components/delete-dialog.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -1842,6 +1843,9 @@ type InspectionRecordRow = typeof inventoryInspectionRecords.$inferSelect & {
   recorder: { name: string } | null;
 };
 
+// Aus der Migration übernommene Zeilen (ohne Ergebnis/Urheber) sind nicht änderbar.
+const isLegacyRecord = (r: { result: unknown; recordedBy: unknown; inspectorPersonId: unknown }) => r.result == null && r.recordedBy == null && r.inspectorPersonId == null;
+
 const personName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`;
 
 const INSPECTION_DIALOG_SCRIPT = `
@@ -1973,9 +1977,9 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
           {history.length === 0 && <tr><td colspan={6} class="text-center opacity-50 py-4">{t("inventory.inspection.historyEmpty")}</td></tr>}
           {history.map((h) => (
             <tr data-history-row={h.inspectionId}>
-              <td>{formatDate(h.inspectedAt)}</td>
+              <td><a class="link" href={`/inventory/${item.id}/inspections/${h.id}`}>{formatDate(h.inspectedAt)}</a></td>
               <td>{h.inspection.name}</td>
-              <td><ResultDot result={h.result} legacy={h.result == null && h.recordedBy == null && h.inspectorPersonId == null} /></td>
+              <td><ResultDot result={h.result} legacy={isLegacyRecord(h)} /></td>
               <td>{h.inspector ? personName(h.inspector) : "—"}</td>
               <td class="whitespace-pre-line">{h.note ?? "—"}</td>
               <td>{h.recorder?.name ?? "—"}</td>
@@ -2050,6 +2054,102 @@ inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("invento
     await tx.update(inventoryInspections).set({ inspectedAt, dueDate }).where(eq(inventoryInspections.id, inspection.id));
   });
   setFlash(c, t("inventory.inspection.doneFlash"), "success");
+  return c.redirect(`/inventory/${id}`);
+});
+
+async function fetchInspectionRecord(itemId: string, recordId: string) {
+  const record = await db.query.inventoryInspectionRecords.findFirst({
+    where: eq(inventoryInspectionRecords.id, recordId),
+    with: { inspection: true, inspector: true, recorder: true },
+  }) as (InspectionRecordRow & { inspection: { name: string; inventoryItemId: string } }) | undefined;
+  return record && record.inspection.inventoryItemId === itemId ? record : undefined;
+}
+
+// GET /inventory/:id/inspections/:recordId — Detailseite einer Prüfung.
+inventoryRoutes.get("/:id/inspections/:recordId", requireAuth("inventory:read"), async (c) => {
+  const user = c.get("user")!;
+  const id = c.req.param("id");
+  const r = await fetchInspectionRecord(id, c.req.param("recordId"));
+  if (!r) return c.notFound();
+  const item = await db.query.inventoryItems.findFirst({ where: eq(inventoryItems.id, id), columns: { name: true } });
+  const legacy = isLegacyRecord(r);
+  const base = `/inventory/${id}/inspections/${r.id}`;
+  const remove = !legacy && user.permissions.has("inventory:inspection:delete") && (
+    <DeleteDialog header id={`inspection-record-${r.id}`} action={`${base}/delete`} title={t("inventory.inspection.deleteTitle")} body={t("inventory.inspection.deleteConfirm")} />
+  );
+  const title = `${r.inspection.name} · ${formatDate(r.inspectedAt)}`;
+  return c.html(
+    <Layout title={title} user={user}>
+      <PageHeader title={title} backHref={`/inventory/${id}`} actions={<DetailActions editHref={!legacy && user.permissions.has("inventory:inspect") ? `${base}/edit` : undefined} remove={remove} />} />
+      <ViewGrid>
+        <ViewField label={t("inventory.inspections.table.item")} value={item?.name} />
+        <ViewField label={t("inventory.form.inspectionName")} value={r.inspection.name} />
+        <ViewField label={t("inventory.inspection.doneDate")} value={formatDate(r.inspectedAt)} />
+        <ViewField label={t("inventory.inspection.result")} value={<ResultDot result={r.result} legacy={legacy} />} />
+        <ViewField label={t("inventory.inspection.inspector")} value={r.inspector ? personName(r.inspector) : null} />
+        <ViewField label={t("inventory.inspection.recordedBy")} value={r.recorder?.name} />
+        <ViewField label={t("inventory.inspection.note")} value={r.note && <span class="whitespace-pre-line">{r.note}</span>} />
+      </ViewGrid>
+    </Layout>,
+  );
+});
+
+// GET /inventory/:id/inspections/:recordId/edit — nur Prüfer und Bemerkung (Datum/Ergebnis bleiben fest).
+inventoryRoutes.get("/:id/inspections/:recordId/edit", requireAuth("inventory:inspect"), async (c) => {
+  const id = c.req.param("id");
+  const r = await fetchInspectionRecord(id, c.req.param("recordId"));
+  if (!r || isLegacyRecord(r)) return c.notFound();
+  const base = `/inventory/${id}/inspections/${r.id}`;
+  const title = t("inventory.inspection.editTitle", { name: r.inspection.name });
+  return c.html(
+    <Layout title={title} user={c.get("user")!}>
+      <PageHeader title={title} backHref={base} actions={<FormActions formId="inspection-record-form" cancelHref={base} />} />
+      <form id="inspection-record-form" method="post" action={base} class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
+        <ViewField label={t("inventory.inspection.doneDate")} value={formatDate(r.inspectedAt)} />
+        <ViewField label={t("inventory.inspection.result")} value={<ResultDot result={r.result} legacy={false} />} />
+        <Field label={t("inventory.inspection.inspector")}>
+          <input type="hidden" name="inspectorPersonId" value={r.inspectorPersonId ?? ""} />
+          <div class="flex items-center gap-2 min-h-6"><span data-inspector-name>{r.inspector ? personName(r.inspector) : ""}</span><button type="button" class="btn btn-ghost btn-xs" onclick="clearInspector(this)">{t("inventory.inspection.inspectorClear")}</button></div>
+          <input type="text" name="q" autocomplete="off" class="input w-full" placeholder={t("inventory.inspection.inspectorSearch")}
+            hx-get="/inventory/search-persons" hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`} hx-target="next [data-inspector-results]" />
+          <div data-inspector-results class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+        </Field>
+        <Field label={t("inventory.inspection.note")}>
+          <textarea name="note" class="textarea w-full" rows={3} maxlength={1000}>{r.note ?? ""}</textarea>
+        </Field>
+      </form>
+      <script dangerouslySetInnerHTML={{ __html: INSPECTION_DIALOG_SCRIPT }} />
+    </Layout>,
+  );
+});
+
+// POST /inventory/:id/inspections/:recordId — Prüfer und Bemerkung speichern.
+inventoryRoutes.post("/:id/inspections/:recordId", requireAuth("inventory:inspect"), async (c) => {
+  const id = c.req.param("id");
+  const r = await fetchInspectionRecord(id, c.req.param("recordId"));
+  if (!r || isLegacyRecord(r)) return c.notFound();
+  const body = await c.req.parseBody();
+  const inspectorPersonId = trimmed(body, "inspectorPersonId") || null;
+  if (inspectorPersonId && !(await db.query.persons.findFirst({ where: eq(persons.id, inspectorPersonId), columns: { id: true } }))) {
+    setFlash(c, t("inventory.inspection.invalidInspector"), "error");
+    return c.redirect(`/inventory/${id}/inspections/${r.id}/edit`);
+  }
+  await db.update(inventoryInspectionRecords).set({ inspectorPersonId, note: trimmed(body, "note").slice(0, 1000) || null }).where(eq(inventoryInspectionRecords.id, r.id));
+  setFlash(c, t("inventory.inspection.editFlash"), "success");
+  return c.redirect(`/inventory/${id}/inspections/${r.id}`);
+});
+
+// POST /inventory/:id/inspections/:recordId/delete — löscht die Zeile, inspectedAt der Prüfart wird neu berechnet (dueDate bleibt).
+inventoryRoutes.post("/:id/inspections/:recordId/delete", requireAuth("inventory:inspection:delete"), async (c) => {
+  const id = c.req.param("id");
+  const r = await fetchInspectionRecord(id, c.req.param("recordId"));
+  if (!r || isLegacyRecord(r)) return c.notFound();
+  await db.transaction(async (tx) => {
+    await tx.delete(inventoryInspectionRecords).where(eq(inventoryInspectionRecords.id, r.id));
+    const [latest] = await tx.select({ at: max(inventoryInspectionRecords.inspectedAt) }).from(inventoryInspectionRecords).where(eq(inventoryInspectionRecords.inspectionId, r.inspectionId));
+    await tx.update(inventoryInspections).set({ inspectedAt: latest?.at ?? null }).where(eq(inventoryInspections.id, r.inspectionId));
+  });
+  setFlash(c, t("inventory.inspection.deleteFlash"), "success");
   return c.redirect(`/inventory/${id}`);
 });
 

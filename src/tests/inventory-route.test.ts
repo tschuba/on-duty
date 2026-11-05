@@ -17,6 +17,8 @@ let fieldValuesFindManyResult: any[] = [];
 let inspectionsFindManyResult: any[] = [];
 let inspectionFindFirstResult: any = undefined;
 let inspectionRecordsFindManyResult: any[] = [];
+let recordFindFirstResult: any = undefined;
+let txLatestResult: any[] = [];
 let selectWhereResult: any[] = [];
 let selectDistinctWhereResult: any[] = [];
 let personFindFirstResult: any = { id: "person1" };
@@ -60,7 +62,7 @@ function makeDelete() {
 const insert = makeInsert();
 const update = makeUpdate();
 const del = makeDelete();
-const transaction = vi.fn(async (cb: any) => cb({ insert, update, delete: del }));
+const transaction = vi.fn(async (cb: any) => cb({ insert, update, delete: del, select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve(txLatestResult)) })) })) }));
 
 vi.mock("../db/index.js", () => ({
   db: {
@@ -79,6 +81,7 @@ vi.mock("../db/index.js", () => ({
       },
       inventoryInspectionRecords: {
         findMany: vi.fn(() => Promise.resolve(inspectionRecordsFindManyResult)),
+        findFirst: vi.fn(() => Promise.resolve(recordFindFirstResult)),
       },
       inventoryTemplates: {
         findMany: vi.fn(() => Promise.resolve(itemTemplatesFindManyResult)),
@@ -138,6 +141,8 @@ beforeEach(() => {
   fieldValuesFindManyResult = [];
   inspectionsFindManyResult = [];
   inspectionFindFirstResult = undefined;
+  recordFindFirstResult = undefined;
+  txLatestResult = [];
   templatesFindManyResult = [];
   itemTemplatesFindManyResult = [];
   itemTemplateFindFirstResult = undefined;
@@ -1220,4 +1225,59 @@ testDetailPageContract({
   readPermissions: ["inventory:read"],
   writePermissions: ["inventory:read", "inventory:manage"],
   ensureRecord: () => { itemsFindFirstResult = makeItem(); },
+});
+
+describe("Inspection record detail/edit/delete", () => {
+  const rec = (over: any = {}) => ({ id: "r1", inspectionId: "p1", inspectedAt: "2026-05-01", result: "passed", inspectorPersonId: null, note: null, recordedBy: "u1", inspection: { name: "TÜV", inventoryItemId: "item1" }, inspector: null, recorder: { name: "Max" }, ...over });
+  const base = "/item1/inspections/r1";
+
+  it("shows detail with edit+delete for a normal record", async () => {
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:inspect", "inventory:inspection:delete"]), disabled: false };
+    recordFindFirstResult = rec();
+    itemsFindFirstResult = { name: "Zelt" };
+    const html = await (await inventoryRoutes.request(base)).text();
+    expect(html).toContain(`${base}/edit`);
+    expect(html).toContain(`${base}/delete`);
+  });
+
+  it("hides edit+delete for legacy records and without delete permission", async () => {
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:inspect", "inventory:inspection:delete"]), disabled: false };
+    recordFindFirstResult = rec({ result: null, recordedBy: null });
+    const legacy = await (await inventoryRoutes.request(base)).text();
+    expect(legacy).not.toContain(`${base}/edit`);
+    expect(legacy).not.toContain(`${base}/delete`);
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:inspect"]), disabled: false };
+    recordFindFirstResult = rec();
+    expect(await (await inventoryRoutes.request(base)).text()).not.toContain(`${base}/delete`);
+  });
+
+  it("404s for a record of another item or a legacy record on mutate", async () => {
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:inspect", "inventory:inspection:delete"]), disabled: false };
+    recordFindFirstResult = rec({ inspection: { name: "x", inventoryItemId: "other" } });
+    expect((await inventoryRoutes.request(base)).status).toBe(404);
+    recordFindFirstResult = rec({ result: null, recordedBy: null });
+    expect((await inventoryRoutes.request(`${base}/delete`, { method: "POST" })).status).toBe(404);
+    expect((await inventoryRoutes.request(base, { method: "POST", body: formBody({ note: "x" }) })).status).toBe(404);
+  });
+
+  it("edit updates only inspector and note", async () => {
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:inspect"]), disabled: false };
+    recordFindFirstResult = rec();
+    const res = await inventoryRoutes.request(base, { method: "POST", body: formBody({ inspectorPersonId: "person1", note: " ok ", result: "failed", inspectedAt: "2020-01-01" }) });
+    expect(res.status).toBe(302);
+    expect(updateCalls.find((u) => u.table === inventoryInspectionRecords)!.set).toEqual({ inspectorPersonId: "person1", note: "ok" });
+  });
+
+  it("delete recomputes inspectedAt (null when none left), dueDate untouched", async () => {
+    currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:inspection:delete"]), disabled: false };
+    recordFindFirstResult = rec();
+    txLatestResult = [{ at: null }];
+    expect((await inventoryRoutes.request(`${base}/delete`, { method: "POST" })).status).toBe(302);
+    expect(deleteCalls.some((d) => d.table === inventoryInspectionRecords)).toBe(true);
+    expect(updateCalls.find((u) => u.table === inventoryInspections)!.set).toEqual({ inspectedAt: null });
+    txLatestResult = [{ at: "2026-03-01" }];
+    updateCalls.length = 0;
+    await inventoryRoutes.request(`${base}/delete`, { method: "POST" });
+    expect(updateCalls.find((u) => u.table === inventoryInspections)!.set).toEqual({ inspectedAt: "2026-03-01" });
+  });
 });
