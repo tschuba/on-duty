@@ -512,6 +512,13 @@
       "when": 1794600000008,
       "tag": "0072_naive_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1794600000009,
+      "tag": "0073_training_permissions_backfill",
+      "breakpoints": true
     }
   ]
 }
