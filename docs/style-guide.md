@@ -52,6 +52,8 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 
 **Zeitraum-Filter:** Seiten mit Von/Bis-Filter nutzen `QuickRangeFilter` (`src/components/quick-range-filter.tsx`) und lösen die URL über `parseRange` (`src/lib/quick-range.ts`) auf. Das Dropdown bietet Presets, „Relativ" und „Benutzerdefiniert"; Datumsfelder erscheinen nur bei „Benutzerdefiniert". URL: `range=<preset-id>|rel|custom`; bei `rel` zusätzlich `rel=P<n><D|W|M|Y>` und `dir=past|future|both`. Angewendet wird mit dem gemeinsamen `ApplyButton` (unter `sm` nur Icon). Links, die den Bereich erhalten sollen, übernehmen `rangeParams(range)`.
 
+**Status-Filter:** Wenige feste Zustände (z. B. Alle/Anstehend/Erledigt) als daisyUI-`filter`: eigenes `<form method="get" class="filter">` in der `filter-bar` mit Radios `btn name="status"`, Reset-Radio `btn btn-square filter-reset` (Wert leer = „Alle", Standard) und `onchange="this.form.submit()"`. Zeitraum- und weitere Filter-Parameter als Hidden-Felder mitführen. Muster: `/inventory/inspections`.
+
 **Formulare:** Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes Formular bekommt eine feste `id`; der Kopf-Button verweist per `form="<id>"` darauf (kein JS, Enter im Feld funktioniert weiter). Löschen = eigenes kleines `<form>` im Inhalt, Button im Kopf zeigt per `form=` darauf. Bei mehreren Formularen zeigt der Kopf nur auf das Hauptformular.
 
 **Icon-only (Container-Queries):** Stufe 1 (Kopf < `@xl`): Labels der sekundären Aktionen entfallen; Stufe 2 (< `@md`): auch das Label der primären Aktion. Icon bleibt, `aria-label`/`title` tragen den Namen.
