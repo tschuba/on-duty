@@ -1,3 +1,4 @@
+import { sortTrainings } from "../lib/training.js";
 import { Hono } from "hono";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
@@ -256,7 +257,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
           <table class="table table-zebra w-full">
             <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th><th></th></tr></thead>
             <tbody>
-              {plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => trainings.map((x) => (
+              {plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => sortTrainings(trainings, (x) => ({ ...x, member: null, organizer: null })).map((x) => (
                 <tr class={x.exists ? "opacity-50 italic" : undefined}>
                   <td>{m.lastName}, {m.firstName}</td><td>{x.title}</td>
                   <td>{x.completedAt ? formatDate(x.completedAt) : ""}</td><td>{x.expiresAt ? formatDate(x.expiresAt) : ""}</td>

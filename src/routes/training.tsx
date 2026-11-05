@@ -13,8 +13,9 @@ import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { formatDate } from "../lib/format.js";
 import { resolveTimezone, toLocalDate } from "../lib/datetime.js";
 import { buildListUrl, PAGE_SIZE_OPTIONS, parsePagination } from "../lib/list-query.js";
-import { TRAINING_TITLE_MAX, parseTrainingInput, trainingStatuses, type TrainingStatus } from "../lib/training.js";
+import { TRAINING_TITLE_MAX, parseTrainingInput, trainingStatuses, sortTrainings, parseTrainingSort, nextTrainingDir, defaultTrainingDir, type SortDir, type TrainingSortKey, type TrainingStatus } from "../lib/training.js";
 import { t } from "../i18n/index.js";
+import { SortIcon } from "./members.js";
 
 export const trainingRoutes = new Hono<{ Variables: Variables }>();
 const read = requireAuth("training:read");
@@ -31,18 +32,26 @@ function StatusBadge({ s }: { s: TrainingStatus | undefined }) {
   return null;
 }
 
-async function loadRecords(memberId: string) {
-  const rows = await db.select().from(trainingRecords).where(eq(trainingRecords.memberId, memberId));
-  return rows.sort((a, b) => (a.expiresAt ?? "9999").localeCompare(b.expiresAt ?? "9999") || a.title.localeCompare(b.title, "de"));
+const recFields = (r: Record_) => ({ member: null, title: r.title, completedAt: r.completedAt, expiresAt: r.expiresAt, organizer: r.organizer });
+export const sortRecords = (rows: Record_[], sort?: TrainingSortKey, dir?: SortDir) => sortTrainings(rows, recFields, sort, dir);
+
+async function loadRecords(memberId: string, sort?: TrainingSortKey, dir?: SortDir) {
+  return sortRecords(await db.select().from(trainingRecords).where(eq(trainingRecords.memberId, memberId)), sort, dir);
 }
 
-export function TrainingBox({ memberId, rows, canWrite, canDelete }: { memberId: string; rows: Record_[]; canWrite: boolean; canDelete: boolean }) {
+const parseDir = (v?: string): SortDir | undefined => (v === "asc" || v === "desc" ? v : undefined);
+
+export function TrainingBox({ memberId, rows, canWrite, canDelete, sort, dir }: { memberId: string; rows: Record_[]; canWrite: boolean; canDelete: boolean; sort?: TrainingSortKey; dir?: SortDir }) {
+  const d = dir ?? (sort ? defaultTrainingDir(sort) : "desc");
+  const th = (col: TrainingSortKey, label: string) => (
+    <th><a href="#" class="link link-hover" hx-get={`/members/${memberId}/training?sort=${col}&dir=${nextTrainingDir(col, sort, d)}`} hx-target="#training-box" hx-swap="outerHTML">{label} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? d : "desc"} /></a></th>
+  );
   const status = trainingStatuses(rows, today());
   return (
     <div id="training-box">
       <div class="overflow-x-auto">
         <table class="table w-full">
-          <thead><tr><th>{t("training.form.title")}</th><th>{t("training.form.completedAt")}</th><th>{t("training.form.expiresAt")}</th><th>{t("training.form.organizer")}</th><th></th></tr></thead>
+          <thead><tr>{th("title", t("training.form.title"))}{th("completedAt", t("training.form.completedAt"))}{th("expiresAt", t("training.form.expiresAt"))}{th("organizer", t("training.form.organizer"))}<th></th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colspan={5} class="text-center opacity-50 py-4">{t("training.empty")}</td></tr>}
             {rows.map((r) => (
@@ -132,7 +141,8 @@ trainingRoutes.get("/members/:id/training", read, async (c) => {
   const id = c.req.param("id");
   if (!(await memberExists(id))) return c.notFound();
   const p = c.get("user").permissions;
-  return c.html(<TrainingBox memberId={id} rows={await loadRecords(id)} canWrite={p.has("training:write")} canDelete={p.has("training:delete")} />);
+  const sort = parseTrainingSort(c.req.query("sort"));
+  return c.html(<TrainingBox memberId={id} rows={await loadRecords(id, sort, parseDir(c.req.query("dir")))} sort={sort} dir={parseDir(c.req.query("dir"))} canWrite={p.has("training:write")} canDelete={p.has("training:delete")} />);
 });
 
 trainingRoutes.get("/members/:id/training/new", write, async (c) => {
@@ -212,11 +222,13 @@ trainingRoutes.get("/training", read, async (c) => {
     .filter((x) => withFormer || !x.exitDate || x.exitDate > now)
     .filter((x) => !search || `${x.firstName} ${x.lastName}`.toLowerCase().includes(search) || x.r.title.toLowerCase().includes(search))
     .filter((x) => statusFilter.length === 0 || (statusFilter as TrainingStatus[]).includes(status.get(x.r.id)!))
-    // NULL zuletzt; stabile Sortierung behält die Namensreihenfolge der Abfrage.
-    .sort((a, b) => (a.r.expiresAt ?? "9999").localeCompare(b.r.expiresAt ?? "9999"));
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const items = rows.slice((page - 1) * pageSize, page * pageSize);
-  const cur = { q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize };
+    ;
+  const sort = parseTrainingSort(q.sort);
+  const dir = parseDir(q.dir) ?? (sort ? defaultTrainingDir(sort) : "desc");
+  const sorted = sortTrainings(rows, (x) => ({ ...recFields(x.r), member: `${x.lastName}, ${x.firstName}` }), sort, dir);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const items = sorted.slice((page - 1) * pageSize, page * pageSize);
+  const cur = { q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
   const pageUrl = (p: number) => buildListUrl("/training", cur, { page: p });
 
   return c.html(
@@ -243,7 +255,9 @@ trainingRoutes.get("/training", read, async (c) => {
       <div id="training-results" class="flex flex-1 flex-col">
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("training.col.member")}</th><th>{t("training.form.title")}</th><th>{t("training.form.completedAt")}</th><th>{t("training.form.expiresAt")}</th><th>{t("training.form.organizer")}</th></tr></thead>
+          <thead><tr>{([["member", "training.col.member"], ["title", "training.form.title"], ["completedAt", "training.form.completedAt"], ["expiresAt", "training.form.expiresAt"], ["organizer", "training.form.organizer"]] as const).map(([col, key]) => (
+            <th><a href={buildListUrl("/training", cur, { sort: col, dir: nextTrainingDir(col, sort, dir), page: 1 })} class="link link-hover">{t(key)} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? dir : "desc"} /></a></th>
+          ))}</tr></thead>
           <tbody>
             {items.length === 0 && <tr><td colspan={5} class="text-center opacity-50 py-4">{t("training.empty")}</td></tr>}
             {items.map((x) => (

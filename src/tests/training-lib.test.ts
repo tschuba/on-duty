@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTrainingInput, trainingStatuses } from "../lib/training.js";
+import { parseTrainingInput, trainingStatuses, sortTrainings, nextTrainingDir, parseTrainingSort } from "../lib/training.js";
 
 const rec = (id: string, title: string, completedAt: string | null, expiresAt: string | null, memberId = "m1") => ({ id, memberId, title, completedAt, expiresAt });
 const T = "2026-06-01";
@@ -44,5 +44,27 @@ describe("parseTrainingInput", () => {
     expect(parseTrainingInput({ ...ok, completedAt: "2026-06-02" }, T)).toEqual({ error: "future" });
     expect(parseTrainingInput({ ...ok, expiresAt: "2025-12-31" }, T)).toEqual({ error: "order" });
     expect(parseTrainingInput({ title: "x", expiresAt: "2030-01-01" }, T)).toHaveProperty("value");
+  });
+});
+
+describe("sortTrainings", () => {
+  const f = (x: { t: string; c: string | null; e: string | null }) => ({ member: null, title: x.t, completedAt: x.c, expiresAt: x.e, organizer: null });
+  const rows = [
+    { t: "B", c: "2020-01-01", e: null },
+    { t: "A", c: "2021-01-01", e: "2025-01-01" },
+    { t: "C", c: "2022-01-01", e: "2026-01-01" },
+    { t: "D", c: "2021-01-01", e: "2025-01-01" },
+  ];
+  it("defaults to expiry desc, completion desc, title; empty last", () => {
+    expect(sortTrainings(rows, f).map((x) => x.t)).toEqual(["C", "A", "D", "B"]);
+  });
+  it("sorts by chosen column and keeps empty values last in both directions", () => {
+    expect(sortTrainings(rows, f, "expiresAt", "asc").map((x) => x.t)).toEqual(["A", "D", "C", "B"]);
+    expect(sortTrainings(rows, f, "title", "desc").map((x) => x.t)).toEqual(["D", "C", "B", "A"]);
+  });
+  it("toggles direction", () => {
+    expect(nextTrainingDir("title", "title", "asc")).toBe("desc");
+    expect(nextTrainingDir("expiresAt", "title", "asc")).toBe("desc");
+    expect(parseTrainingSort("nope")).toBeUndefined();
   });
 });
