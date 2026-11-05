@@ -69,7 +69,7 @@ const OPEN_MODAL = "if(event.detail.successful){document.getElementById('trainin
 export function TrainingSection({ memberId, rows, canWrite, canDelete }: { memberId: string; rows: Record_[]; canWrite: boolean; canDelete: boolean }) {
   return (
     <>
-      <Section title={t("training.title")} badge={rows.length} class="mt-6" actions={canWrite && (
+      <Section title={t("training.title")} badge={<span id="training-count">{rows.length}</span>} class="mt-6" actions={canWrite && (
         <button type="button" class="btn btn-outline btn-primary" aria-label={t("training.add")} title={t("training.add")} onclick="event.preventDefault();event.stopPropagation()" hx-get={`/members/${memberId}/training/new`} hx-target="#training-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": OPEN_MODAL }}>
           <ActionContent icon="plus" label={t("training.add")} />
         </button>
@@ -162,8 +162,19 @@ async function save(c: import("hono").Context<{ Variables: Variables }>, tid?: s
   if (tid) await db.update(trainingRecords).set(parsed.value).where(eq(trainingRecords.id, tid));
   else await db.insert(trainingRecords).values({ ...parsed.value, memberId: id });
   c.header("HX-Trigger", JSON.stringify({ "training-modal": "close" }));
+  return c.html(await boxWithCount(c, id));
+}
+
+// Box neu laden + Badge im Section-Titel per OOB-Swap aktualisieren (liegt außerhalb von #training-box).
+async function boxWithCount(c: import("hono").Context<{ Variables: Variables }>, id: string) {
   const p = c.get("user").permissions;
-  return c.html(<TrainingBox memberId={id} rows={await loadRecords(id)} canWrite={p.has("training:write")} canDelete={p.has("training:delete")} />);
+  const rows = await loadRecords(id);
+  return (
+    <>
+      <TrainingBox memberId={id} rows={rows} canWrite={p.has("training:write")} canDelete={p.has("training:delete")} />
+      <span id="training-count" hx-swap-oob="true">{rows.length}</span>
+    </>
+  );
 }
 
 trainingRoutes.post("/members/:id/training", write, (c) => save(c));
@@ -174,8 +185,7 @@ trainingRoutes.post("/members/:id/training/:tid/delete", del, async (c) => {
   const tid = c.req.param("tid");
   if (!(await findRecord(id, tid))) return c.notFound();
   await db.delete(trainingRecords).where(eq(trainingRecords.id, tid));
-  const p = c.get("user").permissions;
-  return c.html(<TrainingBox memberId={id} rows={await loadRecords(id)} canWrite={p.has("training:write")} canDelete={p.has("training:delete")} />);
+  return c.html(await boxWithCount(c, id));
 });
 
 // ── Gesamtübersicht ─────────────────────────────────────────────────────────
