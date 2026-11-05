@@ -123,10 +123,13 @@ export type ParsedMember = {
   rankDate: string | null;
   iban: string | null;
   bic: string | null;
+  trainings: TrainingEntry[];
+  trainingWarnings: string[];
 };
 
-export function parseMembers(rows: Raw[]): ParsedMember[] {
+export function parseMembers(rows: Raw[], courses: string[] | null = null, today = ""): ParsedMember[] {
   return rows.map((r) => {
+    const tr = courses ? parseTrainings(r, courses, today) : { entries: [], warnings: [] };
     const entryDate = toIsoDate(r["Eintritt"]);
     const first = toIsoDate(r["Eintritt (erste FW)"]);
     const g = clean(r["Geschlecht"]);
@@ -153,8 +156,48 @@ export function parseMembers(rows: Raw[]): ParsedMember[] {
       rankDate: toIsoDate(r["Datum Beförderung"]),
       iban: clean(r["Kontonummer / IBAN"]),
       bic: clean(r["BLZ / BIC"]),
+      trainings: tr.entries,
+      trainingWarnings: tr.warnings,
     };
   });
+}
+
+// ── Lehrgänge (Erweiterung des Mitglieder-Imports) ────────────────────────
+
+export type TrainingEntry = { title: string; completedAt: string | null; expiresAt: string | null };
+export type PlannedTraining = TrainingEntry & { exists: boolean };
+export type TrainingContext = { memberIds: Map<string, string>; keys: Set<string> };
+export const trainingKey = (memberId: string, e: Pick<TrainingEntry, "title" | "completedAt">) => `${memberId}|${e.title.trim().toLowerCase()}|${e.completedAt ?? ""}`;
+
+// Feste Spalten mit eigener Logik; AGT (ja/nein) und Führerscheinklassen (Format ungeklärt) werden bewusst nicht importiert.
+export const TRAINING_SPECIAL = ["AS-tauglich bis", "CSA-tauglich bis", "letzte G26", "AGT", "Führerscheinklassen"];
+
+/** Lehrgangsspalten = unbekannte Spalten mit mindestens einem Datumswert. */
+export function courseColumns(headers: string[], rows: Raw[]): string[] {
+  return headers.filter((h) => h && !MEMBER_COLUMNS.includes(h) && !MEMBER_IGNORED.has(h) && !TRAINING_SPECIAL.includes(h) && rows.some((r) => toIsoDate(r[h])));
+}
+
+/** Zellen in Datum wandeln; Zukunftsdatum bei Abschlüssen und ungültige Werte → Warnung, Zelle übersprungen. */
+export function parseTrainings(r: Raw, courses: string[], today: string): { entries: TrainingEntry[]; warnings: string[] } {
+  const entries: TrainingEntry[] = [];
+  const warnings: string[] = [];
+  const cell = (col: string, past: boolean): string | null => {
+    if (clean(r[col]) == null) return null;
+    const d = toIsoDate(r[col]);
+    if (!d || (past && d > today)) { warnings.push(t("import.row.trainingDate", { title: col })); return null; }
+    return d;
+  };
+  for (const c of courses) {
+    const d = cell(c, true);
+    if (d) entries.push({ title: c, completedAt: d, expiresAt: null });
+  }
+  const g26 = cell("letzte G26", true);
+  const as = cell("AS-tauglich bis", false);
+  const csa = cell("CSA-tauglich bis", false);
+  if (as) entries.push({ title: "Atemschutz-Tauglichkeit", completedAt: g26 && g26 <= as ? g26 : null, expiresAt: as });
+  if (csa) entries.push({ title: "CSA-Tauglichkeit", completedAt: null, expiresAt: csa });
+  if (g26) entries.push({ title: "G26", completedAt: g26, expiresAt: null });
+  return { entries, warnings };
 }
 
 /** Gefüllte Spalten ohne Zielfeld → für den Ergebnisbericht. */
@@ -200,8 +243,10 @@ export type PlannedAssignment = {
 export type MemberRowPlan = {
   m: ParsedMember; included: boolean; duplicate: boolean; errors: string[]; warnings: string[];
   assignments: PlannedAssignment[];
+  /** Bei vorhandenem Mitglied: memberId, damit neue Lehrgänge nachgetragen werden können. */
+  existingMemberId: string | null; trainings: PlannedTraining[];
 };
-export type MemberPlan = { rows: MemberRowPlan[]; titles: TitleDecision[]; blockers: number; assumedCount: number };
+export type MemberPlan = { rows: MemberRowPlan[]; titles: TitleDecision[]; blockers: number; assumedCount: number; newTrainings: number; existingTrainings: number };
 
 type Body = Record<string, string | string[] | File | undefined>;
 const str = (b: Body, k: string): string | undefined => {
@@ -214,7 +259,7 @@ export const memberKey = (m: Pick<ParsedMember, "lastName" | "firstName" | "birt
 
 /** Baut aus Rohdaten + Admin-Eingaben (Formular) den Importplan. `body` leer = Erstvorschau. */
 export function planMembers(
-  parsed: ParsedMember[], roles: RoleOption[], existingKeys: Set<string>, body: Body, today: string,
+  parsed: ParsedMember[], roles: RoleOption[], existingKeys: Set<string>, body: Body, today: string, tctx: TrainingContext | null = null,
 ): MemberPlan {
   const posted = str(body, "_seen") === "1";
   const includedSet = new Set([body.inc].flat().filter((x): x is string => typeof x === "string"));
@@ -281,11 +326,15 @@ export function planMembers(
         assignments.unshift({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice, grants, from, note, assumed: !skipped, skipped, suggested: sameChoice(roleChoice, { kind: "role", roleId: ACTIVE_ROLE_ID }) });
       }
     }
-    return { m, included, duplicate, errors, warnings, assignments };
+    warnings.push(...m.trainingWarnings);
+    const existingMemberId = tctx?.memberIds.get(memberKey(m)) ?? null;
+    const trainings: PlannedTraining[] = m.trainings.map((e) => ({ ...e, exists: !!existingMemberId && tctx!.keys.has(trainingKey(existingMemberId, e)) }));
+    return { m, included, duplicate, errors, warnings, assignments, existingMemberId, trainings };
   });
+  const countTr = (exists: boolean) => rows.filter((r) => r.included || r.existingMemberId).reduce((n, r) => n + r.trainings.filter((x) => x.exists === exists).length, 0);
 
   return {
-    rows, titles,
+    rows, titles, newTrainings: countTr(false), existingTrainings: countTr(true),
     blockers: rows.filter((r) => r.included && r.errors.length).length,
     assumedCount: rows.filter((r) => r.included).reduce((n, r) => n + r.assignments.filter((a) => a.assumed).length, 0),
   };
