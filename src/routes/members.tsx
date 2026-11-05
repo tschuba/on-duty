@@ -26,6 +26,8 @@ import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
+import { TrainingSection } from "./training.js";
+import { trainingRecords } from "../db/schema/index.js";
 
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
@@ -1770,6 +1772,9 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         </Section>
       )}
       {canReadBank && <BankDataSection m={m} editable={false} />}
+      {user.permissions.has("training:read") && (
+        <TrainingSection memberId={m.id} rows={await db.select().from(trainingRecords).where(eq(trainingRecords.memberId, m.id)).orderBy(asc(trainingRecords.expiresAt), asc(trainingRecords.title))} canWrite={user.permissions.has("training:write")} canDelete={user.permissions.has("training:delete")} />
+      )}
     </Layout>
   );
 });

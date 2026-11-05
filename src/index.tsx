@@ -22,6 +22,7 @@ import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
 import { roleRoutes } from "./routes/roles.js";
 import { yearRoutes } from "./routes/anniversary-years.js";
+import { trainingRoutes } from "./routes/training.js";
 import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { eventRoutes } from "./routes/events.js";
@@ -111,6 +112,7 @@ app.get("/", requireAuth(), (c) => {
     [["donations:read", "donations:record", "donations:issue-receipts"], "/donations"],
     [["inventory:read"], "/inventory"],
     [["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"], "/organisation"],
+    [["training:read"], "/training"],
     [["applications:read"], "/applications"],
     [["system:admin"], "/admin"],
     [["import:run"], "/import"],
@@ -126,6 +128,7 @@ app.route("/pending", pendingRoutes);
 app.route("/account", accountRoutes);
 
 // Member routes
+app.route("/", trainingRoutes);
 app.route("/members", memberRoutes);
 
 // Application review routes

@@ -38,6 +38,9 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "anniversary-years:write": t("admin.permissions.key.anniversaryYearsWrite"),
   "anniversary-years:delete": t("admin.permissions.key.anniversaryYearsDelete"),
   "events:manage": t("admin.permissions.key.eventsManage"),
+  "training:read": t("admin.permissions.key.trainingRead"),
+  "training:write": t("admin.permissions.key.trainingWrite"),
+  "training:delete": t("admin.permissions.key.trainingDelete"),
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
@@ -50,6 +53,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
   org: t("admin.permissions.resource.org"),
   "anniversary-years": t("admin.permissions.resource.anniversary-years"),
   events: t("admin.permissions.resource.events"),
+  training: t("admin.permissions.resource.training"),
   "member-roles": t("admin.permissions.resource.member-roles"),
   "member-role-types": t("admin.permissions.resource.member-role-types"),
 };

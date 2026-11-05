@@ -45,6 +45,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     { icon: "users", label: t("common.nav.members"), items: [
       { label: t("common.nav.members"), href: "/members", show: has("members:read") },
       { label: t("common.nav.anniversaries"), href: "/anniversaries", show: has("members:read") },
+      { label: t("common.nav.training"), href: "/training", show: has("training:read") },
       { label: t("common.nav.applications"), href: "/applications", show: has("applications:read"), count: c.applications },
       { label: t("common.nav.roles"), href: "/roles", show: has("member-roles:read") },
       { label: t("common.nav.roleTypes"), href: "/role-types", show: has("member-role-types:read") },

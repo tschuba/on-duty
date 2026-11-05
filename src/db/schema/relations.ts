@@ -9,6 +9,7 @@ import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemS
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
 import { events, eventTags, eventVisibleRoles } from "./events";
 import { appRoles } from "./permissions";
+import { trainingRecords } from "./training";
 
 /* v8 ignore start -- relation declarations, no branching logic to unit-test */
 export const personsRelations = relations(persons, ({ one, many }) => ({
@@ -43,6 +44,7 @@ export const donationsRelations = relations(donations, ({ one }) => ({
 export const membersRelations = relations(members, ({ one, many }) => ({
   person: one(persons, { fields: [members.personId], references: [persons.id] }),
   assignments: many(memberRoleAssignments),
+  training: many(trainingRecords),
   inventoryAssignments: many(inventoryItemAssignments),
 }));
 
@@ -146,4 +148,8 @@ export const eventVisibleRolesRelations = relations(eventVisibleRoles, ({ one })
 export const loanRequestsRelations = relations(loanRequests, ({ one }) => ({
   lendingItem: one(lendingItems, { fields: [loanRequests.lendingItemId], references: [lendingItems.id] }),
   person: one(persons, { fields: [loanRequests.personId], references: [persons.id] }),
+}));
+
+export const trainingRecordsRelations = relations(trainingRecords, ({ one }) => ({
+  member: one(members, { fields: [trainingRecords.memberId], references: [members.id] }),
 }));

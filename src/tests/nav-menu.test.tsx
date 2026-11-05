@@ -53,6 +53,11 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
     expect(html).toContain('badge-warning ml-1">3<');
   });
 
+  it("shows Ausbildungen only with training:read", async () => {
+    expect(await renderAt("/", "members:read")).not.toContain('href="/training"');
+    expect(await renderAt("/", "training:read")).toContain('href="/training"');
+  });
+
   it("shows Funktionen and Funktionstypen only with their own permission", async () => {
     const roles = await renderAt("/", "member-roles:read");
     expect(roles).toContain('href="/roles"');
