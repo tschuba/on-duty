@@ -9,6 +9,7 @@ import { Field } from "../components/field.js";
 import { RowAction } from "../components/row-action.js";
 import { ActionContent, PageHeader } from "../components/page-header.js";
 import { Pager } from "../components/pager.js";
+import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { formatDate } from "../lib/format.js";
 import { resolveTimezone, toLocalDate } from "../lib/datetime.js";
 import { buildListUrl, PAGE_SIZE_OPTIONS, parsePagination } from "../lib/list-query.js";
@@ -196,7 +197,7 @@ trainingRoutes.get("/training", read, async (c) => {
   const q = c.req.query();
   const memberQ = (q.member ?? "").trim().toLowerCase();
   const titleQ = (q.title ?? "").trim().toLowerCase();
-  const statusQ = (LIST_STATUSES as readonly string[]).includes(q.status ?? "") ? q.status! : "";
+  const statusFilter = (c.req.queries("status") ?? []).filter((s): s is (typeof LIST_STATUSES)[number] => (LIST_STATUSES as readonly string[]).includes(s));
   const withFormer = q.former === "1";
   const { page, pageSize } = parsePagination(q);
   const now = today();
@@ -212,12 +213,12 @@ trainingRoutes.get("/training", read, async (c) => {
     .filter((x) => withFormer || !x.exitDate || x.exitDate > now)
     .filter((x) => !memberQ || `${x.firstName} ${x.lastName}`.toLowerCase().includes(memberQ))
     .filter((x) => !titleQ || x.r.title.toLowerCase().includes(titleQ))
-    .filter((x) => !statusQ || status.get(x.r.id) === statusQ)
+    .filter((x) => statusFilter.length === 0 || (statusFilter as TrainingStatus[]).includes(status.get(x.r.id)!))
     // NULL zuletzt; stabile Sortierung behält die Namensreihenfolge der Abfrage.
     .sort((a, b) => (a.r.expiresAt ?? "9999").localeCompare(b.r.expiresAt ?? "9999"));
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const items = rows.slice((page - 1) * pageSize, page * pageSize);
-  const cur = { member: q.member, title: q.title, status: statusQ, former: withFormer ? "1" : "", pageSize };
+  const cur = { member: q.member, title: q.title, status: statusFilter, former: withFormer ? "1" : "", pageSize };
   const pageUrl = (p: number) => buildListUrl("/training", cur, { page: p });
 
   return c.html(
@@ -226,10 +227,16 @@ trainingRoutes.get("/training", read, async (c) => {
       <form method="get" action="/training" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
         <input type="search" name="member" class="input" placeholder={t("training.filter.member")} value={q.member ?? ""} />
         <input type="search" name="title" class="input" placeholder={t("training.filter.title")} value={q.title ?? ""} />
-        <div class="filter self-end" role="radiogroup" aria-label={t("training.filter.statusLabel")}>
-          <input class="btn btn-square filter-reset" type="radio" name="status" value="" aria-label={t("training.filter.statusAll")} checked={!statusQ} onchange="this.form.submit()" />
-          {LIST_STATUSES.map((s) => <input class="btn" type="radio" name="status" value={s} aria-label={t(`training.status.${s}`)} checked={s === statusQ} onchange="this.form.submit()" />)}
-        </div>
+        <MultiSelectFilter
+          param="status"
+          autoApply
+          options={LIST_STATUSES.map((s) => ({ value: s, label: t(`training.status.${s}`) }))}
+          selected={statusFilter}
+          allLabel={t("training.filter.statusAll")}
+          countLabel={(count) => t("training.filter.statusCount", { count })}
+          applyLabel={t("common.apply")}
+          resetLabel={t("common.reset")}
+        />
         <label class="flex items-center gap-2 min-h-11 cursor-pointer">
           <input type="checkbox" name="former" value="1" class="toggle toggle-primary" checked={withFormer} onchange="this.form.submit()" />
           <span class="text-sm">{t("training.filter.former")}</span>
