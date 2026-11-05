@@ -1650,7 +1650,7 @@ inventoryRoutes.post("/:id/reactivate", requireAuth("inventory:manage"), async (
   return c.redirect(`/inventory/${id}`);
 });
 
-// GET /inventory/inspections — Prüffristen-Übersicht, filter-UX identisch zu /anniversaries.
+// GET /inventory/inspections — Prüfungen-Liste (Fristen + Historie), filter-UX identisch zu /anniversaries.
 // Karte: aktive Posten mit Koordinaten, Tag-Filter wie die Liste. Vor "/:id" registrieren.
 inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
