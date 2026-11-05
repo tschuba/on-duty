@@ -439,9 +439,12 @@ adminRoutes.get("/users/search-persons", guard, async (c) => {
     .slice(0, suggest ? 3 : 10);
   const nameCount = new Map<string, number>();
   for (const p of results) { const k = `${p.firstName} ${p.lastName}`.toLowerCase(); nameCount.set(k, (nameCount.get(k) ?? 0) + 1); }
-  // Only same-named entries get a hint, so the list stays clean otherwise.
-  const hint = (p: (typeof results)[number]) =>
-    (nameCount.get(`${p.firstName} ${p.lastName}`.toLowerCase()) ?? 0) > 1 ? [p.birthDate && formatDate(p.birthDate), p.email].filter(Boolean).join(" · ") : "";
+  // Same-named entries also get the birth date; the email shows whenever it differs from the user's (or the name is ambiguous).
+  const hint = (p: (typeof results)[number]) => {
+    const dup = (nameCount.get(`${p.firstName} ${p.lastName}`.toLowerCase()) ?? 0) > 1;
+    const mail = p.email && (dup || p.email.toLowerCase() !== email) ? p.email : "";
+    return [dup && p.birthDate && formatDate(p.birthDate), mail].filter(Boolean).join(" · ");
+  };
   if (results.length === 0) return suggest ? c.html("") : c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
   return c.html(
     <>
