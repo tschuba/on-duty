@@ -673,7 +673,7 @@ describe("inspection types", () => {
     itemsFindManyResult = [makeItem({ id: "a", name: "LF 10", inspections: [insp("p1", "HU", "2000-01-01"), insp("p2", "UVV-Prüfung", "2000-02-01"), insp("p3", "Funk", null)] })];
     const html = await (await inventoryRoutes.request("/inspections")).text();
     expect(html).toContain("UVV-Prüfung");
-    expect(html.match(/window\.location=(?:'|&#39;|&quot;)\/inventory\/a/g)?.length).toBe(2);
+    expect(html.match(/href="\/inventory\/a"/g)?.length).toBe(2);
   });
 
   it("shows the earliest open due in the inventory list with a +N badge", async () => {
