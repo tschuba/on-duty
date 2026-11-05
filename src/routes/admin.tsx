@@ -1,7 +1,7 @@
 import { RowAction } from "../components/row-action.js";
 import { EmailField, Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Hono, type Context } from "hono";
-import { eq, and, or, count, asc, inArray, ilike, isNull, sql } from "drizzle-orm";
+import { eq, and, or, count, asc, desc, inArray, ilike, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   users,
@@ -357,7 +357,7 @@ f.addEventListener('change',function(e){if(e.target.name==='roles')render()});})
 type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; personId?: string; error?: string };
 
 // Optional person link; same search-and-select UX as the inventory member picker (htmx live search, no create).
-function PersonPicker({ personId, personName }: { personId?: string; personName?: string }) {
+function PersonPicker({ userId, personId, personName }: { userId?: string; personId?: string; personName?: string }) {
   const sel = Boolean(personId);
   return (
     <div class="flex flex-col" id="user-person-picker">
@@ -372,9 +372,10 @@ function PersonPicker({ personId, personName }: { personId?: string; personName?
             class="grow min-w-0"
             name="q"
             hx-get="/admin/users/search-persons"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms, load, change from:closest form`}
             hx-target="#user-person-results"
-            hx-vals={`js:{userId: location.pathname.split('/')[3]}`}
+            hx-include="[name=name],[name=email]"
+            hx-vals={JSON.stringify({ userId: userId ?? "" })}
           />
         </label>
         <div id="user-person-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
@@ -406,23 +407,32 @@ function PersonPicker({ personId, personName }: { personId?: string; personName?
 }
 
 // GET /admin/users/search-persons — persons not yet linked to another user.
+// Without a query, suggests persons matching the user's email (exact) or name (pg_trgm similarity); with one, searches and ranks the same way.
 adminRoutes.get("/users/search-persons", guard, async (c) => {
   const q = (c.req.query("q") ?? "").trim();
-  if (q.length < 2) return c.html("");
   const userId = c.req.query("userId") ?? "";
+  const name = (c.req.query("name") ?? "").trim();
+  const email = (c.req.query("email") ?? "").trim().toLowerCase();
+  const suggest = q.length < 2;
+  if (suggest && !name && !email) return c.html("");
+  const fullName = sql`${persons.firstName} || ' ' || ${persons.lastName}`;
+  const score = sql<number>`greatest(case when ${email} <> '' and lower(${persons.email}) = ${email} then 1 else 0 end, similarity(${fullName}, ${name}))`;
   const needle = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
   const results = await db
     .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName })
     .from(persons)
     .where(and(
-      or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(sql`${persons.firstName} || ' ' || ${persons.lastName}`, needle)),
+      suggest
+        ? sql`${score} >= 0.3`
+        : or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(fullName, needle)),
       or(isNull(persons.userId), eq(persons.userId, userId)),
     ))
-    .orderBy(asc(persons.lastName), asc(persons.firstName))
-    .limit(10);
-  if (results.length === 0) return c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
+    .orderBy(desc(score), asc(persons.lastName), asc(persons.firstName))
+    .limit(suggest ? 3 : 10);
+  if (results.length === 0) return suggest ? c.html("") : c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
   return c.html(
     <>
+      {suggest && <p class="px-2 pt-1 text-xs opacity-60">{t("admin.users.modal.personSuggestions")}</p>}
       {results.map((p) => (
         <div key={p.id} class="person-result p-2 hover:bg-base-200 cursor-pointer text-sm" data-id={p.id} data-name={`${p.firstName} ${p.lastName}`}>
           {p.firstName} {p.lastName}
@@ -461,7 +471,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
         ) : (
           <EmailField label={t("admin.users.modal.emailLabel")} name="email" value={f.email} required />
         )}
-        {f.id && <PersonPicker personId={selectedPerson ? f.personId : undefined} personName={selectedPerson ? `${selectedPerson.firstName} ${selectedPerson.lastName}` : undefined} />}
+        <PersonPicker userId={f.id} personId={selectedPerson ? f.personId : undefined} personName={selectedPerson ? `${selectedPerson.firstName} ${selectedPerson.lastName}` : undefined} />
         <FieldGroup legend={t("admin.users.modal.roleLabel")}>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </FieldGroup>
@@ -522,9 +532,15 @@ adminRoutes.post("/users", guard, async (c) => {
   const name = String(body.name ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
+  const personId = String(body.personId ?? "") || undefined;
 
   if (!name || !email) {
-    return renderUserForm(c, {  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
+    return renderUserForm(c, { name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.missingFields") }, 422);
+  }
+
+  if (personId) {
+    const [taken] = await db.select({ userId: persons.userId }).from(persons).where(eq(persons.id, personId));
+    if (taken?.userId) return renderUserForm(c, { name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.personTaken") }, 422);
   }
 
   const existing = await db
@@ -532,7 +548,7 @@ adminRoutes.post("/users", guard, async (c) => {
     .from(users)
     .where(eq(users.email, email));
   if (existing.length > 0) {
-    return renderUserForm(c, {  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
+    return renderUserForm(c, { name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.emailExists") }, 422);
   }
 
   const now = new Date();
@@ -549,6 +565,7 @@ adminRoutes.post("/users", guard, async (c) => {
   if (roleIds.length > 0) {
     await db.insert(userAppRoles).values(roleIds.map((roleId) => ({ userId: id, roleId })));
   }
+  if (personId) await db.update(persons).set({ userId: id }).where(eq(persons.id, personId));
 
   setFlash(c, t("admin.users.flash.created", { name }), "success");
   return c.redirect(`/admin/users/${id}`);

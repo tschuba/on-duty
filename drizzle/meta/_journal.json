@@ -498,6 +498,13 @@
       "when": 1794600000006,
       "tag": "0070_person_user_link",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1794600000007,
+      "tag": "0071_enable_pg_trgm",
+      "breakpoints": true
     }
   ]
 }

@@ -344,6 +344,7 @@ export const de = {
   "admin.users.modal.personHint": "Optional: verknüpft den Login mit einer Person (z. B. für Vorbelegungen).",
   "admin.users.modal.personSearchPlaceholder": "Person suchen …",
   "admin.users.modal.personNoResults": "Keine passende Person gefunden.",
+  "admin.users.modal.personSuggestions": "Vorschläge",
   "admin.users.modal.personClear": "Entfernen",
   "admin.users.modal.roleLabel": "Rollen",
   "admin.users.modal.emailOidcLocked": "Die E-Mail stammt aus der OIDC-Anmeldung und kann nicht geändert werden.",
