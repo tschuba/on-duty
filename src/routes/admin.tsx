@@ -398,8 +398,8 @@ function PersonPicker({ userId, personId, personName }: { userId?: string; perso
             if(r){id.value=r.dataset.id;$('name').textContent=r.dataset.name;$('selected').classList.remove('hidden');$('search').classList.add('hidden');return}
             if(e.target.closest('[data-action=clear]')){
               id.value='';$('selected').classList.add('hidden');$('search').classList.remove('hidden');
-              document.getElementById('user-person-results').innerHTML='';
               var i=$('search').querySelector('input');i.value='';i.focus();
+              htmx.trigger(i,'load');
             }
           });
         })();
