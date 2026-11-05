@@ -33,6 +33,7 @@ const ICONS = {
   moon: "moon",
   clock: "clock",
   check: "check",
+  "checkup-list": "checkup-list",
   "arrow-up": "arrow-up",
   "arrow-down": "arrow-down",
   "no-symbol": "ban",

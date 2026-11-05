@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
-import { boolean, date, index, integer, numeric, pgEnum, pgTable, primaryKey, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, index, integer, numeric, pgEnum, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { users } from "./auth";
 import { members } from "./members";
+import { persons } from "./persons";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const inventoryItems = pgTable("inventory_items", {
@@ -121,6 +123,20 @@ export const inventoryInspections = pgTable(
   },
   (t) => [uniqueIndex("inventory_inspections_item_name_idx").on(t.inventoryItemId, sql`lower(${t.name})`)],
 );
+
+// Verlauf: eine Zeile je durchgeführter Prüfung (Nachweis). inventory_inspections cached nur den letzten Stand.
+export const inventoryInspectionRecords = pgTable("inventory_inspection_records", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  inspectionId: uuid("inspection_id")
+    .notNull()
+    .references(() => inventoryInspections.id, { onDelete: "restrict" }),
+  inspectedAt: date("inspected_at").notNull(),
+  result: text("result", { enum: ["passed", "failed"] }),
+  inspectorPersonId: uuid("inspector_person_id").references(() => persons.id, { onDelete: "restrict" }),
+  note: text("note"),
+  recordedBy: text("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // Zentrale Vorlagen: Name und Intervall werden beim Anlegen einer Prüfart kopiert, nicht verknüpft.
 export const inventoryInspectionTemplates = pgTable(

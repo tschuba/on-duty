@@ -22,6 +22,8 @@ export const permissionEnum = pgEnum("permission", [
   "inventory:read",
   "inventory:manage",
   "inventory:configure",
+  "inventory:inspect",
+  "inventory:inspection:delete",
   "lending:read",
   "lending:manage",
   "org:read",

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldValues, inventoryInspections, lendingItems } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldValues, inventoryInspections, inventoryInspectionRecords, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 import { testDetailPageContract } from "./detail-page-contract.js";
 import { t } from "../i18n/index.js";
@@ -16,6 +16,10 @@ let fieldDefsFindManyResult: any[] = [];
 let fieldValuesFindManyResult: any[] = [];
 let inspectionsFindManyResult: any[] = [];
 let inspectionFindFirstResult: any = undefined;
+let inspectionRecordsFindManyResult: any[] = [];
+let selectWhereResult: any[] = [];
+let selectDistinctWhereResult: any[] = [];
+let personFindFirstResult: any = { id: "person1" };
 let templatesFindManyResult: any[] = [];
 let itemTemplatesFindManyResult: any[] = [];
 let itemTemplateFindFirstResult: any = undefined;
@@ -73,6 +77,9 @@ vi.mock("../db/index.js", () => ({
         findMany: vi.fn(() => Promise.resolve(inspectionsFindManyResult)),
         findFirst: vi.fn(() => Promise.resolve(inspectionFindFirstResult)),
       },
+      inventoryInspectionRecords: {
+        findMany: vi.fn(() => Promise.resolve(inspectionRecordsFindManyResult)),
+      },
       inventoryTemplates: {
         findMany: vi.fn(() => Promise.resolve(itemTemplatesFindManyResult)),
         findFirst: vi.fn(() => Promise.resolve(itemTemplateFindFirstResult)),
@@ -81,6 +88,9 @@ vi.mock("../db/index.js", () => ({
       inventoryFieldValues: { findMany: vi.fn(() => Promise.resolve(fieldValuesFindManyResult)) },
       members: {
         findMany: vi.fn(() => Promise.resolve(membersFindManyResult)),
+      },
+      persons: {
+        findFirst: vi.fn(() => Promise.resolve(personFindFirstResult)),
       },
       lendingItems: {
         findFirst: vi.fn(() => Promise.resolve(lendingItemFindFirstResult)),
@@ -91,7 +101,8 @@ vi.mock("../db/index.js", () => ({
         findMany: vi.fn(() => Promise.resolve([])),
       },
     },
-    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve([])), groupBy: vi.fn(() => Promise.resolve([])) })) })),
+    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve(selectWhereResult)), groupBy: vi.fn(() => Promise.resolve([])) })) })),
+    selectDistinct: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => Promise.resolve(selectDistinctWhereResult)) })) })),
     insert,
     update,
     delete: del,
@@ -99,7 +110,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage"]), disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "inventory:inspect"]), disabled: false };
 
 vi.mock("../lib/org-config.js", async () => ({
   ...(await vi.importActual<typeof import("../lib/org-config.js")>("../lib/org-config.js")),
@@ -133,7 +144,11 @@ beforeEach(() => {
   lendingItemFindFirstResult = undefined;
   lendingItemsFindManyResult = [];
   lendingLoanFindFirstResult = undefined;
-  currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage"]), disabled: false };
+  inspectionRecordsFindManyResult = [];
+  selectWhereResult = [];
+  selectDistinctWhereResult = [];
+  personFindFirstResult = { id: "person1" };
+  currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:manage", "inventory:inspect"]), disabled: false };
 });
 
 function makeItem(overrides: Record<string, unknown> = {}) {
@@ -693,6 +708,30 @@ describe("inspection types", () => {
     expect(sets).toEqual(["__tmp_p1", "__tmp_p2", "B", "A"]);
   });
 
+  it("blocks removing an inspection type that already has recorded inspections", async () => {
+    itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "HU", null)] });
+    selectDistinctWhereResult = [{ id: "p1" }];
+    const res = await inventoryRoutes.request("/item1", {
+      method: "POST",
+      body: formBody({ name: "LF", enabledFields: "inspection", insp_id: "", insp_name: "", insp_interval: "", insp_last: "", insp_due: "" } as any),
+    });
+    expect(res.status).toBe(422);
+    const html = await res.text();
+    expect(html).toContain(t("inventory.form.inspectionHasRecords", { name: "HU" }));
+    expect(deleteCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+  });
+
+  it("allows removing an inspection type without recorded inspections", async () => {
+    itemsFindFirstResult = makeItem({ id: "item1", enabledFields: ["inspection"], inspections: [insp("p1", "HU", null)] });
+    selectDistinctWhereResult = [];
+    const res = await inventoryRoutes.request("/item1", {
+      method: "POST",
+      body: formBody({ name: "LF", enabledFields: "inspection", insp_id: "", insp_name: "", insp_interval: "", insp_last: "", insp_due: "" } as any),
+    });
+    expect(res.status).toBe(302);
+    expect(deleteCalls.find((c) => c.table === inventoryInspections)).toBeDefined();
+  });
+
   it("names a duplicate inspection collision instead of blaming the inventory number", async () => {
     transaction.mockRejectedValueOnce({ code: "23505", constraint: "inventory_inspections_item_name_idx" });
     const res = await inventoryRoutes.request("/", {
@@ -732,6 +771,43 @@ describe("inspection types", () => {
       itemsFindFirstResult = { retiredAt: "2026-01-01" };
       await post({ inspectedAt: "2026-05-20" });
       expect(updateCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+    });
+
+    it("records a passed inspection with inspector and note, and sets the new due date", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      await post({ inspectedAt: "2026-05-20", result: "passed", inspectorPersonId: "person1", note: "ok" });
+      const record = insertCalls.find((c) => c.table === inventoryInspectionRecords)!;
+      expect(record.values).toMatchObject({ inspectionId: "p1", inspectedAt: "2026-05-20", result: "passed", inspectorPersonId: "person1", note: "ok", recordedBy: "u1" });
+      expect(updateCalls.find((c) => c.table === inventoryInspections)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: "2027-06-01" });
+    });
+
+    it("keeps the due date unchanged on a failed inspection, even with an override", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      await post({ inspectedAt: "2026-05-20", result: "failed", dueDate: "2026-05-01" });
+      expect(insertCalls.find((c) => c.table === inventoryInspectionRecords)!.values).toMatchObject({ result: "failed" });
+      expect(updateCalls.find((c) => c.table === inventoryInspections)!.set).toEqual({ inspectedAt: "2026-05-20", dueDate: "2026-06-01" });
+    });
+
+    it("only inserts the record for a backdated entry (Nachtrag), the cache stays untouched", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      selectWhereResult = [{ at: "2026-06-01" }];
+      await post({ inspectedAt: "2026-03-01", result: "passed" });
+      expect(insertCalls.find((c) => c.table === inventoryInspectionRecords)).toBeDefined();
+      expect(updateCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
+    });
+
+    it("allows several inspections of the same inspection type on the same day", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: null, dueDate: null };
+      await post({ inspectedAt: "2026-05-20", result: "failed" });
+      await post({ inspectedAt: "2026-05-20", result: "passed" });
+      expect(insertCalls.filter((c) => c.table === inventoryInspectionRecords)).toHaveLength(2);
+    });
+
+    it("rejects an unknown inspector person", async () => {
+      inspectionFindFirstResult = { id: "p1", inventoryItemId: "item1", intervalMonths: 12, dueDate: "2026-06-01" };
+      personFindFirstResult = undefined;
+      await post({ inspectedAt: "2026-05-20", inspectorPersonId: "nope" });
+      expect(insertCalls.find((c) => c.table === inventoryInspectionRecords)).toBeUndefined();
     });
 
     it("rejects a future inspection date", async () => {

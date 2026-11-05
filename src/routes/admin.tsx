@@ -1,10 +1,12 @@
 import { RowAction } from "../components/row-action.js";
 import { EmailField, Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Hono, type Context } from "hono";
-import { eq, and, count, asc, inArray } from "drizzle-orm";
+import { eq, and, or, count, asc, desc, inArray, ilike, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   users,
+  persons,
+  members,
   sessions,
   accounts,
   anniversaryYears,
@@ -24,8 +26,9 @@ import { logger } from "../lib/logger.js";
 import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
+import { formatDate } from "../lib/format.js";
 import { setFlash } from "../lib/flash.js";
-import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SEARCH_DEBOUNCE_MS, SOURCE_REPO_URL } from "../lib/constants.js";
 import { isPendingUser } from "../lib/registration.js";
 import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
@@ -353,7 +356,108 @@ f.addEventListener('change',function(e){if(e.target.name==='roles')render()});})
   );
 }
 
-type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; error?: string };
+type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; personId?: string; error?: string };
+
+// Optional person link; same search-and-select UX as the inventory member picker (htmx live search, no create).
+function PersonPicker({ userId, personId, personName }: { userId?: string; personId?: string; personName?: string }) {
+  const sel = Boolean(personId);
+  return (
+    <div class="flex flex-col" id="user-person-picker">
+      <p class="fieldset-legend">{t("admin.users.modal.personLabel")}</p>
+      <div data-part="search" class={sel ? "hidden" : ""}>
+        <label class="input flex items-center gap-2 w-full">
+          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <input
+            type="text"
+            autocomplete="off"
+            placeholder={t("admin.users.modal.personSearchPlaceholder")}
+            class="grow min-w-0"
+            name="q"
+            hx-get="/admin/users/search-persons"
+            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms, load, change from:closest form`}
+            hx-target="#user-person-results"
+            hx-include="[name=name],[name=email]"
+            hx-vals={JSON.stringify({ userId: userId ?? "" })}
+          />
+        </label>
+        <div id="user-person-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+      </div>
+      <input type="hidden" name="personId" value={personId ?? ""} />
+      <div data-part="selected" class={sel ? "flex items-center gap-2" : "hidden flex items-center gap-2"}>
+        <span data-part="name">{personName ?? ""}</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-action="clear">{t("admin.users.modal.personClear")}</button>
+      </div>
+      <p class="label text-xs opacity-70 whitespace-normal">{t("admin.users.modal.personHint")}</p>
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function(){
+          var root=document.getElementById('user-person-picker');
+          var $=function(p){return root.querySelector('[data-part="'+p+'"]')};
+          var id=root.querySelector('input[name=personId]');
+          root.addEventListener('click',function(e){
+            var r=e.target.closest('.person-result');
+            if(r){id.value=r.dataset.id;$('name').textContent=r.dataset.name;$('selected').classList.remove('hidden');$('search').classList.add('hidden');return}
+            if(e.target.closest('[data-action=clear]')){
+              id.value='';$('selected').classList.add('hidden');$('search').classList.remove('hidden');
+              var i=$('search').querySelector('input');i.value='';i.focus();
+              htmx.trigger(i,'load');
+            }
+          });
+        })();
+      ` }} />
+    </div>
+  );
+}
+
+// GET /admin/users/search-persons — persons not yet linked to another user.
+// Without a query, suggests persons matching the user's email (exact) or name (pg_trgm similarity); with one, searches and ranks the same way.
+adminRoutes.get("/users/search-persons", guard, async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  const userId = c.req.query("userId") ?? "";
+  const name = (c.req.query("name") ?? "").trim();
+  const email = (c.req.query("email") ?? "").trim().toLowerCase();
+  const suggest = q.length < 2;
+  if (suggest && !name && !email) return c.html("");
+  const fullName = sql`${persons.firstName} || ' ' || ${persons.lastName}`;
+  const score = sql<number>`greatest(case when ${email} <> '' and lower(${persons.email}) = ${email} then 1 else 0 end, similarity(${fullName}, ${name}))`;
+  const needle = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+  const isMember = sql<boolean>`exists (select 1 from ${members} where ${members.personId} = ${persons.id})`;
+  const rows = await db
+    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email, birthDate: persons.birthDate })
+    .from(persons)
+    .where(and(
+      suggest
+        ? sql`${score} >= 0.3`
+        : or(ilike(persons.firstName, needle), ilike(persons.lastName, needle), ilike(fullName, needle)),
+      or(isNull(persons.userId), eq(persons.userId, userId)),
+    ))
+    .orderBy(desc(score), desc(isMember), asc(persons.lastName), asc(persons.firstName))
+    .limit(50);
+  // Same name + email = same real person (e.g. repeated /lend requests, #140); the first row wins, members sort first.
+  const seen = new Set<string>();
+  const results = rows
+    .filter((p) => { const k = `${p.firstName}|${p.lastName}|${p.email?.toLowerCase() ?? ""}`.toLowerCase(); return !seen.has(k) && !!seen.add(k); })
+    .slice(0, suggest ? 3 : 10);
+  const nameCount = new Map<string, number>();
+  for (const p of results) { const k = `${p.firstName} ${p.lastName}`.toLowerCase(); nameCount.set(k, (nameCount.get(k) ?? 0) + 1); }
+  // Same-named entries also get the birth date; the email shows whenever it differs from the user's (or the name is ambiguous).
+  const hint = (p: (typeof results)[number]) => {
+    const dup = (nameCount.get(`${p.firstName} ${p.lastName}`.toLowerCase()) ?? 0) > 1;
+    const mail = p.email && (dup || p.email.toLowerCase() !== email) ? p.email : "";
+    return [dup && p.birthDate && formatDate(p.birthDate), mail].filter(Boolean).join(" · ");
+  };
+  if (results.length === 0) return suggest ? c.html("") : c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
+  return c.html(
+    <>
+      {suggest && <p class="px-2 pt-1 text-xs opacity-60">{t("admin.users.modal.personSuggestions")}</p>}
+      {results.map((p) => (
+        <div key={p.id} class="person-result p-2 hover:bg-base-200 cursor-pointer text-sm" data-id={p.id} data-name={`${p.firstName} ${p.lastName}`}>
+          {p.firstName} {p.lastName}
+          {hint(p) && <span class="opacity-60"> ({hint(p)})</span>}
+        </div>
+      ))}
+    </>
+  );
+});
 
 // Vollseite für Anlegen/Bearbeiten; bei Validierungsfehlern mit 422 und den eingegebenen Werten erneut gerendert.
 async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormState, status: 200 | 422 = 200) {
@@ -367,6 +471,9 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
     const [link] = await db.select({ id: accounts.id }).from(accounts).where(and(eq(accounts.userId, f.id), eq(accounts.providerId, "oidc")));
     f.oidcLinked = !!link;
   }
+  const [selectedPerson] = f.personId
+    ? await db.select({ firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(eq(persons.id, f.personId))
+    : [];
   const title = t(f.id ? "admin.users.modal.edit" : "admin.users.modal.create");
   return c.html(
     <Layout title={title} user={c.get("user")}>
@@ -381,6 +488,7 @@ async function renderUserForm(c: Context<{ Variables: Variables }>, f: UserFormS
         ) : (
           <EmailField label={t("admin.users.modal.emailLabel")} name="email" value={f.email} required />
         )}
+        <PersonPicker userId={f.id} personId={selectedPerson ? f.personId : undefined} personName={selectedPerson ? `${selectedPerson.firstName} ${selectedPerson.lastName}` : undefined} />
         <FieldGroup legend={t("admin.users.modal.roleLabel")}>
           <RoleCheckboxes allRoles={allRoles} permsByRole={permsByRole} checkedIds={f.checkedIds} />
         </FieldGroup>
@@ -405,6 +513,7 @@ adminRoutes.get("/users/:id", guard, async (c) => {
     .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId))
     .where(eq(userAppRoles.userId, id))
     .orderBy(asc(appRoles.name));
+  const [linked] = await db.select({ firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(eq(persons.userId, id));
   return c.html(
     <Layout title={u.name} user={c.get("user")}>
       {/* /users/:id/edit sits behind the same system:admin guard as /:id, so "Bearbeiten" is unconditional. */}
@@ -412,6 +521,7 @@ adminRoutes.get("/users/:id", guard, async (c) => {
       <ViewGrid>
         <ViewField label={t("admin.users.modal.nameLabel")} value={u.name} />
         <ViewField label={t("admin.users.modal.emailLabel")} value={u.email} />
+        <ViewField label={t("admin.users.modal.personLabel")} value={linked ? `${linked.lastName}, ${linked.firstName}` : ""} />
         <ViewField label={t("admin.users.modal.roleLabel")} value={assigned.map((r) => r.name).join(", ")} />
       </ViewGrid>
     </Layout>
@@ -423,7 +533,8 @@ adminRoutes.get("/users/:id/edit", guard, async (c) => {
   const [u] = await db.select().from(users).where(eq(users.id, id));
   if (!u || u.email === LOCAL_ADMIN_EMAIL) return c.html("", HTTP_STATUS.NOT_FOUND);
   const assigned = await db.select({ roleId: userAppRoles.roleId }).from(userAppRoles).where(eq(userAppRoles.userId, id));
-  return renderUserForm(c, { id, name: u.name, email: u.email, checkedIds: new Set(assigned.map((a) => a.roleId)) });
+  const [linked] = await db.select({ id: persons.id }).from(persons).where(eq(persons.userId, id));
+  return renderUserForm(c, { id, name: u.name, email: u.email, checkedIds: new Set(assigned.map((a) => a.roleId)), personId: linked?.id });
 });
 
 async function validRoleIds(requested: string[]): Promise<string[]> {
@@ -438,9 +549,15 @@ adminRoutes.post("/users", guard, async (c) => {
   const name = String(body.name ?? "").trim();
   const email = String(body.email ?? "").trim().toLowerCase();
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
+  const personId = String(body.personId ?? "") || undefined;
 
   if (!name || !email) {
-    return renderUserForm(c, {  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
+    return renderUserForm(c, { name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.missingFields") }, 422);
+  }
+
+  if (personId) {
+    const [taken] = await db.select({ userId: persons.userId }).from(persons).where(eq(persons.id, personId));
+    if (taken?.userId) return renderUserForm(c, { name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.personTaken") }, 422);
   }
 
   const existing = await db
@@ -448,7 +565,7 @@ adminRoutes.post("/users", guard, async (c) => {
     .from(users)
     .where(eq(users.email, email));
   if (existing.length > 0) {
-    return renderUserForm(c, {  name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
+    return renderUserForm(c, { name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.emailExists") }, 422);
   }
 
   const now = new Date();
@@ -465,6 +582,7 @@ adminRoutes.post("/users", guard, async (c) => {
   if (roleIds.length > 0) {
     await db.insert(userAppRoles).values(roleIds.map((roleId) => ({ userId: id, roleId })));
   }
+  if (personId) await db.update(persons).set({ userId: id }).where(eq(persons.id, personId));
 
   setFlash(c, t("admin.users.flash.created", { name }), "success");
   return c.redirect(`/admin/users/${id}`);
@@ -482,15 +600,23 @@ adminRoutes.post("/users/:id", guard, async (c) => {
   // OIDC-linked users: email is owned by the IdP, ignore any submitted value.
   const email = oidcLink ? existing.email : String(body.email ?? "").trim().toLowerCase();
   const roleIds = await validRoleIds(([] as string[]).concat((body.roles as string | string[] | undefined) ?? []));
+  const personId = String(body.personId ?? "") || undefined;
 
   if (!name || !email) {
-    return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.missingFields") }, 422);
+    return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.missingFields") }, 422);
+  }
+
+  if (personId) {
+    const [taken] = await db.select({ userId: persons.userId }).from(persons).where(eq(persons.id, personId));
+    if (taken?.userId && taken.userId !== id) {
+      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.personTaken") }, 422);
+    }
   }
 
   if (email !== existing.email) {
     const dupe = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
     if (dupe.length > 0) {
-      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), error: t("admin.users.flash.emailExists") }, 422);
+      return renderUserForm(c, { id, oidcLinked: !!oidcLink, name, email, checkedIds: new Set(roleIds), personId, error: t("admin.users.flash.emailExists") }, 422);
     }
   }
 
@@ -498,6 +624,9 @@ adminRoutes.post("/users/:id", guard, async (c) => {
     .update(users)
     .set({ name, email, updatedAt: new Date() })
     .where(eq(users.id, id));
+
+  await db.update(persons).set({ userId: null }).where(eq(persons.userId, id));
+  if (personId) await db.update(persons).set({ userId: id }).where(eq(persons.id, personId));
 
   await db.delete(userAppRoles).where(eq(userAppRoles.userId, id));
   if (roleIds.length > 0) {

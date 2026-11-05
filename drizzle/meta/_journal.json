@@ -477,6 +477,34 @@
       "when": 1794600000003,
       "tag": "0067_assignment_from_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1794600000004,
+      "tag": "0068_inventory_inspection_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1794600000005,
+      "tag": "0069_inventory_inspection_records_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1794600000006,
+      "tag": "0070_person_user_link",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1794600000007,
+      "tag": "0071_enable_pg_trgm",
+      "breakpoints": true
     }
   ]
 }

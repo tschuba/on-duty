@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   users,
+  persons,
   sessions,
   accounts,
   memberRoles,
@@ -48,6 +49,7 @@ let appRolesFixture: any[] = [];
 let appRolePermissionsFixture: any[] = [];
 let userAppRolesFixture: any[] = [];
 let orgConfigFixture: any[] = [];
+let personsFixture: any[] = [];
 
 // Per-table one-shot queues: lets a single request that issues two selects
 // against the same table (e.g. lookup, then a separate email-dupe check)
@@ -78,6 +80,7 @@ const select = vi.fn(() => ({
     if (table === userAppRoles) return chainOf(nextRows(userAppRoles, userAppRolesFixture));
     if (table === orgConfig) return chainOf(nextRows(orgConfig, orgConfigFixture));
     if (table === accounts) return chainOf(nextRows(accounts, []));
+    if (table === persons) return chainOf(nextRows(persons, personsFixture));
     return chainOf([]);
   }),
 }));
@@ -151,6 +154,7 @@ beforeEach(() => {
   appRolePermissionsFixture = [];
   userAppRolesFixture = [];
   orgConfigFixture = [];
+  personsFixture = [];
   currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
   backupStatus = { state: "unconfigured", timestamp: null, lastSuccess: null };
 });
@@ -470,6 +474,94 @@ describe("POST /users/:id", () => {
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === userAppRoles)).toBe(true);
     expect(insertCalls.some((c) => c.table === userAppRoles && c.values.some((v: any) => v.roleId === "ar1"))).toBe(true);
+  });
+});
+
+const person = (o: any = {}) => ({ id: "p1", firstName: "Max", lastName: "Muster", email: null, birthDate: null, userId: null, ...o });
+
+describe("GET /users/search-persons", () => {
+  it("is not shadowed by /users/:id", async () => {
+    const res = await adminRoutes.request("/users/search-persons?q=ma");
+    expect(res.status).toBe(200);
+  });
+
+  it("returns nothing without query, name or email", async () => {
+    expect(await (await adminRoutes.request("/users/search-persons")).text()).toBe("");
+  });
+
+  it("suggests matches under a heading, without a no-results message", async () => {
+    personsFixture = [person()];
+    const html = await (await adminRoutes.request("/users/search-persons?name=Max+Muster")).text();
+    expect(html).toContain(t("admin.users.modal.personSuggestions"));
+    expect(html).toContain('data-id="p1"');
+    expect(await (async () => { personsFixture = []; return (await adminRoutes.request("/users/search-persons?name=Max")).text(); })()).toBe("");
+  });
+
+  it("shows a no-results message for a typed search", async () => {
+    expect(await (await adminRoutes.request("/users/search-persons?q=zz")).text()).toContain(t("admin.users.modal.personNoResults"));
+  });
+
+  it("merges duplicates with the same name and email", async () => {
+    personsFixture = [person({ id: "m", email: "A@b.de" }), person({ id: "d", email: "a@b.de" })];
+    const html = await (await adminRoutes.request("/users/search-persons?q=max")).text();
+    expect(html).toContain('data-id="m"');
+    expect(html).not.toContain('data-id="d"');
+  });
+
+  it("shows email and birth date only to tell same names apart", async () => {
+    personsFixture = [person({ id: "a", email: "a@b.de", birthDate: "1985-04-05" }), person({ id: "b", email: "x@y.de" })];
+    const html = await (await adminRoutes.request("/users/search-persons?q=max&email=a@b.de")).text();
+    expect(html).toContain("05.04.1985 · a@b.de");
+    expect(html).toContain("x@y.de");
+  });
+
+  it("shows a differing email even for a unique name, but not a matching one", async () => {
+    personsFixture = [person({ email: "other@b.de" })];
+    expect(await (await adminRoutes.request("/users/search-persons?q=max&email=me@b.de")).text()).toContain("other@b.de");
+    personsFixture = [person({ email: "ME@b.de" })];
+    expect(await (await adminRoutes.request("/users/search-persons?q=max&email=me@b.de")).text()).not.toContain("ME@b.de");
+  });
+
+  it("limits suggestions to 3", async () => {
+    personsFixture = [1, 2, 3, 4, 5].map((i) => person({ id: `p${i}`, firstName: `N${i}` }));
+    const html = await (await adminRoutes.request("/users/search-persons?name=N")).text();
+    expect(html.match(/data-id=/g)).toHaveLength(3);
+  });
+});
+
+describe("person link", () => {
+  it("links the chosen person when creating a user", async () => {
+    queue(persons, [{ userId: null }]);
+    const res = await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de", personId: "p1" }) });
+    expect(res.status).toBe(302);
+    expect(updateCalls.some((c) => c.table === persons && typeof c.set.userId === "string")).toBe(true);
+  });
+
+  it("refuses a person already linked to another user on create", async () => {
+    queue(persons, [{ userId: "other" }]);
+    const res = await adminRoutes.request("/users", { method: "POST", body: formBody({ name: "A", email: "a@b.de", personId: "p1" }) });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("admin.users.flash.personTaken"));
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("refuses a person linked to another user on update", async () => {
+    usersFixture = [makeUser()];
+    queue(persons, [{ userId: "other" }]);
+    const res = await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "a@b.de", personId: "p1" }) });
+    expect(res.status).toBe(422);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("re-links on update and unlinks when the person is cleared", async () => {
+    usersFixture = [makeUser()];
+    queue(persons, [{ userId: "u2" }]);
+    await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "ben@example.com", personId: "p1" }) });
+    const sets = () => updateCalls.filter((c) => c.table === persons).map((c) => c.set.userId);
+    expect(sets()).toEqual([null, "u2"]);
+    updateCalls.length = 0;
+    await adminRoutes.request("/users/u2", { method: "POST", body: formBody({ name: "A", email: "ben@example.com" }) });
+    expect(sets()).toEqual([null]);
   });
 });
 

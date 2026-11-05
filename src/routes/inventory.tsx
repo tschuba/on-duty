@@ -1,9 +1,9 @@
 import { Hono } from "hono";
 import { ToggleFilter } from "../components/toggle-filter.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members } from "../db/schema/index.js";
+import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { TAG_STYLES, TagAvatar, TagBadges } from "../components/tag-badges.js";
@@ -1476,6 +1476,13 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     ? parseInspectionRows(body, new Date().toISOString().slice(0, 10))
     : { rows: [] as InspectionFormRow[], errors: {} as Record<number, InspectionRowError> };
   if (Object.keys(inspectionErrors).length > 0) errors.inspections = t("inventory.form.inspectionsInvalid");
+  // Nachweis: Prüfarten mit erfassten Prüfungen lassen sich nicht entfernen (FK restrict, hier vorab mit klarer Meldung).
+  const removedIds = diffInspections(existing.inspections.map((r) => r.id), inspectionRows).deleteIds;
+  if (removedIds.length > 0) {
+    const used = await db.selectDistinct({ id: inventoryInspectionRecords.inspectionId }).from(inventoryInspectionRecords).where(inArray(inventoryInspectionRecords.inspectionId, removedIds));
+    const names = existing.inspections.filter((r) => used.some((u) => u.id === r.id)).map((r) => r.name);
+    if (names.length > 0) errors.inspections = t("inventory.form.inspectionHasRecords", { name: names.join(", ") });
+  }
 
   // Sperre: ein Feld lässt sich nur abwählen, solange es am gespeicherten Posten leer ist (nichts geht still verloren).
   const lockedFields = INVENTORY_FIELDS.filter((f) => hasField(existing.enabledFields, f) && !hasField(insertValues.enabledFields, f));
@@ -1829,10 +1836,47 @@ inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending
   );
 });
 
-function InspectionList({ item, canManage, today }: { item: ItemWithRelations; canManage: boolean; today: string }) {
-  const rows = item.inspections.slice().sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || a.name.localeCompare(b.name, "de"));
+type InspectionRecordRow = typeof inventoryInspectionRecords.$inferSelect & {
+  inspection: { name: string };
+  inspector: { firstName: string; lastName: string } | null;
+  recorder: { name: string } | null;
+};
+
+const personName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`;
+
+const INSPECTION_DIALOG_SCRIPT = `
+  function pickInspector(btn) {
+    var f = btn.closest('form');
+    f.elements.inspectorPersonId.value = btn.dataset.id;
+    f.querySelector('[data-inspector-name]').textContent = btn.dataset.name;
+    f.querySelector('[data-inspector-results]').innerHTML = '';
+  }
+  function clearInspector(btn) {
+    var f = btn.closest('form');
+    f.elements.inspectorPersonId.value = '';
+    f.querySelector('[data-inspector-name]').textContent = '';
+  }
+  function filterHistory(sel) {
+    document.querySelectorAll('[data-history-row]').forEach(function(r) { r.hidden = sel.value !== '' && r.dataset.historyRow !== sel.value; });
+  }
+`;
+
+function ResultDot({ result, legacy }: { result: "passed" | "failed" | null; legacy: boolean }) {
+  const cls = result === "passed" ? "status-success" : result === "failed" ? "status-error" : "status-neutral";
+  const label = t(`inventory.inspection.result.${result ?? "unknown"}`);
   return (
-    <div class="mt-6 max-w-2xl">
+    <>
+      <span class="inline-flex items-center gap-2"><span class={`status ${cls}`} aria-hidden="true" />{label}</span>
+      {legacy && <div class="opacity-60 text-xs">{t("inventory.inspection.legacy")}</div>}
+    </>
+  );
+}
+
+function InspectionList({ item, records, canInspect, today }: { item: ItemWithRelations; records: InspectionRecordRow[]; canInspect: boolean; today: string }) {
+  const rows = item.inspections.slice().sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || a.name.localeCompare(b.name, "de"));
+  const history = records.slice().sort((a, b) => b.inspectedAt.localeCompare(a.inspectedAt) || +b.createdAt - +a.createdAt);
+  return (
+    <div class="mt-6 max-w-4xl">
       <div class="text-sm opacity-60">{t("inventory.field.inspection")}</div>
       <div class="overflow-x-auto">
       <table class="table w-full">
@@ -1841,7 +1885,7 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
             <th>{t("inventory.form.inspectionName")}</th>
             <th>{t("inventory.form.inspectionLast")}</th>
             <th>{t("inventory.form.inspectionDue")}</th>
-            {canManage && <th></th>}
+            {canInspect && <th></th>}
           </tr>
         </thead>
         <tbody>
@@ -1854,22 +1898,39 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
                 <td>{r.name}{r.intervalMonths ? <span class="opacity-60 text-sm"> · {t("inventory.inspection.everyMonths", { count: r.intervalMonths })}</span> : null}</td>
                 <td>{r.inspectedAt ? formatDate(r.inspectedAt) : "—"}</td>
                 <td class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
-                {canManage && (
+                {canInspect && (
                   <td class="text-right">
-                    <button type="button" class="btn btn-sm" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="check" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
+                    <button type="button" class="btn btn-sm btn-outline btn-primary" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="checkup-list" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
                     <dialog id={dialogId} class="modal text-left">
                       <div class="modal-box">
                         <h3 class="font-bold text-lg">{t("inventory.inspection.doneTitle", { name: r.name })}</h3>
                         <form method="post" action={`/inventory/${item.id}/inspections/${r.id}/done`} class="space-y-2 mt-2"
-                          onsubmit={`var d=this.elements.dueDate;return !d||!d.value||d.value>=this.elements.inspectedAt.value||confirm(${JSON.stringify(t("inventory.inspection.dueBeforeDoneConfirm"))})`}>
+                          onchange="var d=this.elements.dueDate;if(d)d.disabled=this.elements.result.value==='failed'"
+                          onsubmit={`var d=this.elements.dueDate;return !d||d.disabled||!d.value||d.value>=this.elements.inspectedAt.value||confirm(${JSON.stringify(t("inventory.inspection.dueBeforeDoneConfirm"))})`}>
                           <Field label={t("inventory.inspection.doneDate")}>
                             <input type="date" name="inspectedAt" value={today} max={today} required class="input w-full" />
                           </Field>
+                          <Field label={t("inventory.inspection.result")}>
+                            <div class="flex gap-4">
+                              <label class="label cursor-pointer gap-2"><input type="radio" name="result" value="passed" class="radio radio-sm" checked />{t("inventory.inspection.result.passed")}</label>
+                              <label class="label cursor-pointer gap-2"><input type="radio" name="result" value="failed" class="radio radio-sm" />{t("inventory.inspection.result.failed")}</label>
+                            </div>
+                          </Field>
+                          <Field label={t("inventory.inspection.inspector")}>
+                            <input type="hidden" name="inspectorPersonId" value="" />
+                            <div class="flex items-center gap-2 min-h-6"><span data-inspector-name /><button type="button" class="btn btn-ghost btn-xs" onclick="clearInspector(this)">{t("inventory.inspection.inspectorClear")}</button></div>
+                            <input type="text" name="q" autocomplete="off" class="input w-full" placeholder={t("inventory.inspection.inspectorSearch")}
+                              hx-get="/inventory/search-persons" hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`} hx-target="next [data-inspector-results]" />
+                            <div data-inspector-results class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+                          </Field>
                           {r.intervalMonths && (
-                            <Field label={t("inventory.form.inspectionDue")} hint={t("inventory.inspection.dueHint")}>
+                            <Field label={t("inventory.form.inspectionDue")} hint={`${t("inventory.inspection.dueHint")} ${t("inventory.inspection.dueFailedHint")}`}>
                               <input type="date" name="dueDate" value={next} class="input w-full" />
                             </Field>
                           )}
+                          <Field label={t("inventory.inspection.note")}>
+                            <textarea name="note" class="textarea w-full" rows={2} maxlength={1000} />
+                          </Field>
                           <div class="modal-action">
                             <button type="button" class="btn" onclick={`document.getElementById('${dialogId}').close()`}>{t("common.cancel")}</button>
                             <button type="submit" class="btn btn-primary">{t("inventory.inspection.markDone")}</button>
@@ -1886,12 +1947,72 @@ function InspectionList({ item, canManage, today }: { item: ItemWithRelations; c
         </tbody>
       </table>
       </div>
+
+      <div class="mt-8 flex items-center justify-between">
+        <div class="text-sm opacity-60">{t("inventory.inspection.history")}</div>
+        <label class="select select-sm w-auto">
+          <select aria-label={t("inventory.inspection.history")} onchange="filterHistory(this)">
+            <option value="">{t("inventory.inspection.historyAll")}</option>
+            {rows.map((r) => <option value={r.id}>{r.name}</option>)}
+          </select>
+        </label>
+      </div>
+      <div class="overflow-x-auto">
+      <table class="table w-full">
+        <thead>
+          <tr>
+            <th>{t("inventory.inspection.doneDate")}</th>
+            <th>{t("inventory.form.inspectionName")}</th>
+            <th>{t("inventory.inspection.result")}</th>
+            <th>{t("inventory.inspection.inspector")}</th>
+            <th>{t("inventory.inspection.note")}</th>
+            <th>{t("inventory.inspection.recordedBy")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.length === 0 && <tr><td colspan={6} class="text-center opacity-50 py-4">{t("inventory.inspection.historyEmpty")}</td></tr>}
+          {history.map((h) => (
+            <tr data-history-row={h.inspectionId}>
+              <td>{formatDate(h.inspectedAt)}</td>
+              <td>{h.inspection.name}</td>
+              <td><ResultDot result={h.result} legacy={h.result == null && h.recordedBy == null && h.inspectorPersonId == null} /></td>
+              <td>{h.inspector ? personName(h.inspector) : "—"}</td>
+              <td class="whitespace-pre-line">{h.note ?? "—"}</td>
+              <td>{h.recorder?.name ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+      <script dangerouslySetInnerHTML={{ __html: INSPECTION_DIALOG_SCRIPT }} />
     </div>
   );
 }
 
-// POST /inventory/:id/inspections/:inspectionId/done — Prüfdatum setzen, neue Fälligkeit nach nextDueDate (im Dialog überschreibbar).
-inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("inventory:manage"), async (c) => {
+// GET /inventory/search-persons — Personen-Picker für den Prüfer (nur Name, keine weiteren Daten).
+inventoryRoutes.get("/search-persons", requireAuth("inventory:inspect"), async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+  const needle = `%${q}%`;
+  const results = await db
+    .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName })
+    .from(persons)
+    .where(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)))
+    .orderBy(asc(persons.lastName), asc(persons.firstName))
+    .limit(10);
+  if (results.length === 0) return c.html(<p class="p-2 text-sm opacity-60">{t("inventory.inspection.inspectorNone")}</p>);
+  return c.html(
+    <>
+      {results.map((p) => (
+        <button type="button" class="block w-full text-left p-2 hover:bg-base-200" data-id={p.id} data-name={personName(p)} onclick="pickInspector(this)">{personName(p)}</button>
+      ))}
+    </>,
+  );
+});
+
+// POST /inventory/:id/inspections/:inspectionId/done — Prüfung erfassen: Verlaufszeile + Cache (inspectedAt/dueDate) in einer Transaktion.
+inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("inventory:inspect"), async (c) => {
+  const user = c.get("user")!;
   const id = c.req.param("id");
   const inspection = await db.query.inventoryInspections.findFirst({
     where: and(eq(inventoryInspections.id, c.req.param("inspectionId")), eq(inventoryInspections.inventoryItemId, id)),
@@ -1907,13 +2028,27 @@ inventoryRoutes.post("/:id/inspections/:inspectionId/done", requireAuth("invento
   const today = new Date().toISOString().slice(0, 10);
   const inspectedAt = trimmed(body, "inspectedAt");
   const override = trimmed(body, "dueDate");
-  const valid = isIsoDate;
-  if (!valid(inspectedAt) || inspectedAt > today || (override && !valid(override))) {
+  const resultRaw = trimmed(body, "result");
+  const inspectorPersonId = trimmed(body, "inspectorPersonId") || null;
+  const note = trimmed(body, "note").slice(0, 1000) || null;
+  const result = resultRaw === "failed" ? "failed" : "passed";
+  if (!isIsoDate(inspectedAt) || inspectedAt > today || (override && !isIsoDate(override))) {
     setFlash(c, t("inventory.inspection.invalidDone"), "error");
     return c.redirect(`/inventory/${id}`);
   }
-  const dueDate = inspection.intervalMonths ? override || nextDueDate(inspection.dueDate, inspection.intervalMonths, inspectedAt) : null;
-  await db.update(inventoryInspections).set({ inspectedAt, dueDate }).where(eq(inventoryInspections.id, inspection.id));
+  if (inspectorPersonId && !(await db.query.persons.findFirst({ where: eq(persons.id, inspectorPersonId), columns: { id: true } }))) {
+    setFlash(c, t("inventory.inspection.invalidDone"), "error");
+    return c.redirect(`/inventory/${id}`);
+  }
+  const [latest] = await db.select({ at: max(inventoryInspectionRecords.inspectedAt) }).from(inventoryInspectionRecords).where(eq(inventoryInspectionRecords.inspectionId, inspection.id));
+  // Nachtrag (älter als die jüngste Zeile): nur die Zeile anlegen, der Cache bleibt.
+  const backfill = latest?.at != null && inspectedAt < latest.at;
+  await db.transaction(async (tx) => {
+    await tx.insert(inventoryInspectionRecords).values({ inspectionId: inspection.id, inspectedAt, result, inspectorPersonId, note, recordedBy: user.id });
+    if (backfill) return;
+    const dueDate = result === "failed" ? inspection.dueDate : inspection.intervalMonths ? override || nextDueDate(inspection.dueDate, inspection.intervalMonths, inspectedAt) : null;
+    await tx.update(inventoryInspections).set({ inspectedAt, dueDate }).where(eq(inventoryInspections.id, inspection.id));
+  });
   setFlash(c, t("inventory.inspection.doneFlash"), "success");
   return c.redirect(`/inventory/${id}`);
 });
@@ -1933,6 +2068,10 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
   const availableToRetire = item.quantity - item.retiredQuantity - assigned.reduce((sum, x) => sum + x.quantity, 0);
   const retireAction = canManage ? <RetireAction item={item} isBatch={item.quantity > 1} availableToRetire={availableToRetire} /> : undefined;
   const price = item.purchasePrice ? `${item.purchasePrice} €` : null;
+  const records = item.inspections.length === 0 ? [] : ((await db.query.inventoryInspectionRecords.findMany({
+    where: inArray(inventoryInspectionRecords.inspectionId, item.inspections.map((r) => r.id)),
+    with: { inspection: true, inspector: true, recorder: true },
+  })) as InspectionRecordRow[]);
   return c.html(
     <Layout title={item.name} user={user}>
       <PageHeader title={<>{item.name} <TagBadges tags={item.tags.map((tg) => tg.tag)} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
@@ -2014,7 +2153,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
         })()}
       </ViewGrid>
       {hasField(item.enabledFields, "inspection") && item.inspections.length > 0 && (
-        <InspectionList item={item} canManage={canManage && !item.retiredAt} today={new Date().toISOString().slice(0, 10)} />
+        <InspectionList item={item} records={records} canInspect={user.permissions.has("inventory:inspect") && !item.retiredAt} today={new Date().toISOString().slice(0, 10)} />
       )}
       {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
     </Layout>

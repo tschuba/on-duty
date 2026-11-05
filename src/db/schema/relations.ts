@@ -5,7 +5,7 @@ import { memberRoleAssignments, memberRoles } from "./roles";
 import { donors, donations } from "./donations";
 import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
-import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections, inventoryInspectionTemplates, inventoryTemplates, inventoryTemplateFieldDefs, inventoryTemplateInspections } from "./inventory";
+import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryTemplates, inventoryTemplateFieldDefs, inventoryTemplateInspections } from "./inventory";
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
 import { events, eventTags, eventVisibleRoles } from "./events";
 import { appRoles } from "./permissions";
@@ -56,8 +56,15 @@ export const inventoryItemsRelations = relations(inventoryItems, ({ many }) => (
   inspections: many(inventoryInspections),
 }));
 
-export const inventoryInspectionsRelations = relations(inventoryInspections, ({ one }) => ({
+export const inventoryInspectionsRelations = relations(inventoryInspections, ({ one, many }) => ({
   item: one(inventoryItems, { fields: [inventoryInspections.inventoryItemId], references: [inventoryItems.id] }),
+  records: many(inventoryInspectionRecords),
+}));
+
+export const inventoryInspectionRecordsRelations = relations(inventoryInspectionRecords, ({ one }) => ({
+  inspection: one(inventoryInspections, { fields: [inventoryInspectionRecords.inspectionId], references: [inventoryInspections.id] }),
+  inspector: one(persons, { fields: [inventoryInspectionRecords.inspectorPersonId], references: [persons.id] }),
+  recorder: one(users, { fields: [inventoryInspectionRecords.recordedBy], references: [users.id] }),
 }));
 
 export const inventoryTemplatesRelations = relations(inventoryTemplates, ({ many }) => ({
