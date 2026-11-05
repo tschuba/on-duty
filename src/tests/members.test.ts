@@ -180,6 +180,7 @@ function makeMember(overrides: Record<string, unknown> = {}) {
     accountHolder: null,
     phone: null,
     mobile: null,
+    userId: null,
     email: null,
     ...overrides,
   };
