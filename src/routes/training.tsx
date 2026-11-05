@@ -195,8 +195,7 @@ const LIST_STATUSES = ["expired", "soon", "valid", "noExpiry"] as const;
 trainingRoutes.get("/training", read, async (c) => {
   const user = c.get("user");
   const q = c.req.query();
-  const memberQ = (q.member ?? "").trim().toLowerCase();
-  const titleQ = (q.title ?? "").trim().toLowerCase();
+  const search = (q.q ?? "").trim().toLowerCase();
   const statusFilter = (c.req.queries("status") ?? []).filter((s): s is (typeof LIST_STATUSES)[number] => (LIST_STATUSES as readonly string[]).includes(s));
   const withFormer = q.former === "1";
   const { page, pageSize } = parsePagination(q);
@@ -211,22 +210,21 @@ trainingRoutes.get("/training", read, async (c) => {
   const status = trainingStatuses(all.map((x) => x.r), now);
   const rows = all
     .filter((x) => withFormer || !x.exitDate || x.exitDate > now)
-    .filter((x) => !memberQ || `${x.firstName} ${x.lastName}`.toLowerCase().includes(memberQ))
-    .filter((x) => !titleQ || x.r.title.toLowerCase().includes(titleQ))
+    .filter((x) => !search || `${x.firstName} ${x.lastName}`.toLowerCase().includes(search) || x.r.title.toLowerCase().includes(search))
     .filter((x) => statusFilter.length === 0 || (statusFilter as TrainingStatus[]).includes(status.get(x.r.id)!))
     // NULL zuletzt; stabile Sortierung behält die Namensreihenfolge der Abfrage.
     .sort((a, b) => (a.r.expiresAt ?? "9999").localeCompare(b.r.expiresAt ?? "9999"));
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const items = rows.slice((page - 1) * pageSize, page * pageSize);
-  const cur = { member: q.member, title: q.title, status: statusFilter, former: withFormer ? "1" : "", pageSize };
+  const cur = { q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize };
   const pageUrl = (p: number) => buildListUrl("/training", cur, { page: p });
 
   return c.html(
     <Layout title={t("training.pageTitle")} user={user}>
       <PageHeader title={t("training.pageTitle")} />
       <form method="get" action="/training" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
-        <input type="search" name="member" class="input" placeholder={t("training.filter.member")} value={q.member ?? ""} />
-        <input type="search" name="title" class="input" placeholder={t("training.filter.title")} value={q.title ?? ""} />
+        <input type="search" name="q" class="input" placeholder={t("training.filter.search")} value={q.q ?? ""} enterkeyhint="search"
+          hx-get="/training" hx-trigger="input changed delay:300ms, search" hx-include="closest form" hx-target="#training-results" hx-select="#training-results" hx-swap="outerHTML" hx-push-url="true" />
         <MultiSelectFilter
           param="status"
           autoApply
@@ -241,8 +239,8 @@ trainingRoutes.get("/training", read, async (c) => {
           <input type="checkbox" name="former" value="1" class="toggle toggle-primary" checked={withFormer} onchange="this.form.submit()" />
           <span class="text-sm">{t("training.filter.former")}</span>
         </label>
-        <button type="submit" class="btn btn-outline">{t("training.filter.apply")}</button>
       </form>
+      <div id="training-results" class="flex flex-1 flex-col">
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
           <thead><tr><th>{t("training.col.member")}</th><th>{t("training.form.title")}</th><th>{t("training.form.completedAt")}</th><th>{t("training.form.expiresAt")}</th><th>{t("training.form.organizer")}</th></tr></thead>
@@ -261,6 +259,7 @@ trainingRoutes.get("/training", read, async (c) => {
         </table>
       </div>
       <Pager countLabel={t("training.count", { count: rows.length })} page={page} totalPages={totalPages} pageUrl={pageUrl} pageSize={pageSize} pageSizeOptions={PAGE_SIZE_OPTIONS} />
+      </div>
     </Layout>,
   );
 });
