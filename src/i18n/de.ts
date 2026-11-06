@@ -1,6 +1,10 @@
 export const de = {
   // ── Common ──────────────────────────────────────────────────────────────────
   "common.yes": "Ja",
+  "error.forbidden.title": "Zugriff verweigert",
+  "error.forbidden.heading": "403 – Zugriff verweigert",
+  "error.forbidden.text": "Du hast keine Berechtigung für diese Seite.",
+  "error.toHome": "Zur Startseite",
   "common.no": "Nein",
   "common.cancel": "Abbrechen",
   "common.cancelConfirm": "Ungespeicherte Änderungen verwerfen?",

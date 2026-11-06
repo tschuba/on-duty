@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import { setCookie } from "hono/cookie";
+import { HTTPException } from "hono/http-exception";
 import { auth, type AppUser } from "../auth.js";
 import { db } from "../db/index.js";
 import { sessions, userAppRoles, appRolePermissions } from "../db/schema/index.js";
@@ -43,7 +44,8 @@ export function requireAuth(required?: Permission | Permission[], opts: { allowP
 
     const requiredList = required ? ([] as Permission[]).concat(required) : [];
     if (requiredList.length > 0 && !requiredList.some((p) => permissions.has(p))) {
-      return c.html("<h1>403 Zugriff verweigert</h1>", HTTP_STATUS.FORBIDDEN);
+      c.set("user", { ...user, permissions, roleIds }); // so the error page can render the layout
+      throw new HTTPException(HTTP_STATUS.FORBIDDEN);
     }
 
     c.set("user", { ...user, permissions, roleIds });

@@ -42,7 +42,7 @@ import { publicApiRoutes } from "./routes/public-api.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
 import { Layout } from "./components/layout.js";
-import { t } from "./i18n/index.js";
+import { forbiddenPage } from "./components/error-pages.js";
 
 validateEnv();
 initSentry();
@@ -172,6 +172,9 @@ app.notFound((c) => {
 
 // 500
 app.onError(async (err, c) => {
+  if (err instanceof HTTPException && err.status === 403) {
+    return forbiddenPage(c, c.get("user"));
+  }
   c.get("log").error({ err }, "unhandled error");
   const user = c.get("user");
   if (!(err instanceof HTTPException && err.status < 500)) {
