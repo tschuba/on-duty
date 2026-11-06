@@ -328,7 +328,9 @@ describe("role picker", () => {
     expect(html).toContain(t("admin.users.modal.effectivePermissions"));
     expect(html).toContain(t("admin.users.modal.roleDetails"));
     expect(html).toMatch(/aria-expanded="false"/);
-    expect(html).not.toContain("overflow-y-auto");
+    // Rollenliste ist nicht scrollend (der Personen-Picker-Dropdown darf es sein).
+    const roles = html.slice(html.indexOf('class="role-picker'));
+    expect(roles.slice(0, roles.indexOf("data-picker") > 0 ? roles.indexOf("data-picker") : undefined)).not.toContain("overflow-y-auto");
   });
 });
 
@@ -498,7 +500,7 @@ describe("GET /users/search-persons", () => {
   });
 
   it("shows a no-results message for a typed search", async () => {
-    expect(await (await adminRoutes.request("/users/search-persons?q=zz")).text()).toContain(t("admin.users.modal.personNoResults"));
+    expect(await (await adminRoutes.request("/users/search-persons?q=zz")).text()).toContain(t("picker.noResults", { query: "zz" }));
   });
 
   it("merges duplicates with the same name and email", async () => {

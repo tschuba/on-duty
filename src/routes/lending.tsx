@@ -4,6 +4,7 @@ import { EmailField, Field, PhoneField } from "../components/field.js";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
@@ -18,7 +19,6 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
-import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const lendingRoutes = new Hono<{ Variables: Variables }>();
 
@@ -367,26 +367,13 @@ function BorrowerPickerFields({ personId, values, errors }: {
   );
   return (
     <div class="space-y-3">
-      <div id="borrower-picker-search" class={showFields ? "hidden" : ""}>
+      <div id="borrower-picker">
         <p class="fieldset-legend">{t("lending.loans.form.borrowerType")}</p>
-        <label class={`input flex items-center gap-2 w-full${errors?.borrower ? " input-error" : ""}`}>
-          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-          <input
-            type="text"
-            name="q"
-            autocomplete="off"
-            placeholder={t("lending.loans.form.borrowerSearchPlaceholder")}
-            class="grow min-w-0"
-            hx-get="/inventory/lending/search-persons"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-            hx-target="#borrower-picker-results"
-          />
-        </label>
-        <div id="borrower-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
-        <button type="button" class="link link-primary text-sm mt-2 borrower-create-new">{t("lending.loans.form.borrowerCreateNew")}</button>
+        <EntityPicker id="borrower-personId" name="borrowerPersonId" searchUrl="/inventory/lending/search-persons" selectedId={personId}
+          selectedName={personId ? personName({ firstName: v.firstName ?? "", lastName: v.lastName ?? "", companyName: v.companyName }) : undefined}
+          placeholder={t("lending.loans.form.borrowerSearchPlaceholder")} error={!!errors?.borrower} />
         {errors?.borrower && <p class="text-error text-sm mt-1">{errors.borrower}</p>}
       </div>
-      <input type="hidden" id="borrower-personId" name="borrowerPersonId" value={personId ?? ""} />
       <div id="borrower-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
         <p class="text-sm opacity-70">{t("lending.loans.form.borrowerHint")}</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -398,33 +385,18 @@ function BorrowerPickerFields({ personId, values, errors }: {
           {field("email", t("members.form.email"), "email")}
           {field("phone", t("members.form.phone"), "tel")}
         </div>
-        <button type="button" class="btn btn-ghost borrower-change-selection">{t("lending.loans.form.borrowerChangeSelection")}</button>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__borrowerPickerBound) {
-          window.__borrowerPickerBound = true;
-          var fields = ['firstName', 'lastName', 'companyName', 'email', 'phone'];
-          var $ = function(id) { return document.getElementById(id); };
-          var fill = function(d) {
-            $('borrower-personId').value = d.id || '';
-            fields.forEach(function(f) { $('borrower-' + f).value = d[f] || ''; });
-            $('borrower-fields').classList.remove('hidden');
-            $('borrower-picker-search').classList.add('hidden');
+        (function(){
+          var root = document.getElementById('borrower-picker'), fields = ['firstName', 'lastName', 'companyName', 'email', 'phone'];
+          var show = function(on, d) {
+            fields.forEach(function(f) { document.getElementById('borrower-' + f).value = (d && d[f]) || ''; });
+            document.getElementById('borrower-fields').classList.toggle('hidden', !on);
           };
-          document.body.addEventListener('click', function(e) {
-            var resEl = e.target.closest('.borrower-result');
-            if (resEl) { fill(resEl.dataset); return; }
-            if (e.target.closest('.borrower-create-new')) { fill({}); $('borrower-companyName').focus(); return; }
-            if (e.target.closest('.borrower-change-selection')) {
-              $('borrower-personId').value = '';
-              $('borrower-fields').classList.add('hidden');
-              $('borrower-picker-search').classList.remove('hidden');
-              $('borrower-picker-results').innerHTML = '';
-              var input = document.querySelector('#borrower-picker-search input[name=q]');
-              if (input) { input.value = ''; input.focus(); }
-            }
-          });
-        }
+          root.addEventListener('picker:select', function(e) { show(true, e.detail); });
+          root.addEventListener('picker:create', function() { document.getElementById('borrower-personId').value = ''; show(true); document.getElementById('borrower-companyName').focus(); });
+          root.addEventListener('picker:clear', function() { show(false); });
+        })();
       ` }} />
     </div>
   );
@@ -641,38 +613,17 @@ lendingRoutes.get("/search-persons", requireAuth("lending:manage"), async (c) =>
     .orderBy(asc(persons.lastName))
     .limit(10);
 
-  const createNew = (
-    <div class="p-2">
-      <button type="button" class="btn btn-ghost btn-sm borrower-create-new">{t("lending.loans.form.borrowerExternalNew")}</button>
-    </div>
-  );
-  if (results.length === 0) {
-    return c.html(
-      <div class="p-2">
-        <p class="text-sm opacity-60 mb-1">{t("lending.loans.form.borrowerNoResults", { query: q })}</p>
-        <button type="button" class="btn btn-ghost btn-sm borrower-create-new">{t("lending.loans.form.borrowerExternalNew")}</button>
-      </div>
-    );
-  }
   return c.html(
-    <>
-      {results.map((p) => (
-        <div
-          key={p.id}
-          class="borrower-result p-2 hover:bg-base-200 cursor-pointer text-sm"
-          data-id={p.id}
-          data-first-name={p.firstName}
-          data-last-name={p.lastName}
-          data-company-name={p.companyName ?? ""}
-          data-email={p.email ?? ""}
-          data-phone={p.phone ?? ""}
-        >
-          <span class="font-medium">{personName(p)}</span>
-          {(p.email || p.phone) && <span class="opacity-60">{" — "}{[p.email, p.phone].filter(Boolean).join(" · ")}</span>}
-        </div>
-      ))}
-      {createNew}
-    </>
+    <PickerOptions
+      empty={t("picker.noResults", { query: q })}
+      createLabel={t("lending.loans.form.borrowerExternalNew")}
+      options={results.map((p) => ({
+        id: p.id,
+        name: personName(p),
+        sub: [p.email, p.phone].filter(Boolean).join(" · ") || undefined,
+        data: { firstName: p.firstName, lastName: p.lastName, companyName: p.companyName, email: p.email, phone: p.phone },
+      }))}
+    />
   );
 });
 

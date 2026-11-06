@@ -15,6 +15,7 @@ import {
   userAppRoles,
 } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { PermissionBadges, PERMISSION_LABELS, RESOURCE_LABELS } from "../components/permission-badges.js";
 import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
@@ -28,7 +29,7 @@ import { t } from "../i18n/index.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
 import { formatDate } from "../lib/format.js";
 import { setFlash } from "../lib/flash.js";
-import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SEARCH_DEBOUNCE_MS, SOURCE_REPO_URL } from "../lib/constants.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
 import { isPendingUser } from "../lib/registration.js";
 import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
@@ -358,52 +359,16 @@ f.addEventListener('change',function(e){if(e.target.name==='roles')render()});})
 
 type UserFormState = { id?: string; oidcLinked?: boolean; name: string; email: string; checkedIds: Set<string>; personId?: string; error?: string };
 
-// Optional person link; same search-and-select UX as the inventory member picker (htmx live search, no create).
+// Optional person link; suggestions (email/name match) show on focus while the field is empty.
 function PersonPicker({ userId, personId, personName }: { userId?: string; personId?: string; personName?: string }) {
-  const sel = Boolean(personId);
   return (
-    <div class="flex flex-col" id="user-person-picker">
+    <div class="flex flex-col">
       <p class="fieldset-legend">{t("admin.users.modal.personLabel")}</p>
-      <div data-part="search" class={sel ? "hidden" : ""}>
-        <label class="input flex items-center gap-2 w-full">
-          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-          <input
-            type="text"
-            autocomplete="off"
-            placeholder={t("admin.users.modal.personSearchPlaceholder")}
-            class="grow min-w-0"
-            name="q"
-            hx-get="/admin/users/search-persons"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms, load, change from:closest form`}
-            hx-target="#user-person-results"
-            hx-include="[name=name],[name=email]"
-            hx-vals={JSON.stringify({ userId: userId ?? "" })}
-          />
-        </label>
-        <div id="user-person-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
-      </div>
-      <input type="hidden" name="personId" value={personId ?? ""} />
-      <div data-part="selected" class={sel ? "flex items-center gap-2" : "hidden flex items-center gap-2"}>
-        <span data-part="name">{personName ?? ""}</span>
-        <button type="button" class="btn btn-ghost btn-sm" data-action="clear">{t("admin.users.modal.personClear")}</button>
-      </div>
+      <EntityPicker
+        name="personId" searchUrl="/admin/users/search-persons" selectedId={personId} selectedName={personName}
+        placeholder={t("admin.users.modal.personSearchPlaceholder")} suggest include="[name=name],[name=email]" extraParams={{ userId: userId ?? "" }}
+      />
       <p class="label text-xs opacity-70 whitespace-normal">{t("admin.users.modal.personHint")}</p>
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function(){
-          var root=document.getElementById('user-person-picker');
-          var $=function(p){return root.querySelector('[data-part="'+p+'"]')};
-          var id=root.querySelector('input[name=personId]');
-          root.addEventListener('click',function(e){
-            var r=e.target.closest('.person-result');
-            if(r){id.value=r.dataset.id;$('name').textContent=r.dataset.name;$('selected').classList.remove('hidden');$('search').classList.add('hidden');return}
-            if(e.target.closest('[data-action=clear]')){
-              id.value='';$('selected').classList.add('hidden');$('search').classList.remove('hidden');
-              var i=$('search').querySelector('input');i.value='';i.focus();
-              htmx.trigger(i,'load');
-            }
-          });
-        })();
-      ` }} />
     </div>
   );
 }
@@ -445,17 +410,13 @@ adminRoutes.get("/users/search-persons", guard, async (c) => {
     const mail = p.email && (dup || p.email.toLowerCase() !== email) ? p.email : "";
     return [dup && p.birthDate && formatDate(p.birthDate), mail].filter(Boolean).join(" · ");
   };
-  if (results.length === 0) return suggest ? c.html("") : c.html(<p class="p-2 text-sm opacity-60">{t("admin.users.modal.personNoResults")}</p>);
+  if (results.length === 0 && suggest) return c.html("");
   return c.html(
-    <>
-      {suggest && <p class="px-2 pt-1 text-xs opacity-60">{t("admin.users.modal.personSuggestions")}</p>}
-      {results.map((p) => (
-        <div key={p.id} class="person-result p-2 hover:bg-base-200 cursor-pointer text-sm" data-id={p.id} data-name={`${p.firstName} ${p.lastName}`}>
-          {p.firstName} {p.lastName}
-          {hint(p) && <span class="opacity-60"> ({hint(p)})</span>}
-        </div>
-      ))}
-    </>
+    <PickerOptions
+      heading={suggest ? t("admin.users.modal.personSuggestions") : undefined}
+      empty={t("picker.noResults", { query: q })}
+      options={results.map((p) => ({ id: p.id, name: `${p.firstName} ${p.lastName}`, sub: hint(p) }))}
+    />
   );
 });
 

@@ -171,14 +171,14 @@ describe("GET /search-persons", () => {
     personsFixture = [];
     const res = await donorRoutes.request("/search-persons?q=zz");
     const html = await res.text();
-    expect(html).toContain("donor-create-new");
+    expect(html).toContain("data-create");
   });
 
   it("renders matching persons as selectable results", async () => {
     personsFixture = [makePerson()];
     const res = await donorRoutes.request("/search-persons?q=bau");
     const html = await res.text();
-    expect(html).toContain("donor-result");
+    expect(html).toContain('data-first-name="Anna"');
     expect(html).toContain("Anna Bauer");
   });
 });
