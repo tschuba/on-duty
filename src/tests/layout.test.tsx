@@ -76,3 +76,34 @@ describe("user menu", () => {
     expect(await (await app.request("/")).text()).toContain('href="/account"');
   });
 });
+
+describe("title", () => {
+  beforeEach(async () => { (await import("../env.js")).env.ORG_NAME = "FF Altenhammer"; });
+  const render = async (user?: any) => {
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout title="Antrag" user={user}>x</Layout>));
+    return (await (await app.request("/")).text()).match(/<title>(.*?)<\/title>/)![1];
+  };
+
+  it("public pages show the org name, internal pages on-duty", async () => {
+    const { env } = await import("../env.js");
+    expect(await render()).toBe(`Antrag · ${env.ORG_NAME}`);
+    expect(await render(userWith())).toBe("Antrag · on-duty");
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout>x</Layout>));
+    expect(await (await app.request("/")).text()).toMatch(/text-lg mr-4"[^>]*>\s*FF Altenhammer\s*<\/a>/);
+  });
+
+  it("falls back to on-duty when no org name is available", async () => {
+    const { env } = await import("../env.js");
+    env.ORG_NAME = "";
+    expect(await render()).toBe("Antrag · on-duty");
+  });
+
+  it("falls back to env.ORG_NAME when loading the org config throws", async () => {
+    const { env } = await import("../env.js");
+    const { db } = await import("../db/index.js");
+    vi.mocked(db.select).mockImplementationOnce(() => { throw new Error("db down"); });
+    expect(await render()).toBe(`Antrag · ${env.ORG_NAME}`);
+  });
+});

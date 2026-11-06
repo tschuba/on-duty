@@ -19,6 +19,11 @@ export async function loadOrgConfig(): Promise<Record<string, string>> {
   return config;
 }
 
+// Für Seitentitel: wirft nie (Fehlerseiten bei DB-Ausfall), Fallback env.ORG_NAME.
+export async function loadOrgNameSafe(): Promise<string> {
+  try { return (await loadOrgConfig()).orgName?.trim() || ""; } catch { return env.ORG_NAME?.trim() || ""; }
+}
+
 export function isOrgConfigCompleteForReceipts(config: Record<string, string>): boolean {
   return REQUIRED_RECEIPT_FIELDS.every((key) => config[key]);
 }

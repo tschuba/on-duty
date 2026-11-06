@@ -57,3 +57,29 @@ describe("notFoundPage / serverErrorPage", () => {
     expect(html).toContain("Fehler-ID: req-123");
   });
 });
+
+describe("title without login", () => {
+  it("shows the org name on 403 and 404", async () => {
+    const { env } = await import("../env.js");
+    env.ORG_NAME = "FF Altenhammer";
+    const app = new Hono();
+    app.get("/403", (c) => forbiddenPage(c));
+    app.get("/404", (c) => notFoundPage(c));
+    for (const p of ["/403", "/404"]) {
+      expect(await (await app.request(p)).text()).toMatch(/<title>.* · FF Altenhammer<\/title>/);
+    }
+  });
+});
+
+describe("navbar without login", () => {
+  it("shows the org name on 403 and 404", async () => {
+    const { env } = await import("../env.js");
+    env.ORG_NAME = "FF Altenhammer";
+    const app = new Hono();
+    app.get("/403", (c) => forbiddenPage(c));
+    app.get("/404", (c) => notFoundPage(c));
+    for (const p of ["/403", "/404"]) {
+      expect(await (await app.request(p)).text()).toContain(">FF Altenhammer</a>");
+    }
+  });
+});

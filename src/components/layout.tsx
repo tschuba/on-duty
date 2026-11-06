@@ -7,7 +7,7 @@ import { countOpenApplications } from "../lib/applications.js";
 import { countOpenReceipts } from "../lib/donations.js";
 import { countOverdueInspections } from "../lib/inventory.js";
 import { countOpenLoanRequests, countOverdueLoans } from "../lib/lending.js";
-import { canReadOrgTab, loadOrgConfig, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
+import { canReadOrgTab, loadOrgConfig, loadOrgNameSafe, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
 import { SOURCE_REPO_URL } from "../lib/constants.js";
 import { Icon } from "./icon.js";
@@ -59,12 +59,14 @@ export const Layout = async ({ title, children, user, path }: Props) => {
     };
   }
 
+  const brand = user ? "on-duty" : (await loadOrgNameSafe()) || "on-duty";
+
   return (
   <html lang="de">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>{title ? `${title} · on-duty` : "on-duty"}</title>
+      <title>{title ? `${title} · ${brand}` : brand}</title>
       <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}` }} />
       <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -92,7 +94,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
             </label>
           )}
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
-            on-<span class="text-error">duty</span>
+            {user ? <>on-<span class="text-error">duty</span></> : brand === "on-duty" ? <>on-<span class="text-error">duty</span></> : brand}
           </a>
         </div>
         {user && (
