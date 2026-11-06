@@ -127,9 +127,9 @@ function EventCards({ rows, tz }: { rows: EventRow[]; tz: string }) {
         prev = month;
         const monthIdx = Number(day.slice(5, 7)) - 1;
         return (
-          <div data-date={day} data-month={month} class="scroll-mt-20 mb-3">
+          <div data-date={day} data-month={month} class="scroll-mt-20 mb-6">
             {heading && <h2 class="text-xl font-bold mt-4 mb-3">{new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", month: "long", year: "numeric" }).format(new Date(`${day}T12:00:00Z`))}</h2>}
-            <div class="card bg-base-100 shadow-md flex-row p-4 gap-3 sm:p-5 sm:gap-4 lg:p-6">
+            <div class="flex gap-3 sm:gap-4 py-1">
               <div class="bg-primary text-primary-content rounded-box shrink-0 w-14 sm:w-16 flex flex-col items-center justify-center py-2 leading-tight">
                 <span class="text-xl sm:text-2xl font-bold">{Number(day.slice(8, 10))}</span>
                 <span class="text-xs uppercase">{MONTH_ABBR[monthIdx]}</span>
