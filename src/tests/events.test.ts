@@ -19,11 +19,18 @@ describe("parseEventForm", () => {
 });
 
 describe("validateEventForm", () => {
-  const base = { title: "Übung", location: "", description: "", allDay: false, startsAt: "2026-07-15T18:00", endsAt: "2026-07-15T20:00", visibility: "loggedIn" as const, tags: [], roleIds: [] };
+  const base = { title: "Übung", location: "", coordinates: "", description: "", allDay: false, startsAt: "2026-07-15T18:00", endsAt: "2026-07-15T20:00", visibility: "loggedIn" as const, tags: [], roleIds: [] };
 
   it("accepts a valid timed event", () => {
     const r = validateEventForm(base, TZ);
     expect("errors" in r).toBe(false);
+  });
+  it("rejects malformed or out-of-range coordinates, accepts a valid pair", () => {
+    for (const coordinates of ["junk", "48.1", "91, 11"]) {
+      const r = validateEventForm({ ...base, coordinates }, TZ);
+      expect("errors" in r && r.errors.coordinates).toBeTruthy();
+    }
+    expect("errors" in validateEventForm({ ...base, coordinates: "48.137154, 11.576124" }, TZ)).toBe(false);
   });
   it("rejects missing title", () => {
     const r = validateEventForm({ ...base, title: "" }, TZ);

@@ -1,4 +1,4 @@
-import { boolean, check, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { appRoles } from "./permissions";
 
@@ -14,6 +14,8 @@ export const events = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     allDay: boolean("all_day").notNull().default(false),
     location: text("location"),
+    latitude: numeric("latitude", { precision: 9, scale: 6 }),
+    longitude: numeric("longitude", { precision: 9, scale: 6 }),
     description: text("description"),
     visibility: eventVisibilityEnum("visibility").notNull().default("loggedIn"),
   },

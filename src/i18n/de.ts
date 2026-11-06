@@ -1480,6 +1480,8 @@ export const de = {
   "events.form.end": "Ende",
   "events.form.endOptional": "Ende (optional)",
   "events.form.location": "Ort",
+  "events.location.onMap": "Auf Karte",
+  "events.location.mapAria": "Karte des Veranstaltungsorts",
   "events.form.description": "Beschreibung",
   "events.tag.mandatory": "Pflichttermin",
   "events.tag.drill": "Übung",
