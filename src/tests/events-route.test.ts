@@ -172,7 +172,7 @@ describe("GET /events/public", () => {
     const body = await res.text();
     expect(body).toContain("Übung");
     expect(body).toContain("Kurzbeschreibung");
-    expect(body).toContain("card-border");
+    expect(body).toContain("shadow-md");
     expect(body).not.toContain("<table");
     expect(res.headers.get("X-Robots-Tag")).toBe("noindex");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
