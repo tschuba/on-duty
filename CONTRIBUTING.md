@@ -132,7 +132,7 @@ Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit
 
 Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, Build-Configs, `scripts/zitadel-init.mjs`, `scripts/copy-*.mjs`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
 
-Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft**. Das Veröffentlichen des Drafts baut die Docker-Tags `latest`, `X.Y.Z`, `X.Y`, `X`; `edge` kommt bei jedem Push auf `master`.
+Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft**; ältere, unveröffentlichte Drafts (inkl. Tags) werden dabei gelöscht. Das Veröffentlichen des Drafts baut die Docker-Tags `latest`, `X.Y.Z`, `X.Y`, `X`; `edge` kommt bei jedem Push auf `master`.
 
 ## Lizenz
 

@@ -1,7 +1,7 @@
 name: Tag Release
 
 # On master, when package.json's version changed: tag vX.Y.Z and create a
-# draft GitHub release. Publishing the draft triggers docker-publish.
+# draft GitHub release (older unpublished drafts are deleted). Publishing the draft triggers docker-publish.
 # RELEASE_TOKEN is required: pushes with GITHUB_TOKEN don't trigger workflows.
 
 on:
@@ -39,4 +39,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$tag" -m "Release $tag"
           git push origin "$tag"
-          gh release create "$tag" --draft --verify-tag --generate-notes
+          # Unveröffentlichte Drafts früherer Versionen aufräumen (samt Tag)
+          gh release list --json tagName,isDraft --jq '.[] | select(.isDraft) | .tagName' |
+            while read -r old_tag; do gh release delete "$old_tag" --yes --cleanup-tag; done
+          # Notes ab dem zuletzt veröffentlichten Release (nicht ab einem Draft-Tag)
+          prev=$(gh release list --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName // empty')
+          gh release create "$tag" --draft --verify-tag --generate-notes ${prev:+--notes-start-tag "$prev"}
