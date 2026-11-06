@@ -79,7 +79,7 @@ export function PickerOptions({ options, empty, createLabel, heading }: { option
         const data = Object.fromEntries(Object.entries(o.data ?? {}).map(([k, v]) => [`data-${kebab(k)}`, v ?? ""]));
         return (
           <li role="option" data-id={o.id} data-name={o.name} {...data}>
-            <a class="flex-col items-start gap-0 pointer-coarse:min-h-11">
+            <a class="flex flex-col items-start gap-0 pointer-coarse:min-h-11">
               <span>{o.name}</span>
               {o.sub && <span class="block text-xs opacity-60">{o.sub}</span>}
             </a>
