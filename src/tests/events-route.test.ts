@@ -181,7 +181,7 @@ describe("GET /events/public", () => {
 
 describe("GET /events/public?rows=", () => {
   it("returns card fragment with month heading and allDay text", async () => {
-    eventsFindManyResult = [makeEvent({ visibility: "public", allDay: true, startsAt: new Date("2026-11-15T00:00:00Z"), endsAt: new Date("2026-11-15T23:59:00Z") })];
+    eventsFindManyResult = [makeEvent({ visibility: "public", allDay: true, startsAt: new Date("2026-11-14T23:00:00Z"), endsAt: new Date("2026-11-15T22:59:00Z") })];
     const res = await eventRoutes.request("/public?rows=2026-11");
     const body = await res.text();
     expect(body).toContain("November 2026");
