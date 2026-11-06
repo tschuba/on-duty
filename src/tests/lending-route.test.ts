@@ -485,13 +485,13 @@ describe("GET /inventory/lending/search-persons", () => {
     const html = await (await lendingRoutes.request("/search-persons?q=mus")).text();
     expect(html).toContain("Max Muster");
     expect(html).toContain('data-email="m@x.de"');
-    expect(html).toContain("borrower-create-new");
+    expect(html).toContain("data-create");
   });
 
   it("shows a no-results message plus the create option", async () => {
     const html = await (await lendingRoutes.request("/search-persons?q=xyz")).text();
     expect(html).toContain("Keine Treffer");
-    expect(html).toContain("borrower-create-new");
+    expect(html).toContain("data-create");
   });
 });
 

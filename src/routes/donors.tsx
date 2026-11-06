@@ -9,6 +9,7 @@ import { ClickToEditHint, Layout } from "../components/layout.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { Icon } from "../components/icon.js";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
 import { Pager } from "../components/pager.js";
@@ -16,7 +17,6 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { parsePagination, buildListUrl } from "../lib/list-query.js";
 import { trimmed } from "../lib/forms.js";
-import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
 
@@ -141,27 +141,13 @@ export function DonorPersonFields({ values, errors }: { values?: PersonFieldInpu
 // person's address can be corrected/completed inline either way.
 export function DonorPickerFields({ personId, values, errors }: { personId?: string; values?: PersonFieldInput; errors?: Record<string, string> }) {
   const showFields = Boolean(personId) || Object.values(values ?? {}).some(Boolean);
+  const selectedName = personId && values ? recipientName({ firstName: values.firstName ?? "", lastName: values.lastName ?? "", companyName: values.companyName }) : undefined;
   return (
-    <div class="space-y-3">
-      <div id="donor-picker-search" class={showFields ? "hidden" : ""}>
+    <div class="space-y-3" id="donor-picker">
+      <div>
         <p class="fieldset-legend">{t("donations.form.donor")}</p>
-        <label class="input flex items-center gap-2 w-full">
-          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-          <input
-            type="text"
-            name="q"
-            autocomplete="off"
-            placeholder={t("donations.form.donorSearchPlaceholder")}
-            class="grow min-w-0"
-            hx-get="/donors/search-persons"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-            hx-target="#donor-picker-results"
-          />
-        </label>
-        <div id="donor-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
-        <button type="button" class="link link-primary text-sm mt-2 donor-create-new">{t("donations.form.donorCreateNew")}</button>
+        <EntityPicker id="donor-personId" name="personId" searchUrl="/donors/search-persons" selectedId={personId} selectedName={selectedName} placeholder={t("donations.form.donorSearchPlaceholder")} />
       </div>
-      <input type="hidden" id="donor-personId" name="personId" value={personId ?? ""} />
       <div id="donor-fields" class={`space-y-4${showFields ? "" : " hidden"}`}>
         {errors?.duplicate && (
           <div class="alert alert-warning">
@@ -175,43 +161,18 @@ export function DonorPickerFields({ personId, values, errors }: { personId?: str
           </div>
         )}
         <DonorPersonFields values={values} errors={errors} />
-        <button type="button" class="btn btn-ghost donor-change-selection">
-          {t("donations.form.donorChangeSelection")}
-        </button>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__donorPickerBound) {
-          window.__donorPickerBound = true;
-          document.body.addEventListener('click', function(e) {
-            var resEl = e.target.closest('.donor-result');
-            if (resEl) {
-              document.getElementById('donor-personId').value = resEl.dataset.id;
-              ['firstName','lastName','street','houseNumber','zip','city','companyName'].forEach(function(f) {
-                document.getElementById('donor-' + f).value = resEl.dataset[f] || '';
-              });
-              document.getElementById('donor-fields').classList.remove('hidden');
-              document.getElementById('donor-picker-search').classList.add('hidden');
-              return;
-            }
-            if (e.target.closest('.donor-create-new')) {
-              document.getElementById('donor-personId').value = '';
-              ['firstName','lastName','street','houseNumber','zip','city','companyName'].forEach(function(f) {
-                document.getElementById('donor-' + f).value = '';
-              });
-              document.getElementById('donor-fields').classList.remove('hidden');
-              document.getElementById('donor-picker-search').classList.add('hidden');
-              return;
-            }
-            if (e.target.closest('.donor-change-selection')) {
-              document.getElementById('donor-personId').value = '';
-              document.getElementById('donor-fields').classList.add('hidden');
-              document.getElementById('donor-picker-search').classList.remove('hidden');
-              document.getElementById('donor-picker-results').innerHTML = '';
-              var input = document.querySelector('#donor-picker-search input[name=q]');
-              if (input) { input.value = ''; input.focus(); }
-            }
-          });
-        }
+        (function(){
+          var root = document.getElementById('donor-picker'), fields = ['firstName','lastName','street','houseNumber','zip','city','companyName'];
+          var show = function(on, d) {
+            fields.forEach(function(f) { document.getElementById('donor-' + f).value = (d && d[f]) || ''; });
+            document.getElementById('donor-fields').classList.toggle('hidden', !on);
+          };
+          root.addEventListener('picker:select', function(e) { show(true, e.detail); });
+          root.addEventListener('picker:create', function() { document.getElementById('donor-personId').value = ''; show(true); });
+          root.addEventListener('picker:clear', function() { show(false); });
+        })();
       ` }} />
     </div>
   );
@@ -247,38 +208,17 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
     .orderBy(asc(persons.lastName))
     .limit(10);
 
-  if (results.length === 0) {
-    return c.html(
-      <div class="p-2">
-        <p class="text-sm opacity-60 mb-1">{t("donations.form.donorNoResults", { query: q })}</p>
-        <button type="button" class="btn btn-ghost btn-sm donor-create-new">{t("donations.form.donorNoMatch")}</button>
-      </div>
-    );
-  }
-
   return c.html(
-    <>
-      {results.map((p) => (
-        <div
-          key={p.id}
-          class="donor-result p-2 hover:bg-base-200 cursor-pointer text-sm"
-          data-id={p.id}
-          data-first-name={p.firstName}
-          data-last-name={p.lastName}
-          data-street={p.street ?? ""}
-          data-house-number={p.houseNumber ?? ""}
-          data-zip={p.zip ?? ""}
-          data-city={p.city ?? ""}
-          data-company-name={p.companyName ?? ""}
-        >
-          <span class="font-medium">{recipientName(p)}</span>
-          {" — "}{formatAddress(p)}
-        </div>
-      ))}
-      <div class="p-2">
-        <button type="button" class="btn btn-ghost btn-sm donor-create-new">{t("donations.form.donorNoMatch")}</button>
-      </div>
-    </>
+    <PickerOptions
+      empty={t("picker.noResults", { query: q })}
+      createLabel={t("donations.form.donorNoMatch")}
+      options={results.map((p) => ({
+        id: p.id,
+        name: recipientName(p),
+        sub: formatAddress(p),
+        data: { firstName: p.firstName, lastName: p.lastName, street: p.street, houseNumber: p.houseNumber, zip: p.zip, city: p.city, companyName: p.companyName },
+      }))}
+    />
   );
 });
 

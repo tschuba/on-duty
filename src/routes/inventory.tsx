@@ -5,6 +5,7 @@ import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { TAG_STYLES, TagAvatar, TagBadges } from "../components/tag-badges.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
@@ -293,54 +294,10 @@ export function TagInput({ tags }: { tags?: string[] }) {
 // Batch mode (quantity > 1): a list, each member with how many of the batch they hold.
 
 function MemberPickerFields({ memberId, memberName }: { memberId?: string; memberName?: string }) {
-  const showSelected = Boolean(memberId);
   return (
     <div class="flex flex-col" data-field="assignments" data-show-batch="false">
       <p class="fieldset-legend">{t("inventory.form.assignedMember")}</p>
-      <div id="member-picker-search" class={showSelected ? "hidden" : ""}>
-        <label class="input flex items-center gap-2 w-full">
-          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-          <input
-            type="text"
-            name="q"
-            autocomplete="off"
-            placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
-            class="grow min-w-0"
-            hx-get="/inventory/search-members"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-            hx-target="#member-picker-results"
-          />
-        </label>
-        <div id="member-picker-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
-      </div>
-      <input type="hidden" id="assignedMemberId" name="assignedMemberId" value={memberId ?? ""} />
-      <div id="member-picker-selected" class={showSelected ? "flex items-center gap-2" : "hidden flex items-center gap-2"}>
-        <span id="member-picker-selected-name">{memberName ?? ""}</span>
-        <button type="button" class="btn btn-ghost btn-sm member-picker-change">{t("inventory.form.assignedMemberChangeSelection")}</button>
-      </div>
-      <script dangerouslySetInnerHTML={{ __html: `
-        if (!window.__memberPickerBound) {
-          window.__memberPickerBound = true;
-          document.body.addEventListener('click', function(e) {
-            var resEl = e.target.closest('#member-picker-results .member-result');
-            if (resEl) {
-              document.getElementById('assignedMemberId').value = resEl.dataset.id;
-              document.getElementById('member-picker-selected-name').textContent = resEl.dataset.name;
-              document.getElementById('member-picker-selected').classList.remove('hidden');
-              document.getElementById('member-picker-search').classList.add('hidden');
-              return;
-            }
-            if (e.target.closest('.member-picker-change')) {
-              document.getElementById('assignedMemberId').value = '';
-              document.getElementById('member-picker-selected').classList.add('hidden');
-              document.getElementById('member-picker-search').classList.remove('hidden');
-              document.getElementById('member-picker-results').innerHTML = '';
-              var input = document.querySelector('#member-picker-search input[type=text]');
-              if (input) { input.value = ''; input.focus(); }
-            }
-          });
-        }
-      ` }} />
+      <EntityPicker id="assignedMemberId" name="assignedMemberId" searchUrl="/inventory/search-members" selectedId={memberId} selectedName={memberName} placeholder={t("inventory.form.assignedMemberSearchPlaceholder")} />
     </div>
   );
 }
@@ -360,20 +317,7 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
         ))}
       </div>
       <div id="batch-assign-search">
-        <label class="input flex items-center gap-2 w-full">
-          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-          <input
-            type="text"
-            name="q"
-            autocomplete="off"
-            placeholder={t("inventory.form.assignedMemberSearchPlaceholder")}
-            class="grow min-w-0"
-            hx-get="/inventory/search-members"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-            hx-target="#batch-assign-results"
-          />
-        </label>
-        <div id="batch-assign-results" class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+        <EntityPicker searchUrl="/inventory/search-members" placeholder={t("inventory.form.assignedMemberSearchPlaceholder")} />
       </div>
       <input type="hidden" id="inventory-assignments" name="assignments" value={serialized} />
       <script dangerouslySetInnerHTML={{ __html: `
@@ -386,27 +330,26 @@ function BatchAssignmentFields({ assignments }: { assignments: AssignmentInput[]
             });
             document.getElementById('inventory-assignments').value = JSON.stringify(list);
           }
-          document.body.addEventListener('click', function(e) {
-            var resEl = e.target.closest('#batch-assign-results .member-result');
-            if (resEl) {
-              var list = document.getElementById('batch-assign-list');
-              if (list.querySelector('[data-member-id="' + resEl.dataset.id + '"]')) return;
+          document.getElementById('batch-assign-search').addEventListener('picker:select', function(e) {
+            var d = e.detail;
+            var list = document.getElementById('batch-assign-list');
+            var picker = document.getElementById('batch-assign-search').querySelector('[data-picker]');
+            if (!list.querySelector('[data-member-id="' + d.id + '"]')) {
               var row = document.createElement('div');
               row.className = 'flex items-center gap-2 border border-base-300 rounded-box px-2 py-1';
               row.setAttribute('data-assignment', '');
-              row.dataset.memberId = resEl.dataset.id;
-              row.dataset.memberName = resEl.dataset.name;
+              row.dataset.memberId = d.id;
+              row.dataset.memberName = d.name;
               row.innerHTML = '<span class="flex-1 text-sm"></span>' +
                 '<input type="number" min="1" value="1" class="input-sm w-20 assignment-qty" />' +
                 '<button type="button" class="btn btn-ghost btn-sm assignment-remove" aria-label="${t("common.remove")}">×</button>';
-              row.querySelector('span').textContent = resEl.dataset.name;
+              row.querySelector('span').textContent = d.name;
               list.appendChild(row);
-              document.getElementById('batch-assign-results').innerHTML = '';
-              var input = document.querySelector('#batch-assign-search input[type=text]');
-              if (input) { input.value = ''; }
               syncBatchAssignments();
-              return;
             }
+            picker.querySelector('.picker-clear').click();
+          });
+          document.body.addEventListener('click', function(e) {
             if (e.target.closest('.assignment-remove')) {
               e.target.closest('[data-assignment]').remove();
               syncBatchAssignments();
@@ -1842,23 +1785,11 @@ inventoryRoutes.get("/search-members", requireAuth(["inventory:manage", "lending
     .sort((a, b) => a.lastName.localeCompare(b.lastName, "de"))
     .slice(0, 10);
 
-  if (results.length === 0) {
-    return c.html(<p class="p-2 text-sm opacity-60">{t("inventory.form.assignedMemberNoResults")}</p>);
-  }
-
   return c.html(
-    <>
-      {results.map((m) => (
-        <div
-          key={m.id}
-          class="member-result p-2 hover:bg-base-200 cursor-pointer text-sm"
-          data-id={m.id}
-          data-name={`${m.firstName} ${m.lastName}`}
-        >
-          {m.firstName} {m.lastName}
-        </div>
-      ))}
-    </>
+    <PickerOptions
+      empty={t("inventory.form.assignedMemberNoResults")}
+      options={results.map((m) => ({ id: m.id, name: `${m.firstName} ${m.lastName}` }))}
+    />
   );
 });
 
@@ -1874,17 +1805,6 @@ const isLegacyRecord = (r: { result: unknown; recordedBy: unknown; inspectorPers
 const personName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`;
 
 const INSPECTION_DIALOG_SCRIPT = `
-  function pickInspector(btn) {
-    var f = btn.closest('form');
-    f.elements.inspectorPersonId.value = btn.dataset.id;
-    f.querySelector('[data-inspector-name]').textContent = btn.dataset.name;
-    f.querySelector('[data-inspector-results]').innerHTML = '';
-  }
-  function clearInspector(btn) {
-    var f = btn.closest('form');
-    f.elements.inspectorPersonId.value = '';
-    f.querySelector('[data-inspector-name]').textContent = '';
-  }
   function filterHistory(sel) {
     document.querySelectorAll('[data-history-row]').forEach(function(r) { r.hidden = sel.value !== '' && r.dataset.historyRow !== sel.value; });
   }
@@ -1945,12 +1865,8 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
                               <label class="label cursor-pointer gap-2"><input type="radio" name="result" value="failed" class="radio radio-sm" />{t("inventory.inspection.result.failed")}</label>
                             </div>
                           </Field>
-                          <Field label={t("inventory.inspection.inspector")}>
-                            <input type="hidden" name="inspectorPersonId" value="" />
-                            <div class="flex items-center gap-2 min-h-6"><span data-inspector-name /><button type="button" class="btn btn-ghost btn-xs" onclick="clearInspector(this)">{t("inventory.inspection.inspectorClear")}</button></div>
-                            <input type="text" name="q" autocomplete="off" class="input w-full" placeholder={t("inventory.inspection.inspectorSearch")}
-                              hx-get="/inventory/search-persons" hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`} hx-target="next [data-inspector-results]" />
-                            <div data-inspector-results class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+                          <Field label={t("inventory.inspection.inspector")} floating={false}>
+                            <EntityPicker name="inspectorPersonId" searchUrl="/inventory/search-persons" placeholder={t("inventory.inspection.inspectorSearch")} />
                           </Field>
                           {r.intervalMonths && (
                             <Field label={t("inventory.form.inspectionDue")} hint={`${t("inventory.inspection.dueHint")} ${t("inventory.inspection.dueFailedHint")}`}>
@@ -2029,14 +1945,7 @@ inventoryRoutes.get("/search-persons", requireAuth("inventory:inspect"), async (
     .where(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)))
     .orderBy(asc(persons.lastName), asc(persons.firstName))
     .limit(10);
-  if (results.length === 0) return c.html(<p class="p-2 text-sm opacity-60">{t("inventory.inspection.inspectorNone")}</p>);
-  return c.html(
-    <>
-      {results.map((p) => (
-        <button type="button" class="block w-full text-left p-2 hover:bg-base-200" data-id={p.id} data-name={personName(p)} onclick="pickInspector(this)">{personName(p)}</button>
-      ))}
-    </>,
-  );
+  return c.html(<PickerOptions empty={t("inventory.inspection.inspectorNone")} options={results.map((p) => ({ id: p.id, name: personName(p) }))} />);
 });
 
 // POST /inventory/:id/inspections/:inspectionId/done — Prüfung erfassen: Verlaufszeile + Cache (inspectedAt/dueDate) in einer Transaktion.
@@ -2132,12 +2041,8 @@ inventoryRoutes.get("/:id/inspections/:recordId/edit", requireAuth("inventory:in
       <form id="inspection-record-form" method="post" action={base} class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
         <ViewField label={t("inventory.inspection.doneDate")} value={formatDate(r.inspectedAt)} />
         <ViewField label={t("inventory.inspection.result")} value={<ResultDot result={r.result} legacy={false} />} />
-        <Field label={t("inventory.inspection.inspector")}>
-          <input type="hidden" name="inspectorPersonId" value={r.inspectorPersonId ?? ""} />
-          <div class="flex items-center gap-2 min-h-6"><span data-inspector-name>{r.inspector ? personName(r.inspector) : ""}</span><button type="button" class="btn btn-ghost btn-xs" onclick="clearInspector(this)">{t("inventory.inspection.inspectorClear")}</button></div>
-          <input type="text" name="q" autocomplete="off" class="input w-full" placeholder={t("inventory.inspection.inspectorSearch")}
-            hx-get="/inventory/search-persons" hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`} hx-target="next [data-inspector-results]" />
-          <div data-inspector-results class="mt-1 border border-base-300 rounded-box divide-y empty:border-none" />
+        <Field label={t("inventory.inspection.inspector")} floating={false}>
+          <EntityPicker name="inspectorPersonId" searchUrl="/inventory/search-persons" selectedId={r.inspectorPersonId ?? undefined} selectedName={r.inspector ? personName(r.inspector) : undefined} placeholder={t("inventory.inspection.inspectorSearch")} />
         </Field>
         <Field label={t("inventory.inspection.note")}>
           <textarea name="note" class="textarea w-full" rows={3} maxlength={1000}>{r.note ?? ""}</textarea>
