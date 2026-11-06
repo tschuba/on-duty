@@ -4,6 +4,7 @@ type Handler = (e?: any) => void;
 let handlers: Record<string, Handler>;
 let apply: any, input: any, status: any, picker: any, form: any;
 let map: any, marker: any, circle: any, lastControl: any;
+let mapEl: any, resize: Handler;
 let geo: { getCurrentPosition: ReturnType<typeof vi.fn> } | undefined;
 
 async function setup(value = "") {
@@ -12,6 +13,7 @@ async function setup(value = "") {
   const classes = new Set(["hidden"]);
   apply = { disabled: true, addEventListener: (_: string, h: Handler) => (handlers.apply = h) };
   status = { textContent: "" };
+  mapEl = { clientWidth: 100 };
   form = { addEventListener: (_: string, h: Handler) => (handlers.reset = h) };
   input = { value, form, addEventListener: (_: string, h: Handler) => (handlers.change = h), dispatchEvent: vi.fn() };
   picker = {
@@ -39,17 +41,17 @@ async function setup(value = "") {
     };
     return { default: L };
   });
-  vi.stubGlobal("document", { getElementById: (id: string) => (id === "location-picker" ? picker : id === "coordinates" ? input : {}) });
-  vi.stubGlobal("ResizeObserver", class { observe() {} });
+  vi.stubGlobal("document", { getElementById: (id: string) => (id === "location-picker" ? picker : id === "coordinates" ? input : id === "location-map" ? mapEl : {}) });
+  vi.stubGlobal("ResizeObserver", class { constructor(cb: Handler) { resize = cb; } observe() {} });
   geo = { getCurrentPosition: vi.fn() };
   vi.stubGlobal("navigator", { geolocation: geo });
   vi.stubGlobal("Event", class { constructor(public type: string) {} });
-  await import("../browser/inventory-location.js");
+  await import("../browser/location-picker.js");
 }
 
 beforeEach(() => vi.unstubAllGlobals());
 
-describe("browser inventory location picker", () => {
+describe("browser location picker", () => {
   it("shows the picker, a marker for existing coordinates and an empty map otherwise", async () => {
     await setup("48.1, 11.5");
     expect(marker.addTo).toHaveBeenCalled();
@@ -97,6 +99,33 @@ describe("browser inventory location picker", () => {
     vi.stubGlobal("navigator", {});
     handlers.locate();
     expect(status.textContent).toBe("geo failed");
+  });
+
+  it("centres on the current position once the map is visible, without marker", async () => {
+    await setup("");
+    mapEl.clientWidth = 0;
+    resize();
+    expect(geo!.getCurrentPosition).not.toHaveBeenCalled(); // hidden section: no permission prompt
+    mapEl.clientWidth = 100;
+    resize();
+    resize();
+    expect(geo!.getCurrentPosition).toHaveBeenCalledTimes(1);
+    geo!.getCurrentPosition.mock.calls[0][0]({ coords: { latitude: 5, longitude: 6 } });
+    expect(map.setView).toHaveBeenLastCalledWith([5, 6], 17);
+    expect(marker.addTo).not.toHaveBeenCalled();
+  });
+
+  it("start centring is skipped with coordinates and discarded after a map drag or on error", async () => {
+    await setup("48.1, 11.5");
+    resize();
+    expect(geo!.getCurrentPosition).not.toHaveBeenCalled();
+    await setup("");
+    resize();
+    handlers["map:dragstart"]();
+    geo!.getCurrentPosition.mock.calls[0][0]({ coords: { latitude: 5, longitude: 6 } });
+    expect(map.setView).toHaveBeenLastCalledWith([51.1657, 10.4515], 6);
+    geo!.getCurrentPosition.mock.calls[0][1]();
+    expect(status.textContent).toBe("");
   });
 
   it("form reset clears the status and re-reads the field", async () => {

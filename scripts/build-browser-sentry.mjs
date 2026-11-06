@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 await build({
-  entryPoints: [`${root}src/browser/inventory-location-view.ts`],
-  outfile: `${root}public/js/inventory-location-view.min.js`,
+  entryPoints: [`${root}src/browser/location-view.ts`],
+  outfile: `${root}public/js/location-view.min.js`,
   bundle: true,
   minify: true,
   format: "iife",
@@ -20,8 +20,8 @@ await build({
   target: "es2020",
 });
 await build({
-  entryPoints: [`${root}src/browser/inventory-location.ts`],
-  outfile: `${root}public/js/inventory-location.min.js`,
+  entryPoints: [`${root}src/browser/location-picker.ts`],
+  outfile: `${root}public/js/location-picker.min.js`,
   bundle: true,
   minify: true,
   format: "iife",

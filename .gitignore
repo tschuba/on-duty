@@ -17,10 +17,10 @@ coverage/
 public/js/sentry.min.js
 public/js/leaflet*.js
 public/js/inventory-map.min.js
-public/js/inventory-location.min.js
+public/js/location-picker.min.js
 tile-cache/
 .dev-stack/
 .dev-stack-ca/
 
 # Mock-Hilfsdatei
-public/js/inventory-location-view.min.js
+public/js/location-view.min.js

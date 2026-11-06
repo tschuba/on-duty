@@ -5,6 +5,7 @@ import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { LocationPicker } from "../components/location-picker.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { TAG_STYLES, TagAvatar, TagBadges } from "../components/tag-badges.js";
@@ -606,19 +607,15 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         <Field label={t("inventory.form.locationText")}>
           <input type="text" name="locationText" value={v.locationText ?? ""} class="input w-full" placeholder={t("inventory.form.locationText")} />
         </Field>
-        <Field label={t("inventory.form.coordinates")} hint={t("inventory.form.coordinatesHint")}>
-          <input type="text" id="coordinates" name="coordinates" value={v.coordinates ?? ""} class={`input w-full${errors?.coordinates ? " input-error" : ""}`} placeholder="48.137154, 11.576124" autocomplete="off" />
-        </Field>
-        {errors?.coordinates && <span class="text-error text-sm">{errors.coordinates}</span>}
-        <link rel="stylesheet" href="/css/leaflet.css" />
-        {/* Ohne JS bleibt nur das Textfeld sichtbar: Karte und Buttons werden vom Skript eingeblendet. */}
-        <div id="location-picker" class="hidden flex-col gap-2" data-geo-error={t("inventory.form.geoError")} data-locate-label={t("inventory.form.useLocation")} data-attribution={t("inventory.map.attribution")}>
-          <template><Icon name="current-location" class="size-5" /></template>
-          <p data-role="status" class="text-sm text-error" role="status" />
-          <div id="location-map" role="region" aria-label={t("inventory.form.mapAria")} class="h-72 rounded-box border border-base-300 z-0" />
-          <button type="button" data-act="apply" class="btn btn-sm btn-primary self-start" disabled>{t("inventory.form.applyCoordinates")}</button>
-        </div>
-        <script src="/js/inventory-location.min.js" defer></script>
+        <LocationPicker
+          value={v.coordinates ?? ""}
+          error={errors?.coordinates}
+          labels={{
+            coordinates: t("inventory.form.coordinates"), hint: t("inventory.form.coordinatesHint"), geoError: t("inventory.form.geoError"),
+            useLocation: t("inventory.form.useLocation"), attribution: t("inventory.map.attribution"), mapAria: t("inventory.form.mapAria"),
+            apply: t("inventory.form.applyCoordinates"),
+          }}
+        />
       </SectionCard>
 
       {(v.freeDefs ?? []).map((d) => {
@@ -2137,7 +2134,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
               {hasCoords && <>
                 <link rel="stylesheet" href="/css/leaflet.css" />
                 <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-status={status} data-icon={pinIcon} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
-                <script src="/js/inventory-location-view.min.js" defer></script>
+                <script src="/js/location-view.min.js" defer></script>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <div class="flex flex-col gap-1 md:flex-row md:gap-4">
                     <span class="inline-flex items-center gap-1" title={t("inventory.location.latitude")}><Icon name="world-latitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.latitude")}: </span>{Number(item.latitude).toFixed(6)}</span>
