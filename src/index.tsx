@@ -41,8 +41,7 @@ import { pwaRoutes } from "./routes/pwa.js";
 import { publicApiRoutes } from "./routes/public-api.js";
 import { logger } from "./lib/logger.js";
 import { requestLog, type LogVariables } from "./middleware/request-log.js";
-import { Layout } from "./components/layout.js";
-import { forbiddenPage } from "./components/error-pages.js";
+import { forbiddenPage, notFoundPage, serverErrorPage } from "./components/error-pages.js";
 
 validateEnv();
 initSentry();
@@ -156,19 +155,7 @@ app.route("/organisation", organisationRoutes);
 app.route("/import", importRoutes);
 
 // 404
-app.notFound((c) => {
-  const user = c.get("user");
-  return c.html(
-    <Layout title="Nicht gefunden" user={user}>
-      <div class="text-center mt-16">
-        <h1 class="text-3xl font-bold">404 – Seite nicht gefunden</h1>
-        <p class="mt-4 opacity-70">Die angeforderte Seite existiert nicht.</p>
-        <a href="/" class="btn btn-primary mt-6">Zur Startseite</a>
-      </div>
-    </Layout>,
-    404
-  );
-});
+app.notFound((c) => notFoundPage(c, c.get("user")));
 
 // 500
 app.onError(async (err, c) => {
@@ -181,17 +168,7 @@ app.onError(async (err, c) => {
     const dbDown = isAuthSessionError(err) && (await db.execute(sql`select 1`).then(() => false, () => true));
     captureServerError(err, { dbDown, requestId: c.get("requestId"), userId: user?.id, route: c.req.routePath });
   }
-  return c.html(
-    <Layout title="Serverfehler" user={user}>
-      <div class="text-center mt-16">
-        <h1 class="text-3xl font-bold">500 – Serverfehler</h1>
-        <p class="mt-4 opacity-70">Ein unerwarteter Fehler ist aufgetreten.</p>
-        <p class="mt-2 text-sm opacity-60">Fehler-ID: {c.get("requestId")}</p>
-        <a href="/" class="btn btn-primary mt-6">Zur Startseite</a>
-      </div>
-    </Layout>,
-    500
-  );
+  return serverErrorPage(c, user, c.get("requestId"));
 });
 
 startTilePruning();
