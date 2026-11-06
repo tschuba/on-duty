@@ -165,15 +165,29 @@ describe("GET /events/public", () => {
     publicEnabled = "true";
     expect(res.status).toBe(404);
   });
-  it("is reachable without auth and never shows the description", async () => {
-    eventsFindManyResult = [makeEvent({ visibility: "public", description: "geheim" })];
+  it("is reachable without auth and renders cards with description", async () => {
+    eventsFindManyResult = [makeEvent({ visibility: "public", description: "Kurzbeschreibung" })];
     const res = await eventRoutes.request("/public");
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain("Übung");
-    expect(body).not.toContain("geheim");
+    expect(body).toContain("Kurzbeschreibung");
+    expect(body).toContain("card-border");
+    expect(body).not.toContain("<table");
     expect(res.headers.get("X-Robots-Tag")).toBe("noindex");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=60");
+  });
+});
+
+describe("GET /events/public?rows=", () => {
+  it("returns card fragment with month heading and allDay text", async () => {
+    eventsFindManyResult = [makeEvent({ visibility: "public", allDay: true, startsAt: new Date("2026-11-15T00:00:00Z"), endsAt: new Date("2026-11-15T23:59:00Z") })];
+    const res = await eventRoutes.request("/public?rows=2026-11");
+    const body = await res.text();
+    expect(body).toContain("November 2026");
+    expect(body).toContain("NOV");
+    expect(body).toContain("ganztägig");
+    expect(body).not.toContain("<tr");
   });
 });
 

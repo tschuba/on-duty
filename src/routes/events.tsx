@@ -98,9 +98,10 @@ function LocalTimes({ tz }: { tz: string }) {
 
 // ── Liste/Kalender ───────────────────────────────────────────────────────────
 
-function EventTimeLabel({ ev, tz }: { ev: Event; tz: string }) {
+function EventTimeLabel({ ev, tz, card }: { ev: Event; tz: string; card?: boolean }) {
   if (ev.allDay) {
     const sameDay = toLocalDate(ev.startsAt, tz) === toLocalDate(ev.endsAt, tz);
+    if (card && sameDay) return <>{t("events.allDayShort")}</>; // Datum steht schon im Datumsblock
     return <>{formatDay(ev.startsAt, tz)}{!sameDay && <> – {formatDay(ev.endsAt, tz)}</>}</>;
   }
   return <span data-utc-start={ev.startsAt.getTime()} data-utc-end={ev.endsAt.getTime()}>{formatDateTime(ev.startsAt, tz)} – {formatTime(ev.endsAt, tz)}</span>;
@@ -112,6 +113,41 @@ function EventTagBadges({ tags }: { tags: string[] }) {
 }
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
+const MONTH_ABBR = ["JAN", "FEB", "MÄR", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEZ"];
+
+// Öffentliche Kartenliste: Monatsüberschrift steckt im Wrapper der ersten Karte des Monats.
+function EventCards({ rows, tz }: { rows: EventRow[]; tz: string }) {
+  let prev = "";
+  return (
+    <>
+      {rows.map((ev) => {
+        const day = toLocalDate(ev.startsAt, tz);
+        const month = day.slice(0, 7);
+        const heading = month !== prev;
+        prev = month;
+        const monthIdx = Number(day.slice(5, 7)) - 1;
+        return (
+          <div data-date={day} data-month={month} class="scroll-mt-20 mb-3">
+            {heading && <h2 class="text-xl font-bold mt-4 mb-3">{new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", month: "long", year: "numeric" }).format(new Date(`${day}T12:00:00Z`))}</h2>}
+            <div class="card card-border bg-base-100 border-base-300 flex-row p-4 gap-3 sm:p-5 sm:gap-4 lg:p-6">
+              <div class="bg-primary text-primary-content rounded-box shrink-0 w-14 sm:w-16 flex flex-col items-center justify-center py-2 leading-tight">
+                <span class="text-xl sm:text-2xl font-bold">{Number(day.slice(8, 10))}</span>
+                <span class="text-xs uppercase">{MONTH_ABBR[monthIdx]}</span>
+                <span class="text-xs opacity-80">{day.slice(0, 4)}</span>
+              </div>
+              <div class="min-w-0 space-y-1 lg:space-y-1.5">
+                <div class="font-medium lg:text-lg">{ev.title}</div>
+                <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{ev.location && <> · {ev.location}</>}</div>
+                {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
+                <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
 function EventRows({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: string; canManage: boolean; linked: boolean }) {
   return (
@@ -141,10 +177,11 @@ function EventRows({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: stri
 }
 
 // ?rows=YYYY-MM liefert nur die <tr> dieses Monats (Nachladen beim Scrollen).
-function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean, linked: boolean) {
+function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean, linked: boolean, cards = false) {
   const m = c.req.query("rows");
   if (!m || !MONTH_RE.test(m)) return null;
-  return c.html(<EventRows rows={rows.filter((ev) => toLocalDate(ev.startsAt, tz).startsWith(m))} tz={tz} canManage={canManage} linked={linked} />);
+  const month = rows.filter((ev) => toLocalDate(ev.startsAt, tz).startsWith(m));
+  return c.html(cards ? <EventCards rows={month} tz={tz} /> : <EventRows rows={month} tz={tz} canManage={canManage} linked={linked} />);
 }
 
 // Kalender + Liste. Die Liste zeigt ein gleitendes Fenster aus Fokusmonat ± 1 (nur Monate mit Terminen), der Rest kommt per ?rows= nach.
@@ -177,7 +214,12 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
           <div id="ev-calendar"></div>
         </div>
         <div class="min-w-0 flex-1 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
-          <table class="table table-zebra w-full"><tbody id="ev-rows"><EventRows rows={rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)))} tz={tz} canManage={canManage} linked={base === "/events"} /></tbody></table>
+          {(() => {
+            const visible = rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)));
+            return base === "/events/public"
+              ? <div id="ev-rows"><EventCards rows={visible} tz={tz} /></div>
+              : <table class="table table-zebra w-full"><tbody id="ev-rows"><EventRows rows={visible} tz={tz} canManage={canManage} linked={base === "/events"} /></tbody></table>;
+          })()}
         </div>
       </div>
       <script type="application/json" id="ev-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />
@@ -194,6 +236,7 @@ const EVENTS_SCRIPT = `
   const { days, months } = cfg;
   const wrap = document.getElementById("ev-wrap");
   const tbody = document.getElementById("ev-rows");
+  const ITEM = "[data-month]";
   const toggle = document.getElementById("ev-cal-toggle");
   const rows = (sel) => [...tbody.querySelectorAll(sel)];
   const isDesktop = () => matchMedia("(min-width: 1024px)").matches;
@@ -212,12 +255,12 @@ const EVENTS_SCRIPT = `
   document.querySelectorAll("[data-ev-m]").forEach((b) => { b.onclick = () => setMobile(b.dataset.evM); });
 
   const idxOf = (m) => { const i = months.findIndex((x) => x >= m); return i < 0 ? months.length - 1 : i; };
-  const topRow = () => rows("tr").find((tr) => tr.getBoundingClientRect().bottom > 90) || null;
+  const topRow = () => rows(ITEM).find((tr) => tr.getBoundingClientRect().bottom > 90) || null;
 
   // Fenster = Monate i-1..i+1; ältere/entfernte Monate fliegen raus, Scrollposition wird am obersten Eintrag festgehalten.
   async function ensureWindow(i) {
     const want = months.slice(Math.max(0, i - 1), i + 2);
-    const have = new Set(rows("tr").map((tr) => tr.dataset.month));
+    const have = new Set(rows(ITEM).map((tr) => tr.dataset.month));
     const need = want.filter((m) => !have.has(m));
     const drop = [...have].filter((m) => !want.includes(m));
     if (!need.length && !drop.length) return;
@@ -228,11 +271,11 @@ const EVENTS_SCRIPT = `
     }));
     const anchor = topRow();
     const before = anchor ? anchor.getBoundingClientRect().top : 0;
-    rows("tr").forEach((tr) => { if (drop.includes(tr.dataset.month)) tr.remove(); });
+    rows(ITEM).forEach((tr) => { if (drop.includes(tr.dataset.month)) tr.remove(); });
     for (const [m, html] of parts) {
       const tpl = document.createElement("template");
       tpl.innerHTML = html;
-      tbody.insertBefore(tpl.content, rows("tr").find((tr) => tr.dataset.month > m) || null);
+      tbody.insertBefore(tpl.content, rows(ITEM).find((tr) => tr.dataset.month > m) || null);
     }
     if (anchor && anchor.isConnected) scrollBy(0, anchor.getBoundingClientRect().top - before);
     if (window.localTimes) window.localTimes(tbody);
@@ -251,7 +294,7 @@ const EVENTS_SCRIPT = `
     calendar.set({ selectedDates: [d], selectedMonth: Number(d.slice(5, 7)) - 1, selectedYear: Number(d.slice(0, 4)) });
   }
   function flash(d) {
-    rows('tr[data-date="' + d + '"]').forEach((tr) => {
+    rows('[data-date="' + d + '"]').forEach((tr) => {
       tr.style.transition = "background-color .4s";
       tr.style.backgroundColor = "color-mix(in oklab, var(--color-warning) 35%, transparent)";
       setTimeout(() => { tr.style.backgroundColor = ""; }, 1500);
@@ -261,7 +304,7 @@ const EVENTS_SCRIPT = `
   async function jump(target) {
     lock = Infinity;
     await ensure(idxOf(target.slice(0, 7)));
-    const tr = target.length > 7 ? rows('tr[data-date="' + target + '"]')[0] : rows("tr").find((r) => r.dataset.month >= target);
+    const tr = target.length > 7 ? rows('[data-date="' + target + '"]')[0] : rows(ITEM).find((r) => r.dataset.month >= target);
     if (tr) {
       tr.scrollIntoView();
       curMonth = tr.dataset.month; setUrl();
@@ -412,7 +455,7 @@ eventRoutes.get("/public", async (c) => {
   if (!env.EVENTS_PUBLIC_INDEXING) c.header("X-Robots-Tag", "noindex");
   c.header("Cache-Control", "public, max-age=60");
 
-  const fragment = monthFragment(c, filtered, tz, false, false);
+  const fragment = monthFragment(c, filtered, tz, false, false, true);
   if (fragment) return fragment;
 
   return c.html(

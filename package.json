@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": "github:tschuba/on-duty",
   "homepage": "https://github.com/tschuba/on-duty",
-  "packageManager": "pnpm@12.16.1",
+  "packageManager": "pnpm@12.18.0",
   "engines": {
     "node": ">=24"
   },
