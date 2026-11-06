@@ -158,6 +158,33 @@ describe("GET /events", () => {
   });
 });
 
+describe("event place in lists", () => {
+  const coords = { latitude: "48.100000", longitude: "11.500000" };
+  it("links the location to OSM with coordinates, falls back to text and to 'Auf Karte'", async () => {
+    eventsFindManyResult = [makeEvent(coords)];
+    const body = await (await eventRoutes.request("/")).text();
+    expect(body).toMatch(/<a href="https:\/\/www\.openstreetmap\.org\/\?mlat=48\.100000&(amp;)?mlon=11\.500000[^"]*" target="_blank" rel="noopener"[^>]*>Gerätehaus<\/a>/);
+    expect(body).toContain("event.stopPropagation()");
+    eventsFindManyResult = [makeEvent({ ...coords, location: null })];
+    expect(await (await eventRoutes.request("/")).text()).toContain(t("events.location.onMap"));
+    eventsFindManyResult = [makeEvent({ visibility: "public", ...coords })];
+    expect(await (await eventRoutes.request("/public")).text()).toContain("mlat=48.100000");
+    eventsFindManyResult = [makeEvent()];
+    expect(await (await eventRoutes.request("/")).text()).not.toContain("openstreetmap.org");
+  });
+});
+
+describe("GET /events/:id map", () => {
+  it("shows the map and OSM link only with coordinates", async () => {
+    eventFindFirstResult = makeEvent({ latitude: "48.100000", longitude: "11.500000" });
+    const body = await (await eventRoutes.request("/e1")).text();
+    expect(body).toContain('id="location-view-map"');
+    expect(body).toContain("openstreetmap.org");
+    eventFindFirstResult = makeEvent();
+    expect(await (await eventRoutes.request("/e1")).text()).not.toContain("location-view-map");
+  });
+});
+
 describe("GET /events/public", () => {
   it("is 404 when disabled", async () => {
     publicEnabled = "false";
@@ -202,6 +229,18 @@ describe("POST /events/new", () => {
     expect(insertCalls[0].values.title).toBe("Neue Übung");
   });
 
+  it("stores coordinates as latitude/longitude, null when empty, and rejects invalid ones", async () => {
+    const body = { title: "X", startsAt: "2026-11-15T18:00", endsAt: "2026-11-15T20:00", visibility: "loggedIn" };
+    await eventRoutes.request("/new", { method: "POST", body: formBody({ ...body, coordinates: "48.1, 11,5" }) });
+    expect(insertCalls[0].values).toMatchObject({ latitude: "48.100000", longitude: "11.500000" });
+    insertCalls.length = 0;
+    await eventRoutes.request("/new", { method: "POST", body: formBody(body) });
+    expect(insertCalls[0].values).toMatchObject({ latitude: null, longitude: null });
+    const res = await eventRoutes.request("/new", { method: "POST", body: formBody({ ...body, coordinates: "junk" }) });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("inventory.form.invalidCoordinate"));
+  });
+
   it("rejects end before start", async () => {
     const res = await eventRoutes.request("/new", {
       method: "POST",
@@ -238,6 +277,16 @@ describe("POST /events/:id/edit", () => {
     });
     expect(res.status).toBe(302);
     expect(updateCalls[0].set.title).toBe("Geändert");
+  });
+
+  it("updates coordinates and prefills them in the edit form", async () => {
+    eventFindFirstResult = makeEvent({ latitude: "48.100000", longitude: "11.500000" });
+    expect(await (await eventRoutes.request("/e1/edit")).text()).toContain('value="48.100000, 11.500000"');
+    await eventRoutes.request("/e1/edit", {
+      method: "POST",
+      body: formBody({ title: "G", startsAt: "2026-11-15T18:00", endsAt: "2026-11-15T20:00", visibility: "public", coordinates: "" }),
+    });
+    expect(updateCalls[0].set).toMatchObject({ latitude: null, longitude: null });
   });
 
   it("404s for an unknown event", async () => {

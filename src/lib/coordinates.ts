@@ -12,6 +12,10 @@ export function validateLocation(latitude: string, longitude: string): { latitud
   return errors;
 }
 
+// OSM-Link auf einen Punkt (Terminliste/-detail).
+export const osmUrl = (latitude: string | number, longitude: string | number) =>
+  `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=17/${latitude}/${longitude}`;
+
 const NUM = "(-?\\d+(?:[.,]\\d+)?)";
 const PAIR = new RegExp(`^${NUM}\\s*[°]?\\s*[;,\\s]\\s*${NUM}\\s*[°]?$`);
 

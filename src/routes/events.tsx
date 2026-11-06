@@ -7,6 +7,8 @@ import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Icon } from "../components/icon.js";
+import { LocationPicker } from "../components/location-picker.js";
+import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
 import { RowAction } from "../components/row-action.js";
 import { ChipInput } from "../components/chip-input.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -107,6 +109,15 @@ function EventTimeLabel({ ev, tz, card }: { ev: Event; tz: string; card?: boolea
   return <span data-utc-start={ev.startsAt.getTime()} data-utc-end={ev.endsAt.getTime()}>{formatDateTime(ev.startsAt, tz)} – {formatTime(ev.endsAt, tz)}</span>;
 }
 
+// Ort in der Liste: bei Koordinaten OSM-Link (neuer Tab, ohne Zeilenklick), sonst Text.
+function EventPlace({ ev }: { ev: Pick<Event, "location" | "latitude" | "longitude"> }) {
+  if (ev.latitude == null || ev.longitude == null) return <>{ev.location}</>;
+  return <a href={osmUrl(ev.latitude, ev.longitude)} target="_blank" rel="noopener" class="link" onclick="event.stopPropagation()">{ev.location || t("events.location.onMap")}</a>;
+}
+
+// Koordinatenfeld des Formulars -> Spaltenwerte (leer = null).
+const dbCoords = (raw: string) => { const c = parseCoordinates(raw); return { latitude: c.latitude || null, longitude: c.longitude || null }; };
+
 function EventTagBadges({ tags }: { tags: string[] }) {
   if (!tags.length) return null;
   return <div class="flex flex-wrap gap-1 mt-1">{sortEventTags(tags).map((tag) => <span class={`badge badge-sm ${eventTagDef(tag)?.badge ?? "badge-outline"}`}>{eventTagLabel(tag)}</span>)}</div>;
@@ -138,7 +149,7 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
               </div>
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
                 <div class="font-medium lg:text-lg">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
-                <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{ev.location && <> · {ev.location}</>}</div>
+                <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{(ev.location || ev.latitude != null) && <> · <EventPlace ev={ev} /></>}</div>
                 {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
                 <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
               </div>
@@ -493,6 +504,16 @@ async function EventForm({ values, errors, roles, tz }: {
         <input type="text" name="location" value={values.location} placeholder={t("events.form.location")} maxlength={200} class={`input w-full${errors.location ? " input-error" : ""}`} />
       </Field>
 
+      <LocationPicker
+        value={values.coordinates}
+        error={errors.coordinates}
+        labels={{
+          coordinates: t("inventory.form.coordinates"), hint: t("inventory.form.coordinatesHint"), geoError: t("inventory.form.geoError"),
+          useLocation: t("inventory.form.useLocation"), attribution: t("inventory.map.attribution"), mapAria: t("inventory.form.mapAria"),
+          apply: t("inventory.form.applyCoordinates"),
+        }}
+      />
+
       <Field label={t("events.form.description")} after={errors.description && <span class="text-error text-sm">{errors.description}</span>}>
         <textarea name="description" rows={4} maxlength={5000} class={`textarea w-full${errors.description ? " textarea-error" : ""}`}>{values.description}</textarea>
       </Field>
@@ -581,7 +602,7 @@ async function EventForm({ values, errors, roles, tz }: {
 }
 
 function emptyFormValues(): EventFormValues {
-  return { title: "", location: "", description: "", allDay: false, startsAt: "", endsAt: "", visibility: "loggedIn", tags: [], roleIds: [] };
+  return { title: "", location: "", coordinates: "", description: "", allDay: false, startsAt: "", endsAt: "", visibility: "loggedIn", tags: [], roleIds: [] };
 }
 
 async function loadRoles() {
@@ -627,7 +648,7 @@ eventRoutes.post("/new", manage, async (c) => {
   let newId = "";
   await db.transaction(async (tx) => {
     const [row] = await tx.insert(events).values({
-      title: values.title, location: values.location || null, description: values.description || null,
+      title: values.title, location: values.location || null, ...dbCoords(values.coordinates), description: values.description || null,
       allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
     }).returning({ id: events.id });
     newId = row.id;
@@ -646,6 +667,7 @@ function toEventFormValues(ev: NonNullable<Awaited<ReturnType<typeof fetchEventF
   return {
     title: ev.title,
     location: ev.location ?? "",
+    coordinates: ev.latitude != null && ev.longitude != null ? `${ev.latitude}, ${ev.longitude}` : "",
     description: ev.description ?? "",
     allDay: ev.allDay,
     startsAt: ev.allDay ? toLocalInput(ev.startsAt, tz).slice(0, 10) : toLocalInput(ev.startsAt, tz),
@@ -672,6 +694,14 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
       <ViewGrid>
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.start")}</div><div class="font-medium"><EventTimeLabel ev={ev} tz={tz} /></div></div>
         <ViewField label={t("events.form.location")} value={ev.location} />
+        {ev.latitude != null && ev.longitude != null && (
+          <div class="sm:col-span-2 space-y-2">
+            <link rel="stylesheet" href="/css/leaflet.css" />
+            <div id="location-view-map" role="region" aria-label={t("events.location.mapAria")} data-lat={ev.latitude} data-lng={ev.longitude} data-status="none" data-icon={(<Icon name="calendar-days" />).toString()} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
+            <script src="/js/location-view.min.js" defer></script>
+            <a href={osmUrl(ev.latitude, ev.longitude)} target="_blank" rel="noopener noreferrer" class="link">{t("inventory.location.osm")}</a>
+          </div>
+        )}
         <ViewField label={t("events.form.visibility")} value={t(`events.form.visibility.${ev.visibility}`) + (roleNames ? `: ${roleNames}` : "")} />
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.description")}</div><div class="font-medium whitespace-pre-wrap">{ev.description || "—"}</div></div>
         <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
@@ -726,7 +756,7 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
 
   await db.transaction(async (tx) => {
     await tx.update(events).set({
-      title: values.title, location: values.location || null, description: values.description || null,
+      title: values.title, location: values.location || null, ...dbCoords(values.coordinates), description: values.description || null,
       allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
     }).where(eq(events.id, id));
     await saveEventTagsAndRoles(tx as never, id, values.tags, values.visibility, values.roleIds);

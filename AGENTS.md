@@ -12,4 +12,4 @@ Siehe [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Datenbankmigrationen
 
-Migrationen nur mit `pnpm db:generate` (Backfills: `--custom --name=<name>`) erzeugen. `drizzle/meta/_journal.json` und `when`-Werte nie von Hand setzen oder „hochzählen“. Bei Journal-Konflikten die eigene Migration samt Snapshot löschen und neu generieren. Details: [CONTRIBUTING.md](CONTRIBUTING.md).
+Migrationen nur mit `pnpm db:generate` (Backfills: `--custom --name=<name>`) erzeugen. `drizzle/meta/_journal.json` und `when`-Werte nie von Hand setzen oder „hochzählen“. Bei Journal-Konflikten die eigene Migration samt Snapshot löschen und neu generieren. Einzige Ausnahme: Liegt `when` des höchsten Journal-Eintrags (oder einer bereits auf Prod angewendeten Migration) in der Zukunft, wird `when` der neuen Migration nach `pnpm db:generate` einen Tick darüber gesetzt und `LEGACY_MAX_IDX` in `src/tests/migration-journal.test.ts` angehoben, sonst überspringt der Migrator sie still. Details: [CONTRIBUTING.md](CONTRIBUTING.md).

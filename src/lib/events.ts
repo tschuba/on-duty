@@ -2,6 +2,7 @@ import { and, eq, exists, gte, inArray, lt, or, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events, eventTags, eventVisibleRoles } from "../db/schema/index.js";
 import { trimmed, parseTags } from "./forms.js";
+import { parseCoordinates } from "./coordinates.js";
 import { EVENT_TAGS, normalizeEventTags } from "./event-tags.js";
 import { allDayBounds, parseLocal, dayAfter } from "./datetime.js";
 import { t } from "../i18n/index.js";
@@ -42,6 +43,7 @@ export function overlapsRange(start: string, end: string, tz: string): SQL | und
 export type EventFormValues = {
   title: string;
   location: string;
+  coordinates: string; // ein Feld "lat, lng", wie im Inventar
   description: string;
   allDay: boolean;
   startsAt: string;
@@ -56,6 +58,7 @@ export function parseEventForm(body: Record<string, any>): EventFormValues {
   return {
     title: trimmed(body, "title"),
     location: trimmed(body, "location"),
+    coordinates: trimmed(body, "coordinates"),
     description: trimmed(body, "description"),
     allDay: body.allDay === "true" || body.allDay === "on",
     startsAt: trimmed(body, "startsAt"),
@@ -72,6 +75,7 @@ export function validateEventForm(values: EventFormValues, tz: string): { starts
   if (!values.title) errors.title = t("events.form.error.titleRequired");
   else if (values.title.length > 200) errors.title = t("events.form.error.titleTooLong");
   if (values.location.length > 200) errors.location = t("events.form.error.locationTooLong");
+  if (parseCoordinates(values.coordinates).error) errors.coordinates = t("inventory.form.invalidCoordinate");
   if (values.description.length > 5000) errors.description = t("events.form.error.descriptionTooLong");
   if (values.visibility === "roles" && values.roleIds.length === 0) errors.roleIds = t("events.form.error.rolesRequired");
 

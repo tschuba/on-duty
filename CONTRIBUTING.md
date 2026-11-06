@@ -98,6 +98,8 @@ pnpm db:generate
 
 Reine SQL-Backfills mit `pnpm db:generate --custom --name=<name>` anlegen. `drizzle/meta/_journal.json` und die `when`-Werte nie von Hand bearbeiten: Der Migrator überspringt jede Migration, deren `when` nicht größer ist als das höchste bereits angewendete `created_at`. Bei einem Merge-Konflikt im Journal die eigene Migration samt Snapshot löschen und neu generieren. `src/tests/migration-journal.test.ts` prüft das in der CI.
 
+**Ausnahme (Zukunfts-Timestamps):** Tragen die letzten Journal-Einträge ein `when` in der Zukunft (handgesetzt, weil Dev/Prod die Vorgänger schon angewendet hatten), würde ein echter Uhrwert von Prod übersprungen. Dann `pnpm db:generate` ausführen, `when` des neuen Eintrags auf den höchsten bisherigen Wert + 1 setzen, `LEGACY_MAX_IDX` in `src/tests/migration-journal.test.ts` auf den neuen `idx` anheben und dort einen Kommentar ergänzen (Migration, Issue, Grund). Ob eine Migration auf Prod schon angewendet ist, zeigt `select max(created_at) from drizzle.__drizzle_migrations;`. Entfällt, sobald die Uhr die Timestamps überholt hat.
+
 ## Tests
 
 Vor jedem PR:

@@ -1,4 +1,4 @@
-// Ortserfassung im Inventarformular: Karte, Standortabfrage und Koordinatenfeld bleiben synchron.
+// Ortserfassung (Inventar, Termine): Karte, Standortabfrage und Koordinatenfeld bleiben synchron.
 // Ohne JS bleibt das Textfeld; der Picker ist bis hierher ausgeblendet.
 import L from "leaflet";
 import { parseCoordinates } from "../lib/coordinates.js";
@@ -100,4 +100,19 @@ input.form?.addEventListener("reset", () => setTimeout(() => { status.textConten
 showFromInput();
 if (!marker) map.setView(GERMANY, 6);
 // Die Karte liegt in einer Sektion, die per Feld-Schalter ein-/ausgeblendet wird.
-new ResizeObserver(() => map.invalidateSize()).observe(mapEl);
+// Standortabfrage erst, wenn die Karte sichtbar ist (sonst Berechtigungsdialog aus versteckter Sektion), einmal pro Seitenaufruf.
+// Nur zentrieren: kein Marker, nichts übernommen. Verworfen, sobald Marker gesetzt oder Karte vom Nutzer gezogen wurde.
+let dragged = false;
+let centered = false;
+map.on("dragstart", () => { dragged = true; });
+new ResizeObserver(() => {
+  map.invalidateSize();
+  if (centered || !mapEl.clientWidth) return;
+  centered = true;
+  if (marker || !navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (p) => { if (!marker && !dragged) map.setView([p.coords.latitude, p.coords.longitude], 17); },
+    () => {},
+    { timeout: 15000 },
+  );
+}).observe(mapEl);
