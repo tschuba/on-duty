@@ -21,13 +21,12 @@ Definiert in `src/styles/app.css`. daisyUI liest Tailwind-v4-Farbtokens aus `:ro
 
 | Token | Wert | Verwendung |
 |---|---|---|
-| `--color-primary` | `#cc0000` | Aktiv genutzt — Feuerwehr-Rot, treibt daisyUIs `primary`-Klassen (`btn-primary`, `text-primary`, Badges etc.) |
-| `--color-primary-dark` | `#990000` | Abgeleiteter dunklerer Rotton |
-| `--color-gold` | `#f0a500` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
-| `--color-dark` | `#0f2338` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
+| `--color-primary` | `#2a5280` (Dark: `#5b8fd0`) | Aktiv genutzt — Blau, treibt daisyUIs `primary`-Klassen (`btn-primary`, `text-primary`, Badges, Datumsblock etc.) |
+| `--color-error` | `#cc0000` (Dark: `#ff6b6b`) | Feuerwehr-Rot, nur für Fehler/Destruktives |
+| `--color-gold` | `#ffc107` | Nur für die Menü-Icons (`text-gold`) |
 | `--color-surface` | `#f8f8f8` | ⚠️ Reserviert, aktuell **ungenutzt** im Code |
 
-**Regel:** `gold`/`dark`/`surface` nicht "weil sie schon da sind" verwenden. Wird ein Anwendungsfall gebraucht, den Zweck hier dokumentieren. Bleiben sie dauerhaft ungenutzt, sind sie Kandidat zum Entfernen aus `app.css`.
+**Regel:** `surface` nicht "weil sie schon da sind" verwenden. Wird ein Anwendungsfall gebraucht, den Zweck hier dokumentieren. Bleibt es dauerhaft ungenutzt, ist es Kandidat zum Entfernen aus `app.css`.
 
 Für alles andere: daisyUI-Semantikfarben verwenden (`base-100`/`base-200`/`base-300`, `error`, `success`, `info`, `warning`, `neutral`), keine Hex-Werte oder Arbitrary-Values im Markup.
 
@@ -81,6 +80,14 @@ Regeln:
 
 **Zurück-Link:** Detail- und Formularseiten setzen `backHref` auf die Liste.
 
+## Terminliste (Datumsblock-Liste)
+
+Chronologische Einträge mit hervorgehobenem Datum (`/events`, `/events/public`, Komponente `EventCards`) sind **keine Tabelle und keine Card**: kein Zebra, kein Rahmen, kein Schatten, keine Kartenfläche (Rahmen/Schatten wirkten im Test unschön); Trennung allein durch Abstand.
+
+- Monatsüberschrift `h2 text-xl font-bold` über dem ersten Eintrag des Monats (technisch im Wrapper dieses Eintrags).
+- Eintrag: `flex gap-3 sm:gap-4`, Wrapper mit `mb-6`. Links Datumsblock `bg-primary text-primary-content rounded-box w-14 sm:w-16` (Tag fett groß, Monat in Versalien, Jahr abgeblasst), rechts Textspalte `min-w-0` (Titel `font-medium`, Zeitzeile/Beschreibung `text-sm opacity-70`, Tag-Badges zuletzt).
+- Aktionen (Löschen) rechtsbündig in der Zeile, Rest wie bei Tabellen (`RowAction`).
+
 ## Tabellen
 
 Zwei Kategorien, bewusst unterschiedlich behandelt — nicht alles muss wie die großen Listen aussehen:
@@ -130,7 +137,7 @@ Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, 
 Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donors, donations, admin/users, admin/permissions) öffnet zuerst read-only:
 
 - `GET /:id` = Read-only-Ansicht (`ViewGrid` + `ViewField` aus `src/components/field.tsx`, nie lokal neu definieren), `GET /:id/edit` = Formular. Ohne Schreibrecht leitet `/:id/edit` auf `/:id` um (entfällt bei `/inventory/fields`, `/inventory/inspection-templates`, `/inventory/templates`: ein einziges Recht `inventory:configure`, kein Leserecht). „Neu“-Formulare öffnen direkt im Bearbeiten-Modus.
-- Listen-Zeilenklick führt auf `/:id`. Nach Speichern: Redirect auf `/:id` + Toast; bei Validierungsfehler im Formular bleiben.
+- Listen-Zeilenklick (auch bei Einträgen der Terminliste) führt auf `/:id`. Nach Speichern: Redirect auf `/:id` + Toast; bei Validierungsfehler im Formular bleiben.
 - Read-only-Header: `DetailActions` (`src/components/page-header.tsx`) – „Löschen“ (`btn-outline btn-error`, nur mit Löschrecht), rechts davon „Bearbeiten“ (`btn-primary`, `pencil`, nur mit Schreibrecht).
 - Formular-Header: `FormActions` mit `cancelHref` (Abbrechen → `/:id`, Rückfrage bei Änderungen), Verwerfen, Speichern. Kein Löschen im Formular.
 - Ausgenommen: anniversary-years, applications, Einstellungsseiten ohne Datensatz (`/admin/config`, `/organisation`, `/account`).

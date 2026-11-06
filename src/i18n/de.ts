@@ -1444,6 +1444,7 @@ export const de = {
   "events.form.error.endBeforeStart": "Ende darf nicht vor dem Start liegen.",
   "events.title": "Termine",
   "events.empty": "Keine Termine vorhanden.",
+  "events.allDayShort": "ganztägig",
   "events.emptyFiltered": "Keine Termine für diese Filterauswahl.",
   "events.confirmDelete": "Termin \"{title}\" wirklich löschen?",
   "events.orphanRoles": "Keine Rolle zugewiesen, nur für Verwalter sichtbar",
