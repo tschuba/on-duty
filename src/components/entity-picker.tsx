@@ -88,8 +88,11 @@ export function PickerOptions({ options, empty, createLabel, heading }: { option
       })}
       {options.length === 0 && empty && <li class="px-3 py-2 text-sm opacity-60">{empty}</li>}
       {createLabel && (
-        <li role="option" data-create>
-          <a class="pointer-coarse:min-h-11">{createLabel}</a>
+        <li role="option" data-create class={options.length > 0 ? "border-t border-base-300 pt-1 mt-1" : ""}>
+          <a class="text-primary pointer-coarse:min-h-11">
+            <Icon name="plus" class="w-4 h-4" />
+            {createLabel}
+          </a>
         </li>
       )}
     </>
