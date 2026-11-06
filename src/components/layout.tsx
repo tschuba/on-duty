@@ -94,7 +94,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
             </label>
           )}
           <a href="/" class="font-bold text-primary text-lg mr-4" style="font-family: var(--font-heading)">
-            on-<span class="text-error">duty</span>
+            {user ? <>on-<span class="text-error">duty</span></> : brand === "on-duty" ? <>on-<span class="text-error">duty</span></> : brand}
           </a>
         </div>
         {user && (

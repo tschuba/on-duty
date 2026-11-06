@@ -89,6 +89,9 @@ describe("title", () => {
     const { env } = await import("../env.js");
     expect(await render()).toBe(`Antrag · ${env.ORG_NAME}`);
     expect(await render(userWith())).toBe("Antrag · on-duty");
+    const app = new Hono();
+    app.get("/", (c) => c.html(<Layout>x</Layout>));
+    expect(await (await app.request("/")).text()).toMatch(/text-lg mr-4"[^>]*>\s*FF Altenhammer\s*<\/a>/);
   });
 
   it("falls back to on-duty when no org name is available", async () => {
