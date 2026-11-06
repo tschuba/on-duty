@@ -53,7 +53,7 @@ export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, pl
         </button>
       </label>
       <input type="hidden" id={id} name={name} value={selectedId ?? ""} />
-      <ul id={listId} role="listbox" hidden class="picker-list menu menu-sm absolute left-0 right-0 top-full z-50 w-full mt-1 max-h-60 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow" />
+      <ul id={listId} role="listbox" hidden class="picker-list menu menu-sm absolute left-0 right-0 top-full z-50 mt-1 max-h-60 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow" />
       <script dangerouslySetInnerHTML={{ __html: PICKER_SCRIPT }} />
     </div>
   );
