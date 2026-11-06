@@ -167,7 +167,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
         const open = g.items.some((i) => i.href === active || i.children.some((k) => k.href === active));
         return (
           <li data-nav-top data-label={lc(g.label)}>
-            <details name="nav" data-nav class="group is-drawer-close:overflow-visible"open={open} data-active={open ? "" : undefined}>
+            <details name="nav" data-nav class="group is-drawer-close:overflow-visible" open={open} data-active={open ? "" : undefined}>
               <summary class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={g.label}>
                 <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{!open && sum > 0 && <span class="indicator-item badge badge-warning badge-xs is-drawer-open:hidden" />}</span>
                 <span class={`is-drawer-close:hidden ${open ? "font-semibold" : ""}`}>{g.label}</span>
