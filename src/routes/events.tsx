@@ -115,8 +115,8 @@ function EventTagBadges({ tags }: { tags: string[] }) {
 const MONTH_RE = /^\d{4}-\d{2}$/;
 const MONTH_ABBR = ["JAN", "FEB", "MÄR", "APR", "MAI", "JUN", "JUL", "AUG", "SEP", "OKT", "NOV", "DEZ"];
 
-// Öffentliche Kartenliste: Monatsüberschrift steckt im Wrapper der ersten Karte des Monats.
-function EventCards({ rows, tz }: { rows: EventRow[]; tz: string }) {
+// Terminliste (öffentlich + intern): Monatsüberschrift steckt im Wrapper der ersten Karte des Monats.
+function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: string; canManage: boolean; linked: boolean }) {
   let prev = "";
   return (
     <>
@@ -125,22 +125,30 @@ function EventCards({ rows, tz }: { rows: EventRow[]; tz: string }) {
         const month = day.slice(0, 7);
         const heading = month !== prev;
         prev = month;
+        const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
         const monthIdx = Number(day.slice(5, 7)) - 1;
         return (
           <div data-date={day} data-month={month} class="scroll-mt-20 mb-6">
             {heading && <h2 class="text-xl font-bold mt-4 mb-3">{new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", month: "long", year: "numeric" }).format(new Date(`${day}T12:00:00Z`))}</h2>}
-            <div class="flex gap-3 sm:gap-4 py-1">
+            <div class={`flex gap-3 sm:gap-4 py-1 ${linked ? "cursor-pointer" : ""}`} onclick={linked ? `location.href='/events/${ev.id}'` : undefined}>
               <div class="bg-primary text-primary-content rounded-box shrink-0 w-14 sm:w-16 flex flex-col items-center justify-center py-2 leading-tight">
                 <span class="text-xl sm:text-2xl font-bold">{Number(day.slice(8, 10))}</span>
                 <span class="text-xs uppercase">{MONTH_ABBR[monthIdx]}</span>
                 <span class="text-xs opacity-80">{day.slice(0, 4)}</span>
               </div>
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
-                <div class="font-medium lg:text-lg">{ev.title}</div>
+                <div class="font-medium lg:text-lg">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
                 <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{ev.location && <> · {ev.location}</>}</div>
                 {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
                 <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
               </div>
+              {canManage && (
+                <div class="ml-auto shrink-0">
+                  <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{
+                    "hx-post": `/events/${ev.id}/delete`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-target": "closest [data-date]", "hx-swap": "outerHTML",
+                  }} onclick="event.stopPropagation()" />
+                </div>
+              )}
             </div>
           </div>
         );
@@ -149,39 +157,12 @@ function EventCards({ rows, tz }: { rows: EventRow[]; tz: string }) {
   );
 }
 
-function EventRows({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: string; canManage: boolean; linked: boolean }) {
-  return (
-    <>
-      {rows.map((ev) => {
-        const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
-        const day = toLocalDate(ev.startsAt, tz);
-        return (
-          <tr data-date={day} data-month={day.slice(0, 7)} class={`scroll-mt-20 ${linked ? "cursor-pointer hover" : ""}`} onclick={linked ? `location.href='/events/${ev.id}'` : undefined}>
-            <td>
-              <div class="font-medium">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
-              <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} />{ev.location && <> · {ev.location}</>}</div>
-              <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
-            </td>
-            {canManage && (
-              <td class="text-right">
-                <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{
-                  "hx-post": `/events/${ev.id}/delete`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-target": "closest tr", "hx-swap": "outerHTML",
-                }} onclick="event.stopPropagation()" />
-              </td>
-            )}
-          </tr>
-        );
-      })}
-    </>
-  );
-}
-
-// ?rows=YYYY-MM liefert nur die <tr> dieses Monats (Nachladen beim Scrollen).
-function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean, linked: boolean, cards = false) {
+// ?rows=YYYY-MM liefert nur die Einträge dieses Monats (Nachladen beim Scrollen).
+function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: boolean, linked: boolean) {
   const m = c.req.query("rows");
   if (!m || !MONTH_RE.test(m)) return null;
   const month = rows.filter((ev) => toLocalDate(ev.startsAt, tz).startsWith(m));
-  return c.html(cards ? <EventCards rows={month} tz={tz} /> : <EventRows rows={month} tz={tz} canManage={canManage} linked={linked} />);
+  return c.html(<EventCards rows={month} tz={tz} canManage={canManage} linked={linked} />);
 }
 
 // Kalender + Liste. Die Liste zeigt ein gleitendes Fenster aus Fokusmonat ± 1 (nur Monate mit Terminen), der Rest kommt per ?rows= nach.
@@ -214,12 +195,7 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
           <div id="ev-calendar"></div>
         </div>
         <div class="min-w-0 flex-1 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
-          {(() => {
-            const visible = rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)));
-            return base === "/events/public"
-              ? <div id="ev-rows"><EventCards rows={visible} tz={tz} /></div>
-              : <table class="table table-zebra w-full"><tbody id="ev-rows"><EventRows rows={visible} tz={tz} canManage={canManage} linked={base === "/events"} /></tbody></table>;
-          })()}
+          <div id="ev-rows"><EventCards rows={rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)))} tz={tz} canManage={canManage} linked={base === "/events"} /></div>
         </div>
       </div>
       <script type="application/json" id="ev-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />
@@ -455,7 +431,7 @@ eventRoutes.get("/public", async (c) => {
   if (!env.EVENTS_PUBLIC_INDEXING) c.header("X-Robots-Tag", "noindex");
   c.header("Cache-Control", "public, max-age=60");
 
-  const fragment = monthFragment(c, filtered, tz, false, false, true);
+  const fragment = monthFragment(c, filtered, tz, false, false);
   if (fragment) return fragment;
 
   return c.html(
