@@ -614,15 +614,14 @@ async function EventForm({ values, errors, invitees, tz }: {
         </div>
       </FieldGroup>
 
-      <Section title={t("events.form.rsvp")} collapsible={false} class="group/rsvp" actions={
+      <Section title={t("events.form.rsvp")} collapsible={false} class="group/rsvp [&>div]:hidden [&>h2]:rounded-b-box has-[input[name=rsvpEnabled]:checked]:[&>div]:block has-[input[name=rsvpEnabled]:checked]:[&>h2]:rounded-b-none" actions={
         <label class="label cursor-pointer gap-2 text-base-content pointer-coarse:min-h-11">
           <span>{t("events.form.rsvpEnabled")}</span>
           <input type="checkbox" name="rsvpEnabled" checked={values.rsvpEnabled} class="toggle toggle-primary" />
         </label>
       }>
-        <p class="group-has-[input[name=rsvpEnabled]:checked]/rsvp:hidden text-sm opacity-70">{t("events.form.rsvpOff")}</p>
         <p class="hidden group-has-[#event-visibility-public:checked]/ev:group-has-[input[name=rsvpEnabled]:checked]/rsvp:block text-sm opacity-70 mb-3">{t("events.form.rsvpPublicHint")}</p>
-        <div class="hidden group-has-[input[name=rsvpEnabled]:checked]/rsvp:grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label={t("events.form.maxParticipants")} floating={false} hint={t("events.form.maxParticipantsHint")} after={errors.maxParticipants && <span class="text-error text-sm">{errors.maxParticipants}</span>}>
             <input type="number" name="maxParticipants" min="1" step="1" value={values.maxParticipants} class={`input w-full${errors.maxParticipants ? " input-error" : ""}`} />
           </Field>
