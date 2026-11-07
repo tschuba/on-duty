@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { events, eventTags, eventVisibleRoles, appRoles } from "../db/schema/index.js";
+import { events, eventTags, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables, type AuthedUser } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
@@ -11,6 +11,7 @@ import { LocationPicker } from "../components/location-picker.js";
 import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
 import { RowAction } from "../components/row-action.js";
 import { ChipInput } from "../components/chip-input.js";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { addMonths, todayStr } from "../lib/quick-range.js";
 import { parseMulti } from "../lib/list-query.js";
@@ -27,7 +28,9 @@ import {
   eventTagVocabulary,
   overlapsRange,
   parseEventForm,
-  saveEventTagsAndRoles,
+  saveEventTagsAndInvitees,
+  findMembersByStatus,
+  loadMemberNames,
   validateEventForm,
   visibilityCondition,
   type Event,
@@ -38,11 +41,11 @@ import { formatDateTime, formatDay, formatTime, resolveTimezone, toLocalDate, to
 export const eventRoutes = new Hono<{ Variables: Variables }>();
 const manage = requireAuth("events:manage");
 
-type EventRow = Event & { tags: { tag: string }[]; visibleRoles: { roleId: string }[] };
+type EventRow = Event & { tags: { tag: string }[]; invitees: { memberId: string }[] };
 
 async function fetchEvents(user: AuthedUser | undefined, where: ReturnType<typeof and>): Promise<EventRow[]> {
   const cond = and(visibilityCondition(user), where);
-  return db.query.events.findMany({ where: cond, with: { tags: true, visibleRoles: true }, orderBy: asc(events.startsAt) }) as Promise<EventRow[]>;
+  return db.query.events.findMany({ where: cond, with: { tags: true, invitees: true }, orderBy: asc(events.startsAt) }) as Promise<EventRow[]>;
 }
 
 // ── Umrechnung in die Zone des Nutzers ──────────────────────────────────────
@@ -136,7 +139,7 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
         const month = day.slice(0, 7);
         const heading = month !== prev;
         prev = month;
-        const orphanRoles = ev.visibility === "roles" && ev.visibleRoles.length === 0;
+        const orphanMembers = ev.visibility === "members" && ev.invitees.length === 0;
         const monthIdx = Number(day.slice(5, 7)) - 1;
         return (
           <div data-date={day} data-month={month} class="scroll-mt-20 mb-6">
@@ -148,7 +151,7 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
                 <span class="text-xs opacity-80">{day.slice(0, 4)}</span>
               </div>
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
-                <div class="font-medium lg:text-lg">{ev.title}{orphanRoles && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanRoles")}</span>}</div>
+                <div class="font-medium lg:text-lg">{ev.title}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}</div>
                 <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{(ev.location || ev.latitude != null) && <> · <EventPlace ev={ev} /></>}</div>
                 {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
                 <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
@@ -437,7 +440,7 @@ eventRoutes.get("/public", async (c) => {
     limit: PUBLIC_MAX_ROWS,
   })) as (Event & { tags: { tag: string }[] })[];
 
-  const filtered = rows.map((ev) => ({ ...ev, visibleRoles: [] }));
+  const filtered = rows.map((ev) => ({ ...ev, invitees: [] }));
 
   if (!env.EVENTS_PUBLIC_INDEXING) c.header("X-Robots-Tag", "noindex");
   c.header("Cache-Control", "public, max-age=60");
@@ -471,8 +474,33 @@ async function TagSuggestions(user: AuthedUser) {
   return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson([...EVENT_TAGS.map((d) => eventTagLabel(d.key)), ...(await eventTagVocabulary(user))]) }} />;
 }
 
-async function EventForm({ values, errors, roles, tz }: {
-  values: EventFormValues; errors: Record<string, string>; roles: { id: string; name: string }[]; tz: string;
+function MembersPanel({ invitees }: { invitees: { id: string; name: string }[] }) {
+  return (
+    <div id="event-members" class="hidden group-has-[:checked]:flex flex-col gap-3 mt-3 pl-8">
+      <EntityPicker searchUrl="/events/search-members" placeholder={t("events.form.membersSearch")} />
+      <div class="flex flex-wrap items-center gap-1" id="event-member-groups">
+        {(["active", "youth", "children", "passive", "supporting"] as const).map((st) => (
+          <button type="button" class="btn btn-sm btn-outline" data-status={st} data-label={t(`status.${st}`)} disabled>{t(`status.${st}`)}</button>
+        ))}
+      </div>
+      <div class="flex items-center justify-between text-sm">
+        <span class="opacity-70" id="event-member-count" data-one={t("events.form.membersCountOne")} data-many={t("events.form.membersCountMany")} data-none={t("events.form.membersNone")}></span>
+        <button type="button" class="btn btn-ghost btn-xs" id="event-member-clear" data-confirm={t("events.form.membersClearConfirm")}>{t("events.form.membersClear")}</button>
+      </div>
+      <div id="event-member-chips" class="flex flex-wrap gap-1" data-remove={t("common.remove")}>
+        {invitees.map((m) => (
+          <span class="badge badge-ghost gap-1" data-member-chip={m.id}>
+            <input type="hidden" name="memberIds" value={m.id} />{m.name}
+            <button type="button" class="cursor-pointer" aria-label={t("common.remove")} data-chip-remove>×</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function EventForm({ values, errors, invitees, tz }: {
+  values: EventFormValues; errors: Record<string, string>; invitees: { id: string; name: string }[]; tz: string;
 }) {
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
   const indexing = publicEnabled && !!env.EVENTS_PUBLIC_INDEXING;
@@ -522,11 +550,12 @@ async function EventForm({ values, errors, roles, tz }: {
 
       <FieldGroup legend={t("events.form.visibility")}>
         <div class="flex flex-col gap-2">
-          {(["loggedIn", "roles", "public"] as const).map((v) => {
+          {(["loggedIn", "members", "public"] as const).map((v) => {
             const pub = v === "public";
             return (
-              <label class={`group flex items-start gap-3 rounded-box border border-base-300 p-3 cursor-pointer pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
-                <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "roles" ? "event-visibility-roles" : undefined} />
+              <div class={`group rounded-box border border-base-300 p-3 pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
+              <label class={`flex items-start gap-3 cursor-pointer`}>
+                <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "members" ? "event-visibility-members" : undefined} />
                 <span class="flex flex-col gap-1">
                   <span class="font-medium">{t(`events.form.visibility.${v}`)}</span>
                   <span class="text-sm text-base-content/70">{t(`events.form.visibility.${v}.desc`)}</span>
@@ -539,24 +568,12 @@ async function EventForm({ values, errors, roles, tz }: {
                   )}
                 </span>
               </label>
+              {v === "members" && <MembersPanel invitees={invitees} />}
+              </div>
             );
           })}
         </div>
       </FieldGroup>
-
-      <div id="event-roles" hidden={values.visibility !== "roles"}>
-        <FieldGroup legend={t("events.form.roles")}>
-          <div class="flex flex-col gap-1">
-            {roles.map((r) => (
-              <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
-                <input type="checkbox" name="roleIds" value={r.id} checked={values.roleIds.includes(r.id)} class="checkbox" />
-                <span>{r.name}</span>
-              </label>
-            ))}
-          </div>
-        </FieldGroup>
-        {errors.roleIds && <p class="text-error text-sm">{errors.roleIds}</p>}
-      </div>
 
       <LocalTimes tz={tz} />
       <script dangerouslySetInnerHTML={{ __html: `
@@ -590,11 +607,60 @@ async function EventForm({ values, errors, roles, tz }: {
               end.value = e.getFullYear() + '-' + pad(e.getMonth() + 1) + '-' + pad(e.getDate()) + 'T' + pad(e.getHours()) + ':' + pad(e.getMinutes());
             });
           });
-          document.querySelectorAll('input[name=visibility]').forEach(function(r) {
-            r.addEventListener('change', function() {
-              document.getElementById('event-roles').hidden = !document.getElementById('event-visibility-roles').checked;
+          // Mitgliederauswahl: Chips mit Hidden-Feld memberIds; Kategorie-Buttons fügen ihre Treffer mit einem Klick hinzu.
+          const chips = document.getElementById('event-member-chips');
+          const box = document.getElementById('event-members');
+          const countEl = document.getElementById('event-member-count');
+          const radio = document.getElementById('event-visibility-members');
+          let groups = null;
+          function has(id) { return !!chips.querySelector('[data-member-chip="' + id + '"]'); }
+          function refresh() {
+            const n = chips.children.length;
+            countEl.textContent = n === 0 ? countEl.dataset.none : (n === 1 ? countEl.dataset.one : countEl.dataset.many.replace('{n}', n));
+            document.getElementById('event-member-clear').hidden = n === 0;
+            box.querySelectorAll('[data-status]').forEach(function(b) {
+              const all = groups ? groups[b.dataset.status] : [];
+              const open = all.filter(function(m) { return !has(m.id); }).length;
+              const full = all.length > 0 && open === 0;
+              b.dataset.remove = full ? '1' : '';
+              b.disabled = all.length === 0;
+              b.classList.toggle('btn-primary', full); b.classList.toggle('btn-outline', !full);
+              b.textContent = (full ? '× ' : '+ ') + b.dataset.label + (groups ? ' (' + (full ? all.length : open) + ')' : '');
+            });
+          }
+          function addChip(id, name) {
+            if (has(id)) return;
+            const span = document.createElement('span');
+            span.className = 'badge badge-ghost gap-1'; span.dataset.memberChip = id;
+            const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = 'memberIds'; inp.value = id;
+            const x = document.createElement('button'); x.type = 'button'; x.className = 'cursor-pointer'; x.dataset.chipRemove = ''; x.setAttribute('aria-label', chips.dataset.remove); x.textContent = '×';
+            span.append(inp, name, x); chips.appendChild(span);
+          }
+          chips.addEventListener('click', function(e) { const x = e.target.closest('[data-chip-remove]'); if (x) { x.parentElement.remove(); refresh(); } });
+          document.getElementById('event-member-clear').addEventListener('click', function() {
+            if (confirm(this.dataset.confirm)) { chips.textContent = ''; refresh(); }
+          });
+          box.addEventListener('picker:select', function(e) {
+            addChip(e.detail.id, e.detail.name); refresh();
+            const root = e.target.closest('[data-picker]'); const clr = root && root.querySelector('.picker-clear'); if (clr) clr.click();
+          });
+          box.querySelectorAll('[data-status]').forEach(function(b) {
+            b.addEventListener('click', function() {
+              const remove = b.dataset.remove === '1';
+              groups[b.dataset.status].forEach(function(m) {
+                if (!remove) addChip(m.id, m.name);
+                else { const c = chips.querySelector('[data-member-chip="' + m.id + '"]'); if (c) c.remove(); }
+              });
+              refresh();
             });
           });
+          function loadGroups() {
+            if (groups || !radio.checked) return;
+            fetch('/events/members-by-status', { headers: { Accept: 'application/json' } })
+              .then(function(r) { return r.json(); }).then(function(g) { groups = g; refresh(); });
+          }
+          document.querySelectorAll('input[name=visibility]').forEach(function(r) { r.addEventListener('change', loadGroups); });
+          refresh(); loadGroups();
         })();
       ` }} />
     </form>
@@ -602,22 +668,32 @@ async function EventForm({ values, errors, roles, tz }: {
 }
 
 function emptyFormValues(): EventFormValues {
-  return { title: "", location: "", coordinates: "", description: "", allDay: false, startsAt: "", endsAt: "", visibility: "loggedIn", tags: [], roleIds: [] };
+  return { title: "", location: "", coordinates: "", description: "", allDay: false, startsAt: "", endsAt: "", visibility: "loggedIn", tags: [], memberIds: [] };
 }
 
-async function loadRoles() {
-  return db.select({ id: appRoles.id, name: appRoles.name }).from(appRoles).orderBy(asc(appRoles.name));
-}
+// GET /events/search-members — Suche für die Mitgliederauswahl (nur aktive Mitglieder).
+eventRoutes.get("/search-members", manage, async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+  const needle = `%${q}%`;
+  const rows = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId))
+    .where(and(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)), isNull(members.exitDate), isNull(members.deathDate)))
+    .orderBy(asc(persons.lastName), asc(persons.firstName)).limit(10);
+  return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }))} />);
+});
+
+// GET /events/members-by-status — aktive Mitglieder je Statusgruppe, für die Kategorie-Buttons.
+eventRoutes.get("/members-by-status", manage, async (c) => c.json(await findMembersByStatus()));
 
 eventRoutes.get("/new", manage, async (c) => {
   const user = c.get("user")!;
   const tz = resolveTimezone(c);
-  const [roles] = await Promise.all([loadRoles()]);
   return c.html(
     <Layout title={t("events.form.newTitle")} user={user}>
       <div class="max-w-2xl mx-auto">
       <PageHeader title={t("events.form.newTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
-      <EventForm values={emptyFormValues()} errors={{}} roles={roles} tz={tz} />
+      <EventForm values={emptyFormValues()} errors={{}} invitees={[]} tz={tz} />
       <TagSuggestions {...user} />
       </div>
     </Layout>,
@@ -628,16 +704,16 @@ eventRoutes.post("/new", manage, async (c) => {
   const user = c.get("user")!;
   const body = await c.req.parseBody({ all: true });
   const values = parseEventForm(body);
-  const roles = await loadRoles();
   const tz = resolveTimezone(c);
   const result = validateEventForm(values, tz);
 
   if ("errors" in result) {
+    const invitees = await loadMemberNames(values.memberIds);
     return c.html(
       <Layout title={t("events.form.newTitle")} user={user}>
         <div class="max-w-2xl mx-auto">
         <PageHeader title={t("events.form.newTitle")} backHref="/events" actions={<FormActions formId="event-form" />} />
-        <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />
+        <EventForm values={values} errors={result.errors} invitees={invitees} tz={tz} />
         <TagSuggestions {...user} />
         </div>
       </Layout>,
@@ -652,7 +728,7 @@ eventRoutes.post("/new", manage, async (c) => {
       allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
     }).returning({ id: events.id });
     newId = row.id;
-    await saveEventTagsAndRoles(tx as never, row.id, values.tags, values.visibility, values.roleIds);
+    await saveEventTagsAndInvitees(tx as never, row.id, values.tags, values.visibility, values.memberIds);
   });
 
   setFlash(c, t("events.form.created"), "success");
@@ -660,7 +736,7 @@ eventRoutes.post("/new", manage, async (c) => {
 });
 
 async function fetchEventForEdit(id: string) {
-  return db.query.events.findFirst({ where: eq(events.id, id), with: { tags: true, visibleRoles: true } });
+  return db.query.events.findFirst({ where: eq(events.id, id), with: { tags: true, invitees: true } });
 }
 
 function toEventFormValues(ev: NonNullable<Awaited<ReturnType<typeof fetchEventForEdit>>>, tz: string): EventFormValues {
@@ -674,18 +750,17 @@ function toEventFormValues(ev: NonNullable<Awaited<ReturnType<typeof fetchEventF
     endsAt: ev.allDay ? toLocalInput(ev.endsAt, tz).slice(0, 10) : toLocalInput(ev.endsAt, tz),
     visibility: ev.visibility,
     tags: ev.tags.map((x) => x.tag),
-    roleIds: ev.visibleRoles.map((x) => x.roleId),
+    memberIds: ev.invitees.map((x) => x.memberId),
   };
 }
 
 eventRoutes.get("/:id", requireAuth(), async (c) => {
   const user = c.get("user")!;
   const id = c.req.param("id");
-  const ev = await db.query.events.findFirst({ where: and(eq(events.id, id), visibilityCondition(user)), with: { tags: true, visibleRoles: true } });
+  const ev = await db.query.events.findFirst({ where: and(eq(events.id, id), visibilityCondition(user)), with: { tags: true, invitees: true } });
   if (!ev) return c.notFound();
   const tz = resolveTimezone(c);
   const canManage = user.permissions.has("events:manage");
-  const roleNames = ev.visibility === "roles" ? (await loadRoles()).filter((r) => ev.visibleRoles.some((x) => x.roleId === r.id)).map((r) => r.name).join(", ") : null;
   return c.html(
     <Layout title={ev.title} user={user}>
       <div class="max-w-2xl mx-auto">
@@ -702,7 +777,7 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
             <a href={osmUrl(ev.latitude, ev.longitude)} target="_blank" rel="noopener noreferrer" class="link">{t("inventory.location.osm")}</a>
           </div>
         )}
-        <ViewField label={t("events.form.visibility")} value={t(`events.form.visibility.${ev.visibility}`) + (roleNames ? `: ${roleNames}` : "")} />
+        <ViewField label={t("events.form.visibility")} value={t(`events.form.visibility.${ev.visibility as "public" | "loggedIn" | "members"}`)} />
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.description")}</div><div class="font-medium whitespace-pre-wrap">{ev.description || "—"}</div></div>
         <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
       </ViewGrid>
@@ -717,12 +792,12 @@ eventRoutes.get("/:id/edit", requireAuth(), async (c) => {
   if (!ev) return c.notFound();
   if (!user.permissions.has("events:manage")) return c.redirect(`/events/${ev.id}`);
   const tz = resolveTimezone(c);
-  const roles = await loadRoles();
+  const invitees = await loadMemberNames(ev.invitees.map((x) => x.memberId));
   return c.html(
     <Layout title={t("events.form.editTitle")} user={user}>
       <div class="max-w-2xl mx-auto">
       <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" cancelHref={`/events/${ev.id}`} />} />
-      <EventForm values={toEventFormValues(ev, tz)} errors={{}} roles={roles} tz={tz} />
+      <EventForm values={toEventFormValues(ev, tz)} errors={{}} invitees={invitees} tz={tz} />
       <TagSuggestions {...user} />
       </div>
     </Layout>,
@@ -737,16 +812,16 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
 
   const body = await c.req.parseBody({ all: true });
   const values = parseEventForm(body);
-  const roles = await loadRoles();
   const tz = resolveTimezone(c);
   const result = validateEventForm(values, tz);
 
   if ("errors" in result) {
+    const invitees = await loadMemberNames(values.memberIds);
     return c.html(
       <Layout title={t("events.form.editTitle")} user={user}>
         <div class="max-w-2xl mx-auto">
         <PageHeader title={t("events.form.editTitle")} backHref="/events" actions={<FormActions formId="event-form" cancelHref={`/events/${id}`} />} />
-        <EventForm values={values} errors={result.errors} roles={roles} tz={tz} />
+        <EventForm values={values} errors={result.errors} invitees={invitees} tz={tz} />
         <TagSuggestions {...user} />
         </div>
       </Layout>,
@@ -759,7 +834,7 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
       title: values.title, location: values.location || null, ...dbCoords(values.coordinates), description: values.description || null,
       allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
     }).where(eq(events.id, id));
-    await saveEventTagsAndRoles(tx as never, id, values.tags, values.visibility, values.roleIds);
+    await saveEventTagsAndInvitees(tx as never, id, values.tags, values.visibility, values.memberIds);
   });
 
   setFlash(c, t("events.form.saved"), "success");
