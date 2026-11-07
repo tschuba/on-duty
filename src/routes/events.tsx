@@ -613,24 +613,25 @@ async function EventForm({ values, errors, invitees, tz }: {
         </div>
       </FieldGroup>
 
-      <FieldGroup legend={t("events.form.rsvp")}>
-        <div class="group/rsvp rounded-box border border-base-300 p-3 has-[input[name=rsvpEnabled]:checked]:border-primary has-[input[name=rsvpEnabled]:checked]:bg-primary/5 flex flex-col gap-3">
-          <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
-            <input type="checkbox" name="rsvpEnabled" checked={values.rsvpEnabled} class="toggle" />
+      <section class="group/rsvp border-t border-base-300 pt-4 space-y-3" aria-labelledby="event-rsvp-heading">
+        <div class="flex items-center justify-between gap-3">
+          <h2 id="event-rsvp-heading" class="text-lg font-semibold">{t("events.form.rsvp")}</h2>
+          <label class="label cursor-pointer gap-2 pointer-coarse:min-h-11">
             <span>{t("events.form.rsvpEnabled")}</span>
+            <input type="checkbox" name="rsvpEnabled" checked={values.rsvpEnabled} class="toggle toggle-primary" />
           </label>
-          <p class="hidden group-has-[#event-visibility-public:checked]/ev:group-has-[input[name=rsvpEnabled]:checked]/rsvp:block text-sm opacity-70 pl-8">{t("events.form.rsvpPublicHint")}</p>
-          <div class="hidden group-has-[input[name=rsvpEnabled]:checked]/rsvp:grid grid-cols-1 sm:grid-cols-2 gap-4 pl-8">
-            <Field label={t("events.form.maxParticipants")} floating={false} hint={t("events.form.maxParticipantsHint")} after={errors.maxParticipants && <span class="text-error text-sm">{errors.maxParticipants}</span>}>
-              <input type="number" name="maxParticipants" min="1" step="1" value={values.maxParticipants} class={`input w-full${errors.maxParticipants ? " input-error" : ""}`} />
-            </Field>
-            <Field label={t("events.form.rsvpDeadline")} floating={false} hint={t("events.form.rsvpDeadlineHint")} after={errors.rsvpDeadline && <span class="text-error text-sm">{errors.rsvpDeadline}</span>}>
-              <input type="datetime-local" id="event-rsvp-deadline" name="rsvpDeadline" value={values.rsvpDeadline} class={`input w-full${errors.rsvpDeadline ? " input-error" : ""}`} />
-              <p class="text-xs opacity-70 mt-1" data-local-hint="event-rsvp-deadline" hidden></p>
-            </Field>
-          </div>
         </div>
-      </FieldGroup>
+        <p class="hidden group-has-[#event-visibility-public:checked]/ev:group-has-[input[name=rsvpEnabled]:checked]/rsvp:block text-sm opacity-70">{t("events.form.rsvpPublicHint")}</p>
+        <div class="hidden group-has-[input[name=rsvpEnabled]:checked]/rsvp:grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t("events.form.maxParticipants")} floating={false} hint={t("events.form.maxParticipantsHint")} after={errors.maxParticipants && <span class="text-error text-sm">{errors.maxParticipants}</span>}>
+            <input type="number" name="maxParticipants" min="1" step="1" value={values.maxParticipants} class={`input w-full${errors.maxParticipants ? " input-error" : ""}`} />
+          </Field>
+          <Field label={t("events.form.rsvpDeadline")} floating={false} hint={t("events.form.rsvpDeadlineHint")} after={errors.rsvpDeadline && <span class="text-error text-sm">{errors.rsvpDeadline}</span>}>
+            <input type="datetime-local" id="event-rsvp-deadline" name="rsvpDeadline" value={values.rsvpDeadline} class={`input w-full${errors.rsvpDeadline ? " input-error" : ""}`} />
+            <p class="text-xs opacity-70 mt-1" data-local-hint="event-rsvp-deadline" hidden></p>
+          </Field>
+        </div>
+      </section>
 
       <LocalTimes tz={tz} />
       <script dangerouslySetInnerHTML={{ __html: `
