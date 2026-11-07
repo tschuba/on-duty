@@ -1,4 +1,4 @@
-import { boolean, check, index, numeric, primaryKey, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, numeric, primaryKey, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { appRoles } from "./permissions";
 import { members } from "./members";
@@ -19,8 +19,34 @@ export const events = pgTable(
     longitude: numeric("longitude", { precision: 9, scale: 6 }),
     description: text("description"),
     visibility: eventVisibilityEnum("visibility").notNull().default("loggedIn"),
+    rsvpEnabled: boolean("rsvp_enabled").notNull().default(false),
+    maxParticipants: integer("max_participants"),
+    rsvpDeadline: timestamp("rsvp_deadline", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   },
-  (t) => [check("events_ends_at_check", sql`${t.endsAt} >= ${t.startsAt}`)],
+  (t) => [
+    check("events_ends_at_check", sql`${t.endsAt} >= ${t.startsAt}`),
+    check("events_max_participants_check", sql`${t.maxParticipants} > 0`),
+    check("events_rsvp_deadline_check", sql`${t.rsvpDeadline} <= ${t.startsAt}`),
+  ],
+);
+
+export const eventRsvpStatusEnum = pgEnum("event_rsvp_status", ["yes", "no"]);
+
+export const eventRsvps = pgTable(
+  "event_rsvps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+    status: eventRsvpStatusEnum("status").notNull(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("event_rsvps_event_member_idx").on(t.eventId, t.memberId), index("event_rsvps_member_idx").on(t.memberId)],
 );
 
 export const eventTags = pgTable(

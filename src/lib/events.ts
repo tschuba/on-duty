@@ -1,10 +1,10 @@
-import { and, asc, eq, exists, gte, inArray, lt, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, exists, gte, inArray, isNull, lt, notExists, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { events, eventTags, eventInvitees, members, persons } from "../db/schema/index.js";
+import { events, eventTags, eventInvitees, eventRsvps, members, persons } from "../db/schema/index.js";
 import { trimmed, parseTags } from "./forms.js";
 import { parseCoordinates } from "./coordinates.js";
 import { EVENT_TAGS, normalizeEventTags } from "./event-tags.js";
-import { allDayBounds, parseLocal, dayAfter } from "./datetime.js";
+import { allDayBounds, parseLocal, dayAfter, now } from "./datetime.js";
 import { t } from "../i18n/index.js";
 import { deriveMemberStatus } from "./status.js";
 import { env } from "../env.js";
@@ -67,6 +67,9 @@ export type EventFormValues = {
   visibility: EventVisibility;
   tags: string[];
   memberIds: string[];
+  rsvpEnabled: boolean;
+  maxParticipants: string;
+  rsvpDeadline: string;
 };
 
 export function parseEventForm(body: Record<string, any>): EventFormValues {
@@ -81,12 +84,15 @@ export function parseEventForm(body: Record<string, any>): EventFormValues {
     endsAt: trimmed(body, "endsAt"),
     visibility,
     tags: normalizeEventTags(parseTags(body, "tags")),
+    rsvpEnabled: body.rsvpEnabled === "true" || body.rsvpEnabled === "on",
+    maxParticipants: trimmed(body, "maxParticipants"),
+    rsvpDeadline: trimmed(body, "rsvpDeadline"),
     memberIds: [...new Set((Array.isArray(body.memberIds) ? body.memberIds : body.memberIds ? [body.memberIds] : []).map(String))],
   };
 }
 
 // Validiert und wandelt in UTC-Zeiten; gibt { errors } zurück, wenn etwas fehlt/falsch ist.
-export function validateEventForm(values: EventFormValues, tz: string): { startsAt: Date; endsAt: Date } | { errors: Record<string, string> } {
+export function validateEventForm(values: EventFormValues, tz: string): { startsAt: Date; endsAt: Date; maxParticipants: number | null; rsvpDeadline: Date | null } | { errors: Record<string, string> } {
   const errors: Record<string, string> = {};
   if (!values.title) errors.title = t("events.form.error.titleRequired");
   else if (values.title.length > 200) errors.title = t("events.form.error.titleTooLong");
@@ -107,8 +113,16 @@ export function validateEventForm(values: EventFormValues, tz: string): { starts
   }
   if (startsAt && endsAt && endsAt < startsAt) errors.dates = t("events.form.error.endBeforeStart");
 
+  // Anmeldefelder: ungültige Werte blockieren nur bei aktiver Anmeldung, sonst werden sie verworfen (null).
+  const max = values.maxParticipants ? Number(values.maxParticipants) : null;
+  const maxOk = max === null || (Number.isInteger(max) && max >= 1 && max <= 100000);
+  if (!maxOk && values.rsvpEnabled) errors.maxParticipants = t("events.form.error.maxParticipants");
+  const deadline = values.rsvpDeadline ? parseLocal(values.rsvpDeadline, tz) : null;
+  const deadlineOk = !values.rsvpDeadline || (!!deadline && (!startsAt || deadline <= startsAt));
+  if (!deadlineOk && values.rsvpEnabled) errors.rsvpDeadline = t("events.form.error.rsvpDeadline");
+
   if (Object.keys(errors).length > 0) return { errors };
-  return { startsAt: startsAt!, endsAt: endsAt! };
+  return { startsAt: startsAt!, endsAt: endsAt!, maxParticipants: maxOk ? max : null, rsvpDeadline: deadlineOk ? deadline : null };
 }
 
 // Ersetzt Tags und Einladungsliste eines Termins vollständig (Löschen + Neuanlage), analog routes/inventory.tsx.
@@ -146,4 +160,103 @@ export async function findMembersByStatus(): Promise<Record<(typeof AUDIENCE_STA
       if (st in out) out[st as keyof typeof out].push({ id: m.id, name: `${m.person.firstName} ${m.person.lastName}` });
     });
   return out;
+}
+
+
+// ── Anmeldung (RSVP) ─────────────────────────────────────────────────────────
+
+export type RsvpStatus = "yes" | "no";
+type RsvpEvent = Pick<Event, "id" | "startsAt" | "endsAt" | "rsvpEnabled" | "maxParticipants" | "rsvpDeadline" | "cancelledAt">;
+
+// Login -> Mitglied (über persons.userId); undefined ohne verknüpftes Mitglied.
+export async function memberForUser(userId: string): Promise<{ id: string; exitDate: string | null; deathDate: string | null } | undefined> {
+  const [row] = await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId)).where(eq(persons.userId, userId)).limit(1);
+  return row;
+}
+
+export const effectiveDeadline = (ev: Pick<Event, "startsAt" | "rsvpDeadline">): Date => ev.rsvpDeadline ?? ev.startsAt;
+
+export type RsvpLock = "cancelled" | "deadline" | null;
+// Allgemeiner Sperrgrund (gilt für Zu- und Absagen). Terminabsage sperrt alle, der Schluss nur Mitglieder.
+export function rsvpLock(ev: RsvpEvent, manager: boolean, at = now()): RsvpLock {
+  if (ev.cancelledAt) return "cancelled";
+  return !manager && at > effectiveDeadline(ev) ? "deadline" : null;
+}
+export const isFull = (ev: Pick<Event, "maxParticipants">, yes: number) => ev.maxParticipants != null && yes >= ev.maxParticipants;
+
+// Löschen nur für abgesagte oder vergangene Termine.
+export const canDelete = (ev: Pick<Event, "cancelledAt" | "endsAt">, at = now()) => !!ev.cancelledAt || ev.endsAt < at;
+
+export type RsvpRow = { memberId: string; name: string; lastName: string; status: RsvpStatus; active: boolean };
+
+// Alle Anmeldungen eines Termins mit Name (inkl. Ausgetretener; Aufrufer zählen nur aktive).
+export async function loadRsvps(eventId: string): Promise<RsvpRow[]> {
+  const rows = await db.select({ memberId: members.id, firstName: persons.firstName, lastName: persons.lastName, status: eventRsvps.status, exitDate: members.exitDate, deathDate: members.deathDate })
+    .from(eventRsvps).innerJoin(members, eq(members.id, eventRsvps.memberId)).innerJoin(persons, eq(persons.id, members.personId))
+    .where(eq(eventRsvps.eventId, eventId));
+  return rows.map((r) => ({ memberId: r.memberId, name: `${r.firstName} ${r.lastName}`, lastName: r.lastName, status: r.status, active: isActiveMember(r) }))
+    .sort((a, b) => a.lastName.localeCompare(b.lastName, "de") || a.name.localeCompare(b.name, "de"));
+}
+
+export const countYes = (rows: RsvpRow[]) => rows.filter((r) => r.active && r.status === "yes").length;
+
+// "Offen": eingeladene aktive Mitglieder ohne Zeile.
+export async function loadOpenMembers(event: { id: string; visibility: EventVisibility }, rows: RsvpRow[]): Promise<{ id: string; name: string }[]> {
+  const answered = new Set(rows.map((r) => r.memberId));
+  return (await loadMemberNames((await invitedMembers(event)).filter((id) => !answered.has(id))));
+}
+
+// Zusagen aktiver Mitglieder und eigener Status für die Listenansicht (ein Query für alle Termine).
+export async function loadRsvpSummaries(eventIds: string[], memberId: string | undefined): Promise<Map<string, { yes: number; mine: RsvpStatus | null }>> {
+  const out = new Map<string, { yes: number; mine: RsvpStatus | null }>(eventIds.map((id) => [id, { yes: 0, mine: null }]));
+  if (!eventIds.length) return out;
+  const rows = await db.select({ eventId: eventRsvps.eventId, memberId: eventRsvps.memberId, status: eventRsvps.status }).from(eventRsvps)
+    .innerJoin(members, eq(members.id, eventRsvps.memberId))
+    .where(and(inArray(eventRsvps.eventId, eventIds), isNull(members.exitDate), isNull(members.deathDate)));
+  for (const r of rows) {
+    const s = out.get(r.eventId)!;
+    if (r.status === "yes") s.yes++;
+    if (r.memberId === memberId) s.mine = r.status;
+  }
+  return out;
+}
+
+export type SetRsvpResult = "ok" | "cancelled" | "deadline" | "full" | "notFound";
+
+// Setzt Zu-/Absage. Die Termin-Zeile wird gesperrt (FOR UPDATE), damit Limit-Prüfung und Eintrag race-sicher sind.
+// manager = Führung: Schluss und Limit gelten nicht, die Terminabsage schon.
+export async function setRsvp(eventId: string, memberId: string, status: RsvpStatus, manager: boolean): Promise<SetRsvpResult> {
+  return db.transaction(async (tx) => {
+    const [ev] = await tx.select().from(events).where(eq(events.id, eventId)).for("update");
+    if (!ev || !ev.rsvpEnabled) return "notFound";
+    const lock = rsvpLock(ev, manager);
+    if (lock) return lock;
+    if (status === "yes" && !manager && ev.maxParticipants != null) {
+      const [mine] = await tx.select({ status: eventRsvps.status }).from(eventRsvps).where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.memberId, memberId)));
+      if (mine?.status !== "yes") {
+        const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(eventRsvps).innerJoin(members, eq(members.id, eventRsvps.memberId))
+          .where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.status, "yes"), isNull(members.exitDate), isNull(members.deathDate)));
+        if (isFull(ev, n)) return "full";
+      }
+    }
+    await tx.insert(eventRsvps).values({ eventId, memberId, status }).onConflictDoUpdate({ target: [eventRsvps.eventId, eventRsvps.memberId], set: { status, respondedAt: now() } });
+    return "ok";
+  });
+}
+
+// Zurück auf "offen" (nur Führung). Terminabsage sperrt auch das.
+export async function resetRsvp(eventId: string, memberId: string): Promise<SetRsvpResult> {
+  return db.transaction(async (tx) => {
+    const [ev] = await tx.select().from(events).where(eq(events.id, eventId)).for("update");
+    if (!ev || !ev.rsvpEnabled) return "notFound";
+    if (ev.cancelledAt) return "cancelled";
+    await tx.delete(eventRsvps).where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.memberId, memberId)));
+    return "ok";
+  });
+}
+
+// Picker der Führung: alle aktiven Mitglieder ohne Zeile für diesen Termin (auch nicht eingeladene).
+export function withoutRsvp(eventId: string): SQL {
+  return notExists(db.select({ x: eventRsvps.id }).from(eventRsvps).where(and(eq(eventRsvps.eventId, eventId), eq(eventRsvps.memberId, members.id))));
 }

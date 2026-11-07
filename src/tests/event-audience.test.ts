@@ -13,7 +13,7 @@ vi.mock("../db/index.js", () => ({
   db: { select: vi.fn(() => chain), query: { members: { findMany: vi.fn(async () => memberRows) } } },
 }));
 
-const { visibilityCondition, isActiveMember, saveEventTagsAndInvitees, findMembersByStatus } = await import("../lib/events.js");
+const { rsvpLock, canDelete, isFull, visibilityCondition, isActiveMember, saveEventTagsAndInvitees, findMembersByStatus } = await import("../lib/events.js");
 
 beforeEach(() => { selectRows = []; memberRows = []; inserted.length = 0; });
 
@@ -92,5 +92,30 @@ describe("migration 0077 backfill", () => {
   });
   it("adds the enum value by recreating the type (ADD VALUE would be unusable in the backfill's transaction)", () => {
     expect(readFileSync("drizzle/0075_ambitious_reavers.sql", "utf8")).toContain("'roles', 'members'");
+  });
+});
+
+describe("rsvp rules", () => {
+  const start = new Date("2026-11-15T17:00:00Z");
+  const ev = { id: "e", startsAt: start, endsAt: new Date("2026-11-15T19:00:00Z"), rsvpEnabled: true, maxParticipants: null, rsvpDeadline: null, cancelledAt: null };
+  it("locks members after the deadline (default startsAt), never the manager", () => {
+    const after = new Date("2026-11-15T17:01:00Z");
+    expect(rsvpLock(ev, false, new Date("2026-11-15T16:59:00Z"))).toBeNull();
+    expect(rsvpLock(ev, false, after)).toBe("deadline");
+    expect(rsvpLock(ev, true, after)).toBeNull();
+    expect(rsvpLock({ ...ev, rsvpDeadline: new Date("2026-11-10T00:00:00Z") }, false, new Date("2026-11-11T00:00:00Z"))).toBe("deadline");
+  });
+  it("cancelled events lock everyone", () => {
+    expect(rsvpLock({ ...ev, cancelledAt: new Date() }, true, start)).toBe("cancelled");
+  });
+  it("limit", () => {
+    expect(isFull({ maxParticipants: null }, 99)).toBe(false);
+    expect(isFull({ maxParticipants: 2 }, 1)).toBe(false);
+    expect(isFull({ maxParticipants: 2 }, 2)).toBe(true);
+  });
+  it("deletes only cancelled or past events", () => {
+    expect(canDelete(ev, new Date("2026-11-01T00:00:00Z"))).toBe(false);
+    expect(canDelete(ev, new Date("2026-11-16T00:00:00Z"))).toBe(true);
+    expect(canDelete({ ...ev, cancelledAt: new Date() }, new Date("2026-11-01T00:00:00Z"))).toBe(true);
   });
 });

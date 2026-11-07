@@ -7,7 +7,7 @@ import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryTemplates, inventoryTemplateFieldDefs, inventoryTemplateInspections } from "./inventory";
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
-import { events, eventTags, eventVisibleRoles, eventInvitees } from "./events";
+import { events, eventTags, eventVisibleRoles, eventInvitees, eventRsvps } from "./events";
 import { appRoles } from "./permissions";
 import { trainingRecords } from "./training";
 
@@ -134,6 +134,12 @@ export const eventsRelations = relations(events, ({ many }) => ({
   tags: many(eventTags),
   visibleRoles: many(eventVisibleRoles),
   invitees: many(eventInvitees),
+  rsvps: many(eventRsvps),
+}));
+
+export const eventRsvpsRelations = relations(eventRsvps, ({ one }) => ({
+  event: one(events, { fields: [eventRsvps.eventId], references: [events.id] }),
+  member: one(members, { fields: [eventRsvps.memberId], references: [members.id] }),
 }));
 
 export const eventInviteesRelations = relations(eventInvitees, ({ one }) => ({
