@@ -1,9 +1,10 @@
-import { boolean, check, numeric, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, numeric, primaryKey, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { appRoles } from "./permissions";
+import { members } from "./members";
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
-export const eventVisibilityEnum = pgEnum("event_visibility", ["public", "loggedIn", "roles"]);
+export const eventVisibilityEnum = pgEnum("event_visibility", ["public", "loggedIn", "roles", "members"]);
 
 export const events = pgTable(
   "events",
@@ -46,4 +47,17 @@ export const eventVisibleRoles = pgTable(
       .references(() => appRoles.id, { onDelete: "cascade" }),
   },
   (t) => [uniqueIndex("event_visible_roles_event_role_idx").on(t.eventId, t.roleId)],
+);
+
+export const eventInvitees = pgTable(
+  "event_invitees",
+  {
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    memberId: uuid("member_id")
+      .notNull()
+      .references(() => members.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.eventId, t.memberId] }), index("event_invitees_member_idx").on(t.memberId)],
 );

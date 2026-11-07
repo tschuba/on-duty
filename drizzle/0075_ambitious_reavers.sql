@@ -1,0 +1,1 @@
+ALTER TYPE "public"."event_visibility" ADD VALUE 'members';

@@ -5,21 +5,21 @@ import { parseEventForm, validateEventForm } from "../lib/events.js";
 const TZ = "Europe/Berlin";
 
 describe("parseEventForm", () => {
-  it("defaults visibility to loggedIn and dedupes tags/roles", () => {
-    const v = parseEventForm({ title: " Übung ", tags: ["a", "a,b"], roleIds: ["r1", "r1"] });
+  it("defaults visibility to loggedIn and dedupes tags/members", () => {
+    const v = parseEventForm({ title: " Übung ", tags: ["a", "a,b"], memberIds: ["m1", "m1"] });
     expect(v.visibility).toBe("loggedIn");
     expect(v.title).toBe("Übung");
     expect(v.tags).toEqual(["a", "b"]);
-    expect(v.roleIds).toEqual(["r1"]);
+    expect(v.memberIds).toEqual(["m1"]);
   });
-  it("accepts public/roles and allDay checkbox", () => {
-    expect(parseEventForm({ visibility: "roles", allDay: "on" }).visibility).toBe("roles");
+  it("accepts public/members and allDay checkbox", () => {
+    expect(parseEventForm({ visibility: "members", allDay: "on" }).visibility).toBe("members");
     expect(parseEventForm({ allDay: "on" }).allDay).toBe(true);
   });
 });
 
 describe("validateEventForm", () => {
-  const base = { title: "Übung", location: "", coordinates: "", description: "", allDay: false, startsAt: "2026-07-15T18:00", endsAt: "2026-07-15T20:00", visibility: "loggedIn" as const, tags: [], roleIds: [] };
+  const base = { title: "Übung", location: "", coordinates: "", description: "", allDay: false, startsAt: "2026-07-15T18:00", endsAt: "2026-07-15T20:00", visibility: "loggedIn" as const, tags: [], memberIds: [] };
 
   it("accepts a valid timed event", () => {
     const r = validateEventForm(base, TZ);
@@ -39,10 +39,6 @@ describe("validateEventForm", () => {
   it("rejects end before start", () => {
     const r = validateEventForm({ ...base, startsAt: "2026-07-15T20:00", endsAt: "2026-07-15T18:00" }, TZ);
     expect("errors" in r && r.errors.dates).toBeTruthy();
-  });
-  it("roles visibility requires at least one role", () => {
-    const r = validateEventForm({ ...base, visibility: "roles", roleIds: [] }, TZ);
-    expect("errors" in r && r.errors.roleIds).toBeTruthy();
   });
   it("allDay uses day bounds", () => {
     const r = validateEventForm({ ...base, allDay: true, startsAt: "2026-07-15", endsAt: "2026-07-16" }, TZ);

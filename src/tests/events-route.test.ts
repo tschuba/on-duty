@@ -117,7 +117,7 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
   return {
     id: "e1", title: "Übung", location: "Gerätehaus", description: null,
     allDay: false, startsAt: new Date("2026-11-15T17:00:00Z"), endsAt: new Date("2026-11-15T19:00:00Z"),
-    visibility: "loggedIn", tags: [], visibleRoles: [],
+    visibility: "loggedIn", tags: [], invitees: [],
     ...overrides,
   };
 }
@@ -132,10 +132,10 @@ describe("GET /events", () => {
     expect(body).toContain("Gerätehaus");
   });
 
-  it("marks a roles-event without assigned roles with the orphan badge for managers", async () => {
-    eventsFindManyResult = [makeEvent({ visibility: "roles", visibleRoles: [] })];
+  it("marks a members-event without invitees with the orphan badge for managers", async () => {
+    eventsFindManyResult = [makeEvent({ visibility: "members", invitees: [] })];
     const body = await (await eventRoutes.request("/")).text();
-    expect(body).toContain(t("events.orphanRoles"));
+    expect(body).toContain(t("events.orphanMembers"));
   });
 
   it("renders calendar and list together", async () => {
@@ -251,16 +251,6 @@ describe("POST /events/new", () => {
     expect(body).toContain(t("events.form.error.endBeforeStart"));
   });
 
-  it("requires at least one role for roles visibility", async () => {
-    const res = await eventRoutes.request("/new", {
-      method: "POST",
-      body: formBody({ title: "X", startsAt: "2026-11-15T18:00", endsAt: "2026-11-15T20:00", visibility: "roles" }),
-    });
-    expect(res.status).toBe(422);
-    const body = await res.text();
-    expect(body).toContain(t("events.form.error.rolesRequired"));
-  });
-
   it("requires events:manage", async () => {
     currentUser = { ...currentUser, permissions: new Set() };
     const res = await eventRoutes.request("/new", { method: "POST", body: formBody({ title: "X" }) });
@@ -308,7 +298,7 @@ describe("POST /events/:id/delete", () => {
 });
 
 describe("GET /events/:id (read-only)", () => {
-  const ev = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], visibleRoles: [] };
+  const ev = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], invitees: [] };
 
   it("shows edit button only with events:manage", async () => {
     eventFindFirstResult = ev;
@@ -336,7 +326,7 @@ testDetailPageContract({
   setPermissions: (perms) => { currentUser = { ...currentUser, permissions: new Set(perms) }; },
   readPermissions: [],
   writePermissions: ["events:manage"],
-  ensureRecord: () => { eventFindFirstResult = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], visibleRoles: [] }; },
+  ensureRecord: () => { eventFindFirstResult = { id: "e1", title: "Übung", location: null, description: null, allDay: false, startsAt: new Date("2026-11-15T18:00:00Z"), endsAt: new Date("2026-11-15T20:00:00Z"), visibility: "loggedIn", tags: [], invitees: [] }; },
 });
 
 describe("GET /events/new visibility cards", () => {
@@ -350,9 +340,9 @@ describe("GET /events/new visibility cards", () => {
     (env as any).EVENTS_PUBLIC_INDEXING = false;
     return body;
   }
-  it("orders cards loggedIn, roles, public with loggedIn preselected", async () => {
+  it("orders cards loggedIn, members, public with loggedIn preselected", async () => {
     const body = await render("true", false);
-    const order = ["loggedIn", "roles", "public"].map((v) => body.indexOf(`value="${v}"`));
+    const order = ["loggedIn", "members", "public"].map((v) => body.indexOf(`value="${v}"`));
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(body).toMatch(/value="loggedIn"[^>]*checked/);
   });
