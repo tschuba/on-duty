@@ -9,3 +9,16 @@ backups/
 public/css
 public/fonts
 public/js
+.env.*
+.github/
+.claude/
+.vscode/
+.vitest/
+.dev-stack*/
+.playwright-mcp/
+coverage/
+tile-cache/
+data/
+docs/
+*.md
+# Tailwind liest nur src/ und public/js (@source in src/styles/app.css); Doku darf das CSS nicht beeinflussen.
