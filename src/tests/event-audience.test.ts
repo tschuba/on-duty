@@ -63,11 +63,12 @@ describe("findMembersByStatus", () => {
     id, exitDate: null, deathDate: null, person: { firstName: "X", lastName: last, birthDate },
     assignments: [{ role: { grantsActiveStatus: true }, from: null, to: null }], ...extra,
   });
-  it("ORs statuses, skips exited members", async () => {
+  it("groups active members by status, skips exited ones, sorts by name", async () => {
     memberRows = [m("act", "B", "1990-01-01"), m("you", "A", `${new Date().getFullYear() - 15}-01-01`), m("gone", "C", "1990-01-01", { exitDate: "2024-01-01" })];
-    expect((await findMembersByStatus(["active", "youth"])).map((x) => x.id)).toEqual(["you", "act"]);
-    expect((await findMembersByStatus(["active"])).map((x) => x.id)).toEqual(["act"]);
-    expect(await findMembersByStatus([])).toEqual([]);
+    const g = await findMembersByStatus();
+    expect(g.active.map((x) => x.id)).toEqual(["act"]);
+    expect(g.youth.map((x) => x.id)).toEqual(["you"]);
+    expect(Object.values(g).flat().map((x) => x.id)).not.toContain("gone");
   });
 });
 

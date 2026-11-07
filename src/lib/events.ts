@@ -131,13 +131,17 @@ export async function loadMemberNames(ids: string[]): Promise<{ id: string; name
   return rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }));
 }
 
-// Aktive Mitglieder, deren abgeleiteter Status in `statuses` liegt (Oder). Ausgetretene/Verstorbene nie.
-export async function findMembersByStatus(statuses: string[]): Promise<{ id: string; name: string }[]> {
-  const wanted = new Set(statuses);
-  if (!wanted.size) return [];
+// Aktive Mitglieder je abgeleitetem Status (Ausgetretene/Verstorbene nie), nach Name sortiert.
+export const AUDIENCE_STATUSES = ["active", "youth", "children", "passive", "supporting"] as const;
+export async function findMembersByStatus(): Promise<Record<(typeof AUDIENCE_STATUSES)[number], { id: string; name: string }[]>> {
+  const out = Object.fromEntries(AUDIENCE_STATUSES.map((s) => [s, [] as { id: string; name: string }[]])) as Awaited<ReturnType<typeof findMembersByStatus>>;
   const rows = await db.query.members.findMany({ with: { person: true, assignments: { with: { role: true } } } });
-  return rows
-    .filter((m) => isActiveMember(m) && wanted.has(deriveMemberStatus({ ...m, birthDate: m.person.birthDate! }, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT)))
+  rows
+    .filter(isActiveMember)
     .sort((a, b) => a.person.lastName.localeCompare(b.person.lastName, "de") || a.person.firstName.localeCompare(b.person.firstName, "de"))
-    .map((m) => ({ id: m.id, name: `${m.person.firstName} ${m.person.lastName}` }));
+    .forEach((m) => {
+      const st = deriveMemberStatus({ ...m, birthDate: m.person.birthDate! }, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
+      if (st in out) out[st as keyof typeof out].push({ id: m.id, name: `${m.person.firstName} ${m.person.lastName}` });
+    });
+  return out;
 }

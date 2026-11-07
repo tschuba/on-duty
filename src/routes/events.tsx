@@ -474,6 +474,32 @@ async function TagSuggestions(user: AuthedUser) {
   return <script type="application/json" id={TAG_SUGGESTIONS_ID} dangerouslySetInnerHTML={{ __html: tagSuggestionsJson([...EVENT_TAGS.map((d) => eventTagLabel(d.key)), ...(await eventTagVocabulary(user))]) }} />;
 }
 
+function MembersPanel({ invitees }: { invitees: { id: string; name: string }[] }) {
+  return (
+    <div id="event-members" class="hidden group-has-[:checked]:flex flex-col gap-3 mt-3 pl-8">
+      <EntityPicker searchUrl="/events/search-members" placeholder={t("events.form.membersSearch")} />
+      <div class="flex flex-wrap items-center gap-1" id="event-member-groups">
+        <span class="text-sm opacity-70 mr-1">{t("events.form.membersAddGroup")}</span>
+        {(["active", "youth", "children", "passive", "supporting"] as const).map((st) => (
+          <button type="button" class="btn btn-sm btn-outline" data-status={st} data-label={t(`status.${st}`)} disabled>{t(`status.${st}`)}</button>
+        ))}
+      </div>
+      <div class="flex items-center justify-between text-sm">
+        <span class="opacity-70" id="event-member-count" data-one={t("events.form.membersCountOne")} data-many={t("events.form.membersCountMany")} data-none={t("events.form.membersNone")}></span>
+        <button type="button" class="btn btn-ghost btn-xs" id="event-member-clear" data-confirm={t("events.form.membersClearConfirm")}>{t("events.form.membersClear")}</button>
+      </div>
+      <div id="event-member-chips" class="flex flex-wrap gap-1" data-remove={t("common.remove")}>
+        {invitees.map((m) => (
+          <span class="badge badge-ghost gap-1" data-member-chip={m.id}>
+            <input type="hidden" name="memberIds" value={m.id} />{m.name}
+            <button type="button" class="cursor-pointer" aria-label={t("common.remove")} data-chip-remove>×</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 async function EventForm({ values, errors, invitees, tz }: {
   values: EventFormValues; errors: Record<string, string>; invitees: { id: string; name: string }[]; tz: string;
 }) {
@@ -528,7 +554,8 @@ async function EventForm({ values, errors, invitees, tz }: {
           {(["loggedIn", "members", "public"] as const).map((v) => {
             const pub = v === "public";
             return (
-              <label class={`group flex items-start gap-3 rounded-box border border-base-300 p-3 cursor-pointer pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
+              <div class={`group rounded-box border border-base-300 p-3 pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
+              <label class={`flex items-start gap-3 cursor-pointer`}>
                 <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "members" ? "event-visibility-members" : undefined} />
                 <span class="flex flex-col gap-1">
                   <span class="font-medium">{t(`events.form.visibility.${v}`)}</span>
@@ -542,32 +569,12 @@ async function EventForm({ values, errors, invitees, tz }: {
                   )}
                 </span>
               </label>
+              {v === "members" && <MembersPanel invitees={invitees} />}
+              </div>
             );
           })}
         </div>
       </FieldGroup>
-
-      <div id="event-members" hidden={values.visibility !== "members"} class="space-y-2">
-        <FieldGroup legend={t("events.form.members")}>
-          <div class="flex flex-col gap-2">
-            <EntityPicker searchUrl="/events/search-members" placeholder={t("events.form.membersSearch")} />
-            <div class="flex flex-wrap items-center gap-1" id="event-member-groups">
-              {(["active", "youth", "children", "passive", "supporting"] as const).map((st) => (
-                <button type="button" class="btn btn-xs btn-ghost" aria-pressed="false" data-status={st}>{t(`status.${st}`)}</button>
-              ))}
-              <button type="button" class="btn btn-xs btn-primary" id="event-member-add" data-label={t("events.form.membersAdd")} disabled>{t("events.form.membersAdd")}</button>
-            </div>
-            <div id="event-member-chips" class="flex flex-wrap gap-1" data-remove={t("common.remove")}>
-              {invitees.map((m) => (
-                <span class="badge badge-lg gap-1" data-member-chip={m.id}>
-                  <input type="hidden" name="memberIds" value={m.id} />{m.name}
-                  <button type="button" class="btn btn-ghost btn-xs btn-circle" aria-label={t("common.remove")} data-chip-remove>×</button>
-                </span>
-              ))}
-            </div>
-          </div>
-        </FieldGroup>
-      </div>
 
       <LocalTimes tz={tz} />
       <script dangerouslySetInnerHTML={{ __html: `
@@ -601,44 +608,49 @@ async function EventForm({ values, errors, invitees, tz }: {
               end.value = e.getFullYear() + '-' + pad(e.getMonth() + 1) + '-' + pad(e.getDate()) + 'T' + pad(e.getHours()) + ':' + pad(e.getMinutes());
             });
           });
-          document.querySelectorAll('input[name=visibility]').forEach(function(r) {
-            r.addEventListener('change', function() {
-              document.getElementById('event-members').hidden = !document.getElementById('event-visibility-members').checked;
-            });
-          });
-          // Mitgliederauswahl: Chips mit Hidden-Feld memberIds; Statusbuttons sind Oder-verknüpfte Toggles.
+          // Mitgliederauswahl: Chips mit Hidden-Feld memberIds; Kategorie-Buttons fügen ihre Treffer mit einem Klick hinzu.
           const chips = document.getElementById('event-member-chips');
-          const addBtn = document.getElementById('event-member-add');
           const box = document.getElementById('event-members');
-          let found = [];
+          const countEl = document.getElementById('event-member-count');
+          const radio = document.getElementById('event-visibility-members');
+          let groups = null;
+          function has(id) { return !!chips.querySelector('[data-member-chip="' + id + '"]'); }
+          function refresh() {
+            const n = chips.children.length;
+            countEl.textContent = n === 0 ? countEl.dataset.none : (n === 1 ? countEl.dataset.one : countEl.dataset.many.replace('{n}', n));
+            document.getElementById('event-member-clear').hidden = n === 0;
+            box.querySelectorAll('[data-status]').forEach(function(b) {
+              const open = groups ? groups[b.dataset.status].filter(function(m) { return !has(m.id); }).length : 0;
+              b.disabled = open === 0;
+              b.textContent = '+ ' + b.dataset.label + (groups ? ' (' + open + ')' : '');
+            });
+          }
           function addChip(id, name) {
-            if (chips.querySelector('[data-member-chip="' + id + '"]')) return;
+            if (has(id)) return;
             const span = document.createElement('span');
-            span.className = 'badge badge-lg gap-1'; span.dataset.memberChip = id;
+            span.className = 'badge badge-ghost gap-1'; span.dataset.memberChip = id;
             const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = 'memberIds'; inp.value = id;
-            const x = document.createElement('button'); x.type = 'button'; x.className = 'btn btn-ghost btn-xs btn-circle'; x.dataset.chipRemove = ''; x.setAttribute('aria-label', chips.dataset.remove); x.textContent = '×';
+            const x = document.createElement('button'); x.type = 'button'; x.className = 'cursor-pointer'; x.dataset.chipRemove = ''; x.setAttribute('aria-label', chips.dataset.remove); x.textContent = '×';
             span.append(inp, name, x); chips.appendChild(span);
           }
-          chips.addEventListener('click', function(e) { const x = e.target.closest('[data-chip-remove]'); if (x) x.parentElement.remove(); });
+          chips.addEventListener('click', function(e) { const x = e.target.closest('[data-chip-remove]'); if (x) { x.parentElement.remove(); refresh(); } });
+          document.getElementById('event-member-clear').addEventListener('click', function() {
+            if (confirm(this.dataset.confirm)) { chips.textContent = ''; refresh(); }
+          });
           box.addEventListener('picker:select', function(e) {
-            addChip(e.detail.id, e.detail.name);
+            addChip(e.detail.id, e.detail.name); refresh();
             const root = e.target.closest('[data-picker]'); const clr = root && root.querySelector('.picker-clear'); if (clr) clr.click();
           });
-          function refreshGroups() {
-            const sel = Array.from(document.querySelectorAll('#event-member-groups [data-status][aria-pressed=true]')).map(function(b) { return b.dataset.status; });
-            if (!sel.length) { found = []; addBtn.disabled = true; addBtn.textContent = addBtn.dataset.label; return; }
-            fetch('/events/members-by-status?' + sel.map(function(s) { return 'status=' + s; }).join('&'), { headers: { Accept: 'application/json' } })
-              .then(function(r) { return r.json(); })
-              .then(function(list) { found = list; addBtn.disabled = !list.length; addBtn.textContent = addBtn.dataset.label + ' (' + list.length + ')'; });
-          }
-          document.querySelectorAll('#event-member-groups [data-status]').forEach(function(b) {
-            b.addEventListener('click', function() {
-              const on = b.getAttribute('aria-pressed') !== 'true';
-              b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.classList.toggle('btn-ghost', !on); b.classList.toggle('btn-primary', on);
-              refreshGroups();
-            });
+          box.querySelectorAll('[data-status]').forEach(function(b) {
+            b.addEventListener('click', function() { groups[b.dataset.status].forEach(function(m) { addChip(m.id, m.name); }); refresh(); });
           });
-          addBtn.addEventListener('click', function() { found.forEach(function(m) { addChip(m.id, m.name); }); });
+          function loadGroups() {
+            if (groups || !radio.checked) return;
+            fetch('/events/members-by-status', { headers: { Accept: 'application/json' } })
+              .then(function(r) { return r.json(); }).then(function(g) { groups = g; refresh(); });
+          }
+          document.querySelectorAll('input[name=visibility]').forEach(function(r) { r.addEventListener('change', loadGroups); });
+          refresh(); loadGroups();
         })();
       ` }} />
     </form>
@@ -661,8 +673,8 @@ eventRoutes.get("/search-members", manage, async (c) => {
   return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }))} />);
 });
 
-// GET /events/members-by-status?status=active&status=youth — aktive Mitglieder der Statusgruppen (Oder), für die Schnellbuttons.
-eventRoutes.get("/members-by-status", manage, async (c) => c.json(await findMembersByStatus(c.req.queries("status") ?? [])));
+// GET /events/members-by-status — aktive Mitglieder je Statusgruppe, für die Kategorie-Buttons.
+eventRoutes.get("/members-by-status", manage, async (c) => c.json(await findMembersByStatus()));
 
 eventRoutes.get("/new", manage, async (c) => {
   const user = c.get("user")!;
