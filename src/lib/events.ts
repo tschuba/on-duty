@@ -112,15 +112,17 @@ export function validateEventForm(values: EventFormValues, tz: string): { starts
 }
 
 // Ersetzt Tags und Einladungsliste eines Termins vollständig (Löschen + Neuanlage), analog routes/inventory.tsx.
-// Ausgetretene/Verstorbene und unbekannte IDs werden nicht aufgenommen; die Liste gilt nur bei visibility "members".
+// Die Liste gilt nur bei visibility "members". Bereits eingeladene Ausgetretene bleiben erhalten (zählen nur nicht mehr);
+// neu aufgenommen werden nur aktive Mitglieder, unbekannte IDs fallen weg.
 export async function saveEventTagsAndInvitees(tx: typeof db, eventId: string, tags: string[], visibility: EventVisibility, memberIds: string[]): Promise<void> {
   await tx.delete(eventTags).where(eq(eventTags.eventId, eventId));
   if (tags.length) await tx.insert(eventTags).values(tags.map((tag) => ({ eventId, tag })));
 
+  const existing = new Set((await tx.select({ id: eventInvitees.memberId }).from(eventInvitees).where(eq(eventInvitees.eventId, eventId))).map((r) => r.id));
   await tx.delete(eventInvitees).where(eq(eventInvitees.eventId, eventId));
   if (visibility !== "members" || !memberIds.length) return;
   const rows = await tx.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members).where(inArray(members.id, memberIds));
-  const ids = rows.filter(isActiveMember).map((r) => r.id);
+  const ids = rows.filter((r) => existing.has(r.id) || isActiveMember(r)).map((r) => r.id);
   if (ids.length) await tx.insert(eventInvitees).values(ids.map((memberId) => ({ eventId, memberId })));
 }
 

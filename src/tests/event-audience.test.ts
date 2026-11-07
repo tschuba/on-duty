@@ -42,18 +42,26 @@ describe("isActiveMember", () => {
 });
 
 describe("saveEventTagsAndInvitees", () => {
-  function tx() {
+  // select() liefert nacheinander: bestehende Einladungen, dann die Mitglieder-Zeilen.
+  function tx(existing: any[], memberRows: any[]) {
+    const results = [existing, memberRows];
     const del = vi.fn(() => ({ where: vi.fn(async () => undefined) }));
     const insert = vi.fn(() => ({ values: vi.fn(async (v: any) => { inserted.push(v); }) }));
-    return { delete: del, insert, select: () => chain } as any;
+    const select = vi.fn(() => { const r = results.shift() ?? []; const c: any = { from: () => c, where: () => c, then: (f: any) => Promise.resolve(r).then(f) }; return c; });
+    return { delete: del, insert, select } as any;
   }
-  it("stores only active members for visibility members", async () => {
-    selectRows = [{ id: "a", exitDate: null, deathDate: null }, { id: "b", exitDate: "2024-01-01", deathDate: null }];
-    await saveEventTagsAndInvitees(tx(), "e1", [], "members", ["a", "b"]);
+  const act = { exitDate: null, deathDate: null };
+  const gone = { exitDate: "2024-01-01", deathDate: null };
+  it("does not add exited members as new invitees", async () => {
+    await saveEventTagsAndInvitees(tx([], [{ id: "a", ...act }, { id: "b", ...gone }]), "e1", [], "members", ["a", "b"]);
     expect(inserted).toEqual([[{ eventId: "e1", memberId: "a" }]]);
   });
+  it("keeps already invited members who have since left", async () => {
+    await saveEventTagsAndInvitees(tx([{ id: "b" }], [{ id: "a", ...act }, { id: "b", ...gone }]), "e1", [], "members", ["a", "b"]);
+    expect(inserted).toEqual([[{ eventId: "e1", memberId: "a" }, { eventId: "e1", memberId: "b" }]]);
+  });
   it("stores no list for other visibilities", async () => {
-    await saveEventTagsAndInvitees(tx(), "e1", [], "loggedIn", ["a"]);
+    await saveEventTagsAndInvitees(tx([], []), "e1", [], "loggedIn", ["a"]);
     expect(inserted).toEqual([]);
   });
 });
