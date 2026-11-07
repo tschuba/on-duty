@@ -10,7 +10,7 @@ import { Icon } from "../components/icon.js";
 import { LocationPicker } from "../components/location-picker.js";
 import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
 import { Section } from "../components/section.js";
-import { RowAction } from "../components/row-action.js";
+import { SortIcon } from "./members.js";
 import { ChipInput } from "../components/chip-input.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -939,21 +939,41 @@ for (const [path, cancelledAt] of [["cancel", () => now()], ["uncancel", () => n
 // ── Anmeldung ────────────────────────────────────────────────────────────────
 
 const SECTION = "rsvp-section";
+const RANK = { open: 0, yes: 1, no: 2 } as const;
 const toStatus = (v: unknown): RsvpStatus | null => (v === "yes" || v === "no" ? v : null);
 
-function RsvpButton({ id, status, mine, disabled, url }: { id?: string; status: RsvpStatus; mine: RsvpStatus | null; disabled: boolean; url: string }) {
+// Zu-/Absage-Button für Kopf und Tabellenzeilen: unter md Icon, ab md Text. Mit resetUrl setzt ein Klick auf den aktiven Button zurück (nur Führung).
+function RsvpButton({ status, mine, disabled, url, resetUrl, vals = {}, size = "btn-sm" }: { status: RsvpStatus; mine: RsvpStatus | null; disabled: boolean; url: string; resetUrl?: string; vals?: Record<string, string>; size?: "btn-sm" | "btn-xs" }) {
   const active = mine === status;
-  const cls = active ? (status === "yes" ? "btn-success" : "btn-error") : "btn-ghost";
+  const label = t(status === "yes" ? (active ? "events.rsvp.isYes" : "events.rsvp.yes") : (active ? "events.rsvp.isNo" : "events.rsvp.no"));
+  const cls = active ? (status === "yes" ? "btn-success" : "btn-error") : `btn-outline text-base-content ${status === "yes" ? "btn-success hover:text-success-content" : "btn-error hover:text-error-content"}`; // Text neutral: success-Grün hat auf hellem Grund zu wenig Kontrast
+  const post = active ? resetUrl && { url: resetUrl, vals } : { url, vals: { status, ...vals } };
   return (
-    <button type="button" id={id} class={`btn ${cls}`} aria-pressed={active ? "true" : "false"} disabled={disabled}
-      {...(active ? {} : { "hx-post": url, "hx-vals": JSON.stringify({ status }), "hx-target": `#${SECTION}`, "hx-swap": "outerHTML" })}>
-      {t(status === "yes" ? "events.rsvp.yes" : "events.rsvp.no")}
+    <button type="button" class={`btn ${size} join-item ${cls}`} aria-label={label} title={active && resetUrl ? t("events.rsvp.reset") : label} aria-pressed={active ? "true" : "false"} disabled={disabled}
+      {...(post ? { "hx-post": post.url, "hx-vals": JSON.stringify(post.vals), "hx-target": `#${SECTION}`, "hx-swap": "outerHTML" } : {})}>
+      <Icon name={status === "yes" ? "check" : "x-mark"} class="h-4 w-4 shrink-0 md:hidden" />
+      <span class="max-md:hidden">{label}</span>
     </button>
   );
 }
 
+function RsvpRow({ m, base, cancelled, sort = "name", dir = "asc" }: { m: { id: string; name: string; status: RsvpStatus | null }; base: string; cancelled: boolean; sort?: string; dir?: string }) {
+  return (
+    <tr data-name={m.name.toLowerCase()}>
+      <td>{m.name}</td>
+      <td class="text-right">
+        <span class="join">
+          {(["yes", "no"] as const).map((st) => (
+            <RsvpButton status={st} mine={m.status} disabled={cancelled} url={`${base}/${m.id}`} resetUrl={`${base}/${m.id}/delete`} vals={{ sort, sort_dir: dir }} size="btn-xs" />
+          ))}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 // Abschnitt "Anmeldung" (Detailseite und HTMX-Fragment). Namen nur, wenn der Nutzer events:manage hat.
-async function RsvpSection({ ev, user, tz, notice }: { ev: Event; user: AuthedUser; tz: string; notice?: string }) {
+async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }: { ev: Event; user: AuthedUser; tz: string; notice?: string; sort?: "name" | "status"; dir?: "asc" | "desc" }) {
   const manager = user.permissions.has("events:manage");
   const [rows, member] = await Promise.all([loadRsvps(ev.id), memberForUser(user.id)]);
   const invitedIds = manager || member ? await invitedMembers(ev) : [];
@@ -973,79 +993,68 @@ async function RsvpSection({ ev, user, tz, notice }: { ev: Event; user: AuthedUs
     t("events.rsvp.noCount", { n: no }),
   ].join(", ");
   const base = `/events/${ev.id}/rsvp`;
-  const groups: { key: string; label: string; items: { id: string; name: string; status: RsvpStatus | null }[] }[] = [
-    { key: "open", label: t("events.rsvp.groupOpen"), items: open.map((m) => ({ ...m, status: null })) },
-    { key: "yes", label: t("events.rsvp.groupYes"), items: rows.filter((r) => r.active && r.status === "yes").map((r) => ({ id: r.memberId, name: r.name, status: "yes" as const })) },
-    { key: "no", label: t("events.rsvp.groupNo"), items: rows.filter((r) => r.active && r.status === "no").map((r) => ({ id: r.memberId, name: r.name, status: "no" as const })) },
-  ];
+  const people: { id: string; name: string; status: RsvpStatus | null }[] = [
+    ...open.map((m) => ({ ...m, status: null })),
+    ...rows.filter((r) => r.active && r.status).map((r) => ({ id: r.memberId, name: r.name, status: r.status as RsvpStatus })),
+  ].sort((x, y) => (sort === "status" ? RANK[x.status ?? "open"] - RANK[y.status ?? "open"] : 0) * (dir === "asc" ? 1 : -1) || x.name.localeCompare(y.name, "de") * (sort === "name" && dir === "desc" ? -1 : 1));
+  const th = (col: "name" | "status", label: string, cls = "") => (
+    <th class={cls}><a href="#" class="link link-hover" hx-get={`${base}/section?sort=${col}&sort_dir=${sort === col && dir === "asc" ? "desc" : "asc"}`} hx-target={`#${SECTION}`} hx-swap="outerHTML">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>
+  );
   return (
-    <section id={SECTION} class="mt-8 space-y-4" aria-labelledby="rsvp-heading">
-      <h2 id="rsvp-heading" class="text-lg font-bold">{t("events.rsvp.title")}</h2>
-      {notice && <div role="alert" class="alert alert-warning">{notice}</div>}
-      {selfInvited && (
-        <div class="space-y-2">
-          {!mine && <p class="text-sm">{t("events.rsvp.unanswered")}</p>}
-          <div class="flex gap-2">
-            <RsvpButton status="yes" mine={mine} disabled={blockYes} url={base} />
-            <RsvpButton status="no" mine={mine} disabled={!!lock} url={base} />
-          </div>
-        </div>
-      )}
-      {reason && <p class="text-sm opacity-70">{reason}</p>}
-      <p class="text-sm opacity-70">
-        {manager && ev.maxParticipants != null && yes > ev.maxParticipants ? <span class="text-warning font-medium">{yes}/{ev.maxParticipants}</span> : null}
-        {manager && ev.maxParticipants != null && yes > ev.maxParticipants ? " · " : null}{counts}
-        {manager && full && !lock && <> · {t("events.rsvp.overbooked")}</>}
-      </p>
+    <div id={SECTION} class="mt-8">
+    <Section title={t("events.rsvp.title")} badge={manager ? people.length : undefined} extra={manager && (
+      <>
+        <span class="badge badge-sm badge-success" title={t("events.rsvp.groupYes")}>{ev.maxParticipants == null ? yes : `${yes}/${ev.maxParticipants}`}</span>
+        <span class="badge badge-sm badge-error" title={t("events.rsvp.groupNo")}>{no}</span>
+      </>
+    )} badge2={manager && full && !lock ? t("events.rsvp.overbooked") : undefined} tone={manager && ev.maxParticipants != null && yes > ev.maxParticipants ? "warning" : undefined} collapsible={false} actions={selfInvited && (
+      <span class="flex items-center gap-2">
+        {!mine && <span class="text-sm opacity-70 max-md:hidden">{t("events.rsvp.unanswered")}</span>}
+        <span class="join">
+          <RsvpButton status="yes" mine={mine} disabled={blockYes} url={base} />
+          <RsvpButton status="no" mine={mine} disabled={!!lock} url={base} />
+        </span>
+      </span>
+    )}>
+      <div class="space-y-4">
+        {notice && <div role="alert" class="alert alert-warning">{notice}</div>}
+        {reason && <p class="text-sm opacity-70">{reason}</p>}
       {manager && (
         <div class="space-y-4">
-          {groups.map((g) => (
-            <div>
-              <h3 class="font-medium mb-1">{g.label} ({g.items.length})</h3>
-              {g.items.length === 0 ? <p class="text-sm opacity-60">{t("events.rsvp.empty")}</p> : (
-                <ul class="divide-y divide-base-300">
-                  {g.items.map((m) => (
-                    <li class="flex items-center justify-between gap-2 py-1">
-                      <span>{m.name}</span>
-                      <span class="flex gap-1">
-                        {(["yes", "no"] as const).map((st) => {
-                          const active = m.status === st;
-                          const cls = active ? (st === "yes" ? "btn-success" : "btn-error") : "btn-ghost";
-                          return <RowAction icon={st === "yes" ? "check" : "x-mark"} label={t(st === "yes" ? "events.rsvp.yes" : "events.rsvp.no")} class={cls} disabled={lock === "cancelled"}
-                            attrs={{ "aria-pressed": active ? "true" : "false", ...(active ? {} : { "hx-post": `${base}/${m.id}`, "hx-vals": JSON.stringify({ status: st }), "hx-target": `#${SECTION}`, "hx-swap": "outerHTML" }) }} />;
-                        })}
-                        {m.status && <RowAction icon="arrow-uturn-left" label={t("events.rsvp.reset")} class="btn-ghost" disabled={lock === "cancelled"}
-                          attrs={{ "hx-post": `${base}/${m.id}/delete`, "hx-target": `#${SECTION}`, "hx-swap": "outerHTML" }} />}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+          <input type="search" class="input w-full" data-rsvp-filter placeholder={t("events.rsvp.filter")} aria-label={t("events.rsvp.filter")} />
+          <script dangerouslySetInnerHTML={{ __html: `(function(){
+            var i = document.querySelector('[data-rsvp-filter]');
+            i.addEventListener('input', function () {
+              var q = i.value.trim().toLowerCase();
+              document.querySelectorAll('#${SECTION} tr[data-name]').forEach(function (r) { r.hidden = q && r.dataset.name.indexOf(q) < 0; });
+            });
+          })();` }} />
+          <table class="table w-full">
+            <thead><tr>{th("name", t("events.rsvp.colMember"))}{th("status", t("events.rsvp.colStatus"), "text-right")}</tr></thead>
+            <tbody>
+              {people.length === 0 ? <tr data-rsvp-empty><td colspan={2} class="text-center opacity-50 py-4">{t("events.rsvp.empty")}</td></tr> : people.map((m) => <RsvpRow m={m} base={base} cancelled={lock === "cancelled"} sort={sort} dir={dir} />)}
+            </tbody>
+          </table>
           {lock !== "cancelled" && (
             <div class="space-y-2" data-rsvp-add>
               <h3 class="font-medium">{t("events.rsvp.addMember")}</h3>
               <EntityPicker searchUrl={`${base}/search`} placeholder={t("events.form.membersSearch")} />
-              <div class="flex gap-2">
-                <button type="button" class="btn btn-success btn-outline" data-add="yes" disabled>{t("events.rsvp.addYes")}</button>
-                <button type="button" class="btn btn-error btn-outline" data-add="no" disabled>{t("events.rsvp.addNo")}</button>
-              </div>
               <script dangerouslySetInnerHTML={{ __html: `(function(){
-                var s = document.querySelector('[data-rsvp-add]'), h = s.querySelector('input[type=hidden]'), b = s.querySelectorAll('[data-add]');
-                function sync() { b.forEach(function (x) { x.disabled = !h.value; }); }
-                s.addEventListener('picker:select', function () { setTimeout(sync); });
-                s.addEventListener('picker:clear', function () { setTimeout(sync); });
-                b.forEach(function (x) { x.addEventListener('click', function () {
-                  htmx.ajax('POST', ${JSON.stringify(base)} + '/' + h.value, { target: '#${SECTION}', swap: 'outerHTML', values: { status: x.dataset.add } });
-                }); });
-                sync();
+                var s = document.querySelector('[data-rsvp-add]');
+                s.addEventListener('picker:select', function (e) {
+                  var id = e.detail.id, body = document.querySelector('#${SECTION} tbody');
+                  var empty = body.querySelector('[data-rsvp-empty]'); if (empty) empty.remove();
+                  htmx.ajax('GET', ${JSON.stringify(base)} + '/' + id + '/row', { target: body, swap: 'afterbegin' });
+                  setTimeout(function () { s.querySelector('.picker-clear').click(); }, 0);
+                });
               })();` }} />
             </div>
           )}
         </div>
       )}
-    </section>
+      </div>
+    </Section>
+    </div>
   );
 }
 
@@ -1058,12 +1067,14 @@ async function rsvpEvent(c: Context<{ Variables: Variables }>) {
 
 async function rsvpResponse(c: Context<{ Variables: Variables }>, ev: Event, user: AuthedUser, result: string, status?: RsvpStatus) {
   const tz = resolveTimezone(c);
-  if (result === "ok") return c.html(<RsvpSection ev={ev} user={user} tz={tz} />);
+  const b = await c.req.parseBody();
+  const sort = b.sort === "status" ? "status" : "name", dir = b.sort_dir === "desc" ? "desc" : "asc";
+  if (result === "ok") return c.html(<RsvpSection ev={ev} user={user} tz={tz} sort={sort} dir={dir} />);
   // Die Fragmente zeigen den aktuellen Stand; nur "voll" braucht den zusätzlichen Hinweis.
   const fresh = (await db.query.events.findFirst({ where: eq(events.id, ev.id) })) ?? ev;
   const notice = result === "full" && status === "yes"
     ? t("events.rsvp.race.full", { yes: countYes(await loadRsvps(ev.id)), max: ev.maxParticipants! }) : undefined;
-  return c.html(<RsvpSection ev={fresh} user={user} tz={tz} notice={notice} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  return c.html(<RsvpSection ev={fresh} user={user} tz={tz} notice={notice} sort={sort} dir={dir} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
 }
 
 // POST /events/:id/rsvp — eigene Zu-/Absage (nur eingeladene, aktive, verknüpfte Mitglieder).
@@ -1076,6 +1087,13 @@ eventRoutes.post("/:id/rsvp", requireAuth(), async (c) => {
   return rsvpResponse(c, ev, user, await setRsvp(ev.id, member.id, status, user.permissions.has("events:manage")), status);
 });
 
+// GET /events/:id/rsvp/section — Abschnitt neu sortiert (HTMX-Fragment).
+eventRoutes.get("/:id/rsvp/section", manage, async (c) => {
+  const { user, ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  return c.html(<RsvpSection ev={ev} user={user} tz={resolveTimezone(c)} sort={c.req.query("sort") === "status" ? "status" : "name"} dir={c.req.query("sort_dir") === "desc" ? "desc" : "asc"} />);
+});
+
 // GET /events/:id/rsvp/search — Picker der Führung: alle aktiven Mitglieder ohne Zeile, auch nicht eingeladene.
 eventRoutes.get("/:id/rsvp/search", manage, async (c) => {
   const q = (c.req.query("q") ?? "").trim();
@@ -1085,7 +1103,17 @@ eventRoutes.get("/:id/rsvp/search", manage, async (c) => {
     .innerJoin(persons, eq(persons.id, members.personId))
     .where(and(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)), isNull(members.exitDate), isNull(members.deathDate), withoutRsvp(c.req.param("id")!)))
     .orderBy(asc(persons.lastName), asc(persons.firstName)).limit(10);
-  return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }))} />);
+  return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.lastName}, ${r.firstName}` }))} />);
+});
+
+// GET /events/:id/rsvp/:memberId/row — Tabellenzeile für ein per Picker gewähltes Mitglied (ohne Eintrag).
+eventRoutes.get("/:id/rsvp/:memberId/row", manage, async (c) => {
+  const { ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  const [m] = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId)).where(eq(members.id, c.req.param("memberId")!));
+  if (!m || !isActiveMember(m)) return c.notFound();
+  return c.html(<RsvpRow m={{ id: m.id, name: `${m.lastName}, ${m.firstName}`, status: null }} base={`/events/${ev.id}/rsvp`} cancelled={false} />);
 });
 
 // POST /events/:id/rsvp/:memberId — Stellvertretung (aktive Mitglieder, auch ohne Login oder Einladung).

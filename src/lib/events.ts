@@ -140,11 +140,11 @@ export async function saveEventTagsAndInvitees(tx: typeof db, eventId: string, t
   if (ids.length) await tx.insert(eventInvitees).values(ids.map((memberId) => ({ eventId, memberId })));
 }
 
-export async function loadMemberNames(ids: string[]): Promise<{ id: string; name: string }[]> {
+export async function loadMemberNames(ids: string[], lastFirst = false): Promise<{ id: string; name: string }[]> {
   if (!ids.length) return [];
   const rows = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members)
     .innerJoin(persons, eq(persons.id, members.personId)).where(inArray(members.id, ids)).orderBy(asc(persons.lastName), asc(persons.firstName));
-  return rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }));
+  return rows.map((r) => ({ id: r.id, name: lastFirst ? `${r.lastName}, ${r.firstName}` : `${r.firstName} ${r.lastName}` }));
 }
 
 // Aktive Mitglieder je abgeleitetem Status (Ausgetretene/Verstorbene nie), nach Name sortiert.
@@ -195,7 +195,7 @@ export async function loadRsvps(eventId: string): Promise<RsvpRow[]> {
   const rows = await db.select({ memberId: members.id, firstName: persons.firstName, lastName: persons.lastName, status: eventRsvps.status, exitDate: members.exitDate, deathDate: members.deathDate })
     .from(eventRsvps).innerJoin(members, eq(members.id, eventRsvps.memberId)).innerJoin(persons, eq(persons.id, members.personId))
     .where(eq(eventRsvps.eventId, eventId));
-  return rows.map((r) => ({ memberId: r.memberId, name: `${r.firstName} ${r.lastName}`, lastName: r.lastName, status: r.status, active: isActiveMember(r) }))
+  return rows.map((r) => ({ memberId: r.memberId, name: `${r.lastName}, ${r.firstName}`, lastName: r.lastName, status: r.status, active: isActiveMember(r) }))
     .sort((a, b) => a.lastName.localeCompare(b.lastName, "de") || a.name.localeCompare(b.name, "de"));
 }
 
@@ -204,7 +204,7 @@ export const countYes = (rows: RsvpRow[]) => rows.filter((r) => r.active && r.st
 // "Offen": eingeladene aktive Mitglieder ohne Zeile.
 export async function loadOpenMembers(event: { id: string; visibility: EventVisibility }, rows: RsvpRow[]): Promise<{ id: string; name: string }[]> {
   const answered = new Set(rows.map((r) => r.memberId));
-  return (await loadMemberNames((await invitedMembers(event)).filter((id) => !answered.has(id))));
+  return (await loadMemberNames((await invitedMembers(event)).filter((id) => !answered.has(id)), true));
 }
 
 // Zusagen aktiver Mitglieder und eigener Status für die Listenansicht (ein Query für alle Termine).
