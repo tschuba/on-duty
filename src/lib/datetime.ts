@@ -5,6 +5,9 @@ export function resolveTimezone(_c?: unknown): string {
   return env.APP_TIMEZONE;
 }
 
+// Einziger Zugriff auf die Uhr für Termin-Logik (Anmeldeschluss, Löschregel), damit Tests sie steuern können.
+export const now = () => new Date();
+
 const PARTS_FMT = new Map<string, Intl.DateTimeFormat>();
 function partsFmt(tz: string) {
   let f = PARTS_FMT.get(tz);

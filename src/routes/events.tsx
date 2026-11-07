@@ -9,7 +9,8 @@ import { Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Icon } from "../components/icon.js";
 import { LocationPicker } from "../components/location-picker.js";
 import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
-import { RowAction } from "../components/row-action.js";
+import { Section } from "../components/section.js";
+import { SortIcon } from "./members.js";
 import { ChipInput } from "../components/chip-input.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -33,15 +34,58 @@ import {
   loadMemberNames,
   validateEventForm,
   visibilityCondition,
+  canDelete,
+  countYes,
+  effectiveDeadline,
+  invitedMembers,
+  isActiveMember,
+  isFull,
+  loadOpenMembers,
+  loadRsvps,
+  loadRsvpSummaries,
+  memberForUser,
+  resetRsvp,
+  rsvpLock,
+  setRsvp,
+  withoutRsvp,
   type Event,
+  type RsvpStatus,
   type EventFormValues,
 } from "../lib/events.js";
-import { formatDateTime, formatDay, formatTime, resolveTimezone, toLocalDate, toLocalInput } from "../lib/datetime.js";
+import { formatDateTime, formatDay, formatTime, now, resolveTimezone, toLocalDate, toLocalInput } from "../lib/datetime.js";
 
 export const eventRoutes = new Hono<{ Variables: Variables }>();
 const manage = requireAuth("events:manage");
 
-type EventRow = Event & { tags: { tag: string }[]; invitees: { memberId: string }[] };
+type EventRow = Event & { tags: { tag: string }[]; invitees: { memberId: string }[]; rsvp?: { yes: number; mine: RsvpStatus | null; invited: boolean } };
+
+// Platzzeile und eigener Status für die interne Liste; public setzt rsvp nicht.
+async function withRsvpInfo(rows: EventRow[], user: AuthedUser): Promise<EventRow[]> {
+  const enabled = rows.filter((ev) => ev.rsvpEnabled);
+  if (!enabled.length) return rows;
+  const member = await memberForUser(user.id);
+  const active = !!member && isActiveMember(member);
+  const sums = await loadRsvpSummaries(enabled.map((ev) => ev.id), member?.id);
+  return rows.map((ev) => {
+    const s = sums.get(ev.id);
+    if (!s) return ev;
+    const invited = active && (ev.visibility !== "members" || ev.invitees.some((i) => i.memberId === member!.id));
+    return { ...ev, rsvp: { ...s, invited } };
+  });
+}
+
+function RsvpLine({ ev }: { ev: EventRow }) {
+  const r = ev.rsvp;
+  if (!ev.rsvpEnabled || !r || ev.cancelledAt) return null;
+  const free = ev.maxParticipants == null ? null : ev.maxParticipants - r.yes;
+  const mine = r.mine ? t(r.mine === "yes" ? "events.rsvp.mineYes" : "events.rsvp.mineNo") : r.invited && !rsvpLock(ev, false) ? t("events.rsvp.mineOpen") : null;
+  return (
+    <div class="text-sm opacity-70">
+      {free == null ? t("events.rsvp.yesCount", { n: r.yes }) : free <= 0 ? <span class="badge badge-sm badge-warning">{t("events.rsvp.soldOut")}</span> : free === 1 ? t("events.rsvp.listFreeOne") : t("events.rsvp.listFree", { n: free })}
+      {mine && <> · {mine}</>}
+    </div>
+  );
+}
 
 async function fetchEvents(user: AuthedUser | undefined, where: ReturnType<typeof and>): Promise<EventRow[]> {
   const cond = and(visibilityCondition(user), where);
@@ -119,6 +163,7 @@ function EventPlace({ ev }: { ev: Pick<Event, "location" | "latitude" | "longitu
 }
 
 // Koordinatenfeld des Formulars -> Spaltenwerte (leer = null).
+const rsvpColumns = (v: EventFormValues, r: { maxParticipants: number | null; rsvpDeadline: Date | null }) => ({ rsvpEnabled: v.rsvpEnabled, maxParticipants: r.maxParticipants, rsvpDeadline: r.rsvpDeadline });
 const dbCoords = (raw: string) => { const c = parseCoordinates(raw); return { latitude: c.latitude || null, longitude: c.longitude || null }; };
 
 function EventTagBadges({ tags }: { tags: string[] }) {
@@ -151,18 +196,12 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
                 <span class="text-xs opacity-80">{day.slice(0, 4)}</span>
               </div>
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
-                <div class="font-medium lg:text-lg">{ev.title}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}</div>
+                <div class="font-medium lg:text-lg"><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-sm badge-error ml-2">{t("events.cancelled")}</span>}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}</div>
                 <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{(ev.location || ev.latitude != null) && <> · <EventPlace ev={ev} /></>}</div>
+                <RsvpLine ev={ev} />
                 {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
                 <EventTagBadges tags={ev.tags.map((x) => x.tag)} />
               </div>
-              {canManage && (
-                <div class="ml-auto shrink-0">
-                  <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{
-                    "hx-post": `/events/${ev.id}/delete`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-target": "closest [data-date]", "hx-swap": "outerHTML",
-                  }} onclick="event.stopPropagation()" />
-                </div>
-              )}
             </div>
           </div>
         );
@@ -363,7 +402,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
 
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
-  let rows = await fetchEvents(user, undefined);
+  let rows = await withRsvpInfo(await fetchEvents(user, undefined), user);
   if (tagFilter.length) rows = rows.filter((ev) => tagFilter.every((tag) => ev.tags.some((x) => x.tag === tag)));
   const fragment = monthFragment(c, rows, tz, canManage, true);
   if (fragment) return fragment;
@@ -505,7 +544,7 @@ async function EventForm({ values, errors, invitees, tz }: {
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
   const indexing = publicEnabled && !!env.EVENTS_PUBLIC_INDEXING;
   return (
-    <form id="event-form" method="post" class="space-y-4 max-w-2xl">
+    <form id="event-form" method="post" class="group/ev space-y-4 max-w-2xl">
       <Field label={t("events.form.title")} required after={errors.title && <span class="text-error text-sm">{errors.title}</span>}>
         <input type="text" name="title" value={values.title} placeholder={t("events.form.title")} maxlength={200} class={`input w-full${errors.title ? " input-error" : ""}`} required />
       </Field>
@@ -555,7 +594,7 @@ async function EventForm({ values, errors, invitees, tz }: {
             return (
               <div class={`group rounded-box border border-base-300 p-3 pointer-coarse:min-h-11 ${pub ? "has-[:checked]:border-warning has-[:checked]:bg-warning/10" : "has-[:checked]:border-primary has-[:checked]:bg-primary/5"}`}>
               <label class={`flex items-start gap-3 cursor-pointer`}>
-                <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "members" ? "event-visibility-members" : undefined} />
+                <input type="radio" name="visibility" value={v} checked={values.visibility === v} class="radio mt-1" id={v === "members" ? "event-visibility-members" : pub ? "event-visibility-public" : undefined} />
                 <span class="flex flex-col gap-1">
                   <span class="font-medium">{t(`events.form.visibility.${v}`)}</span>
                   <span class="text-sm text-base-content/70">{t(`events.form.visibility.${v}.desc`)}</span>
@@ -574,6 +613,21 @@ async function EventForm({ values, errors, invitees, tz }: {
           })}
         </div>
       </FieldGroup>
+
+      <Section title={t("events.form.rsvp")} collapsible={false} class="group/rsvp [&>div]:hidden [&>h2]:rounded-b-box has-[input[name=rsvpEnabled]:checked]:[&>div]:block has-[input[name=rsvpEnabled]:checked]:[&>h2]:rounded-b-none" actions={
+        <input type="checkbox" name="rsvpEnabled" checked={values.rsvpEnabled} class="toggle toggle-primary" aria-label={t("events.form.rsvpEnabled")} />
+      }>
+        <p class="hidden group-has-[#event-visibility-public:checked]/ev:group-has-[input[name=rsvpEnabled]:checked]/rsvp:block text-sm opacity-70 mb-3">{t("events.form.rsvpPublicHint")}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={t("events.form.maxParticipants")} floating={false} hint={t("events.form.maxParticipantsHint")} after={errors.maxParticipants && <span class="text-error text-sm">{errors.maxParticipants}</span>}>
+            <input type="number" name="maxParticipants" min="1" step="1" value={values.maxParticipants} class={`input w-full${errors.maxParticipants ? " input-error" : ""}`} />
+          </Field>
+          <Field label={t("events.form.rsvpDeadline")} floating={false} hint={t("events.form.rsvpDeadlineHint")} after={errors.rsvpDeadline && <span class="text-error text-sm">{errors.rsvpDeadline}</span>}>
+            <input type="datetime-local" id="event-rsvp-deadline" name="rsvpDeadline" value={values.rsvpDeadline} class={`input w-full${errors.rsvpDeadline ? " input-error" : ""}`} />
+            <p class="text-xs opacity-70 mt-1" data-local-hint="event-rsvp-deadline" hidden></p>
+          </Field>
+        </div>
+      </Section>
 
       <LocalTimes tz={tz} />
       <script dangerouslySetInnerHTML={{ __html: `
@@ -668,7 +722,7 @@ async function EventForm({ values, errors, invitees, tz }: {
 }
 
 function emptyFormValues(): EventFormValues {
-  return { title: "", location: "", coordinates: "", description: "", allDay: false, startsAt: "", endsAt: "", visibility: "loggedIn", tags: [], memberIds: [] };
+  return { title: "", location: "", coordinates: "", description: "", allDay: false, startsAt: "", endsAt: "", visibility: "loggedIn", tags: [], memberIds: [], rsvpEnabled: false, maxParticipants: "", rsvpDeadline: "" };
 }
 
 // GET /events/search-members — Suche für die Mitgliederauswahl (nur aktive Mitglieder).
@@ -725,7 +779,7 @@ eventRoutes.post("/new", manage, async (c) => {
   await db.transaction(async (tx) => {
     const [row] = await tx.insert(events).values({
       title: values.title, location: values.location || null, ...dbCoords(values.coordinates), description: values.description || null,
-      allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
+      allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility, ...rsvpColumns(values, result),
     }).returning({ id: events.id });
     newId = row.id;
     await saveEventTagsAndInvitees(tx as never, row.id, values.tags, values.visibility, values.memberIds);
@@ -751,6 +805,9 @@ function toEventFormValues(ev: NonNullable<Awaited<ReturnType<typeof fetchEventF
     visibility: ev.visibility,
     tags: ev.tags.map((x) => x.tag),
     memberIds: ev.invitees.map((x) => x.memberId),
+    rsvpEnabled: ev.rsvpEnabled,
+    maxParticipants: ev.maxParticipants?.toString() ?? "",
+    rsvpDeadline: ev.rsvpDeadline ? toLocalInput(ev.rsvpDeadline, tz) : "",
   };
 }
 
@@ -761,10 +818,20 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
   if (!ev) return c.notFound();
   const tz = resolveTimezone(c);
   const canManage = user.permissions.has("events:manage");
+  const deletable = canDelete(ev, now());
+  const deleteRows = canManage && deletable ? await loadRsvps(ev.id) : [];
+  const nYes = deleteRows.filter((r) => r.status === "yes").length;
+  const nNo = deleteRows.length - nYes;
+  const summary = [nYes && t(nYes === 1 ? "events.rsvpCountYesOne" : "events.rsvpCountYesMany", { n: nYes }), nNo && t(nNo === 1 ? "events.rsvpCountNoOne" : "events.rsvpCountNoMany", { n: nNo })].filter(Boolean).join(" und ");
+  const confirmDelete = summary ? t("events.confirmDeleteRsvps", { title: ev.title, summary }) : t("events.confirmDelete", { title: ev.title });
+  const cancelAction = canManage && (ev.cancelledAt
+    ? <HeaderAction icon="arrow-uturn-left" label={t("events.uncancel")} class="btn-outline" attrs={{ "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" }} />
+    : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" attrs={{ "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" }} />);
+  const deleteAction = canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
   return c.html(
     <Layout title={ev.title} user={user}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={ev.title} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/events/${ev.id}/delete?from=detail`, "hx-confirm": t("events.confirmDelete", { title: ev.title }), "hx-swap": "none" }} />} />} />
+      <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{cancelAction}{deleteAction}</>} />} />
       <LocalTimes tz={tz} />
       <ViewGrid>
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.start")}</div><div class="font-medium"><EventTimeLabel ev={ev} tz={tz} /></div></div>
@@ -779,8 +846,13 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
         )}
         <ViewField label={t("events.form.visibility")} value={t(`events.form.visibility.${ev.visibility as "public" | "loggedIn" | "members"}`)} />
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.description")}</div><div class="font-medium whitespace-pre-wrap">{ev.description || "—"}</div></div>
+        {canManage && ev.cancelledAt && <ViewField label={t("events.cancelled")} value={t("events.cancelledAt", { date: formatDateTime(ev.cancelledAt, tz) })} />}
         <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
       </ViewGrid>
+      {ev.rsvpEnabled && <RsvpSection ev={ev} user={user} tz={tz} />}
+      <script dangerouslySetInnerHTML={{ __html: `document.body.addEventListener('htmx:beforeSwap', function (e) {
+        if (e.detail.xhr.status === 422 && e.detail.requestConfig.elt.closest('#rsvp-section')) { e.detail.shouldSwap = true; e.detail.isError = false; }
+      });` }} />
       </div>
     </Layout>,
   );
@@ -832,7 +904,7 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
   await db.transaction(async (tx) => {
     await tx.update(events).set({
       title: values.title, location: values.location || null, ...dbCoords(values.coordinates), description: values.description || null,
-      allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility,
+      allDay: values.allDay, startsAt: result.startsAt, endsAt: result.endsAt, visibility: values.visibility, ...rsvpColumns(values, result),
     }).where(eq(events.id, id));
     await saveEventTagsAndInvitees(tx as never, id, values.tags, values.visibility, values.memberIds);
   });
@@ -843,9 +915,220 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
 
 eventRoutes.post("/:id/delete", manage, async (c) => {
   const id = c.req.param("id");
+  const ev = await db.query.events.findFirst({ where: eq(events.id, id) });
+  if (!ev) return c.notFound();
+  if (!canDelete(ev, now())) return c.text(t("events.cannotDelete"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   await db.delete(events).where(eq(events.id, id));
   setFlash(c, t("events.form.deleted"), "success");
-  if (c.req.query("from") === "detail") { c.header("HX-Redirect", "/events"); return c.body(null, 204); }
+  c.header("HX-Redirect", "/events");
+  return c.body(null, 204);
+});
 
-  return c.html(""); // htmx ersetzt die Zeile durch nichts
+// ── Terminabsage ─────────────────────────────────────────────────────────────
+
+for (const [path, cancelledAt] of [["cancel", () => now()], ["uncancel", () => null]] as const) {
+  eventRoutes.post(`/:id/${path}`, manage, async (c) => {
+    const id = c.req.param("id");
+    const [row] = await db.update(events).set({ cancelledAt: cancelledAt() }).where(eq(events.id, id)).returning({ id: events.id });
+    if (!row) return c.notFound();
+    c.header("HX-Redirect", `/events/${id}`);
+    return c.body(null, 204);
+  });
+}
+
+// ── Anmeldung ────────────────────────────────────────────────────────────────
+
+const SECTION = "rsvp-section";
+const RANK = { open: 0, yes: 1, no: 2 } as const;
+const toStatus = (v: unknown): RsvpStatus | null => (v === "yes" || v === "no" ? v : null);
+
+// Zu-/Absage-Button für Kopf und Tabellenzeilen: unter md Icon, ab md Text. Mit resetUrl setzt ein Klick auf den aktiven Button zurück (nur Führung).
+function RsvpButton({ status, mine, disabled, url, resetUrl, vals = {}, size = "btn-sm" }: { status: RsvpStatus; mine: RsvpStatus | null; disabled: boolean; url: string; resetUrl?: string; vals?: Record<string, string>; size?: "btn-sm" | "btn-xs" }) {
+  const active = mine === status;
+  const label = t(status === "yes" ? (active ? "events.rsvp.isYes" : "events.rsvp.yes") : (active ? "events.rsvp.isNo" : "events.rsvp.no"));
+  const cls = active ? (status === "yes" ? "btn-success" : "btn-error") : `btn-outline text-base-content ${status === "yes" ? "btn-success hover:text-success-content" : "btn-error hover:text-error-content"}`; // Text neutral: success-Grün hat auf hellem Grund zu wenig Kontrast
+  const post = active ? resetUrl && { url: resetUrl, vals } : { url, vals: { status, ...vals } };
+  return (
+    <button type="button" class={`btn ${size} join-item ${cls}`} aria-label={label} title={active && resetUrl ? t("events.rsvp.reset") : label} aria-pressed={active ? "true" : "false"} disabled={disabled}
+      {...(post ? { "hx-post": post.url, "hx-vals": JSON.stringify(post.vals), "hx-target": `#${SECTION}`, "hx-swap": "outerHTML" } : {})}>
+      <Icon name={status === "yes" ? "check" : "x-mark"} class="h-4 w-4 shrink-0 md:hidden" />
+      <span class="max-md:hidden">{label}</span>
+    </button>
+  );
+}
+
+function RsvpRow({ m, base, cancelled, sort = "name", dir = "asc" }: { m: { id: string; name: string; status: RsvpStatus | null }; base: string; cancelled: boolean; sort?: string; dir?: string }) {
+  return (
+    <tr data-name={m.name.toLowerCase()}>
+      <td>{m.name}</td>
+      <td class="text-right">
+        <span class="join">
+          {(["yes", "no"] as const).map((st) => (
+            <RsvpButton status={st} mine={m.status} disabled={cancelled} url={`${base}/${m.id}`} resetUrl={`${base}/${m.id}/delete`} vals={{ sort, sort_dir: dir }} size="btn-xs" />
+          ))}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+// Abschnitt "Anmeldung" (Detailseite und HTMX-Fragment). Namen nur, wenn der Nutzer events:manage hat.
+async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }: { ev: Event; user: AuthedUser; tz: string; notice?: string; sort?: "name" | "status"; dir?: "asc" | "desc" }) {
+  const manager = user.permissions.has("events:manage");
+  const [rows, member] = await Promise.all([loadRsvps(ev.id), memberForUser(user.id)]);
+  const invitedIds = manager || member ? await invitedMembers(ev) : [];
+  const selfInvited = !!member && invitedIds.includes(member.id);
+  const open = manager ? await loadOpenMembers(ev, rows) : [];
+  const yes = countYes(rows);
+  const no = rows.filter((r) => r.active && r.status === "no").length;
+  const mine = rows.find((r) => r.memberId === member?.id)?.status ?? null;
+  const lock = rsvpLock(ev, manager);
+  const full = isFull(ev, yes);
+  const blockYes = !!lock || (full && !manager && mine !== "yes");
+  const reason = lock === "cancelled" ? t("events.rsvp.lock.cancelled")
+    : lock === "deadline" ? t("events.rsvp.lock.deadline", { date: formatDateTime(effectiveDeadline(ev), tz) })
+    : full && !manager && mine !== "yes" ? t("events.rsvp.lock.full", { yes, max: ev.maxParticipants! }) : null;
+  const counts = [
+    ev.maxParticipants == null ? t("events.rsvp.yesCount", { n: yes }) : t("events.rsvp.free", { n: Math.max(0, ev.maxParticipants - yes), max: ev.maxParticipants }),
+    t("events.rsvp.noCount", { n: no }),
+  ].join(", ");
+  const base = `/events/${ev.id}/rsvp`;
+  const people: { id: string; name: string; status: RsvpStatus | null }[] = [
+    ...open.map((m) => ({ ...m, status: null })),
+    ...rows.filter((r) => r.active && r.status).map((r) => ({ id: r.memberId, name: r.name, status: r.status as RsvpStatus })),
+  ].sort((x, y) => (sort === "status" ? RANK[x.status ?? "open"] - RANK[y.status ?? "open"] : 0) * (dir === "asc" ? 1 : -1) || x.name.localeCompare(y.name, "de") * (sort === "name" && dir === "desc" ? -1 : 1));
+  const th = (col: "name" | "status", label: string, cls = "") => (
+    <th class={cls}><a href="#" class="link link-hover" hx-get={`${base}/section?sort=${col}&sort_dir=${sort === col && dir === "asc" ? "desc" : "asc"}`} hx-target={`#${SECTION}`} hx-swap="outerHTML">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>
+  );
+  return (
+    <div id={SECTION} class="mt-8">
+    <Section title={t("events.rsvp.title")} badge={manager ? people.length : undefined} extra={manager && (
+      <>
+        <span class="badge badge-sm badge-success" title={t("events.rsvp.groupYes")}>{ev.maxParticipants == null ? yes : `${yes}/${ev.maxParticipants}`}</span>
+        <span class="badge badge-sm badge-error" title={t("events.rsvp.groupNo")}>{no}</span>
+      </>
+    )} badge2={manager && full && !lock ? t("events.rsvp.overbooked") : undefined} tone={manager && ev.maxParticipants != null && yes > ev.maxParticipants ? "warning" : undefined} collapsible={false} actions={selfInvited && (
+      <span class="flex items-center gap-2">
+        {!mine && <span class="text-sm opacity-70 max-md:hidden">{t("events.rsvp.unanswered")}</span>}
+        <span class="join">
+          <RsvpButton status="yes" mine={mine} disabled={blockYes} url={base} />
+          <RsvpButton status="no" mine={mine} disabled={!!lock} url={base} />
+        </span>
+      </span>
+    )}>
+      <div class="space-y-4">
+        {notice && <div role="alert" class="alert alert-warning">{notice}</div>}
+        {reason && <p class="text-sm opacity-70">{reason}</p>}
+      {manager && (
+        <div class="space-y-4">
+          <input type="search" class="input w-full" data-rsvp-filter placeholder={t("events.rsvp.filter")} aria-label={t("events.rsvp.filter")} />
+          <script dangerouslySetInnerHTML={{ __html: `(function(){
+            var i = document.querySelector('[data-rsvp-filter]');
+            i.addEventListener('input', function () {
+              var q = i.value.trim().toLowerCase();
+              document.querySelectorAll('#${SECTION} tr[data-name]').forEach(function (r) { r.hidden = q && r.dataset.name.indexOf(q) < 0; });
+            });
+          })();` }} />
+          <table class="table w-full">
+            <thead><tr>{th("name", t("events.rsvp.colMember"))}{th("status", t("events.rsvp.colStatus"), "text-right")}</tr></thead>
+            <tbody>
+              {people.length === 0 ? <tr data-rsvp-empty><td colspan={2} class="text-center opacity-50 py-4">{t("events.rsvp.empty")}</td></tr> : people.map((m) => <RsvpRow m={m} base={base} cancelled={lock === "cancelled"} sort={sort} dir={dir} />)}
+            </tbody>
+          </table>
+          {lock !== "cancelled" && (
+            <div class="space-y-2" data-rsvp-add>
+              <h3 class="font-medium">{t("events.rsvp.addMember")}</h3>
+              <EntityPicker searchUrl={`${base}/search`} placeholder={t("events.form.membersSearch")} />
+              <script dangerouslySetInnerHTML={{ __html: `(function(){
+                var s = document.querySelector('[data-rsvp-add]');
+                s.addEventListener('picker:select', function (e) {
+                  var id = e.detail.id, body = document.querySelector('#${SECTION} tbody');
+                  var empty = body.querySelector('[data-rsvp-empty]'); if (empty) empty.remove();
+                  htmx.ajax('GET', ${JSON.stringify(base)} + '/' + id + '/row', { target: body, swap: 'afterbegin' });
+                  setTimeout(function () { s.querySelector('.picker-clear').click(); }, 0);
+                });
+              })();` }} />
+            </div>
+          )}
+        </div>
+      )}
+      </div>
+    </Section>
+    </div>
+  );
+}
+
+// Lädt den Termin so, wie ihn der Nutzer sehen darf; nur mit aktivierter Anmeldung.
+async function rsvpEvent(c: Context<{ Variables: Variables }>) {
+  const user = c.get("user")!;
+  const ev = await db.query.events.findFirst({ where: and(eq(events.id, c.req.param("id")!), visibilityCondition(user)) });
+  return { user, ev: ev?.rsvpEnabled ? ev : undefined };
+}
+
+async function rsvpResponse(c: Context<{ Variables: Variables }>, ev: Event, user: AuthedUser, result: string, status?: RsvpStatus) {
+  const tz = resolveTimezone(c);
+  const b = await c.req.parseBody();
+  const sort = b.sort === "status" ? "status" : "name", dir = b.sort_dir === "desc" ? "desc" : "asc";
+  if (result === "ok") return c.html(<RsvpSection ev={ev} user={user} tz={tz} sort={sort} dir={dir} />);
+  // Die Fragmente zeigen den aktuellen Stand; nur "voll" braucht den zusätzlichen Hinweis.
+  const fresh = (await db.query.events.findFirst({ where: eq(events.id, ev.id) })) ?? ev;
+  const notice = result === "full" && status === "yes"
+    ? t("events.rsvp.race.full", { yes: countYes(await loadRsvps(ev.id)), max: ev.maxParticipants! }) : undefined;
+  return c.html(<RsvpSection ev={fresh} user={user} tz={tz} notice={notice} sort={sort} dir={dir} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
+}
+
+// POST /events/:id/rsvp — eigene Zu-/Absage (nur eingeladene, aktive, verknüpfte Mitglieder).
+eventRoutes.post("/:id/rsvp", requireAuth(), async (c) => {
+  const { user, ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  const status = toStatus((await c.req.parseBody()).status);
+  const member = await memberForUser(user.id);
+  if (!status || !member || !(await invitedMembers(ev)).includes(member.id)) return c.text("forbidden", HTTP_STATUS.FORBIDDEN);
+  return rsvpResponse(c, ev, user, await setRsvp(ev.id, member.id, status, user.permissions.has("events:manage")), status);
+});
+
+// GET /events/:id/rsvp/section — Abschnitt neu sortiert (HTMX-Fragment).
+eventRoutes.get("/:id/rsvp/section", manage, async (c) => {
+  const { user, ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  return c.html(<RsvpSection ev={ev} user={user} tz={resolveTimezone(c)} sort={c.req.query("sort") === "status" ? "status" : "name"} dir={c.req.query("sort_dir") === "desc" ? "desc" : "asc"} />);
+});
+
+// GET /events/:id/rsvp/search — Picker der Führung: alle aktiven Mitglieder ohne Zeile, auch nicht eingeladene.
+eventRoutes.get("/:id/rsvp/search", manage, async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+  const needle = `%${q}%`;
+  const rows = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId))
+    .where(and(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)), isNull(members.exitDate), isNull(members.deathDate), withoutRsvp(c.req.param("id")!)))
+    .orderBy(asc(persons.lastName), asc(persons.firstName)).limit(10);
+  return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.lastName}, ${r.firstName}` }))} />);
+});
+
+// GET /events/:id/rsvp/:memberId/row — Tabellenzeile für ein per Picker gewähltes Mitglied (ohne Eintrag).
+eventRoutes.get("/:id/rsvp/:memberId/row", manage, async (c) => {
+  const { ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  const [m] = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId)).where(eq(members.id, c.req.param("memberId")!));
+  if (!m || !isActiveMember(m)) return c.notFound();
+  return c.html(<RsvpRow m={{ id: m.id, name: `${m.lastName}, ${m.firstName}`, status: null }} base={`/events/${ev.id}/rsvp`} cancelled={false} />);
+});
+
+// POST /events/:id/rsvp/:memberId — Stellvertretung (aktive Mitglieder, auch ohne Login oder Einladung).
+eventRoutes.post("/:id/rsvp/:memberId", manage, async (c) => {
+  const { user, ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  const status = toStatus((await c.req.parseBody()).status);
+  const [member] = await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members).where(eq(members.id, c.req.param("memberId")!));
+  if (!status || !member || !isActiveMember(member)) return c.notFound();
+  return rsvpResponse(c, ev, user, await setRsvp(ev.id, member.id, status, true), status);
+});
+
+// POST /events/:id/rsvp/:memberId/delete — zurück auf "offen".
+eventRoutes.post("/:id/rsvp/:memberId/delete", manage, async (c) => {
+  const { user, ev } = await rsvpEvent(c);
+  if (!ev) return c.notFound();
+  return rsvpResponse(c, ev, user, await resetRsvp(ev.id, c.req.param("memberId")!));
 });

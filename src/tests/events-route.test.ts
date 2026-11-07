@@ -287,13 +287,43 @@ describe("POST /events/:id/edit", () => {
 });
 
 describe("POST /events/:id/delete", () => {
-  it("deletes and returns an empty row", async () => {
-    eventsFindManyResult = [];
+  it("rejects an active upcoming event with 422", async () => {
+    eventFindFirstResult = makeEvent({ startsAt: new Date("2999-01-01T10:00:00Z"), endsAt: new Date("2999-01-01T11:00:00Z"), cancelledAt: null });
     const res = await eventRoutes.request("/e1/delete", { method: "POST" });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(422);
+    expect(deleteCalls.length).toBe(0);
+  });
+  it("deletes a cancelled event and redirects", async () => {
+    eventFindFirstResult = makeEvent({ startsAt: new Date("2999-01-01T10:00:00Z"), endsAt: new Date("2999-01-01T11:00:00Z"), cancelledAt: new Date() });
+    const res = await eventRoutes.request("/e1/delete", { method: "POST" });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("HX-Redirect")).toBe("/events");
     expect(deleteCalls.length).toBe(1);
-    const body = await res.text();
-    expect(body).toBe("");
+  });
+  it("deletes a past event", async () => {
+    eventFindFirstResult = makeEvent({ cancelledAt: null, startsAt: new Date("2020-01-01T10:00:00Z"), endsAt: new Date("2020-01-01T11:00:00Z") });
+    expect((await eventRoutes.request("/e1/delete", { method: "POST" })).status).toBe(204);
+  });
+});
+
+describe("event cancel / RSVP access", () => {
+  it("cancel and rsvp management routes need events:manage", async () => {
+    currentUser = { ...currentUser, permissions: new Set() };
+    for (const [m, p] of [["POST", "/e1/cancel"], ["POST", "/e1/uncancel"], ["POST", "/e1/rsvp/m1"], ["POST", "/e1/rsvp/m1/delete"], ["GET", "/e1/rsvp/search?q=ab"]]) {
+      expect((await eventRoutes.request(p, { method: m })).status, p).toBe(403);
+    }
+  });
+  it("rsvp 404s when RSVP is disabled", async () => {
+    eventFindFirstResult = makeEvent({ rsvpEnabled: false });
+    const res = await eventRoutes.request("/e1/rsvp", { method: "POST", body: formBody({ status: "yes" }) });
+    expect(res.status).toBe(404);
+  });
+  it("saves RSVP settings on create", async () => {
+    await eventRoutes.request("/new", {
+      method: "POST",
+      body: formBody({ title: "X", startsAt: "2026-11-15T18:00", endsAt: "2026-11-15T20:00", visibility: "loggedIn", rsvpEnabled: "on", maxParticipants: "5" }),
+    });
+    expect(insertCalls[0].values).toMatchObject({ rsvpEnabled: true, maxParticipants: 5, rsvpDeadline: null });
   });
 });
 
