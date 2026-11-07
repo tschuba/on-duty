@@ -43,6 +43,11 @@ export function validateEnv(): void {
     logger.warn({ orgName }, "ORG_NAME enthält Zeichen, die im Mail-Betreff ersetzt werden (|, [, ], Zeilenumbruch)");
   }
 
+  if (Boolean(process.env.CAP_API_ENDPOINT) !== Boolean(process.env.CAP_SECRET)) {
+    logger.fatal("CAP_API_ENDPOINT and CAP_SECRET must be set together");
+    process.exit(1);
+  }
+
   const tz = process.env.APP_TIMEZONE ?? "Europe/Berlin";
   try {
     new Intl.DateTimeFormat("de-DE", { timeZone: tz });
@@ -75,6 +80,9 @@ export const env = {
   // Pfad zur status.json des Backup-Containers; leer = Überwachung aus
   BACKUP_STATUS_FILE: process.env.BACKUP_STATUS_FILE,
   BACKUP_STATUS_MAX_AGE_HOURS: Number(process.env.BACKUP_STATUS_MAX_AGE_HOURS ?? "26"),
+  // Cap-Captcha für öffentliche Formulare (opt-in); leer = Schutz aus
+  CAP_API_ENDPOINT: process.env.CAP_API_ENDPOINT,
+  CAP_SECRET: process.env.CAP_SECRET,
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_PORT: process.env.SMTP_PORT,
   SMTP_USER: process.env.SMTP_USER,
@@ -106,6 +114,8 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "ADMIN_PASSWORD_MIN_LENGTH", value: env.ADMIN_PASSWORD_MIN_LENGTH },
   { key: "BACKUP_STATUS_FILE",       value: env.BACKUP_STATUS_FILE },
   { key: "BACKUP_STATUS_MAX_AGE_HOURS", value: env.BACKUP_STATUS_MAX_AGE_HOURS },
+  { key: "CAP_API_ENDPOINT",          value: env.CAP_API_ENDPOINT },
+  { key: "CAP_SECRET",                value: env.CAP_SECRET ? "••••••••" : undefined },
   { key: "SMTP_HOST",                 value: env.SMTP_HOST },
   { key: "SMTP_FROM",                 value: env.SMTP_FROM },
   { key: "ERROR_TRACKER_URL",         value: env.ERROR_TRACKER_URL },

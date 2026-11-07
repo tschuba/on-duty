@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.106.0",
+  "version": "0.107.0",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "repository": "github:tschuba/on-duty",
@@ -30,10 +30,12 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs && node scripts/copy-calendar.mjs && node scripts/copy-trix.mjs && node scripts/copy-leaflet.mjs && node scripts/build-browser-sentry.mjs",
+    "postinstall": "node scripts/copy-fonts.mjs && node scripts/copy-htmx.mjs && node scripts/copy-calendar.mjs && node scripts/copy-trix.mjs && node scripts/copy-leaflet.mjs && node scripts/copy-cap.mjs && node scripts/build-browser-sentry.mjs",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
+    "@cap.js/wasm": "0.0.8",
+    "@cap.js/widget": "^0.1.58",
     "@hono/node-server": "^2.1.5",
     "@opentelemetry/api": "^1.10.0",
     "@opentelemetry/core": "^3.0.0",

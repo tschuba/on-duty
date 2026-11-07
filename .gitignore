@@ -15,6 +15,7 @@ data/
 coverage/
 .vitest/
 public/js/sentry.min.js
+public/js/cap/
 public/js/leaflet*.js
 public/js/inventory-map.min.js
 public/js/location-picker.min.js

@@ -8,9 +8,10 @@ import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { isApplicationFormActive } from "../lib/application-forms.js";
+import { verifyCap } from "../lib/cap.js";
 import { sendMail } from "../lib/mail.js";
 import { HTTP_STATUS } from "../lib/constants.js";
-import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
+import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
 
 export const applyRoutes = new Hono();
 
@@ -162,6 +163,7 @@ function MembershipPage({ values, errors }: { values: ApplicantValues; errors: R
           <Honeypot />
           <ApplicantFormFields values={values} errors={errors} />
           <PrivacyNotice />
+          <CapWidget error={errors._cap} />
           <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
         </form>
         <ContactFooter />
@@ -206,6 +208,7 @@ function YouthPage({
             {consentError && <span class="text-error text-sm">{consentError}</span>}
           </div>
           <PrivacyNotice />
+          <CapWidget error={errors._cap} />
           <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
         </form>
         <ContactFooter />
@@ -285,7 +288,9 @@ applyRoutes.post("/", async (c) => {
   const body = await c.req.parseBody();
   if (String(body.website ?? "").trim()) return c.redirect("/apply/success");
 
+  const cap = await verifyCap(body["cap-token"]);
   const { values, errors } = parseApplicantFields(body);
+  if (cap !== "ok") errors._cap = capError(cap);
   if (Object.keys(errors).length > 0) {
     return c.html(<MembershipPage values={values} errors={errors} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
   }
@@ -323,7 +328,9 @@ applyRoutes.post("/youth", async (c) => {
   const body = await c.req.parseBody({ all: true });
   if (String(body.website ?? "").trim()) return c.redirect("/apply/success");
 
+  const cap = await verifyCap(body["cap-token"]);
   const { values, errors } = parseApplicantFields(body);
+  if (cap !== "ok") errors._cap = capError(cap);
   const { rows, rowErrors, hasGuardianError } = parseGuardianRows(body);
   const consentGiven = body.consent === "on";
   if (rows.length === 0) errors._guardians = t("common.required");

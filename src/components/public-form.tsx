@@ -1,5 +1,7 @@
 import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
+import { env } from "../env.js";
+import { capEnabled } from "../lib/cap.js";
 import { loadOrgConfig, privacyMode, isImpressumComplete } from "../lib/org-config.js";
 
 export function Honeypot() {
@@ -10,6 +12,25 @@ export function Honeypot() {
         <input type="text" name="website" tabindex={-1} autocomplete="off" />
       </label>
     </div>
+  );
+}
+
+// Cap-Captcha-Widget (Token landet im Feld `cap-token`); entfällt ohne Konfiguration.
+// Jedes Absenden lädt die Seite neu, daher liefert das Widget automatisch ein frisches Token.
+export function CapWidget({ error }: { error?: string }) {
+  if (!capEnabled()) return <></>;
+  // Widget-Farben aus dem daisyUI-Theme; Breite füllt das Formular.
+  const style = "display:block;--cap-widget-width:100%;--cap-background:var(--color-base-100);--cap-border-color:var(--color-base-300);--cap-border-radius:var(--radius-field);--cap-color:var(--color-base-content);--cap-focus-ring:var(--color-primary)";
+  return (
+    <fieldset class="fieldset p-0" id="cap-field">
+      <legend class="fieldset-legend">{t("cap.label")}<span class="text-error ml-1">*</span></legend>
+      <script dangerouslySetInnerHTML={{ __html: `window.CAP_CUSTOM_WASM_URL="/js/cap/cap_wasm_bg.wasm";window.CAP_CUSTOM_HASHWX_URL="/js/cap/hashwx.wasm";` }} />
+      <script src="/js/cap/cap.min.js" />
+      <cap-widget data-cap-api-endpoint={env.CAP_API_ENDPOINT} data-cap-lang={t("cap.lang")} style={style} />
+      <p id="cap-msg" class={`label text-xs whitespace-normal ${error ? "text-error" : "opacity-70"}`} role={error ? "alert" : undefined}>{error ?? t("cap.hint")}</p>
+      <noscript><p class="text-sm text-error">{t("cap.noscript")}</p></noscript>
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var f=document.getElementById("cap-field").closest("form");f.addEventListener("submit",function(e){var i=f.querySelector('input[name="cap-token"]');if(i&&i.value)return;e.preventDefault();var m=document.getElementById("cap-msg");m.textContent=${JSON.stringify(t("cap.error.pending"))};m.className="label text-xs whitespace-normal text-error";document.getElementById("cap-field").scrollIntoView({block:"center"})})})();` }} />
+    </fieldset>
   );
 }
 
@@ -40,6 +61,10 @@ export async function ContactFooter({ hint, subject, body }: { hint?: string; su
       {c.orgContactEmail && row("envelope", <a class="link" href={`mailto:${c.orgContactEmail}${[subject && `subject=${encodeURIComponent(subject)}`, body && `body=${encodeURIComponent(body)}`].filter(Boolean).map((p, i) => (i ? "&" : "?") + p).join("")}`}>{c.orgContactEmail}</a>)}
     </div>
   );
+}
+
+export function capError(result: "invalid" | "unavailable"): string {
+  return t(result === "invalid" ? "cap.error.invalid" : "cap.error.unavailable");
 }
 
 export function clientIp(c: any): string {
