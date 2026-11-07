@@ -1,5 +1,7 @@
 import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
+import { env } from "../env.js";
+import { capEnabled } from "../lib/cap.js";
 import { loadOrgConfig, privacyMode, isImpressumComplete } from "../lib/org-config.js";
 
 export function Honeypot() {
@@ -9,6 +11,21 @@ export function Honeypot() {
         Website
         <input type="text" name="website" tabindex={-1} autocomplete="off" />
       </label>
+    </div>
+  );
+}
+
+// Cap-Captcha-Widget (Token landet im Feld `cap-token`); entfällt ohne Konfiguration.
+// Jedes Absenden lädt die Seite neu, daher liefert das Widget automatisch ein frisches Token.
+export function CapWidget({ error }: { error?: string }) {
+  if (!capEnabled()) return <></>;
+  return (
+    <div>
+      <script dangerouslySetInnerHTML={{ __html: `window.CAP_CUSTOM_WASM_URL="/js/cap/cap_wasm_bg.wasm";window.CAP_CUSTOM_HASHWX_URL="/js/cap/hashwx.wasm";` }} />
+      <script src="/js/cap/cap.min.js" />
+      <cap-widget data-cap-api-endpoint={env.CAP_API_ENDPOINT} data-cap-lang={t("cap.lang")} />
+      <noscript><p class="text-sm text-error">{t("cap.noscript")}</p></noscript>
+      {error && <p class="text-sm text-error mt-1" role="alert">{error}</p>}
     </div>
   );
 }
@@ -40,6 +57,10 @@ export async function ContactFooter({ hint, subject, body }: { hint?: string; su
       {c.orgContactEmail && row("envelope", <a class="link" href={`mailto:${c.orgContactEmail}${[subject && `subject=${encodeURIComponent(subject)}`, body && `body=${encodeURIComponent(body)}`].filter(Boolean).map((p, i) => (i ? "&" : "?") + p).join("")}`}>{c.orgContactEmail}</a>)}
     </div>
   );
+}
+
+export function capError(result: "invalid" | "unavailable"): string {
+  return t(result === "invalid" ? "cap.error.invalid" : "cap.error.unavailable");
 }
 
 export function clientIp(c: any): string {

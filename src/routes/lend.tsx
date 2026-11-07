@@ -7,10 +7,11 @@ import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader, HeaderAction } from "../components/page-header.js";
 import { Field, EmailInput, PhoneInput } from "../components/field.js";
-import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, clientIp } from "../components/public-form.js";
+import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
+import { verifyCap } from "../lib/cap.js";
 import { sendMail } from "../lib/mail.js";
 import { parseRequestValues, validateRequest, type RequestValues } from "../lib/loan-request.js";
 import { blockedDays, checkAvailability } from "../lib/lending.js";
@@ -87,6 +88,7 @@ function RequestForm({ item, values, errors, maxQuantity }: {
         <textarea name="message" class={`textarea w-full${errors.message ? " textarea-error" : ""}`} rows={3}>{values.message}</textarea>
       </Field>
       <PrivacyNotice />
+      <CapWidget error={errors._cap} />
     </form>
   );
 }
@@ -338,6 +340,7 @@ lendRoutes.post("/:itemId", async (c) => {
   const body = await c.req.parseBody();
   if (String(body.website ?? "").trim()) return c.redirect(`/lend/${item.id}`);
 
+  const cap = await verifyCap(body["cap-token"]);
   const values = parseRequestValues(body);
   const { errors, quantity } = validateRequest(values, { individualTracking: item.individualTracking, timesRequired: item.timesRequired, maxQuantity });
   if (Object.keys(errors).length === 0) {
@@ -353,6 +356,7 @@ lendRoutes.post("/:itemId", async (c) => {
       errors.dates = availability.freeFrom ? t("lend.error.conflictFreeFrom", { time: availability.freeFrom }) : t("lend.error.conflict");
     }
   }
+  if (cap !== "ok") errors._cap = capError(cap);
   if (Object.keys(errors).length > 0) {
     return c.html(<RequestPage item={item} orgName={config.orgName} values={values} errors={errors} maxQuantity={maxQuantity} />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
   }
