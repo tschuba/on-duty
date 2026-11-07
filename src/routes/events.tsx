@@ -479,7 +479,6 @@ function MembersPanel({ invitees }: { invitees: { id: string; name: string }[] }
     <div id="event-members" class="hidden group-has-[:checked]:flex flex-col gap-3 mt-3 pl-8">
       <EntityPicker searchUrl="/events/search-members" placeholder={t("events.form.membersSearch")} />
       <div class="flex flex-wrap items-center gap-1" id="event-member-groups">
-        <span class="text-sm opacity-70 mr-1">{t("events.form.membersAddGroup")}</span>
         {(["active", "youth", "children", "passive", "supporting"] as const).map((st) => (
           <button type="button" class="btn btn-sm btn-outline" data-status={st} data-label={t(`status.${st}`)} disabled>{t(`status.${st}`)}</button>
         ))}
@@ -620,9 +619,13 @@ async function EventForm({ values, errors, invitees, tz }: {
             countEl.textContent = n === 0 ? countEl.dataset.none : (n === 1 ? countEl.dataset.one : countEl.dataset.many.replace('{n}', n));
             document.getElementById('event-member-clear').hidden = n === 0;
             box.querySelectorAll('[data-status]').forEach(function(b) {
-              const open = groups ? groups[b.dataset.status].filter(function(m) { return !has(m.id); }).length : 0;
-              b.disabled = open === 0;
-              b.textContent = '+ ' + b.dataset.label + (groups ? ' (' + open + ')' : '');
+              const all = groups ? groups[b.dataset.status] : [];
+              const open = all.filter(function(m) { return !has(m.id); }).length;
+              const full = all.length > 0 && open === 0;
+              b.dataset.remove = full ? '1' : '';
+              b.disabled = all.length === 0;
+              b.classList.toggle('btn-primary', full); b.classList.toggle('btn-outline', !full);
+              b.textContent = (full ? '× ' : '+ ') + b.dataset.label + (groups ? ' (' + (full ? all.length : open) + ')' : '');
             });
           }
           function addChip(id, name) {
@@ -642,7 +645,14 @@ async function EventForm({ values, errors, invitees, tz }: {
             const root = e.target.closest('[data-picker]'); const clr = root && root.querySelector('.picker-clear'); if (clr) clr.click();
           });
           box.querySelectorAll('[data-status]').forEach(function(b) {
-            b.addEventListener('click', function() { groups[b.dataset.status].forEach(function(m) { addChip(m.id, m.name); }); refresh(); });
+            b.addEventListener('click', function() {
+              const remove = b.dataset.remove === '1';
+              groups[b.dataset.status].forEach(function(m) {
+                if (!remove) addChip(m.id, m.name);
+                else { const c = chips.querySelector('[data-member-chip="' + m.id + '"]'); if (c) c.remove(); }
+              });
+              refresh();
+            });
           });
           function loadGroups() {
             if (groups || !radio.checked) return;

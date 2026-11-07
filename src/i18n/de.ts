@@ -1510,7 +1510,6 @@ export const de = {
   "events.form.visibility.public.warnIndexing": "Suchmaschinen dürfen den Termin indexieren.",
   "events.form.visibility.public.warnPersonal": "Keine personenbezogenen Daten in Titel oder Ort eintragen.",
   "events.form.membersSearch": "Mitglied suchen …",
-  "events.form.membersAddGroup": "Alle hinzufügen:",
   "events.form.membersNone": "Noch niemand eingeladen",
   "events.form.membersCountOne": "1 Mitglied eingeladen",
   "events.form.membersCountMany": "{n} Mitglieder eingeladen",
