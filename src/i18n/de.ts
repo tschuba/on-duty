@@ -1526,6 +1526,7 @@ export const de = {
   "events.form.error.maxParticipants": "Maximale Teilnehmer muss eine ganze Zahl ab 1 sein.",
   "events.form.error.rsvpDeadline": "Anmeldeschluss ist ungültig oder liegt nach dem Beginn.",
   "events.form.rsvp": "Anmeldung",
+  "events.form.rsvpOff": "Mitglieder können sich zu- oder absagen, optional mit Teilnehmerlimit und Anmeldeschluss.",
   "events.form.rsvpEnabled": "Anmeldung aktivieren",
   "events.form.rsvpPublicHint": "Anmelden können sich nur eingeloggte Mitglieder.",
   "events.form.maxParticipants": "Maximale Teilnehmer",

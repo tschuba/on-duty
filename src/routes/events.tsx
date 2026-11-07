@@ -9,6 +9,7 @@ import { Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Icon } from "../components/icon.js";
 import { LocationPicker } from "../components/location-picker.js";
 import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
+import { Section } from "../components/section.js";
 import { RowAction } from "../components/row-action.js";
 import { ChipInput } from "../components/chip-input.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
@@ -613,15 +614,14 @@ async function EventForm({ values, errors, invitees, tz }: {
         </div>
       </FieldGroup>
 
-      <section class="group/rsvp border-t border-base-300 pt-4 space-y-3" aria-labelledby="event-rsvp-heading">
-        <div class="flex items-center justify-between gap-3">
-          <h2 id="event-rsvp-heading" class="text-lg font-semibold">{t("events.form.rsvp")}</h2>
-          <label class="label cursor-pointer gap-2 pointer-coarse:min-h-11">
-            <span>{t("events.form.rsvpEnabled")}</span>
-            <input type="checkbox" name="rsvpEnabled" checked={values.rsvpEnabled} class="toggle toggle-primary" />
-          </label>
-        </div>
-        <p class="hidden group-has-[#event-visibility-public:checked]/ev:group-has-[input[name=rsvpEnabled]:checked]/rsvp:block text-sm opacity-70">{t("events.form.rsvpPublicHint")}</p>
+      <Section title={t("events.form.rsvp")} collapsible={false} class="group/rsvp" actions={
+        <label class="label cursor-pointer gap-2 text-base-content pointer-coarse:min-h-11">
+          <span>{t("events.form.rsvpEnabled")}</span>
+          <input type="checkbox" name="rsvpEnabled" checked={values.rsvpEnabled} class="toggle toggle-primary" />
+        </label>
+      }>
+        <p class="group-has-[input[name=rsvpEnabled]:checked]/rsvp:hidden text-sm opacity-70">{t("events.form.rsvpOff")}</p>
+        <p class="hidden group-has-[#event-visibility-public:checked]/ev:group-has-[input[name=rsvpEnabled]:checked]/rsvp:block text-sm opacity-70 mb-3">{t("events.form.rsvpPublicHint")}</p>
         <div class="hidden group-has-[input[name=rsvpEnabled]:checked]/rsvp:grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label={t("events.form.maxParticipants")} floating={false} hint={t("events.form.maxParticipantsHint")} after={errors.maxParticipants && <span class="text-error text-sm">{errors.maxParticipants}</span>}>
             <input type="number" name="maxParticipants" min="1" step="1" value={values.maxParticipants} class={`input w-full${errors.maxParticipants ? " input-error" : ""}`} />
@@ -631,7 +631,7 @@ async function EventForm({ values, errors, invitees, tz }: {
             <p class="text-xs opacity-70 mt-1" data-local-hint="event-rsvp-deadline" hidden></p>
           </Field>
         </div>
-      </section>
+      </Section>
 
       <LocalTimes tz={tz} />
       <script dangerouslySetInnerHTML={{ __html: `
