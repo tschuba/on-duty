@@ -81,7 +81,7 @@ describe("migration 0077 backfill", () => {
     expect(sql).toContain(`SET "visibility" = 'members' WHERE "visibility" = 'roles'`);
     expect(sql.indexOf("INSERT")).toBeLessThan(sql.indexOf("UPDATE"));
   });
-  it("adds the enum value in a separate earlier migration", () => {
-    expect(readFileSync("drizzle/0075_ambitious_reavers.sql", "utf8")).toContain("ADD VALUE 'members'");
+  it("adds the enum value by recreating the type (ADD VALUE would be unusable in the backfill's transaction)", () => {
+    expect(readFileSync("drizzle/0075_ambitious_reavers.sql", "utf8")).toContain("'roles', 'members'");
   });
 });
