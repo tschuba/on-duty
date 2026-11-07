@@ -18,7 +18,7 @@ const { entries } = JSON.parse(readFileSync(join(dir, "meta/_journal.json"), "ut
 // 0074 (#146) likewise: prod already applied 0072 (created_at 1794600000008), so a real clock value would be skipped silently.
 // 0075-0077 (#149) likewise: prod already applied 0074 (created_at 1794600000010).
 // 0078 (RSVP) likewise: prod already applied 0077 (created_at 1794600000013).
-const LEGACY_MAX_IDX = 78;
+const LEGACY_MAX_IDX = 79;
 
 describe("drizzle journal", () => {
   it("has gapless idx and a SQL file per tag", () => {

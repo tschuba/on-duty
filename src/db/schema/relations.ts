@@ -7,7 +7,7 @@ import { users } from "./auth";
 import { applications, applicationGuardians } from "./applications";
 import { inventoryItems, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryItemAssignments, inventoryFieldDefs, inventoryFieldValues, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryTemplates, inventoryTemplateFieldDefs, inventoryTemplateInspections } from "./inventory";
 import { lendingItems, lendingLoans, loanRequests } from "./lending";
-import { events, eventTags, eventVisibleRoles, eventInvitees, eventRsvps } from "./events";
+import { events, eventTags, eventInvitees, eventRsvps } from "./events";
 import { appRoles } from "./permissions";
 import { trainingRecords } from "./training";
 
@@ -132,7 +132,6 @@ export const rolesRelations = relations(memberRoles, ({ many }) => ({
 
 export const eventsRelations = relations(events, ({ many }) => ({
   tags: many(eventTags),
-  visibleRoles: many(eventVisibleRoles),
   invitees: many(eventInvitees),
   rsvps: many(eventRsvps),
 }));
@@ -151,10 +150,6 @@ export const eventTagsRelations = relations(eventTags, ({ one }) => ({
   event: one(events, { fields: [eventTags.eventId], references: [events.id] }),
 }));
 
-export const eventVisibleRolesRelations = relations(eventVisibleRoles, ({ one }) => ({
-  event: one(events, { fields: [eventVisibleRoles.eventId], references: [events.id] }),
-  role: one(appRoles, { fields: [eventVisibleRoles.roleId], references: [appRoles.id] }),
-}));
 /* v8 ignore stop */
 
 export const loanRequestsRelations = relations(loanRequests, ({ one }) => ({
