@@ -48,7 +48,7 @@ function makeDelete() {
 const insert = makeInsert();
 const update = makeUpdate();
 const del = makeDelete();
-const transaction = vi.fn(async (cb: any) => cb({ insert, update, delete: del }));
+const transaction = vi.fn(async (cb: any) => cb({ insert, update, delete: del, select: vi.fn(() => selectChain([])) }));
 
 // select() chain used by eventTagVocabulary (select({tag}).from(eventTags).innerJoin(events).where(...))
 // and loadRoles (select({id,name}).from(appRoles).orderBy(...)) — same thenable chain covers both.
