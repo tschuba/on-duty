@@ -19,14 +19,18 @@ export function Honeypot() {
 // Jedes Absenden lädt die Seite neu, daher liefert das Widget automatisch ein frisches Token.
 export function CapWidget({ error }: { error?: string }) {
   if (!capEnabled()) return <></>;
+  // Widget-Farben aus dem daisyUI-Theme; Breite füllt das Formular.
+  const style = "display:block;--cap-widget-width:100%;--cap-background:var(--color-base-100);--cap-border-color:var(--color-base-300);--cap-border-radius:var(--radius-field);--cap-color:var(--color-base-content);--cap-focus-ring:var(--color-primary)";
   return (
-    <div>
+    <fieldset class="fieldset p-0" id="cap-field">
+      <legend class="fieldset-legend">{t("cap.label")}<span class="text-error ml-1">*</span></legend>
       <script dangerouslySetInnerHTML={{ __html: `window.CAP_CUSTOM_WASM_URL="/js/cap/cap_wasm_bg.wasm";window.CAP_CUSTOM_HASHWX_URL="/js/cap/hashwx.wasm";` }} />
       <script src="/js/cap/cap.min.js" />
-      <cap-widget data-cap-api-endpoint={env.CAP_API_ENDPOINT} data-cap-lang={t("cap.lang")} />
+      <cap-widget data-cap-api-endpoint={env.CAP_API_ENDPOINT} data-cap-lang={t("cap.lang")} style={style} />
+      <p id="cap-msg" class={`label text-xs whitespace-normal ${error ? "text-error" : "opacity-70"}`} role={error ? "alert" : undefined}>{error ?? t("cap.hint")}</p>
       <noscript><p class="text-sm text-error">{t("cap.noscript")}</p></noscript>
-      {error && <p class="text-sm text-error mt-1" role="alert">{error}</p>}
-    </div>
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var f=document.getElementById("cap-field").closest("form");f.addEventListener("submit",function(e){var i=f.querySelector('input[name="cap-token"]');if(i&&i.value)return;e.preventDefault();var m=document.getElementById("cap-msg");m.textContent=${JSON.stringify(t("cap.error.pending"))};m.className="label text-xs whitespace-normal text-error";document.getElementById("cap-field").scrollIntoView({block:"center"})})})();` }} />
+    </fieldset>
   );
 }
 
