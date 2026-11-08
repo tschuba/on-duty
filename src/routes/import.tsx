@@ -482,7 +482,7 @@ const COMBO_SCRIPT = `
 (() => {
   const opts = [...document.querySelectorAll("#role-options option")];
   document.querySelectorAll("input[data-combo]").forEach((inp) => {
-    const hidden = inp.nextElementSibling; let prev = inp.value;
+    const box = inp.closest("label"); const hidden = box.nextElementSibling; let prev = inp.value;
     // Beim Fokus leeren, sonst zeigt die Liste nur den aktuellen Treffer.
     inp.addEventListener("focus", () => { prev = inp.value; inp.value = ""; });
     const commit = () => {
@@ -491,6 +491,8 @@ const COMBO_SCRIPT = `
       prev = inp.value;
       if (hidden.value !== o.dataset.id) { hidden.value = o.dataset.id; hidden.dispatchEvent(new Event("change", { bubbles: true })); }
     };
+    // Klick aufs Chevron: Liste öffnen (Chrome öffnet die datalist sonst nur per Klick ins Feld).
+    box.addEventListener("click", (e) => { if (e.target !== inp && !inp.disabled) { inp.focus(); try { inp.showPicker(); } catch {} } });
     inp.addEventListener("change", commit);
     inp.addEventListener("blur", () => { inp.value ? commit() : (inp.value = prev); });
   });
