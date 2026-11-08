@@ -69,7 +69,11 @@ describe("import routes", () => {
   });
   it("renders the role mapping as a bordered combo with chevron and aria-label", async () => {
     const html = await (await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "active", Funktionen: "Kassier" }]))).text();
-    expect(html).toContain('<label class="input input-sm w-56');
+    expect(html).toContain('class="input input-sm w-56');
+    expect(html).not.toContain("<th>Art</th>");
+    expect(html).toContain("<th colspan=\"5\" class=\"bg-base-200 text-left\">Funktionen</th>");
+    expect(html).not.toContain(">Dienstgrade</th>"); // leere Gruppe entfällt
+    expect(html).toContain('name="type_0"'); // „neu“ → Funktionstyp-Auswahl
     expect(html).toContain('aria-label="Kassier – Zuordnung"');
     expect(html).toContain("Zuordnung kann geändert werden");
   });
