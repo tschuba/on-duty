@@ -147,14 +147,15 @@ async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer;
 function RoleCombo({ name, value, roles, disabled, suggested, label: fwTitle }: { name: string; value: string; roles: RoleOption[]; disabled?: boolean; suggested?: boolean; label: string }) {
   const label = value === "new" ? t("import.option.new") : roles.find((r) => r.id === value)?.title ?? "";
   return (
-    <div class="relative inline-block">
-      <input type="text" list="role-options" data-combo value={label} disabled={disabled} autocomplete="off" placeholder={t("import.option.search")}
-        aria-label={`${fwTitle} – ${t("import.col.mapping")}`}
-        class={`input input-sm w-56 pr-8 pointer-coarse:min-h-11 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
-        title={suggested ? t("import.role.suggestedHint") : undefined} />
-      <Icon name="chevron-down" class="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-60" />
+    <>
+      <label class={`input input-sm w-56 items-center gap-1 pointer-coarse:min-h-11 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
+        title={suggested ? t("import.role.suggestedHint") : undefined}>
+        <input type="text" list="role-options" data-combo value={label} disabled={disabled} autocomplete="off" placeholder={t("import.option.search")}
+          aria-label={`${fwTitle} – ${t("import.col.mapping")}`} class="grow min-w-0" />
+        <Icon name="chevron-down" class="pointer-events-none h-4 w-4 shrink-0 opacity-60" />
+      </label>
       <input type="hidden" name={name} value={value} disabled={disabled} />
-    </div>
+    </>
   );
 }
 
