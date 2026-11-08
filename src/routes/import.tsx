@@ -9,6 +9,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
+import { Icon } from "../components/icon.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { TagSuggestions } from "./inventory.js";
@@ -143,15 +144,17 @@ async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer;
 }
 
 // Durchsuchbare Rollenauswahl: sichtbares Textfeld mit <datalist>, die ID steckt im Hidden-Feld.
-function RoleCombo({ name, value, roles, disabled, suggested }: { name: string; value: string; roles: RoleOption[]; disabled?: boolean; suggested?: boolean }) {
+function RoleCombo({ name, value, roles, disabled, suggested, label: fwTitle }: { name: string; value: string; roles: RoleOption[]; disabled?: boolean; suggested?: boolean; label: string }) {
   const label = value === "new" ? t("import.option.new") : roles.find((r) => r.id === value)?.title ?? "";
   return (
-    <>
+    <div class="relative inline-block">
       <input type="text" list="role-options" data-combo value={label} disabled={disabled} autocomplete="off" placeholder={t("import.option.search")}
-        class={`input-sm w-56 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
+        aria-label={`${fwTitle} – ${t("import.col.mapping")}`}
+        class={`input input-sm w-56 pr-8 pointer-coarse:min-h-11 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
         title={suggested ? t("import.role.suggestedHint") : undefined} />
+      <Icon name="chevron-down" class="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-60" />
       <input type="hidden" name={name} value={value} disabled={disabled} />
-    </>
+    </div>
   );
 }
 
@@ -176,13 +179,13 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
       <Section title={t("import.titles.heading")} badge={plan.titles.length} tone={newCount ? "warning" : undefined} open={newCount > 0}>
         {plan.titles.length === 0 ? <p class="opacity-60">{t("import.titles.none")}</p> : (
           <table class="table table-zebra w-full">
-            <thead><tr><th>{t("import.col.fwportal")}</th><th>{t("import.col.kind")}</th><th>{t("import.col.count")}</th><th>{t("import.col.mapping")}</th><th>{t("import.col.grantsActive")}</th><th>{t("import.col.use")}</th></tr></thead>
+            <thead><tr><th>{t("import.col.fwportal")}</th><th>{t("import.col.kind")}</th><th>{t("import.col.count")}</th><th title={t("import.col.mapping.hint")}>{t("import.col.mapping")}</th><th>{t("import.col.grantsActive")}</th><th>{t("import.col.use")}</th></tr></thead>
             <tbody>
               {plan.titles.map((d, i) => (
                 <tr>
                   <td>{d.title}</td><td>{d.kind === "rank" ? t("import.kind.rank") : t("import.kind.function")}</td><td>{d.count}</td>
                   <td>
-                    <RoleCombo name={`map_${i}`} value={d.choice.kind === "new" ? "new" : (d.choice as { roleId: string }).roleId} roles={roles} disabled={d.ignored} />
+                    <RoleCombo name={`map_${i}`} value={d.choice.kind === "new" ? "new" : (d.choice as { roleId: string }).roleId} roles={roles} disabled={d.ignored} label={d.title} />
                   </td>
                   <td>{d.choice.kind === "new" && !d.ignored ? <label class="flex w-full items-center pointer-coarse:min-h-11"><input type="checkbox" name={`grants_${i}`} value="1" class="checkbox checkbox-sm" checked={d.grants} /></label> : "–"}</td>
                   <td><input type="checkbox" name={`use_${i}`} value="1" class="toggle toggle-sm" checked={!d.ignored} /></td>
@@ -207,8 +210,8 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
             {plan.rows.map(({ m, included, duplicate, errors, warnings, assignments }) => (
               <tr data-problem={errors.length || warnings.length ? "1" : undefined} class={duplicate ? "opacity-50 italic" : undefined}>
                                 <td>{m.lastName}, {m.firstName}</td>
-                <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input-sm" />}</td>
-                <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input-sm" />}</td>
+                <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input input-sm" />}</td>
+                <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input input-sm" />}</td>
                 <td class="text-sm">
                   {[[m.street, m.houseNumber].filter(Boolean).join(" "), [m.zip, m.city].filter(Boolean).join(" ")].filter(Boolean).map((v) => <div>{v}</div>)}
                 </td>
@@ -247,11 +250,11 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                 <td>{m.lastName}, {m.firstName}</td>
                 <td>{a.key === "a" ? <span class="badge badge-info badge-sm" title={t("import.badge.baseRoleHint")}>{t("import.badge.baseRole")}</span> : a.title}</td>
                 <td>
-                  <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} suggested={a.suggested} />
+                  <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} suggested={a.suggested} label={a.key === "a" ? t("import.badge.baseRole") : a.title} />
                 </td>
-                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input-sm" disabled={a.skipped} /></td>
+                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input input-sm" disabled={a.skipped} /></td>
                 <td>
-                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from ?? ""} class="input-sm" disabled={a.skipped} />
+                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from ?? ""} class="input input-sm" disabled={a.skipped} />
                   {!a.from && !a.skipped && <FromMissingBadge />}
                   {a.assumed && <span class="badge badge-warning badge-sm ml-1">{t("import.badge.assumed")}</span>}
                 </td>
