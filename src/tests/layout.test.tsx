@@ -22,9 +22,13 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
+let pendingRsvps = 0;
+vi.mock("../lib/events.js", () => ({ countPendingRsvps: async () => pendingRsvps }));
+
 const { Layout } = await import("../components/layout.js");
 
 beforeEach(() => {
+  pendingRsvps = 0;
   openApplicationsFixture = [];
   openDonationsFixture = [];
 });

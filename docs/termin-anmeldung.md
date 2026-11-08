@@ -44,6 +44,10 @@ Tabelle aller Eingeladenen und Antwortenden, sortierbar nach Name oder Antwort, 
 
 Antworten hängen an `members.id` und werden beim Löschen des Mitglieds oder Termins mitgelöscht (Cascade). Es gibt keine Notiz und keine Mails.
 
+## Hinweis auf offene Rückmeldungen
+
+Ausstehend ist ein Termin, wenn das verknüpfte aktive Mitglied eingeladen ist, die Anmeldung aktiv und der Termin nicht abgesagt ist, der Anmeldeschluss (sonst der Beginn) noch nicht verstrichen ist und noch keine Antwort vorliegt. `countPendingRsvps` (`src/lib/events.ts`) zählt diese Termine. Der Zähler erscheint als Badge am Nav-Eintrag „Termine“, in der Liste markiert ein Badge „Antwort offen“ den Termin. Gezählt wird nur für sich selbst, auch für die Führung; ohne aktives Mitglied 0.
+
 ## Nicht enthalten
 
 Anwesenheit, Ausbildungseintrag aus Terminen, Erinnerungs-Mails, Warteliste.

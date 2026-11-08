@@ -1,4 +1,4 @@
-import { and, asc, eq, exists, gte, inArray, isNull, lt, notExists, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, gt, exists, gte, inArray, isNull, lt, notExists, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events, eventTags, eventInvitees, eventRsvps, members, persons } from "../db/schema/index.js";
 import { trimmed, parseTags } from "./forms.js";
@@ -220,6 +220,24 @@ export async function loadRsvpSummaries(eventIds: string[], memberId: string | u
     if (r.memberId === memberId) s.mine = r.status;
   }
   return out;
+}
+
+// Offene Rückmeldungen des Logins: gleiche Definition wie RsvpLine (eingeladen, beantwortbar, keine Zeile). Ohne aktives Mitglied 0.
+export async function countPendingRsvps(userId: string): Promise<number> {
+  const member = await memberForUser(userId);
+  if (!member || !isActiveMember(member)) return 0;
+  const at = now();
+  const [row] = await db.select({ n: count() }).from(events).where(and(
+    eq(events.rsvpEnabled, true), isNull(events.cancelledAt),
+    gt(events.startsAt, at), gt(sql`coalesce(${events.rsvpDeadline}, ${events.startsAt})`, at),
+    or(
+      inArray(events.visibility, ["public", "loggedIn"]),
+      and(eq(events.visibility, "members"), exists(db.select({ x: eventInvitees.eventId }).from(eventInvitees)
+        .where(and(eq(eventInvitees.eventId, events.id), eq(eventInvitees.memberId, member.id))))),
+    ),
+    notExists(db.select({ x: eventRsvps.eventId }).from(eventRsvps).where(and(eq(eventRsvps.eventId, events.id), eq(eventRsvps.memberId, member.id)))),
+  ));
+  return Number(row?.n ?? 0);
 }
 
 export type SetRsvpResult = "ok" | "cancelled" | "deadline" | "full" | "notFound";
