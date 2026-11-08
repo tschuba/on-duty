@@ -5,7 +5,7 @@ export type FilterOption = { value: string; label: string; dim?: boolean; hint?:
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
 // autoApply: Schließen navigiert (page=1). Sonst gehören die Checkboxen (name=param)
 // zu einem umgebenden <form method="get">, das beim Schließen mit geänderter Auswahl abgeschickt wird. UND/ODER entscheidet die Route.
-export function MultiSelectFilter({ param, options, selected, allLabel, countLabel, applyLabel, resetLabel, searchPlaceholder, emptyLabel, searchable = false, autoApply = false, labelOverride, unusedToggle }: {
+export function MultiSelectFilter({ param, options, selected, allLabel, countLabel, applyLabel, resetLabel, searchPlaceholder, emptyLabel, searchable = false, autoApply = false, labelOverride, unusedToggle, single, ariaLabel, tone, disabled }: {
   param: string;
   options: FilterOption[];
   selected: string[];
@@ -20,6 +20,11 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
   labelOverride?: string;
   // Blendet Optionen mit unused=true clientseitig aus; Zustand in localStorage[storageKey].
   unusedToggle?: { label: string; storageKey: string };
+  // Einfachauswahl für Formulare: Wert steckt in einem Hidden-Feld (name=param), Radios haben bewusst keinen name; Auswahl schließt und feuert `change`.
+  single?: boolean;
+  ariaLabel?: string;
+  tone?: "warning" | "info";
+  disabled?: boolean;
 }) {
   const id = `msf-${param}`;
   const label = labelOverride ?? (selected.length === 0
@@ -29,8 +34,18 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
     : countLabel(selected.length));
 
   return (
-    <div class="msf inline-block" data-msf-param={param} data-msf-auto={autoApply ? "1" : undefined}>
-      <button type="button" class="btn btn-ghost m-0" popovertarget={id}>{label} ▾</button>
+    <div class="msf inline-block" data-msf-param={param} data-msf-auto={autoApply ? "1" : undefined} data-msf-single={single ? "1" : undefined}>
+      {single ? (
+        <>
+          <button type="button" class={`input input-sm w-56 items-center gap-1 m-0 pointer-coarse:min-h-11 ${tone ? `input-${tone}` : ""}`} popovertarget={id} aria-label={ariaLabel} disabled={disabled}>
+            <span class="grow min-w-0 truncate text-left" data-msf-label>{label}</span>
+            <Icon name="chevron-down" class="pointer-events-none h-4 w-4 shrink-0 opacity-60" />
+          </button>
+          <input type="hidden" name={param} value={selected[0] ?? ""} disabled={disabled} />
+        </>
+      ) : (
+        <button type="button" class="btn btn-ghost m-0" popovertarget={id}>{label} ▾</button>
+      )}
       <div id={id} popover="auto" class="msf-panel bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 m-0">
         {searchable && (
           <label class="input flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
@@ -47,7 +62,9 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             )}
             <li key={o.value} data-title={o.label.toLowerCase()} data-unused={o.unused && !selected.includes(o.value) ? "1" : undefined}>
               <label class={`flex items-center gap-2 px-2 py-1 min-h-11 rounded cursor-pointer hover:bg-base-200${o.dim ? " opacity-50" : ""}`}>
-                <input type="checkbox" class="checkbox checkbox-sm" name={param} value={o.value} checked={selected.includes(o.value)} />
+                {single
+                  ? <input type="radio" class="radio radio-sm" value={o.value} checked={selected.includes(o.value)} data-msf-radio />
+                  : <input type="checkbox" class="checkbox checkbox-sm" name={param} value={o.value} checked={selected.includes(o.value)} />}
                 {o.icon && <Icon name={o.icon} class="w-4 h-4" />}
                 <span class="text-sm flex-1">{o.label}</span>
                 {o.hint && <span class="text-xs opacity-60">{o.hint}</span>}
@@ -56,12 +73,12 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             </>
           ))}
         </ul>
-        <div class="flex gap-1 mt-2">
+        {!single && <div class="flex gap-1 mt-2">
           <button type="button" class="btn btn-primary flex-1" popovertarget={id} popovertargetaction="hide">{applyLabel}</button>
           {selected.length > 0 && (
             <button type="button" class="btn btn-ghost" data-msf-reset popovertarget={id} popovertargetaction="hide">{resetLabel}</button>
           )}
-        </div>
+        </div>}
       </div>
       {unusedToggle && (
         <script dangerouslySetInnerHTML={{ __html: `
@@ -104,6 +121,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
               p.style.left = Math.max(4, Math.min(r.left, window.innerWidth - p.offsetWidth - 4)) + 'px';
               return;
             }
+            if (root.dataset.msfSingle) return;
             if (!root.dataset.msfAuto) {
               var form = root.closest('form');
               if (form && q(p, 'input[type=checkbox]').some(function(c) { return c.checked !== c.defaultChecked; })) form.requestSubmit();
@@ -128,18 +146,27 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
             var v = e.target.value.toLowerCase();
             q(e.target.closest('.msf-panel'), 'li[data-title]').forEach(function(li) { li.hidden = !li.dataset.title.includes(v); });
           });
+          document.addEventListener('change', function(e) {
+            if (!e.target.matches('[data-msf-radio]')) return;
+            var root = e.target.closest('.msf'), h = root.querySelector('input[type=hidden]');
+            h.value = e.target.value;
+            q(root, '[data-msf-radio]').forEach(function(r) { r.checked = r === e.target; });
+            root.querySelector('[data-msf-label]').textContent = e.target.closest('label').querySelector('span').textContent;
+            e.target.closest('.msf-panel').hidePopover();
+            h.dispatchEvent(new Event('change', { bubbles: true }));
+          });
           document.addEventListener('keydown', function(e) {
-            var cb = e.target.closest && e.target.closest('.msf-panel input[type=checkbox]');
+            var cb = e.target.closest && e.target.closest('.msf-panel input[type=checkbox], .msf-panel input[type=radio]');
             if (!cb) return;
             var panel = cb.closest('.msf-panel');
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault();
-              var vis = q(panel, 'li:not([hidden]) input[type=checkbox]').filter(function(c) { return c.offsetParent !== null; });
+              var vis = q(panel, 'li:not([hidden]) input[type=checkbox], li:not([hidden]) input[type=radio]').filter(function(c) { return c.offsetParent !== null; });
               var n = vis.indexOf(cb) + (e.key === 'ArrowDown' ? 1 : -1);
               if (n >= 0 && n < vis.length) vis[n].focus();
             } else if (e.key === 'Enter') {
               e.preventDefault();
-              panel.hidePopover();
+              if (cb.type === 'radio') cb.click(); else panel.hidePopover();
             }
           });
         }

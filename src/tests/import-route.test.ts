@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import * as XLSX from "xlsx";
 
 // Jede Abfragekette ist awaitbar und liefert eine leere Liste.
+const state = vi.hoisted(() => ({ roles: [] as any[], types: [] as any[], inserts: [] as any[] }));
 vi.mock("../db/index.js", () => {
   const chain: any = new Proxy(() => {}, {
     get: (_t, k) => (k === "then" ? (r: any) => r([]) : chain),
@@ -16,7 +17,10 @@ vi.mock("../db/index.js", () => {
     { id: "t-geraet", name: "Gerät", enabledFields: ["quantity", "numbers", "serials"] },
     { id: "t-sonst", name: "Sonstiges", enabledFields: ["quantity"] },
   ];
-  return { db: { select: () => chain, query: { inventoryTemplates: { findMany: async () => [...templates] } }, transaction: async (fn: any) => fn({ insert: () => txChain, select: () => txChain }) } };
+  const rows = (data: () => any[]): any => new Proxy(() => {}, { get: (_t, k) => (k === "then" ? (r: any) => r(data()) : rows(data)), apply: () => rows(data) });
+  const insertChain = { values: (v: any) => { state.inserts.push(v); return txChain; } };
+  const select = (f?: any) => (f && "typeName" in f ? rows(() => state.roles) : f && "allowsActiveStatus" in f && !("typeName" in f) ? rows(() => state.types) : chain);
+  return { db: { select, query: { inventoryTemplates: { findMany: async () => [...templates] } }, transaction: async (fn: any) => fn({ insert: () => insertChain, select: () => txChain }) } };
 });
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -69,7 +73,11 @@ describe("import routes", () => {
   });
   it("renders the role mapping as a bordered combo with chevron and aria-label", async () => {
     const html = await (await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "active", Funktionen: "Kassier" }]))).text();
-    expect(html).toContain('<label class="input input-sm w-56');
+    expect(html).toContain('class="input input-sm w-56');
+    expect(html).not.toContain("<th>Art</th>");
+    expect(html).toContain("<th colspan=\"5\" class=\"bg-base-200 text-left\">Funktionen</th>");
+    expect(html).not.toContain(">Dienstgrade</th>"); // leere Gruppe entfällt
+    expect(html).toContain('name="type_0"'); // „neu“ → Funktionstyp-Auswahl
     expect(html).toContain('aria-label="Kassier – Zuordnung"');
     expect(html).toContain("Zuordnung kann geändert werden");
   });
@@ -182,5 +190,54 @@ describe("import routes", () => {
       const res = await post(path, fd);
       expect(res.status).toBe(200);
     }
+  });
+
+  describe("role mapping with known roles", () => {
+    const T = { rank: "ty-rank", pos: "ty-pos", club: "ty-club" };
+    const types = [
+      { id: T.rank, name: "Dienstgrad", sortOrder: 1, allowsActiveStatus: true },
+      { id: T.pos, name: "Dienststellung", sortOrder: 2, allowsActiveStatus: true },
+      { id: T.club, name: "Verein", sortOrder: 3, allowsActiveStatus: false },
+    ];
+    const role = (id: string, title: string, grantsActiveStatus: boolean, ty: typeof types[number]) => ({ id, title, grantsActiveStatus, typeId: ty.id, typeName: ty.name, typeSortOrder: ty.sortOrder, typeAllowsActive: ty.allowsActiveStatus });
+    const withRoles = () => { state.types = types; state.roles = [role("r-k", "Kommandant", true, types[1]), role("r-v", "Vorstand", false, types[2])]; state.inserts = []; };
+    const member = (extra: Record<string, unknown>) => ({ mID: 1, Name: "Muster", Vorname: "Max", Status: "Passiv", Geburtstag: "01.02.1990", Eintritt: "01.01.2010", ...extra });
+    const withFields = (fd: FormData, f: Record<string, string>) => { for (const [k, v] of Object.entries(f)) fd.set(k, v); return fd; };
+
+    it("shows Ja/Nein for existing roles and a checkbox for new ones", async () => {
+      withRoles();
+      const html = await (await post("/preview", upload(MEMBER_HEAD, [member({ Funktionen: "Kommandant, Vorstand, Kassier" })]))).text();
+      expect(html).toMatch(/<span title="Macht aktiv">Ja<\/span>/);
+      expect(html).toMatch(/<span title="Macht aktiv">Nein<\/span>/);
+      expect(html).toContain('name="grants_0"'); // Kassier (Index 0) = neu
+    });
+    it("offers pending new functions but no 'new' option in the member assignment list", async () => {
+      withRoles();
+      const html = await (await post("/preview", upload(MEMBER_HEAD, [member({ Funktionen: "Kassier" })]))).text();
+      const [titles, assignments] = html.split('id="assignments"');
+      expect(titles).toContain("＋ Neue Rolle anlegen");
+      expect(assignments).not.toContain("＋ Neue Rolle anlegen");
+      expect(assignments).toContain('name="arole_1_0"');
+      expect(assignments).toContain('value="new:0"');
+      expect(assignments).toContain(">neu</span>");
+      expect(assignments).toContain('<li class="text-xs font-semibold opacity-60 px-2 pt-2" data-msf-group="true">Dienststellung</li>');
+    });
+    it("disables 'Macht aktiv' when the chosen type does not allow active status", async () => {
+      withRoles();
+      const html = await (await post("/preview", withFields(upload(MEMBER_HEAD, [member({ Funktionen: "Kassier" })]), { _seen: "1", inc: "1", use_0: "1", ause_1_0: "1", type_0: T.club, grants_0: "1" }))).text();
+      expect(html).toMatch(/name="grants_0"[^>]*disabled/);
+      expect(html).not.toMatch(/name="grants_0"[^>]*checked/);
+    });
+    it("creates a new role with the chosen type on run", async () => {
+      withRoles();
+      const res = await post("/run", withFields(upload(MEMBER_HEAD, [member({ Funktionen: "Kassier" })]), { intent: "run", _seen: "1", inc: "1", use_0: "1", ause_1_0: "1", type_0: T.club }));
+      expect(res.status).toBe(200);
+      expect(state.inserts).toContainEqual(expect.objectContaining({ title: "Kassier", typeId: T.club, grantsActiveStatus: false }));
+    });
+    it("run keeps grantsActiveStatus for a type that allows it", async () => {
+      withRoles();
+      await post("/run", withFields(upload(MEMBER_HEAD, [member({ Funktionen: "Kassier" })]), { intent: "run", _seen: "1", inc: "1", use_0: "1", ause_1_0: "1", type_0: T.pos, grants_0: "1" }));
+      expect(state.inserts).toContainEqual(expect.objectContaining({ title: "Kassier", typeId: T.pos, grantsActiveStatus: true }));
+    });
   });
 });
