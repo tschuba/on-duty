@@ -61,6 +61,12 @@ describe("import routes", () => {
     expect(html).toContain("data-only-problems");
     expect(html).toContain("<th>Hinweise</th>");
   });
+  it("shows no assignment banner and an empty hint without assignments; member badge has both counts", async () => {
+    const html = await (await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "active", Geburtstag: "01.02.1990", Eintritt: "01.01.2010" }]))).text();
+    expect(html).toContain("Keine Funktionszuweisungen zu übernehmen.");
+    expect(html).not.toContain("alert-warning");
+    expect(html).toContain("1 · 1 übernommen");
+  });
   it("previews an inventory list", async () => {
     const res = await post("/preview", upload(INV_HEAD, [
       { InventarID: 1, "Inventartyp (Voll)": "Schlauch", Bezeichnung: "B-Schlauch", "Inventarnr.": "A1", "Standort (komplett)": "Auto", Indienststellung: 42000 },
@@ -127,6 +133,12 @@ describe("import routes", () => {
       const res = await post("/preview", fd);
       expect(res.status).toBe(200);
     }
+  });
+  it("shows banner and checkbox when assignments carry assumed dates", async () => {
+    const html = await (await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, ...full }]))).text();
+    expect(html).toContain("alert-warning");
+    expect(html).toContain('name="assumed_ok"');
+    expect(html).not.toContain("Keine Funktionszuweisungen zu übernehmen.");
   });
   it("previews inventory with overrides", async () => {
     const rows = [

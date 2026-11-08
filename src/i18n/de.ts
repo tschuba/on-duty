@@ -1327,6 +1327,7 @@ export const de = {
   // ── Import (fwportal) ───────────────────────────────────────────────────────
   "import.assignments.assumedHint": "fwportal liefert keinen Funktionsbeginn. Die Daten mit Badge „angenommen“ sind eine Annahme (Vorbelegung = Importdatum bzw. Eintritt) und sollten geprüft werden.",
   "import.assignments.confirm": "Funktionsbeginn geprüft ({count} angenommene Werte)",
+  "import.assignments.none": "Keine Funktionszuweisungen zu übernehmen.",
   "import.assignments.heading": "Funktionszuweisungen",
   "import.backupHint": "Vor dem Import bitte ein Backup erstellen (Admin → Backup). Der Import legt nur neue Datensätze an, bestehende werden nicht überschrieben.",
   "import.badge.assumed": "angenommen",
@@ -1420,6 +1421,7 @@ export const de = {
   "import.titles.heading": "Funktionen & Dienstgrade",
   "import.titles.none": "Keine Funktionen oder Dienstgrade in der Datei.",
   "import.upload.submit": "Vorschau",
+  "import.members.badge": "{total} · {included} übernommen",
   "import.members.title": "Mitglieder",
   "import.members.onlyProblems": "Nur Zeilen mit Hinweisen anzeigen ({count})",
   "import.assignments.badge": "{count} ungeprüft",
