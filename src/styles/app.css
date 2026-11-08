@@ -258,3 +258,6 @@ form trix-toolbar .trix-button-group.trix-button-group--file-tools { display: no
 
 /* Neu aktiviertes Feld im Inventarformular: dezenter Rand bis zum Speichern. */
 .field-new { box-shadow: inset 4px 0 0 var(--color-primary); }
+
+/* Eigenes Chevron statt Chrome-/Safari-Datalist-Pfeil (RoleCombo). */
+input[data-combo]::-webkit-calendar-picker-indicator { display: none !important; }

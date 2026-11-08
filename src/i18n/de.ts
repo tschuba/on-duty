@@ -1357,6 +1357,7 @@ export const de = {
   "import.templates.selectHelp": "Die Vorlage bestimmt die Felder des Gegenstands und wird als Tag vorbelegt.",
   "import.col.kind": "Art",
   "import.col.mapping": "Zuordnung",
+  "import.col.mapping.hint": "Zuordnung kann geändert werden",
   "import.col.name": "Name",
   "import.col.note": "Notiz",
   "import.col.notes": "Hinweise",
