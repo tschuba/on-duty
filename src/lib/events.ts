@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gt, exists, gte, inArray, isNull, lt, notExists, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, exists, gte, inArray, isNull, lt, notExists, or, sql, type SQL } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events, eventTags, eventInvitees, eventRsvps, members, persons } from "../db/schema/index.js";
 import { trimmed, parseTags } from "./forms.js";
@@ -229,7 +229,7 @@ export async function countPendingRsvps(userId: string): Promise<number> {
   const at = now();
   const [row] = await db.select({ n: count() }).from(events).where(and(
     eq(events.rsvpEnabled, true), isNull(events.cancelledAt),
-    gt(events.startsAt, at), gt(sql`coalesce(${events.rsvpDeadline}, ${events.startsAt})`, at),
+    gte(sql`coalesce(${events.rsvpDeadline}, ${events.startsAt})`, at), // wie rsvpLock: gesperrt erst nach dem Schluss
     or(
       inArray(events.visibility, ["public", "loggedIn"]),
       and(eq(events.visibility, "members"), exists(db.select({ x: eventInvitees.eventId }).from(eventInvitees)
