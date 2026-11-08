@@ -13,6 +13,7 @@ process.env.ADMIN_PASSWORD = "test-password-123";
 let user: any;
 let roleRows: any[] = [];
 let block: string | null = null;
+const updateSet = vi.fn();
 const deleteOwnAccount = vi.fn(async () => block);
 const signOut = vi.fn(async () => undefined);
 
@@ -27,7 +28,8 @@ vi.mock("../lib/flash.js", () => ({ setFlash: vi.fn() }));
 vi.mock("../auth.js", () => ({ auth: { api: { signOut: (...a: unknown[]) => (signOut as any)(...a) } } }));
 vi.mock("../db/index.js", () => {
   const c: any = { from: () => c, innerJoin: () => c, where: () => Promise.resolve(roleRows) };
-  return { db: { select: () => c } };
+  const u: any = { set: (v: unknown) => (updateSet(v), u), where: () => Promise.resolve([]) };
+  return { db: { select: () => c, update: () => u } };
 });
 
 const { accountRoutes, pendingRoutes } = await import("../routes/account.js");
@@ -37,6 +39,7 @@ beforeEach(() => {
   user = { id: "u1", name: "Max", email: "max@x.de", emailVerified: true, permissions: new Set<string>() };
   roleRows = [];
   block = null;
+  updateSet.mockClear();
   deleteOwnAccount.mockClear();
   signOut.mockClear();
 });
@@ -106,5 +109,36 @@ describe("/account", () => {
     const res = await post(" MAX@x.de ");
     expect(res.headers.get("location")).toBe("/login");
     expect(signOut).toHaveBeenCalled();
+  });
+});
+
+describe("/account/name", () => {
+  const postName = (name: string) => app.request("/account/name", { method: "POST", body: new URLSearchParams({ name }) });
+  it("shows the edit button for normal users only", async () => {
+    expect(await (await app.request("/account")).text()).toContain("/account/name/edit");
+    const { LOCAL_ADMIN_ACCOUNT_ID } = await import("../lib/constants.js");
+    user.id = LOCAL_ADMIN_ACCOUNT_ID;
+    expect(await (await app.request("/account")).text()).not.toContain("/account/name/edit");
+  });
+  it("serves read-only and edit rows", async () => {
+    expect(await (await app.request("/account/name")).text()).toContain("/account/name/edit");
+    expect(await (await app.request("/account/name/edit")).text()).toContain('hx-post="/account/name"');
+  });
+  it("saves and redirects", async () => {
+    const res = await postName("  Erika   Muster ");
+    expect(res.headers.get("HX-Redirect")).toBe("/account");
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ name: "Erika Muster" }));
+  });
+  it.each(["  ", "a".repeat(101)])("rejects invalid name %#", async (n) => {
+    const res = await postName(n);
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain("höchstens 100");
+    expect(updateSet).not.toHaveBeenCalled();
+  });
+  it("forbids the local admin", async () => {
+    const { LOCAL_ADMIN_ACCOUNT_ID } = await import("../lib/constants.js");
+    user.id = LOCAL_ADMIN_ACCOUNT_ID;
+    expect((await postName("X")).status).toBe(403);
+    expect(updateSet).not.toHaveBeenCalled();
   });
 });

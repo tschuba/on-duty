@@ -1289,6 +1289,8 @@ export const de = {
   "account.profile.email": "E-Mail",
   "account.profile.roles": "Rollen",
   "account.profile.permissions": "Berechtigungen",
+  "account.name.saved": "Name gespeichert.",
+  "account.name.error": "Bitte einen Namen mit höchstens 100 Zeichen eingeben.",
   "account.delete.heading": "Konto löschen",
   "account.login.heading": "Anmeldung",
   "account.login.body": "Ändere dein Passwort oder richte eine zusätzliche Anmeldung ein, z. B. einen Passkey.",
