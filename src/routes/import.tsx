@@ -501,15 +501,6 @@ document.querySelectorAll("a[data-open]").forEach((a) => a.addEventListener("cli
   const d = document.querySelector(a.getAttribute("href")); if (d) d.open = true;
 }));`;
 
-// Entwurf-Restore setzt nur das Hidden-Feld; sichtbaren Text und Radio daraus ableiten.
-const MSF_RESTORE_SCRIPT = `
-document.getElementById("restore-yes")?.addEventListener("click", () => {
-  document.querySelectorAll(".msf[data-msf-single]").forEach((root) => {
-    const v = root.querySelector("input[type=hidden]").value;
-    root.querySelectorAll("[data-msf-radio]").forEach((r) => { r.checked = r.value === v; if (r.checked) root.querySelector("[data-msf-label]").textContent = r.closest("label").querySelector("span").textContent; });
-  });
-});`;
-
 type Summary = { label: string; value: number; tone?: "error" | "warning" }[];
 
 function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; fp: string; hidden: unknown; canRun: boolean; unmapped: { column: string; count: number }[]; notices: (string | { text: string; href: string } | false)[]; summary: Summary; children: unknown }) {
@@ -554,7 +545,7 @@ function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; f
             </Section>
           )}
         </form>
-        <script dangerouslySetInnerHTML={{ __html: DRAFT_SCRIPT + FILTER_SCRIPT + AUTOREFRESH_SCRIPT + OPENLINK_SCRIPT + MSF_RESTORE_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: DRAFT_SCRIPT + FILTER_SCRIPT + AUTOREFRESH_SCRIPT + OPENLINK_SCRIPT }} />
       </div>
     </Layout>
   );
