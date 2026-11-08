@@ -51,6 +51,11 @@ describe("import routes", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Muster");
   });
+  it("omits the notes column and filter when no member row has notes", async () => {
+    const html = await (await post("/preview", upload(MEMBER_HEAD, [{ mID: 1, Name: "Muster", Vorname: "Max", Status: "active", Geburtstag: "01.02.1990", Eintritt: "01.01.2010" }]))).text();
+    expect(html).not.toContain('sm" data-only-problems');
+    expect(html).not.toContain("<th>Hinweise</th>");
+  });
   it("previews an inventory list", async () => {
     const res = await post("/preview", upload(INV_HEAD, [
       { InventarID: 1, "Inventartyp (Voll)": "Schlauch", Bezeichnung: "B-Schlauch", "Inventarnr.": "A1", "Standort (komplett)": "Auto", Indienststellung: 42000 },

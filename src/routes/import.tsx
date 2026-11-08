@@ -163,6 +163,9 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
   const included = plan.rows.filter((r) => r.included);
   const warned = included.filter((r) => r.warnings.length).length;
   const problems = plan.blockers + warned;
+  const hasNotes = plan.rows.some((r) => r.errors.length || r.warnings.length);
+  const trainingRows = plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => sortTrainings(trainings, (x) => ({ ...x, member: null, organizer: null })).map((x) => ({ m, x })));
+  const anyExistingTraining = trainingRows.some(({ x }) => x.exists);
   return (
     <>
       <datalist id="role-options">
@@ -191,12 +194,14 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
       </Section>
 
       <Section title={t("import.members.title")} badge={plan.rows.length} open={problems > 0}>
-        <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
-          <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
-          <span>{t("import.members.onlyProblems", { count: problems })}</span>
-        </label>
+        {hasNotes && (
+          <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
+            <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
+            <span>{t("import.members.onlyProblems", { count: problems })}</span>
+          </label>
+        )}
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th><th>{t("import.col.notes")}</th><th>{t("import.col.use")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th>{hasNotes && <th>{t("import.col.notes")}</th>}<th>{t("import.col.use")}</th></tr></thead>
           <tbody>
             {plan.rows.map(({ m, included, duplicate, errors, warnings, assignments }) => (
               <tr data-problem={errors.length || warnings.length ? "1" : undefined} class={duplicate ? "opacity-50 italic" : undefined}>
@@ -209,12 +214,13 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                 <td class="text-sm">
                   {[m.phone, m.mobile, m.email].filter(Boolean).map((v) => <div>{v}</div>)}
                 </td>
-                <td class="space-x-1">
-                  {duplicate && <span class="badge badge-info badge-sm not-italic">{t("import.badge.existing")}</span>}
-                  {errors.map((e) => <Err>{e}</Err>)}
-                  {warnings.map((w) => <span class="badge badge-warning badge-sm" title={w}>{w}</span>)}
-                </td>
-                <td><input type="checkbox" name="inc" value={m.mid} class="toggle toggle-sm" checked={included} disabled={duplicate} /></td>
+                {hasNotes && (
+                  <td class="space-x-1">
+                    {errors.map((e) => <Err>{e}</Err>)}
+                    {warnings.map((w) => <span class="badge badge-warning badge-sm" title={w}>{w}</span>)}
+                  </td>
+                )}
+                <td>{duplicate ? <span class="badge badge-info badge-sm not-italic whitespace-nowrap">{t("import.badge.existing")}</span> : <input type="checkbox" name="inc" value={m.mid} class="toggle toggle-sm" checked={included} />}</td>
               </tr>
             ))}
           </tbody>
@@ -255,15 +261,15 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
       {plan.newTrainings + plan.existingTrainings > 0 && (
         <Section title={t("import.trainings.heading")} badge={plan.newTrainings} open>
           <table class="table table-zebra w-full">
-            <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th><th></th></tr></thead>
+            <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th>{anyExistingTraining && <th></th>}</tr></thead>
             <tbody>
-              {plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => sortTrainings(trainings, (x) => ({ ...x, member: null, organizer: null })).map((x) => (
+              {trainingRows.map(({ m, x }) => (
                 <tr class={x.exists ? "opacity-50 italic" : undefined}>
                   <td>{m.lastName}, {m.firstName}</td><td>{x.title}</td>
                   <td>{x.completedAt ? formatDate(x.completedAt) : ""}</td><td>{x.expiresAt ? formatDate(x.expiresAt) : ""}</td>
-                  <td>{x.exists && <span class="badge badge-info badge-sm not-italic">{t("import.badge.existing")}</span>}</td>
+                  {anyExistingTraining && <td>{x.exists && <span class="badge badge-info badge-sm not-italic whitespace-nowrap">{t("import.badge.existing")}</span>}</td>}
                 </tr>
-              )))}
+              ))}
             </tbody>
           </table>
         </Section>
@@ -301,15 +307,17 @@ function InventoryPreview({ plan, templates }: { plan: InventoryPlan; templates:
         </table>
       </Section>
       <Section title={t("import.positions.title")} badge={plan.rowCount} tone={existing ? "warning" : undefined} open={existing > 0}>
-        <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
-          <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
-          <span>{t("import.positions.onlyExisting", { count: existing })}</span>
-        </label>
+        {existing > 0 && (
+          <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
+            <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
+            <span>{t("import.positions.onlyExisting", { count: existing })}</span>
+          </label>
+        )}
         <p class="text-sm opacity-70 mb-2">{t("import.positions.bundleHint")}</p>
         <TagSuggestions />
         <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.template")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th><th>{t("import.col.notes")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.template")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th>{existing > 0 && <th>{t("import.col.notes")}</th>}</tr></thead>
           <tbody>
             {plan.positions.map((p) => {
               const nums = [...p.numbers].sort((a, b) => a.localeCompare(b, "de", { numeric: true }));
@@ -338,9 +346,9 @@ function InventoryPreview({ plan, templates }: { plan: InventoryPlan; templates:
                     </div>
                   </td>
                   <td class="min-w-80"><ChipInput name={`tags_${p.items[0].id}`} label="" values={p.tags} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} /></td>
-                  <td>
+                  {existing > 0 && <td>
                     {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic whitespace-nowrap" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
-                  </td>
+                  </td>}
                 </tr>
               );
             })}
