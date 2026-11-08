@@ -6,6 +6,7 @@ import { t } from "../i18n/index.js";
 import { countOpenApplications } from "../lib/applications.js";
 import { countOpenReceipts } from "../lib/donations.js";
 import { countOverdueInspections } from "../lib/inventory.js";
+import { countPendingRsvps } from "../lib/events.js";
 import { countOpenLoanRequests, countOverdueLoans } from "../lib/lending.js";
 import { canReadOrgTab, loadOrgConfig, loadOrgNameSafe, missingReceiptFields, type OrgTab } from "../lib/org-config.js";
 import { countPendingUsers } from "../lib/registration.js";
@@ -54,6 +55,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       inspections: has("inventory:read") ? await countOverdueInspections() : 0,
       loans: has("lending:read") ? await countOverdueLoans() : 0,
       loanRequests: has("lending:manage") ? await countOpenLoanRequests() : 0,
+      events: await countPendingRsvps(user.id).catch(() => 0), // Badge darf die Seite nie brechen
       org,
       pendingUsers: has("system:admin") ? await countPendingUsers() : 0,
     };

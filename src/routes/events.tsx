@@ -78,7 +78,7 @@ function RsvpLine({ ev }: { ev: EventRow }) {
   const r = ev.rsvp;
   if (!ev.rsvpEnabled || !r || ev.cancelledAt) return null;
   const free = ev.maxParticipants == null ? null : ev.maxParticipants - r.yes;
-  const mine = r.mine ? t(r.mine === "yes" ? "events.rsvp.mineYes" : "events.rsvp.mineNo") : r.invited && !rsvpLock(ev, false) ? t("events.rsvp.mineOpen") : null;
+  const mine = r.mine ? t(r.mine === "yes" ? "events.rsvp.mineYes" : "events.rsvp.mineNo") : r.invited && !rsvpLock(ev, false) ? <span class="badge badge-sm badge-primary">{t("events.rsvp.mineOpen")}</span> : null;
   return (
     <div class="text-sm opacity-70">
       {free == null ? t("events.rsvp.yesCount", { n: r.yes }) : free <= 0 ? <span class="badge badge-sm badge-warning">{t("events.rsvp.soldOut")}</span> : free === 1 ? t("events.rsvp.listFreeOne") : t("events.rsvp.listFree", { n: free })}
