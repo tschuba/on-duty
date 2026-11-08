@@ -161,6 +161,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
   const selected = (c: { kind: string; roleId?: string }) => (c.kind === "role" ? c.roleId : c.kind);
   const newCount = plan.titles.filter((d) => d.choice.kind === "new" && !d.ignored).length;
   const included = plan.rows.filter((r) => r.included);
+  const assignmentRows = included.flatMap(({ m, assignments }) => assignments.map((a) => ({ m, a })));
   const warned = included.filter((r) => r.warnings.length).length;
   const problems = plan.blockers + warned;
   const hasNotes = plan.rows.some((r) => r.errors.length || r.warnings.length);
@@ -193,7 +194,7 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         {newCount > 0 && <p class="text-sm opacity-60 mt-1">{t("import.newRolesHint")}</p>}
       </Section>
 
-      <Section title={t("import.members.title")} badge={plan.rows.length} open={problems > 0}>
+      <Section title={t("import.members.title")} badge={t("import.members.badge", { total: plan.rows.length, included: included.length })} open={problems > 0}>
         {hasNotes && (
           <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
             <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
@@ -227,18 +228,21 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
         </table>
       </Section>
 
-      <Section id="assignments" title={t("import.assignments.heading")} badge={plan.rows.reduce((n, r) => n + r.assignments.length, 0)} badge2={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : undefined} open={plan.assumedCount > 0 && !confirmed}>
+      <Section id="assignments" title={t("import.assignments.heading")} badge={assignmentRows.length} badge2={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : undefined} open={plan.assumedCount > 0 && !confirmed}>
         {plan.assumedCount > 0 && (
-          <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold pointer-coarse:min-h-11">
-            <input type="checkbox" name="assumed_ok" value="1" class="checkbox checkbox-sm" checked={confirmed} />
-            <span>{t("import.assignments.confirm", { count: plan.assumedCount })}</span>
-          </label>
+          <>
+            <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold pointer-coarse:min-h-11">
+              <input type="checkbox" name="assumed_ok" value="1" class="checkbox checkbox-sm" checked={confirmed} />
+              <span>{t("import.assignments.confirm", { count: plan.assumedCount })}</span>
+            </label>
+            <div class="alert alert-warning mb-2">{t("import.assignments.assumedHint")}</div>
+          </>
         )}
-        <div class="alert alert-warning mb-2">{t("import.assignments.assumedHint")}</div>
+        {assignmentRows.length === 0 ? <p class="opacity-60">{t("import.assignments.none")}</p> : (
         <table class="table table-zebra w-full">
           <thead><tr><th>{t("import.col.person")}</th><th>{t("import.col.fwportal")}</th><th>{t("import.col.role")}</th><th>{t("import.col.note")}</th><th>{t("import.col.from")}</th><th>{t("import.col.use")}</th></tr></thead>
           <tbody>
-            {included.flatMap(({ m, assignments }) => assignments.map((a) => (
+            {assignmentRows.map(({ m, a }) => (
               <tr class={a.skipped ? "opacity-50" : undefined}>
                 <td>{m.lastName}, {m.firstName}</td>
                 <td>{a.key === "a" ? <span class="badge badge-info badge-sm" title={t("import.badge.baseRoleHint")}>{t("import.badge.baseRole")}</span> : a.title}</td>
@@ -253,9 +257,10 @@ function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: Ro
                 </td>
                 <td><input type="checkbox" name={`ause_${m.mid}_${a.key}`} value="1" class="toggle toggle-sm" checked={!a.skipped} /></td>
               </tr>
-            )))}
+            ))}
           </tbody>
         </table>
+        )}
       </Section>
 
       {plan.newTrainings + plan.existingTrainings > 0 && (
