@@ -27,8 +27,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -162,8 +162,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -277,8 +277,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -400,8 +400,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -535,8 +535,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -677,8 +677,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -792,8 +792,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -907,8 +907,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
@@ -1030,8 +1030,8 @@
             "label_option": {
               "rotate": 0.0
             },
-            "show_symbol": false,
-            "line_interpolation": "smooth",
+            "show_symbol": true,
+            "line_interpolation": "linear",
             "legend_width": {
               "unit": "px"
             },
