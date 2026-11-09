@@ -432,7 +432,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
                   </a>
                   <button type="button" class="btn btn-sm btn-ghost btn-square" title={t("applications.links.copy")} aria-label={t("applications.links.copy")}
                     data-url={new URL("/events/public", env.OIDC_APP_URL).toString()}
-                    onclick={`navigator.clipboard.writeText(this.dataset.url).then(function(){document.body.dispatchEvent(new CustomEvent('showToast',{detail:{message:${JSON.stringify(t("applications.links.copied"))},type:'info'}}))})`}>
+                    onclick={`navigator.clipboard.writeText(this.dataset.url).then(function(){document.body.dispatchEvent(new CustomEvent('showToast',{detail:{message:${JSON.stringify(t("applications.links.copied")).replace(/</g, "\\u003c")},type:'info'}}))})`}>
                     <Icon name="clipboard-document" class="h-4 w-4" />
                   </button>
                 </div>

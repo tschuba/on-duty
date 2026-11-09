@@ -2,3 +2,8 @@ allowBuilds:
   "@parcel/watcher": true
   esbuild: true
   protobufjs: false
+overrides:
+  glob: ">=14.0.2"
+  minimatch: ">=11.0.1"
+  "@esbuild-kit/core-utils>esbuild": "^0.28.2"
+  "drizzle-kit>esbuild": "^0.28.2"

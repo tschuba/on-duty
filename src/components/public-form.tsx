@@ -29,7 +29,7 @@ export function CapWidget({ error }: { error?: string }) {
       <cap-widget data-cap-api-endpoint={env.CAP_API_ENDPOINT} data-cap-lang={t("cap.lang")} style={style} />
       <p id="cap-msg" class={`label text-xs whitespace-normal ${error ? "text-error" : "opacity-70"}`} role={error ? "alert" : undefined}>{error ?? t("cap.hint")}</p>
       <noscript><p class="text-sm text-error">{t("cap.noscript")}</p></noscript>
-      <script dangerouslySetInnerHTML={{ __html: `(function(){var f=document.getElementById("cap-field").closest("form");f.addEventListener("submit",function(e){var i=f.querySelector('input[name="cap-token"]');if(i&&i.value)return;e.preventDefault();var m=document.getElementById("cap-msg");m.textContent=${JSON.stringify(t("cap.error.pending"))};m.className="label text-xs whitespace-normal text-error";document.getElementById("cap-field").scrollIntoView({block:"center"})})})();` }} />
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var f=document.getElementById("cap-field").closest("form");f.addEventListener("submit",function(e){var i=f.querySelector('input[name="cap-token"]');if(i&&i.value)return;e.preventDefault();var m=document.getElementById("cap-msg");m.textContent=${JSON.stringify(t("cap.error.pending")).replace(/</g, "\\u003c")};m.className="label text-xs whitespace-normal text-error";document.getElementById("cap-field").scrollIntoView({block:"center"})})})();` }} />
     </fieldset>
   );
 }

@@ -907,7 +907,7 @@ describe("effective permissions inline script", () => {
     appRolePermissionsFixture = Object.entries(roleDefs).flatMap(([roleId, ps]) => ps.map((permission) => ({ roleId, permission })));
     const html = await (await adminRoutes.request("/users/new")).text();
     const json = html.match(/<script type="application\/json">(.*?)<\/script>/s)![1];
-    const code = html.match(/<script>(\(function\(\)\{var s=document\.currentScript.*?)<\/script>/s)![1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+    const code = html.match(/<script>(\(function\(\)\{var s=document\.currentScript.*?)<\/script>/s)![1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
     const cfg = JSON.parse(json.replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
 
     for (const combo of [["all"], ["res"], ["one"], ["res", "one"], ["none"], []]) {
