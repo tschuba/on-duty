@@ -309,9 +309,12 @@ Optional und standardmäßig aus. Aktivieren: in Coolify `COMPOSE_PROFILES=obser
 
 1. *Alerts → Destinations*: Typ E-Mail, Empfänger eintragen.
 2. *Alerts → Alerts*: zwei Alerts im Typ „SQL“ auf dem Stream `default` (Traces), Intervall z. B. 5 min:
-   - **Fehlerrate 5xx**: Anteil der Root-Spans mit `http_response_status_code >= 500` an allen Root-Spans im Zeitfenster.
-   - **p95 gesamt**: `approx_percentile_cont(duration, 0.95)` über Root-Spans (`duration` in µs).
-3. Feldnamen vor dem Anlegen in *Logs/Traces* prüfen (hängen von der Instrumentierung ab). Schwellwerte erst nach einigen Wochen Daten festlegen.
+   - **Fehlerrate 5xx** (Prozent, Bedingung z. B. `rate > <Schwellwert>`):
+     `select 100.0*sum(case when cast(http_response_status_code as int) >= 500 then 1 else 0 end)/count(*) as rate from "default" where span_kind='2' and http_route is not null`
+   - **p95 gesamt** (Millisekunden, Bedingung `p95_ms > <Schwellwert>`):
+     `select approx_percentile_cont(duration,0.95)/1000 as p95_ms from "default" where span_kind='2' and http_route is not null`
+   - `span_kind='2'` = Server-Span (eingehender Request); `duration` ist in µs; `http_response_status_code` ist ein String. Beide Abfragen sind gegen den Dev-Stack geprüft.
+3. Schwellwerte erst nach einigen Wochen Daten festlegen.
 4. Test-Versand an der laufenden Instanz prüfen (Alert bearbeiten → Test bzw. Schwellwert kurz absenken), sonst ist nicht sicher, dass SMTP funktioniert.
 
 **Betrieb:** Die Aufbewahrung (60 Tage) begrenzt die Zeit, nicht das Volumen. Größe des Volumes `openobserve-data` gelegentlich prüfen (`docker system df -v`); bei Wachstum `OTEL_TRACES_SAMPLER_ARG` senken (z. B. `0.2`). Nach Produktivstart Event-Loop-Lag und Heap im Dashboard beobachten.
