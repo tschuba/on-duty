@@ -46,3 +46,17 @@ describe("verifyCap", () => {
     expect(await verifyCap("tok")).toBe("unavailable");
   });
 });
+
+describe("CapWidget", () => {
+  it("renders nothing when unconfigured and the inline script when configured", async () => {
+    vi.doMock("../lib/org-config.js", () => ({ loadOrgConfig: vi.fn(), privacyMode: vi.fn(), isImpressumComplete: vi.fn() }));
+    const { CapWidget } = await import("../components/public-form.js");
+    mockEnv.CAP_API_ENDPOINT = undefined;
+    expect(String(CapWidget({}))).toBe("");
+    mockEnv.CAP_API_ENDPOINT = "https://cap.example.org/key";
+    mockEnv.CAP_SECRET = "s";
+    const html = String(CapWidget({}));
+    expect(html).toContain('id="cap-field"');
+    expect(html).toContain("cap-msg");
+  });
+});

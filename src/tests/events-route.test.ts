@@ -132,6 +132,13 @@ describe("GET /events", () => {
     expect(body).toContain("Gerätehaus");
   });
 
+  it("renders the copy-link button for managers when public", async () => {
+    eventsFindManyResult = [makeEvent()];
+    const body = await (await eventRoutes.request("/")).text();
+    expect(body).toContain('data-url="http://localhost:3000/events/public"');
+    expect(body).toContain("navigator.clipboard.writeText");
+  });
+
   it("marks a members-event without invitees with the orphan badge for managers", async () => {
     eventsFindManyResult = [makeEvent({ visibility: "members", invitees: [] })];
     const body = await (await eventRoutes.request("/")).text();
