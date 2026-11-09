@@ -2,16 +2,16 @@ import { Hono } from "hono";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { PermissionBadges } from "../components/permission-badges.js";
 import { Layout } from "../components/layout.js";
-import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { HeaderAction, PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { deleteOwnAccount, resolveAccountUrl } from "../lib/account.js";
+import { deleteOwnAccount, normalizeName, resolveAccountUrl } from "../lib/account.js";
 import { auth } from "../auth.js";
 import { env } from "../env.js";
 import { db } from "../db/index.js";
-import { appRoles, userAppRoles } from "../db/schema/index.js";
+import { appRoles, userAppRoles, users } from "../db/schema/index.js";
 import { eq } from "drizzle-orm";
-import { LOCAL_ADMIN_ACCOUNT_ID } from "../lib/constants.js";
+import { HTTP_STATUS, LOCAL_ADMIN_ACCOUNT_ID } from "../lib/constants.js";
 
 export const accountRoutes = new Hono<{ Variables: Variables }>();
 
@@ -52,6 +52,40 @@ function DeleteAccount({ email, back }: { email: string; back: "/account" | "/pe
   );
 }
 
+const NAME_SWAP = { "hx-target": "#account-name", "hx-swap": "outerHTML" };
+
+// Header actions follow the name row's mode; edit/cancel responses re-send them out-of-band.
+function NameActions({ editing = false, oob = false }: { editing?: boolean; oob?: boolean }) {
+  return (
+    <div id="account-actions" class="contents" hx-swap-oob={oob ? "true" : undefined}>
+      {editing ? (<>
+        <HeaderAction icon="x-mark" label={t("common.cancel")} class="btn-outline" attrs={{ "hx-get": "/account/name", ...NAME_SWAP }} />
+        <HeaderAction variant="primary" icon="check" label={t("common.save")} form="account-name-form" class="btn-primary" />
+      </>) : (
+        <HeaderAction variant="primary" icon="pencil" label={t("common.edit")} class="btn-primary" attrs={{ "hx-get": "/account/name/edit", ...NAME_SWAP }} />
+      )}
+    </div>
+  );
+}
+
+// The <dd> is swapped as a whole (the <dl> is a dt/dd grid); the local admin's name stays plain text.
+function NameRow({ name, editing = false, error = false, readOnly = false, oob = false }: { name: string; editing?: boolean; error?: boolean; readOnly?: boolean; oob?: boolean }) {
+  if (readOnly) return <dd>{name}</dd>;
+  return (<>
+    {editing ? (
+      <dd id="account-name" hx-target="this" hx-swap="outerHTML">
+        <form id="account-name-form" hx-post="/account/name" class="flex flex-wrap items-center gap-2">
+          <input name="name" value={name} required maxlength={100} class={`input input-sm ${error ? "input-error" : ""}`} aria-label={t("account.profile.name")} />
+          {error && <p class="text-error text-sm w-full">{t("account.name.error")}</p>}
+        </form>
+      </dd>
+    ) : (
+      <dd id="account-name">{name}</dd>
+    )}
+    {oob && <NameActions editing={editing} oob />}
+  </>);
+}
+
 // Users without a role see this instead of the app. Rendered without nav (no `user` passed): they have no permissions.
 export const pendingRoutes = new Hono<{ Variables: Variables }>();
 pendingRoutes.get("/", guard, (c) => {
@@ -89,12 +123,12 @@ accountRoutes.get("/", guard, async (c) => {
   return c.html(
     <Layout title={t("account.title")} user={user}>
       <div class="max-w-xl mx-auto">
-        <PageHeader title={t("account.title")} />
-        {/* Name and email come from the OIDC provider and are not editable here. */}
+        <PageHeader title={t("account.title")} actions={!isLocalAdmin && <NameActions />} />
+        {/* Email comes from the OIDC provider and is not editable here. */}
         <h2 class="text-lg font-semibold mb-2">{t("account.profile.heading")}</h2>
         <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 mb-6">
           <dt class="opacity-60">{t("account.profile.name")}</dt>
-          <dd>{user.name}</dd>
+          <NameRow name={user.name} readOnly={isLocalAdmin} />
           <dt class="opacity-60">{t("account.profile.email")}</dt>
           <dd>{user.email}</dd>
           <dt class="opacity-60">{t("account.profile.roles")}</dt>
@@ -104,6 +138,9 @@ accountRoutes.get("/", guard, async (c) => {
           <dt class="opacity-60">{t("account.profile.permissions")}</dt>
           <dd>{user.permissions.size === 0 ? <span class="opacity-40">—</span> : <PermissionBadges permissions={[...user.permissions]} />}</dd>
         </dl>
+        <script dangerouslySetInnerHTML={{ __html: `document.body.addEventListener('htmx:beforeSwap', function (e) {
+          if (e.detail.xhr.status === 422 && e.detail.requestConfig.elt.id === 'account-name-form') { e.detail.shouldSwap = true; e.detail.isError = false; }
+        });` }} />
         {accountUrl && !isLocalAdmin && (
           <section class="mb-6">
             <h2 class="text-lg font-semibold mb-1">{t("account.login.heading")}</h2>
@@ -140,4 +177,19 @@ accountRoutes.post("/delete", guard, async (c) => {
   }
   await auth.api.signOut({ headers: c.req.raw.headers }).catch(() => undefined);
   return c.redirect("/login");
+});
+
+accountRoutes.get("/name", guard, (c) => c.html(<NameRow name={c.get("user").name} oob />));
+accountRoutes.get("/name/edit", guard, (c) => c.html(<NameRow name={c.get("user").name} editing oob />));
+
+accountRoutes.post("/name", guard, async (c) => {
+  const user = c.get("user");
+  if (user.id === LOCAL_ADMIN_ACCOUNT_ID) return c.text("", HTTP_STATUS.FORBIDDEN);
+  const raw = String((await c.req.parseBody()).name ?? "");
+  const name = normalizeName(raw);
+  if (!name) return c.html(<NameRow name={raw} editing error oob />, HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  await db.update(users).set({ name, updatedAt: new Date() }).where(eq(users.id, user.id));
+  setFlash(c, t("account.name.saved"), "success");
+  c.header("HX-Redirect", "/account");
+  return c.body(null);
 });

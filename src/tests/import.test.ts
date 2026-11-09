@@ -1,3 +1,4 @@
+import { ROLE_TYPES, ROLE_TYPE_IDS } from "../db/role-seed-data.js";
 import { describe, it, expect } from "vitest";
 import * as XLSX from "xlsx";
 import {
@@ -49,10 +50,15 @@ describe("readWorkbook", () => {
   });
 });
 
+const roleTypes = ROLE_TYPES.map((x) => ({ id: x.id, name: x.name, sortOrder: x.sortOrder, allowsActiveStatus: x.allowsActiveStatus }));
+const typed = (id: string, title: string, grantsActiveStatus: boolean, key: "rank" | "position" | "club") => {
+  const ty = roleTypes.find((x) => x.id === ROLE_TYPE_IDS[key])!;
+  return { id, title, grantsActiveStatus, typeId: ty.id, typeName: ty.name, typeSortOrder: ty.sortOrder, typeAllowsActive: ty.allowsActiveStatus };
+};
 const roles = [
-  { id: "r-k", title: "Kommandant", grantsActiveStatus: true },
-  { id: "r-v", title: "Vorstand", grantsActiveStatus: false },
-  { id: ACTIVE_ROLE_ID, title: "Feuerwehr-Anwärter", grantsActiveStatus: true },
+  typed("r-k", "Kommandant", true, "position"),
+  typed("r-v", "Vorstand", false, "club"),
+  typed(ACTIVE_ROLE_ID, "Feuerwehr-Anwärter", true, "rank"),
 ];
 
 describe("members", () => {
@@ -78,25 +84,25 @@ describe("members", () => {
     const ranks = [{ id: "r-f", title: "Feuerwehrmann/-frau", grantsActiveStatus: true }, { id: "r-o", title: "Oberfeuerwehrmann/-frau", grantsActiveStatus: true }];
     for (const [t, id] of [["Feuerwehrfrau", "r-f"], ["Feuerwehrmann", "r-f"], ["Oberfeuerwehrfrau", "r-o"]]) expect(suggestRole(t, ranks).choice).toEqual({ kind: "role", roleId: id });
     expect(suggestRole("Schriftführerin", [roles[0]]).choice).toEqual({ kind: "new" });
-    expect(suggestRole("Schriftführerin", [{ id: "r-s", title: "Schriftführer/-in", grantsActiveStatus: false }]).choice).toEqual({ kind: "role", roleId: "r-s" });
+    expect(suggestRole("Schriftführerin", [{ id: "r-s", title: "Schriftführer/-in" }]).choice).toEqual({ kind: "role", roleId: "r-s" });
   });
 
   it("blocks rows with missing required values until supplied", () => {
-    const p1 = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
+    const p1 = planMembers(parsed, roles, roleTypes, new Set(), {}, "2026-01-01");
     expect(p1.rows[2].errors).toContain("Geburtsdatum fehlt");
     expect(p1.blockers).toBe(1);
-    const p2 = planMembers(parsed, roles, new Set(), { _seen: "1", inc: ["1", "2", "3"], birth_3: "1990-02-03" }, "2026-01-01");
+    const p2 = planMembers(parsed, roles, roleTypes, new Set(), { _seen: "1", inc: ["1", "2", "3"], birth_3: "1990-02-03" }, "2026-01-01");
     expect(p2.blockers).toBe(0);
     expect(p2.rows[2].m.birthDate).toBe("1990-02-03");
-    const p3 = planMembers(parsed, roles, new Set(), { _seen: "1", inc: ["1", "2"] }, "2026-01-01");
+    const p3 = planMembers(parsed, roles, roleTypes, new Set(), { _seen: "1", inc: ["1", "2"] }, "2026-01-01");
     expect(p3.blockers).toBe(0);
   });
 
   it("plans assignments, assumed flags, active role, deceased and duplicates", () => {
-    const p = planMembers(parsed, roles, new Set(["muster|max|1982-02-18"]), {}, "2026-01-01");
+    const p = planMembers(parsed, roles, roleTypes, new Set(["muster|max|1982-02-18"]), {}, "2026-01-01");
     expect(p.rows[0].duplicate).toBe(true);
     expect(p.rows[0].included).toBe(false);
-    const plan = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
+    const plan = planMembers(parsed, roles, roleTypes, new Set(), {}, "2026-01-01");
     const a = plan.rows[0].assignments;
     expect(a.map((x) => x.title)).toEqual(["1. Kommandant", "Löschmeister"]); // Löschmeister grants → no base role
     expect(a[0]).toMatchObject({ note: "1.", from: null, assumed: false });
@@ -108,39 +114,39 @@ describe("members", () => {
   });
 
   it("falls back to base role when the granting assignment is ignored or skipped", () => {
-    const ign = planMembers(parsed, roles, new Set(), { _seen: "1", inc: ["1"], use_2: "1" }, "2026-01-01");
+    const ign = planMembers(parsed, roles, roleTypes, new Set(), { _seen: "1", inc: ["1"], use_2: "1" }, "2026-01-01");
     expect(ign.rows[0].assignments.map((x) => x.title)).toContain("Feuerwehr-Anwärter");
   });
 
   it("lets the base role fallback be overridden, dated, annotated or skipped like a regular assignment", () => {
     const base = { _seen: "1", inc: ["3"], ause_3_a: "1" };
-    const plain = planMembers(parsed, roles, new Set(), base, "2026-01-01");
+    const plain = planMembers(parsed, roles, roleTypes, new Set(), base, "2026-01-01");
     expect(plain.rows[2].assignments[0]).toMatchObject({ key: "a", title: "Feuerwehr-Anwärter", from: plain.rows[2].m.entryDate, note: null });
-    const other = planMembers(parsed, roles, new Set(), { ...base, arole_3_a: "r-v" }, "2026-01-01");
+    const other = planMembers(parsed, roles, roleTypes, new Set(), { ...base, arole_3_a: "r-v" }, "2026-01-01");
     expect(other.rows[2].assignments[0].roleChoice).toEqual({ kind: "role", roleId: "r-v" });
     expect(other.rows[2].assignments[0].grants).toBe(false);
-    const edited = planMembers(parsed, roles, new Set(), { ...base, from_3_a: "2026-02-01", note_3_a: "geprüft" }, "2026-01-01");
+    const edited = planMembers(parsed, roles, roleTypes, new Set(), { ...base, from_3_a: "2026-02-01", note_3_a: "geprüft" }, "2026-01-01");
     expect(edited.rows[2].assignments[0]).toMatchObject({ from: "2026-02-01", note: "geprüft" });
-    const skipped = planMembers(parsed, roles, new Set(), { _seen: "1", inc: ["3"] }, "2026-01-01");
+    const skipped = planMembers(parsed, roles, roleTypes, new Set(), { _seen: "1", inc: ["3"] }, "2026-01-01");
     expect(skipped.rows[2].assignments[0].skipped).toBe(true);
   });
 
   it("flags an assignment as suggested until the admin overrides its role, and never once overridden", () => {
-    const plan = planMembers(parsed, roles, new Set(), {}, "2026-01-01");
+    const plan = planMembers(parsed, roles, roleTypes, new Set(), {}, "2026-01-01");
     expect(plan.rows[0].assignments.every((a) => a.suggested)).toBe(true);
-    const overridden = planMembers(parsed, roles, new Set(), { arole_1_0: "r-v" }, "2026-01-01");
+    const overridden = planMembers(parsed, roles, roleTypes, new Set(), { arole_1_0: "r-v" }, "2026-01-01");
     expect(overridden.rows[0].assignments[0].suggested).toBe(false);
     expect(overridden.rows[0].assignments[1].suggested).toBe(true);
     // re-picking the same role the suggestion already had still counts as suggested
-    const reconfirmed = planMembers(parsed, roles, new Set(), { arole_1_0: "r-k" }, "2026-01-01");
+    const reconfirmed = planMembers(parsed, roles, roleTypes, new Set(), { arole_1_0: "r-k" }, "2026-01-01");
     expect(reconfirmed.rows[0].assignments[0].suggested).toBe(true);
   });
 
   it("honours ignore choice and warns when a passive gets an active-granting role", () => {
     const passiveWithRole = parseMembers(readWorkbook(book(MEMBER_HEAD, [mrow({ mID: 9, Name: "P", Vorname: "Q", Status: "Passiv", Geburtstag: 30000, Eintritt: 40000, Funktionen: "Kommandant" })])).rows);
-    const warn = planMembers(passiveWithRole, roles, new Set(), {}, "2026-01-01");
+    const warn = planMembers(passiveWithRole, roles, roleTypes, new Set(), {}, "2026-01-01");
     expect(warn.rows[0].warnings).toHaveLength(1);
-    const ign = planMembers(passiveWithRole, roles, new Set(), { _seen: "1", inc: ["9"], use_1: "1" }, "2026-01-01");
+    const ign = planMembers(passiveWithRole, roles, roleTypes, new Set(), { _seen: "1", inc: ["9"], use_1: "1" }, "2026-01-01");
     expect(ign.rows[0].assignments).toEqual([]);
   });
 });
@@ -149,11 +155,47 @@ describe("per-assignment overrides", () => {
   const rows = parseMembers(readWorkbook(book(MEMBER_HEAD, [mrow({ mID: 5, Name: "A", Vorname: "B", Status: "Aktiv", Geburtstag: 30000, Eintritt: 40000, Funktionen: "1. Kommandant" })])).rows);
   it("lets a single assignment use another role or be skipped", () => {
     const base = { _seen: "1", inc: ["5"], use_0: "1", ause_5_0: "1", ause_5_a: "1" };
-    expect(planMembers(rows, roles, new Set(), { ...base, arole_5_0: "r-v" }, "2026-01-01").rows[0].assignments[1].roleChoice).toEqual({ kind: "role", roleId: "r-v" });
-    expect(planMembers(rows, roles, new Set(), { ...base, arole_5_0: "new" }, "2026-01-01").rows[0].assignments[1].roleChoice).toEqual({ kind: "new" });
-    const skipped = planMembers(rows, roles, new Set(), { _seen: "1", inc: ["5"], use_0: "1", ause_5_a: "1" }, "2026-01-01");
+    expect(planMembers(rows, roles, roleTypes, new Set(), { ...base, arole_5_0: "r-v" }, "2026-01-01").rows[0].assignments[1].roleChoice).toEqual({ kind: "role", roleId: "r-v" });
+    // Alt-Wert „new“ ist veraltet → Fallback auf die Titel-Zuordnung (hier: bestehende Rolle)
+    expect(planMembers(rows, roles, roleTypes, new Set(), { ...base, arole_5_0: "new" }, "2026-01-01").rows[0].assignments[0].roleChoice).toEqual({ kind: "role", roleId: "r-k" });
+    const skipped = planMembers(rows, roles, roleTypes, new Set(), { _seen: "1", inc: ["5"], use_0: "1", ause_5_a: "1" }, "2026-01-01");
     expect(skipped.rows[0].assignments[1].skipped).toBe(true);
     expect(skipped.assumedCount).toBe(1); // only the Basisrolle (Eintrittsdatum) is assumed
+  });
+});
+
+describe("new function types and per-member picks", () => {
+  const rows = parseMembers(readWorkbook(book(MEMBER_HEAD, [mrow({ mID: 7, Name: "A", Vorname: "B", Status: "Aktiv", Geburtstag: 30000, Eintritt: 40000, Funktionen: "Zeugwart", Dienstgrad: "Hauptlöschmeister" })])).rows);
+  const T = "2026-01-01";
+  // Titel sortiert: function < rank → 0 = Zeugwart, 1 = Hauptlöschmeister
+  it("presets the type by origin and lets type_i override", () => {
+    const p = planMembers(rows, roles, roleTypes, new Set(), {}, T);
+    expect(p.titles[0]).toMatchObject({ title: "Zeugwart", typeId: ROLE_TYPE_IDS.position, grants: false });
+    expect(p.titles[1]).toMatchObject({ title: "Hauptlöschmeister", typeId: ROLE_TYPE_IDS.rank, grants: true });
+    const o = planMembers(rows, roles, roleTypes, new Set(), { _seen: "1", inc: ["7"], use_0: "1", use_1: "1", type_0: ROLE_TYPE_IDS.club }, T);
+    expect(o.titles[0].typeId).toBe(ROLE_TYPE_IDS.club);
+  });
+  it("forces grants off for types without active status", () => {
+    const p = planMembers(rows, roles, roleTypes, new Set(), { _seen: "1", inc: ["7"], use_0: "1", use_1: "1", type_0: ROLE_TYPE_IDS.club, grants_0: "1", type_1: ROLE_TYPE_IDS.club, grants_1: "1" }, T);
+    expect(p.titles.map((x) => x.grants)).toEqual([false, false]);
+    const ok = planMembers(rows, roles, roleTypes, new Set(), { _seen: "1", inc: ["7"], use_0: "1", use_1: "1", grants_0: "1" }, T);
+    expect(ok.titles[0].grants).toBe(true);
+  });
+  it("resolves new:<i> to the pending title and falls back when stale", () => {
+    const base = { _seen: "1", inc: ["7"], use_0: "1", use_1: "1", grants_1: "1", ause_7_0: "1", ause_7_1: "1" };
+    const a = planMembers(rows, roles, roleTypes, new Set(), { ...base, arole_7_1: "new:0" }, T).rows[0].assignments.find((x) => x.key === "1")!;
+    expect(a.title).toBe("Hauptlöschmeister");
+    expect(a).toMatchObject({ roleChoice: { kind: "new" }, newIdx: 0, typeId: ROLE_TYPE_IDS.position, grants: false, suggested: false });
+    const stale = planMembers(rows, roles, roleTypes, new Set(), { ...base, map_0: "r-v", arole_7_1: "new:0" }, T).rows[0].assignments.find((x) => x.key === "1")!;
+    expect(stale.roleChoice).toEqual({ kind: "new" }); // fallback = Titel 1 (neu), nicht Titel 0
+    expect(stale.newIdx).toBe(1);
+    const ign = planMembers(rows, roles, roleTypes, new Set(), { ...base, use_0: "", arole_7_1: "new:0" }, T).rows[0].assignments;
+    expect(ign.find((x) => x.title === "Hauptlöschmeister")!.newIdx).toBe(1);
+  });
+  it("accepts new:<i> for the base role", () => {
+    const act = parseMembers(readWorkbook(book(MEMBER_HEAD, [mrow({ mID: 8, Name: "C", Vorname: "D", Status: "Aktiv", Geburtstag: 30000, Eintritt: 40000, Funktionen: "Zeugwart" })])).rows);
+    const p = planMembers(act, roles, roleTypes, new Set(), { _seen: "1", inc: ["8"], use_0: "1", ause_8_a: "1", ause_8_0: "1", arole_8_a: "new:0" }, T);
+    expect(p.rows[0].assignments[0]).toMatchObject({ key: "a", roleChoice: { kind: "new" }, newIdx: 0 });
   });
 });
 
