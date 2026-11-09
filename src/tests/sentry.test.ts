@@ -172,6 +172,6 @@ describe("Sentry with active OTel SDK", () => {
     expect(ev.tags).toEqual({ request_id: "req-1", route: "/x" });
     expect(ev.user).toEqual({ id: "u-1" });
     expect(ev.request).toBeUndefined();
-    await sdk!.shutdown().catch(() => undefined);
-  });
+    await sdk!.shutdown().catch(() => undefined); // final metric flush against the dead endpoint takes ~9 s
+  }, 30_000);
 });
