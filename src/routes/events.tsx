@@ -187,7 +187,7 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
         const orphanMembers = ev.visibility === "members" && ev.invitees.length === 0;
         const monthIdx = Number(day.slice(5, 7)) - 1;
         return (
-          <div data-date={day} data-month={month} class="scroll-mt-20 mb-6">
+          <div data-date={day} data-month={month} class="scroll-mt-[var(--ev-off,5rem)] mb-6 rounded-box">
             {heading && <h2 class="text-xl font-bold mt-4 mb-3">{new Intl.DateTimeFormat("de-DE", { timeZone: "UTC", month: "long", year: "numeric" }).format(new Date(`${day}T12:00:00Z`))}</h2>}
             <div class={`flex gap-3 sm:gap-4 py-1 ${linked ? "cursor-pointer" : ""}`} onclick={linked ? `location.href='/events/${ev.id}'` : undefined}>
               <div class="bg-primary text-primary-content rounded-box shrink-0 w-14 sm:w-16 flex flex-col items-center justify-center py-2 leading-tight">
@@ -196,7 +196,7 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
                 <span class="text-xs opacity-80">{day.slice(0, 4)}</span>
               </div>
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
-                <div class="font-medium lg:text-lg"><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-sm badge-error ml-2">{t("events.cancelled")}</span>}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}</div>
+                <div class="font-medium lg:text-lg"><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-sm badge-error ml-2">{t("events.cancelled")}</span>}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}{linked && ev.visibility === "public" && <span class="inline-block ml-2 align-middle text-primary" title={t("events.form.visibility.public")}><Icon name="world" class="h-4 w-4" /><span class="sr-only">{t("events.form.visibility.public")}</span></span>}</div>
                 <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{(ev.location || ev.latitude != null) && <> · <EventPlace ev={ev} /></>}</div>
                 <RsvpLine ev={ev} />
                 {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
@@ -218,6 +218,24 @@ function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: bool
   return c.html(<EventCards rows={month} tz={tz} canManage={canManage} linked={linked} />);
 }
 
+function ViewSwitch() {
+  return (
+    <div class="lg:hidden">
+      <button type="button" data-ev-m="list" class="btn btn-outline btn-primary gap-2 hidden"><Icon name="list" class="h-5 w-5" />{t("events.view.list")}</button>
+      <button type="button" data-ev-m="cal" class="btn btn-outline btn-primary gap-2"><Icon name="calendar-days" class="h-5 w-5" />{t("events.view.calendar")}</button>
+    </div>
+  );
+}
+
+function CalendarToggle() {
+  return (
+    <label class="hidden lg:flex items-center gap-2 cursor-pointer">
+      <input type="checkbox" id="ev-cal-toggle" class="toggle toggle-sm" checked />
+      <span>{t("events.calendar.show")}</span>
+    </label>
+  );
+}
+
 // Kalender + Liste. Die Liste zeigt ein gleitendes Fenster aus Fokusmonat ± 1 (nur Monate mit Terminen), der Rest kommt per ?rows= nach.
 function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { rows: EventRow[]; tz: string; canManage: boolean; base: string; tagFilter: string[]; monthParam?: string }) {
   if (!rows.length) return <p class="text-base-content/60 py-8">{t(tagFilter.length ? "events.emptyFiltered" : "events.empty")}</p>;
@@ -233,34 +251,25 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
   const data = { days, months, focus: months[fi], base, tags: tagFilter, dayColors };
   return (
     <>
-      <div class="mb-4 flex items-center gap-3">
-        <div class="join lg:hidden">
-          <button type="button" data-ev-m="list" class="btn join-item btn-outline btn-primary">{t("events.view.list")}</button>
-          <button type="button" data-ev-m="cal" class="btn join-item btn-ghost">{t("events.view.calendar")}</button>
-        </div>
-        <label class="hidden lg:flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" id="ev-cal-toggle" class="toggle toggle-sm" checked />
-          <span>{t("events.calendar.show")}</span>
-        </label>
-      </div>
-      <div id="ev-wrap" data-m="list" data-dc="1" class="group lg:flex lg:gap-6 lg:items-start">
-        <div class="hidden group-data-[m=cal]:block lg:group-data-[dc=1]:block lg:group-data-[dc=0]:hidden lg:w-80 lg:shrink-0 lg:sticky lg:top-20">
+      {base !== "/events" && <div class="mb-4 flex items-center gap-3"><ViewSwitch /><CalendarToggle /></div>}
+      <div id="ev-wrap" data-m="list" data-dc="1" class="group">
+        <div class="hidden group-data-[m=cal]:block lg:group-data-[dc=1]:block lg:group-data-[dc=0]:hidden lg:sticky lg:top-[calc(var(--nav-h)+var(--header-h)+var(--filter-h))] lg:z-10 bg-base-100 pb-2 mb-4">
           <div id="ev-calendar"></div>
         </div>
-        <div class="min-w-0 flex-1 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
+        <div class="min-w-0 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
           <div id="ev-rows"><EventCards rows={rows.filter((ev) => shown.has(toLocalDate(ev.startsAt, tz).slice(0, 7)))} tz={tz} canManage={canManage} linked={base === "/events"} /></div>
         </div>
       </div>
       <script type="application/json" id="ev-data" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, "\\u003c") }} />
       <link rel="stylesheet" href="/css/vanilla-calendar.css" />
-      <style>{`#ev-calendar [data-vc-date]:not([data-vc-date-disabled]) [data-vc-date-btn]{background-image:radial-gradient(circle at 50% calc(100% - 5px),var(--ev-dot,currentColor) 2.5px,transparent 3px)}`}</style>
+      <style>{`#ev-calendar [data-vc-date][data-vc-date-month=prev],#ev-calendar [data-vc-date][data-vc-date-month=next]{visibility:hidden}#ev-calendar [data-vc-date]:not([data-vc-date-disabled]) [data-vc-date-btn]{background-image:radial-gradient(circle at 50% calc(100% - 5px),var(--ev-dot,currentColor) 2.5px,transparent 3px)}`}</style>
       <script type="module" dangerouslySetInnerHTML={{ __html: EVENTS_SCRIPT }} />
     </>
   );
 }
 
 const EVENTS_SCRIPT = `
-  import { Calendar } from "/js/vanilla-calendar.min.js";
+  import { Calendar, months as monthsExt } from "/js/vanilla-calendar.min.js";
   const cfg = JSON.parse(document.getElementById("ev-data").textContent);
   const { days, months } = cfg;
   const wrap = document.getElementById("ev-wrap");
@@ -273,18 +282,21 @@ const EVENTS_SCRIPT = `
 
   wrap.dataset.dc = localStorage.getItem("ev-cal") === "0" ? "0" : "1";
   toggle.checked = wrap.dataset.dc === "1";
-  toggle.onchange = () => { wrap.dataset.dc = toggle.checked ? "1" : "0"; localStorage.setItem("ev-cal", wrap.dataset.dc); };
+  toggle.onchange = () => { wrap.dataset.dc = toggle.checked ? "1" : "0"; localStorage.setItem("ev-cal", wrap.dataset.dc); syncOff(); };
   function setMobile(m) {
     wrap.dataset.m = m;
-    document.querySelectorAll("[data-ev-m]").forEach((b) => {
-      const on = b.dataset.evM === m;
-      b.classList.toggle("btn-outline", on); b.classList.toggle("btn-primary", on); b.classList.toggle("btn-ghost", !on);
-    });
+    document.querySelectorAll("[data-ev-m]").forEach((b) => b.classList.toggle("hidden", b.dataset.evM === m)); // nur den Button der anderen Ansicht zeigen
   }
   document.querySelectorAll("[data-ev-m]").forEach((b) => { b.onclick = () => setMobile(b.dataset.evM); });
 
   const idxOf = (m) => { const i = months.findIndex((x) => x >= m); return i < 0 ? months.length - 1 : i; };
-  const topRow = () => rows(ITEM).find((tr) => tr.getBoundingClientRect().bottom > 90) || null;
+  // Die Liste scrollt unter dem klebenden Kalender: dessen Höhe wird zum oberen Versatz für Ankerzeile und Scroll-Ziel.
+  const calEl = document.getElementById("ev-calendar").parentElement;
+  let off = 80;
+  const syncOff = () => { const top = isDesktop() ? parseFloat(getComputedStyle(calEl).top) || 80 : 80; off = top + (isDesktop() && wrap.dataset.dc === "1" ? calEl.offsetHeight : 0); wrap.style.setProperty("--ev-off", off + "px"); };
+  new ResizeObserver(syncOff).observe(calEl);
+  addEventListener("resize", syncOff);
+  const topRow = () => rows(ITEM).find((tr) => tr.getBoundingClientRect().bottom > off + 10) || null;
 
   // Fenster = Monate i-1..i+1; ältere/entfernte Monate fliegen raus, Scrollposition wird am obersten Eintrag festgehalten.
   async function ensureWindow(i) {
@@ -324,9 +336,10 @@ const EVENTS_SCRIPT = `
   }
   function flash(d) {
     rows('[data-date="' + d + '"]').forEach((tr) => {
-      tr.style.transition = "background-color .4s";
-      tr.style.backgroundColor = "color-mix(in oklab, var(--color-warning) 35%, transparent)";
-      setTimeout(() => { tr.style.backgroundColor = ""; }, 1500);
+      tr.style.transition = "background-color .4s, box-shadow .4s";
+      tr.style.backgroundColor = "color-mix(in oklab, var(--color-primary) 10%, transparent)";
+      tr.style.boxShadow = "0 0 0 .5rem color-mix(in oklab, var(--color-primary) 10%, transparent)";
+      setTimeout(() => { tr.style.backgroundColor = ""; tr.style.boxShadow = ""; }, 1500);
     });
   }
   // target: "YYYY-MM-DD" (erster Eintrag des Tages) oder "YYYY-MM" (erster Eintrag ab diesem Monat)
@@ -351,6 +364,7 @@ const EVENTS_SCRIPT = `
   const first = new Date(days[0] + "T00:00:00");
   const calendar = new Calendar(document.getElementById("ev-calendar"), {
     locale: "de-DE", firstWeekday: 1,
+    extensions: [monthsExt], type: "multiple", displayMonthsCount: 3, // Spalten umbrechen bei schmalem Viewport (Mobil: untereinander)
     dateMin: days[0], dateMax: days[days.length - 1],
     disableAllDates: true, enableDates: days, enableDateToggle: false,
     selectedMonth: Number(cfg.focus.slice(5)) - 1, selectedYear: Number(cfg.focus.slice(0, 4)),
@@ -448,6 +462,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
         <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: eventTagLabel(tag) }))} selected={tagFilter}
           allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
           applyLabel={t("common.apply")} resetLabel={t("common.reset")} searchPlaceholder={t("common.searchPlaceholder")} emptyLabel={t("events.filter.noTags")} />
+        <div class="self-center flex items-center gap-3"><ViewSwitch /><CalendarToggle /></div>
       </div>
 
       <EventsBrowser rows={rows} tz={tz} canManage={canManage} base="/events" tagFilter={tagFilter} monthParam={c.req.query("month")} />
