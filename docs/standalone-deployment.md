@@ -315,7 +315,7 @@ Optional und standardmäßig aus. Aktivieren: in Coolify `COMPOSE_PROFILES=obser
      `select approx_percentile_cont(duration,0.95)/1000 as p95_ms from "default" where span_kind='2' and http_route is not null`
    - `span_kind='2'` = Server-Span (eingehender Request); `duration` ist in µs; `http_response_status_code` ist ein String. Beide Abfragen sind gegen den Dev-Stack geprüft.
 3. Schwellwerte erst nach einigen Wochen Daten festlegen.
-4. Test-Versand an der laufenden Instanz prüfen (Alert bearbeiten → Test bzw. Schwellwert kurz absenken), sonst ist nicht sicher, dass SMTP funktioniert.
+4. Test-Versand an der laufenden Instanz prüfen: Schwellwert kurz so absenken, dass der Alert auslöst, Mail abwarten (Intervall + ca. 1 min), Schwellwert zurücksetzen. Empfänger müssen Nutzer der OpenObserve-Organisation sein (sonst 400 „recipients must be part of this org“). Im Dev-Stack mit Mailpit (`docker run --rm --network on-duty-dev-stack_default -p 8025:8025 --name mailpit axllent/mailpit`, OpenObserve mit `OPENOBSERVE_SMTP_ENABLED=true SMTP_HOST=mailpit SMTP_PORT=1025` neu starten) einmal erfolgreich getestet. Der E-Mail-Body hängt vom Template ab (Vorlage mit `{alert_name}`, `{rows}`).
 
 **Betrieb:** Die Aufbewahrung (60 Tage) begrenzt die Zeit, nicht das Volumen. Größe des Volumes `openobserve-data` gelegentlich prüfen (`docker system df -v`); bei Wachstum `OTEL_TRACES_SAMPLER_ARG` senken (z. B. `0.2`). Nach Produktivstart Event-Loop-Lag und Heap im Dashboard beobachten.
 
