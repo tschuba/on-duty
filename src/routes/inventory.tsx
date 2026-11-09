@@ -861,7 +861,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             { type: "toggle", param: "due", value: "soon", title: t("inventory.filter.dueSoon"), selected: dueFilter },
             { type: "toggle", param: "archived", title: t("inventory.filter.showArchived"), selected: showArchived ? ["1"] : [] },
             ...(canSeeLending ? [{ type: "toggle" as const, param: "lendable", title: t("inventory.filter.lendable"), selected: lendableOnly ? ["1"] : [] }] : []),
-            { type: "list", param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
+            { type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
             { type: "list", param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
           ]}
         />

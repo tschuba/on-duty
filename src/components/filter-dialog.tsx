@@ -6,7 +6,7 @@ type Base = { param: string; title: string; selected: string[]; defaults?: strin
 // mehrere toggles mit gleichem `param` bilden zusammen eine Gruppe (je mit der vollen `selected`-Liste).
 export type FilterSection =
   | (Base & { type: "chips"; options: FilterOption[] })
-  | (Base & { type: "list"; options: FilterOption[]; unused?: { label: string; storageKey: string } })
+  | (Base & { type: "list"; options: FilterOption[]; compact?: boolean; unused?: { label: string; storageKey: string } })
   | (Base & { type: "toggle"; value?: string });
 export type QuickFilter = { label: string; values: Record<string, string[]> };
 
@@ -45,7 +45,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
       </h4>
       <label class="input flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={labels.searchPlaceholder} class="grow min-w-0" data-fd-search /></label>
       {s.unused && <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-xs opacity-60"><input type="checkbox" class="toggle toggle-xs" data-fd-unused />{s.unused.label}</label>}
-      <ul class="space-y-0.5 min-h-24 max-h-[40dvh] overflow-y-auto">
+      <ul class={`space-y-0.5 min-h-24 overflow-y-auto ${s.compact ? "max-h-40" : "max-h-[40dvh]"}`}>
         {s.options.map((o, i) => (
           <>
             {o.group && o.group !== s.options[i - 1]?.group && <li class="text-xs font-semibold opacity-60 px-2 pt-2" data-fd-group>{o.group}</li>}
