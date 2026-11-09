@@ -204,7 +204,7 @@ Basis sind dieselben Compose-Dateien wie oben, nur ohne das Compose-Profil
 `app`.
 
 ```bash
-pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors
+pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors; mit OpenObserve: pnpm stack:up:observability
 pnpm stack:trust       # einmalig pro Rechner, danach Browser neu starten
 pnpm dev               # → https://app.localhost
 ```
@@ -232,6 +232,12 @@ Datei gewinnt) und verbindet sich mit dem Stack. Caddy proxyt dafür auf
 `host.docker.internal:3000` statt auf `app:3000`; Zitadels `HTTPClient.DenyList`
 lässt diese Adresse zu (sonst würde `DeniedURL` den Webhook blockieren, siehe
 oben).
+
+`--with-observability` startet zusätzlich OpenObserve (https://observe.localhost, Login
+`admin@openobserve.local` / `SERVICE_PASSWORD_OPENOBSERVE` aus `.env.standalone.dev` plus `Aa1!`) und trägt
+`OTEL_EXPORTER_OTLP_ENDPOINT` + Zugangsdaten in `.env.dev-stack` ein; `pnpm dev`
+exportiert dann Traces und Metriken (Intervall 60 s).
+Wer vor Ticket 112 schon `stack:up:obs` genutzt hat: Das alte Volume `openobserve-data` behält die damaligen Zugangsdaten (Login 401, Healthcheck bleibt `starting`) — einmalig `pnpm stack:reset`.
 
 Aufräumen: `pnpm stack:down` (Container stoppen, Volumes bleiben) bzw.
 `pnpm stack:reset` (alles löschen, inkl. `.env.standalone.dev`,
@@ -279,6 +285,15 @@ Unbehandelte Serverfehler (5xx, `uncaughtException`, `unhandledRejection`) könn
 ### Traces (OpenTelemetry, optional)
 
 Mit `OTEL_EXPORTER_OTLP_ENDPOINT` (z. B. `https://<host>/api/default` bei OpenObserve) exportiert die App Traces und Metriken per OTLP/HTTP; leer = aus. Anmeldung über `OPENOBSERVE_USER`/`OPENOBSERVE_PASSWORD` (Basic), `OTEL_EXPORTER_OTLP_HEADERS` überschreibt; `OTEL_TRACES_SAMPLER_ARG` = Anteil 0..1 (Standard 1). Details: `docs/deployment.md`.
+
+### OpenObserve mitliefern (Compose-Profil `observability`)
+
+Optional und standardmäßig aus. Aktivieren: in Coolify `COMPOSE_PROFILES=observability` setzen (zusammen mit Bugsink: `errors,observability`) und neu deployen. Zurück: Profil entfernen und neu deployen. Ob Coolify bei einer Profiländerung nur geänderte Services oder auch `app` neu startet, ist nicht geprüft.
+
+- UI unter eigener Domain (`SERVICE_FQDN_OPENOBSERVE_5080`). Login: `OPENOBSERVE_ADMIN_EMAIL` (Default `admin@openobserve.local`) und `SERVICE_PASSWORD_OPENOBSERVE` **plus `Aa1!`** (OpenObserve lehnt reine Hex-Passwörter ab).
+- Die App sendet Traces und Metriken automatisch an `http://openobserve:5080/api/default` (nur im Compose-Netz, OTLP ist nicht öffentlich); eine explizite `OTEL_EXPORTER_OTLP_ENDPOINT` hat Vorrang.
+- Aufbewahrung 60 Tage (`ZO_COMPACT_DATA_RETENTION_DAYS`). Speicher: Volume `openobserve-data`, **kein Backup**. RAM: höchstens ca. 1 GB zusätzlich.
+- Alert-Mails: mit `OPENOBSERVE_SMTP_ENABLED=true` über dieselben `SMTP_*`-Werte wie die App (Verschlüsselung ergibt sich aus dem Port). Standard ist aus, weil OpenObserve bei leeren Werten nicht startet.
 
 ### Bugsink mitliefern (Compose-Profil `errors`)
 

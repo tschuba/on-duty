@@ -12,6 +12,7 @@ export type NavCounts = {
   inspections: number;
   loans: number;
   loanRequests: number;
+  events: number;
   org: boolean;
   pendingUsers: number;
 };
@@ -41,7 +42,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
   const any = (...p: string[]) => p.some(has);
   const donations = any("donations:read", "donations:record", "donations:issue-receipts");
   return [
-    { icon: "calendar-days", label: t("common.nav.events"), items: [{ label: t("common.nav.events"), href: "/events", show: true }] },
+    { icon: "calendar-days", label: t("common.nav.events"), items: [{ label: t("common.nav.events"), href: "/events", show: true, count: c.events }] },
     { icon: "users", label: t("common.nav.members"), items: [
       { label: t("common.nav.members"), href: "/members", show: has("members:read") },
       { label: t("common.nav.anniversaries"), href: "/anniversaries", show: has("members:read") },

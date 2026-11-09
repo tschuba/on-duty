@@ -9,7 +9,9 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { HttpInstrumentation } from "@opentelemetry/instrumentation-http";
 import { PgInstrumentation } from "@opentelemetry/instrumentation-pg";
-import type { Span } from "@opentelemetry/api";
+import { metrics, type Meter, type Span } from "@opentelemetry/api";
+import { monitorEventLoopDelay } from "node:perf_hooks";
+import { getHeapStatistics } from "node:v8";
 
 const ASSET = /^\/(css|fonts|js)\/|^\/(health|favicon\.svg|apple-touch-icon\.png|manifest\.webmanifest|offline\.html|icon-[\w-]+\.png)(\?|$)/;
 
@@ -41,6 +43,30 @@ export function pgRequestHook(span: Span, { query }: { query: { text: string } }
   span.setAttribute("db.query.text", sanitizeSql(text));
 }
 
+// Event-loop delay (seconds, reset per export interval) and heap size (bytes), named after OTel semconv.
+export function registerRuntimeMetrics(meter: Meter): void {
+  const histogram = monitorEventLoopDelay({ resolution: 20 });
+  histogram.enable();
+  const sec = (ns: number) => (Number.isFinite(ns) ? ns / 1e9 : 0);
+  const p99 = meter.createObservableGauge("nodejs.eventloop.delay.p99", { unit: "s" });
+  const max = meter.createObservableGauge("nodejs.eventloop.delay.max", { unit: "s" });
+  const mean = meter.createObservableGauge("nodejs.eventloop.delay.mean", { unit: "s" });
+  // batch callback: one read + reset serves all three gauges
+  meter.addBatchObservableCallback((r) => {
+    r.observe(p99, sec(histogram.percentile(99)));
+    r.observe(max, sec(histogram.max));
+    r.observe(mean, sec(histogram.mean));
+    histogram.reset();
+  }, [p99, max, mean]);
+  meter
+    .createObservableGauge("v8js.memory.heap.used", { unit: "By" })
+    .addCallback((r) => r.observe(getHeapStatistics().used_heap_size));
+  meter
+    .createObservableGauge("v8js.memory.heap.limit", { unit: "By" })
+    .addCallback((r) => r.observe(getHeapStatistics().heap_size_limit));
+  meter.createObservableGauge("process.memory.usage", { unit: "By" }).addCallback((r) => r.observe(process.memoryUsage().rss));
+}
+
 export function startOtel(env: NodeJS.ProcessEnv = process.env): NodeSDK | undefined {
   if (!env.OTEL_EXPORTER_OTLP_ENDPOINT) return undefined;
   env.OTEL_SERVICE_NAME ??= "on-duty";
@@ -65,6 +91,7 @@ export function startOtel(env: NodeJS.ProcessEnv = process.env): NodeSDK | undef
   if (supportsSyncHooks()) registerSync({ include: ["node:http", "http"] });
   else register("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
   sdk.start();
+  registerRuntimeMetrics(metrics.getMeter("on-duty"));
   return sdk;
 }
 

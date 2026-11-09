@@ -4,6 +4,7 @@ import { t } from "../i18n/index.js";
 import { ageInYears } from "./status.js";
 import { isValidIban, normalizeIban } from "./iban.js";
 import { parseTags } from "./forms.js";
+import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
 
 // Reine Import-Logik für fwportal-xlsx-Exporte (Mitglieder- und Inventarliste). Kein DB-Zugriff.
 
@@ -220,10 +221,11 @@ export const ROLE_SYNONYMS: Record<string, Synonym> = {
   "schriftführerin": { role: "Schriftführer/-in", note: null },
 };
 
-export type RoleOption = { id: string; title: string; grantsActiveStatus: boolean };
+export type RoleOption = { id: string; title: string; grantsActiveStatus: boolean; typeId: string; typeName: string; typeSortOrder: number; typeAllowsActive: boolean };
+export type RoleTypeOption = { id: string; name: string; sortOrder: number; allowsActiveStatus: boolean };
 export type RoleChoice = { kind: "role"; roleId: string } | { kind: "new" };
 
-export function suggestRole(title: string, roles: RoleOption[]): { choice: RoleChoice; note: string | null } {
+export function suggestRole(title: string, roles: Pick<RoleOption, "id" | "title">[]): { choice: RoleChoice; note: string | null } {
   const syn = ROLE_SYNONYMS[title.toLowerCase().trim()];
   const find = (name: string) => roles.find((r) => normRole(r.title) === normRole(name));
   const bySyn = syn && find(syn.role);
@@ -234,10 +236,12 @@ export function suggestRole(title: string, roles: RoleOption[]): { choice: RoleC
   return { choice: same ? { kind: "role", roleId: same.id } : { kind: "new" }, note: null };
 }
 
-export type TitleDecision = { title: string; kind: "function" | "rank"; count: number; choice: RoleChoice; ignored: boolean; grants: boolean };
+export type TitleDecision = { title: string; kind: "function" | "rank"; count: number; choice: RoleChoice; ignored: boolean; grants: boolean; typeId: string };
 const sameChoice = (a: RoleChoice, b: RoleChoice) => a.kind === b.kind && (a.kind !== "role" || a.roleId === (b as { roleId: string }).roleId);
 export type PlannedAssignment = {
   key: string; title: string; kind: "function" | "rank"; roleChoice: RoleChoice; grants: boolean;
+  /** Index der Titel-Entscheidung, deren neue Funktion verwendet wird (nur bei roleChoice „new“). */
+  newIdx: number | null; typeId: string;
   from: string | null; note: string | null; assumed: boolean; skipped: boolean; suggested: boolean;
 };
 export type MemberRowPlan = {
@@ -259,7 +263,7 @@ export const memberKey = (m: Pick<ParsedMember, "lastName" | "firstName" | "birt
 
 /** Baut aus Rohdaten + Admin-Eingaben (Formular) den Importplan. `body` leer = Erstvorschau. */
 export function planMembers(
-  parsed: ParsedMember[], roles: RoleOption[], existingKeys: Set<string>, body: Body, today: string, tctx: TrainingContext | null = null,
+  parsed: ParsedMember[], roles: RoleOption[], roleTypes: RoleTypeOption[], existingKeys: Set<string>, body: Body, today: string, tctx: TrainingContext | null = null,
 ): MemberPlan {
   const posted = str(body, "_seen") === "1";
   const includedSet = new Set([body.inc].flat().filter((x): x is string => typeof x === "string"));
@@ -276,10 +280,30 @@ export function planMembers(
       const sel = str(body, `map_${i}`);
       const suggestion = suggestRole(title, roles).choice;
       const choice: RoleChoice = !sel ? suggestion : sel === "new" ? { kind: "new" } : { kind: "role", roleId: sel };
-      const grants = posted ? str(body, `grants_${i}`) === "1" : kind === "rank";
-      return { title, kind, count, choice, ignored: posted && str(body, `use_${i}`) !== "1", grants };
+      const fallbackType = [...roleTypes].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+      const preset = roleTypes.find((x) => x.id === ROLE_TYPE_IDS[kind === "rank" ? "rank" : "position"]) ?? fallbackType;
+      const type = roleTypes.find((x) => x.id === str(body, `type_${i}`)) ?? preset;
+      // Aktiver Status nur, wenn der Funktionstyp ihn erlaubt (serverseitig erzwungen).
+      const grants = !!type?.allowsActiveStatus && (posted ? str(body, `grants_${i}`) === "1" : kind === "rank");
+      return { title, kind, count, choice, ignored: posted && str(body, `use_${i}`) !== "1", grants, typeId: type?.id ?? "" };
     });
   const decision = new Map(titles.map((d) => [d.title, d]));
+  type Picked = { roleChoice: RoleChoice; newIdx: number | null; grants: boolean; typeId: string };
+  // Auswahl pro Zuweisung: Rollen-ID oder `new:<titelIndex>`; veraltete Werte (inkl. altem „new“) fallen auf `fallback` zurück.
+  const ofRole = (roleId: string): Picked => {
+    const role = roles.find((r) => r.id === roleId);
+    return { roleChoice: { kind: "role", roleId }, newIdx: null, grants: !!role?.grantsActiveStatus, typeId: role?.typeId ?? "" };
+  };
+  const pick = (raw: string | undefined, fallback: Picked): Picked => {
+    if (!raw) return fallback;
+    const m = /^new:(\d+)$/.exec(raw);
+    if (m) {
+      const idx = Number(m[1]), d = titles[idx];
+      return d && d.choice.kind === "new" && !d.ignored ? { roleChoice: { kind: "new" }, newIdx: idx, grants: d.grants, typeId: d.typeId } : fallback;
+    }
+    if (raw === "new") return fallback;
+    return ofRole(raw);
+  };
 
   const rows: MemberRowPlan[] = parsed.map((orig) => {
     const m = { ...orig };
@@ -306,24 +330,23 @@ export function planMembers(
         const noteIn = str(body, `note_${m.mid}_${k}`);
         const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : suggestRole(title, roles).note;
         // Pro Zuweisung überschreibbar: andere Rolle (oder „neu“) bzw. diese Zuweisung nicht übernehmen.
-        const rolePick = str(body, `arole_${m.mid}_${k}`);
-        const roleChoice: RoleChoice = !rolePick ? d.choice : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
+        const own: Picked = d.choice.kind === "new"
+          ? { roleChoice: d.choice, newIdx: titles.indexOf(d), grants: d.grants, typeId: d.typeId }
+          : ofRole(d.choice.roleId);
+        const { roleChoice, newIdx, grants, typeId } = pick(str(body, `arole_${m.mid}_${k}`), own);
         const skipped = posted && str(body, `ause_${m.mid}_${k}`) !== "1";
-        const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : d.grants;
         if (!skipped && !m.active && grants && !(m.birthDate && ageInYears(m.birthDate) >= env.ACTIVE_AGE_LIMIT)) warnings.push(t("import.row.activeWarning", { title: title }));
         // Angenommen: fehlendes Beförderungsdatum. Funktionen ohne Von bleiben leer (Warnung „Von fehlt“).
-        assignments.push({ key: String(k), title, kind, roleChoice, grants, from, note, assumed: !skipped && kind === "rank" && !rankDate, skipped, suggested: sameChoice(roleChoice, d.choice) });
+        assignments.push({ key: String(k), title, kind, roleChoice, grants, newIdx, typeId, from, note, assumed: !skipped && kind === "rank" && !rankDate, skipped, suggested: roleChoice.kind === "new" ? newIdx === own.newIdx : sameChoice(roleChoice, d.choice) });
       });
       // Basisrolle nur als Fallback, wenn keine (nicht ausgelassene) Zuweisung den aktiven Status vergibt. Wie jede andere Zuweisung pro Mitglied überschreibbar.
       if (m.active && !assignments.some((x) => !x.skipped && x.grants)) {
-        const rolePick = str(body, `arole_${m.mid}_a`);
-        const roleChoice: RoleChoice = !rolePick ? { kind: "role", roleId: ACTIVE_ROLE_ID } : rolePick === "new" ? { kind: "new" } : { kind: "role", roleId: rolePick };
+        const { roleChoice, newIdx, grants, typeId } = pick(str(body, `arole_${m.mid}_a`), ofRole(ACTIVE_ROLE_ID));
         const skipped = posted && str(body, `ause_${m.mid}_a`) !== "1";
         const from = toIsoDate(str(body, `from_${m.mid}_a`)) ?? m.firstEntryDate ?? m.entryDate!;
         const noteIn = str(body, `note_${m.mid}_a`);
         const note = noteIn !== undefined ? clean(noteIn)?.slice(0, 200) ?? null : null;
-        const grants = roleChoice.kind === "role" ? !!roles.find((r) => r.id === roleChoice.roleId)?.grantsActiveStatus : true;
-        assignments.unshift({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice, grants, from, note, assumed: !skipped, skipped, suggested: sameChoice(roleChoice, { kind: "role", roleId: ACTIVE_ROLE_ID }) });
+        assignments.unshift({ key: "a", title: "Feuerwehr-Anwärter", kind: "function", roleChoice, grants, newIdx, typeId, from, note, assumed: !skipped, skipped, suggested: sameChoice(roleChoice, { kind: "role", roleId: ACTIVE_ROLE_ID }) });
       }
     }
     warnings.push(...m.trainingWarnings);

@@ -1,24 +1,25 @@
 import { sortTrainings } from "../lib/training.js";
 import { Hono } from "hono";
-import { eq, isNotNull, sql } from "drizzle-orm";
-import { ROLE_TYPE_IDS } from "../db/role-seed-data.js";
+import { asc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { FromMissingBadge } from "./members.js";
-import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, inventoryTemplates, memberRoleAssignments, memberRoles, members, persons, trainingRecords } from "../db/schema/index.js";
+import { inventoryItemNumbers, inventoryItems, inventoryItemSerials, inventoryItemTags, inventoryTemplates, memberRoleAssignments, memberRoleTypes, memberRoles, members, persons, trainingRecords } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDate } from "../lib/format.js";
 import { Layout } from "../components/layout.js";
+import { Icon } from "../components/icon.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { TagSuggestions } from "./inventory.js";
 import { ChipInput } from "../components/chip-input.js";
+import { MultiSelectFilter, type FilterOption } from "../components/multi-select-filter.js";
 import { Section } from "../components/section.js";
 import { HTTP_STATUS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import {
   ASSUMED_NOTE, ACTIVE_ROLE_ID, ImportError, courseColumns, trainingKey, TRAINING_SPECIAL, MAX_UPLOAD_BYTES, checkUpload, memberKey, normalizeIban,
   parseInventory, parseMembers, planInventory, planMembers, readWorkbook, unmappedColumns,
-  type ImportKind, type ImportTemplate, type InventoryPlan, type MemberPlan, type RoleOption,
+  type ImportKind, type ImportTemplate, type InventoryPlan, type MemberPlan, type RoleOption, type RoleTypeOption,
 } from "../lib/import.js";
 
 export const importRoutes = new Hono<{ Variables: Variables }>();
@@ -117,14 +118,18 @@ function UploadPage({ user, error, kind: only }: { user: any; error?: string; ki
 importRoutes.get("/", guard, (c) => c.html(<UploadPage user={c.get("user")} kind={parseKind(c.req.query("kind"))} />));
 
 async function loadContext() {
-  const roles: RoleOption[] = (await db.select({ id: memberRoles.id, title: memberRoles.title, grantsActiveStatus: memberRoles.grantsActiveStatus }).from(memberRoles))
+  const roles: RoleOption[] = (await db.select({
+    id: memberRoles.id, title: memberRoles.title, grantsActiveStatus: memberRoles.grantsActiveStatus,
+    typeId: memberRoleTypes.id, typeName: memberRoleTypes.name, typeSortOrder: memberRoleTypes.sortOrder, typeAllowsActive: memberRoleTypes.allowsActiveStatus,
+  }).from(memberRoles).innerJoin(memberRoleTypes, eq(memberRoles.typeId, memberRoleTypes.id)))
     .sort((x, y) => x.title.localeCompare(y.title, "de"));
+  const roleTypes: RoleTypeOption[] = await db.select({ id: memberRoleTypes.id, name: memberRoleTypes.name, sortOrder: memberRoleTypes.sortOrder, allowsActiveStatus: memberRoleTypes.allowsActiveStatus }).from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   const people = await db.select({ id: members.id, lastName: persons.lastName, firstName: persons.firstName, birthDate: persons.birthDate }).from(persons).innerJoin(members, eq(members.personId, persons.id)).where(isNotNull(persons.birthDate));
   const existingKeys = new Set(people.map(memberKey));
   const memberIds = new Map(people.map((p) => [memberKey(p), p.id]));
   const trainingKeys = new Set((await db.select().from(trainingRecords)).map((r) => trainingKey(r.memberId, r)));
   const numbers = new Set((await db.select({ n: inventoryItemNumbers.number }).from(inventoryItemNumbers)).map((r) => r.n));
-  return { roles, existingKeys, numbers, training: { memberIds, keys: trainingKeys } };
+  return { roles, roleTypes, existingKeys, numbers, training: { memberIds, keys: trainingKeys } };
 }
 
 async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer; name: string; kind: ImportKind; headers: string[]; rows: ReturnType<typeof readWorkbook>["rows"] }> {
@@ -142,128 +147,161 @@ async function readUpload(body: Body, only?: ImportKind): Promise<{ buf: Buffer;
   return { buf, name, ...wb };
 }
 
-// Durchsuchbare Rollenauswahl: sichtbares Textfeld mit <datalist>, die ID steckt im Hidden-Feld.
-function RoleCombo({ name, value, roles, disabled, suggested }: { name: string; value: string; roles: RoleOption[]; disabled?: boolean; suggested?: boolean }) {
-  const label = value === "new" ? t("import.option.new") : roles.find((r) => r.id === value)?.title ?? "";
+// Durchsuchbare Einfachauswahl (Gruppen nach Funktionstyp); Wert steckt im Hidden-Feld `name`.
+function RoleCombo({ name, value, options, disabled, suggested, label: fwTitle }: { name: string; value: string; options: FilterOption[]; disabled?: boolean; suggested?: boolean; label: string }) {
   return (
-    <>
-      <input type="text" list="role-options" data-combo value={label} disabled={disabled} autocomplete="off" placeholder={t("import.option.search")}
-        class={`input-sm w-56 ${value === "new" ? "input-warning" : suggested ? "input-info" : ""}`}
-        title={suggested ? t("import.role.suggestedHint") : undefined} />
-      <input type="hidden" name={name} value={value} disabled={disabled} />
-    </>
+    <span title={suggested ? t("import.role.suggestedHint") : undefined}>
+      <MultiSelectFilter single searchable param={name} options={options} selected={[value]} disabled={disabled}
+        tone={value === "new" ? "warning" : suggested ? "info" : undefined} ariaLabel={`${fwTitle} – ${t("import.col.mapping")}`}
+        allLabel="" countLabel={() => ""} applyLabel="" resetLabel="" searchPlaceholder={t("import.option.search")} />
+    </span>
   );
+}
+
+/** Rollen nach Typ gruppiert (Typreihenfolge, darin alphabetisch); `extra` sind noch nicht angelegte Funktionen. */
+function roleOptions(roles: RoleOption[], extra: { value: string; label: string; typeId: string }[], roleTypes: RoleTypeOption[], withNew: boolean): FilterOption[] {
+  const typeName = new Map(roleTypes.map((x) => [x.id, x.name]));
+  const order = new Map(roleTypes.map((x) => [x.id, x.sortOrder]));
+  const all = [
+    ...roles.map((r) => ({ value: r.id, label: r.title, typeId: r.typeId, group: r.typeName, hint: undefined as string | undefined })),
+    ...extra.map((e) => ({ ...e, group: typeName.get(e.typeId) ?? "", hint: t("import.option.pending") })),
+  ].sort((a, b) => (order.get(a.typeId) ?? 0) - (order.get(b.typeId) ?? 0) || a.label.localeCompare(b.label, "de"));
+  return [...(withNew ? [{ value: "new", label: t("import.option.new") }] : []), ...all.map(({ typeId: _t, ...o }) => o)];
 }
 
 const Err = ({ children }: { children: string }) => <span class="badge badge-error badge-sm">{children}</span>;
 
-function MemberPreview({ plan, roles, confirmed }: { plan: MemberPlan; roles: RoleOption[]; confirmed: boolean }) {
+function MemberPreview({ plan, roles, roleTypes, confirmed }: { plan: MemberPlan; roles: RoleOption[]; roleTypes: RoleTypeOption[]; confirmed: boolean }) {
   const selected = (c: { kind: string; roleId?: string }) => (c.kind === "role" ? c.roleId : c.kind);
   const newCount = plan.titles.filter((d) => d.choice.kind === "new" && !d.ignored).length;
   const included = plan.rows.filter((r) => r.included);
+  const assignmentRows = included.flatMap(({ m, assignments }) => assignments.map((a) => ({ m, a })));
   const warned = included.filter((r) => r.warnings.length).length;
   const problems = plan.blockers + warned;
+  const hasNotes = plan.rows.some((r) => r.errors.length || r.warnings.length);
+  const trainingRows = plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => sortTrainings(trainings, (x) => ({ ...x, member: null, organizer: null })).map((x) => ({ m, x })));
+  const titleOptions = roleOptions(roles, [], roleTypes, true);
+  const memberOptions = roleOptions(roles, plan.titles.flatMap((d, i) => d.choice.kind === "new" && !d.ignored ? [{ value: `new:${i}`, label: d.title, typeId: d.typeId }] : []), roleTypes, false);
+  const anyExistingTraining = trainingRows.some(({ x }) => x.exists);
   return (
     <>
-      <datalist id="role-options">
-        <option value={t("import.option.new")} data-id="new" />
-        {roles.map((r) => <option value={r.title} data-id={r.id} />)}
-      </datalist>
       <Section title={t("import.titles.heading")} badge={plan.titles.length} tone={newCount ? "warning" : undefined} open={newCount > 0}>
         {plan.titles.length === 0 ? <p class="opacity-60">{t("import.titles.none")}</p> : (
-          <table class="table table-zebra w-full">
-            <thead><tr><th>{t("import.col.fwportal")}</th><th>{t("import.col.kind")}</th><th>{t("import.col.count")}</th><th>{t("import.col.mapping")}</th><th>{t("import.col.grantsActive")}</th><th>{t("import.col.use")}</th></tr></thead>
+          <table class="table w-full">
+            <thead><tr><th>{t("import.col.fwportal")}</th><th>{t("import.col.count")}</th><th title={t("import.col.mapping.hint")}>{t("import.col.mapping")}</th><th>{t("import.col.grantsActive")}</th><th>{t("import.col.use")}</th></tr></thead>
             <tbody>
-              {plan.titles.map((d, i) => (
-                <tr>
-                  <td>{d.title}</td><td>{d.kind === "rank" ? t("import.kind.rank") : t("import.kind.function")}</td><td>{d.count}</td>
-                  <td>
-                    <RoleCombo name={`map_${i}`} value={d.choice.kind === "new" ? "new" : (d.choice as { roleId: string }).roleId} roles={roles} disabled={d.ignored} />
-                  </td>
-                  <td>{d.choice.kind === "new" && !d.ignored ? <label class="flex w-full items-center pointer-coarse:min-h-11"><input type="checkbox" name={`grants_${i}`} value="1" class="checkbox checkbox-sm" checked={d.grants} /></label> : "–"}</td>
-                  <td><input type="checkbox" name={`use_${i}`} value="1" class="toggle toggle-sm" checked={!d.ignored} /></td>
-                </tr>
-              ))}
+              {plan.titles.map((d, i) => {
+                const isNew = d.choice.kind === "new";
+                const existing = d.choice.kind === "role" ? roles.find((r) => r.id === (d.choice as { roleId: string }).roleId) : undefined;
+                const type = roleTypes.find((x) => x.id === d.typeId);
+                return (
+                  <>
+                    {d.kind !== plan.titles[i - 1]?.kind && <tr><th colspan={5} class="bg-base-200 text-left">{t(`import.titles.group.${d.kind}`)}</th></tr>}
+                    <tr>
+                      <td>{d.title}</td><td>{d.count}</td>
+                      <td class="space-y-1">
+                        <RoleCombo name={`map_${i}`} value={isNew ? "new" : (d.choice as { roleId: string }).roleId} options={titleOptions} disabled={d.ignored} label={d.title} />
+                        {isNew && !d.ignored && (
+                          <select name={`type_${i}`} class="select select-sm w-56 block pointer-coarse:min-h-11" aria-label={`${d.title} – ${t("import.col.roleType")}`} title={t("import.col.roleType")}>
+                            {roleTypes.map((x) => <option value={x.id} selected={x.id === d.typeId}>{x.name}</option>)}
+                          </select>
+                        )}
+                      </td>
+                      <td>{d.ignored ? "–" : isNew
+                        ? <label class="flex w-full items-center pointer-coarse:min-h-11" title={type?.allowsActiveStatus ? undefined : t("import.grantsActive.na")}><input type="checkbox" name={`grants_${i}`} value="1" class="checkbox checkbox-sm" checked={d.grants} disabled={!type?.allowsActiveStatus} /></label>
+                        : <span title={t("import.col.grantsActive")}>{existing?.grantsActiveStatus ? t("import.grantsActive.yes") : t("import.grantsActive.no")}</span>}</td>
+                      <td><input type="checkbox" name={`use_${i}`} value="1" class="toggle toggle-sm" checked={!d.ignored} /></td>
+                    </tr>
+                  </>
+                );
+              })}
             </tbody>
           </table>
         )}
         {newCount > 0 && <p class="text-sm opacity-60 mt-1">{t("import.newRolesHint")}</p>}
       </Section>
 
-      <Section title={t("import.members.title")} badge={plan.rows.length} open={problems > 0}>
-        <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
-          <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
-          <span>{t("import.members.onlyProblems", { count: problems })}</span>
-        </label>
+      <Section title={t("import.members.title")} badge={t("import.members.badge", { total: plan.rows.length, included: included.length })} open={problems > 0}>
+        {hasNotes && (
+          <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
+            <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
+            <span>{t("import.members.onlyProblems", { count: problems })}</span>
+          </label>
+        )}
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th><th>{t("import.col.notes")}</th><th>{t("import.col.use")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.name")}</th><th>{t("import.col.birthDate")}</th><th>{t("import.col.entryDate")}</th><th>{t("import.col.address")}</th><th>{t("import.col.contact")}</th>{hasNotes && <th>{t("import.col.notes")}</th>}<th>{t("import.col.use")}</th></tr></thead>
           <tbody>
             {plan.rows.map(({ m, included, duplicate, errors, warnings, assignments }) => (
               <tr data-problem={errors.length || warnings.length ? "1" : undefined} class={duplicate ? "opacity-50 italic" : undefined}>
                                 <td>{m.lastName}, {m.firstName}</td>
-                <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input-sm" />}</td>
-                <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input-sm" />}</td>
+                <td>{m.birthDate ? formatDate(m.birthDate) : <input type="date" name={`birth_${m.mid}`} class="input input-sm" />}</td>
+                <td>{m.entryDate ? formatDate(m.entryDate) : <input type="date" name={`entry_${m.mid}`} class="input input-sm" />}</td>
                 <td class="text-sm">
                   {[[m.street, m.houseNumber].filter(Boolean).join(" "), [m.zip, m.city].filter(Boolean).join(" ")].filter(Boolean).map((v) => <div>{v}</div>)}
                 </td>
                 <td class="text-sm">
                   {[m.phone, m.mobile, m.email].filter(Boolean).map((v) => <div>{v}</div>)}
                 </td>
-                <td class="space-x-1">
-                  {duplicate && <span class="badge badge-info badge-sm not-italic">{t("import.badge.existing")}</span>}
-                  {errors.map((e) => <Err>{e}</Err>)}
-                  {warnings.map((w) => <span class="badge badge-warning badge-sm" title={w}>{w}</span>)}
-                </td>
-                <td><input type="checkbox" name="inc" value={m.mid} class="toggle toggle-sm" checked={included} disabled={duplicate} /></td>
+                {hasNotes && (
+                  <td class="space-x-1">
+                    {errors.map((e) => <Err>{e}</Err>)}
+                    {warnings.map((w) => <span class="badge badge-warning badge-sm" title={w}>{w}</span>)}
+                  </td>
+                )}
+                <td>{duplicate ? <span class="badge badge-info badge-sm not-italic whitespace-nowrap">{t("import.badge.existing")}</span> : <input type="checkbox" name="inc" value={m.mid} class="toggle toggle-sm" checked={included} />}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </Section>
 
-      <Section id="assignments" title={t("import.assignments.heading")} badge={plan.rows.reduce((n, r) => n + r.assignments.length, 0)} badge2={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : undefined} open={plan.assumedCount > 0 && !confirmed}>
+      <Section id="assignments" title={t("import.assignments.heading")} badge={assignmentRows.length} badge2={plan.assumedCount ? t("import.assignments.badge", { count: plan.assumedCount }) : undefined} open={plan.assumedCount > 0 && !confirmed}>
         {plan.assumedCount > 0 && (
-          <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold pointer-coarse:min-h-11">
-            <input type="checkbox" name="assumed_ok" value="1" class="checkbox checkbox-sm" checked={confirmed} />
-            <span>{t("import.assignments.confirm", { count: plan.assumedCount })}</span>
-          </label>
+          <>
+            <label class="flex items-center gap-2 cursor-pointer mb-3 font-semibold pointer-coarse:min-h-11">
+              <input type="checkbox" name="assumed_ok" value="1" class="checkbox checkbox-sm" checked={confirmed} />
+              <span>{t("import.assignments.confirm", { count: plan.assumedCount })}</span>
+            </label>
+            <div class="alert alert-warning mb-2">{t("import.assignments.assumedHint")}</div>
+          </>
         )}
-        <div class="alert alert-warning mb-2">{t("import.assignments.assumedHint")}</div>
+        {assignmentRows.length === 0 ? <p class="opacity-60">{t("import.assignments.none")}</p> : (
         <table class="table table-zebra w-full">
           <thead><tr><th>{t("import.col.person")}</th><th>{t("import.col.fwportal")}</th><th>{t("import.col.role")}</th><th>{t("import.col.note")}</th><th>{t("import.col.from")}</th><th>{t("import.col.use")}</th></tr></thead>
           <tbody>
-            {included.flatMap(({ m, assignments }) => assignments.map((a) => (
+            {assignmentRows.map(({ m, a }) => (
               <tr class={a.skipped ? "opacity-50" : undefined}>
                 <td>{m.lastName}, {m.firstName}</td>
                 <td>{a.key === "a" ? <span class="badge badge-info badge-sm" title={t("import.badge.baseRoleHint")}>{t("import.badge.baseRole")}</span> : a.title}</td>
                 <td>
-                  <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? "new" : a.roleChoice.roleId} roles={roles} disabled={a.skipped} suggested={a.suggested} />
+                  <RoleCombo name={`arole_${m.mid}_${a.key}`} value={a.roleChoice.kind === "new" ? `new:${a.newIdx}` : a.roleChoice.roleId} options={memberOptions} disabled={a.skipped} suggested={a.suggested} label={a.key === "a" ? t("import.badge.baseRole") : a.title} />
                 </td>
-                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input-sm" disabled={a.skipped} /></td>
+                <td><input name={`note_${m.mid}_${a.key}`} value={a.note ?? ""} maxlength={ASSIGNMENT_NOTE_MAX_LENGTH} class="input input-sm" disabled={a.skipped} /></td>
                 <td>
-                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from ?? ""} class="input-sm" disabled={a.skipped} />
+                  <input type="date" name={`from_${m.mid}_${a.key}`} value={a.from ?? ""} class="input input-sm" disabled={a.skipped} />
                   {!a.from && !a.skipped && <FromMissingBadge />}
                   {a.assumed && <span class="badge badge-warning badge-sm ml-1">{t("import.badge.assumed")}</span>}
                 </td>
                 <td><input type="checkbox" name={`ause_${m.mid}_${a.key}`} value="1" class="toggle toggle-sm" checked={!a.skipped} /></td>
               </tr>
-            )))}
+            ))}
           </tbody>
         </table>
+        )}
       </Section>
 
       {plan.newTrainings + plan.existingTrainings > 0 && (
         <Section title={t("import.trainings.heading")} badge={plan.newTrainings} open>
           <table class="table table-zebra w-full">
-            <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th><th></th></tr></thead>
+            <thead><tr><th>{t("import.col.person")}</th><th>{t("import.trainings.title")}</th><th>{t("import.trainings.completedAt")}</th><th>{t("import.trainings.expiresAt")}</th>{anyExistingTraining && <th></th>}</tr></thead>
             <tbody>
-              {plan.rows.filter((r) => r.included || r.existingMemberId).flatMap(({ m, trainings }) => sortTrainings(trainings, (x) => ({ ...x, member: null, organizer: null })).map((x) => (
+              {trainingRows.map(({ m, x }) => (
                 <tr class={x.exists ? "opacity-50 italic" : undefined}>
                   <td>{m.lastName}, {m.firstName}</td><td>{x.title}</td>
                   <td>{x.completedAt ? formatDate(x.completedAt) : ""}</td><td>{x.expiresAt ? formatDate(x.expiresAt) : ""}</td>
-                  <td>{x.exists && <span class="badge badge-info badge-sm not-italic">{t("import.badge.existing")}</span>}</td>
+                  {anyExistingTraining && <td>{x.exists && <span class="badge badge-info badge-sm not-italic whitespace-nowrap">{t("import.badge.existing")}</span>}</td>}
                 </tr>
-              )))}
+              ))}
             </tbody>
           </table>
         </Section>
@@ -301,15 +339,17 @@ function InventoryPreview({ plan, templates }: { plan: InventoryPlan; templates:
         </table>
       </Section>
       <Section title={t("import.positions.title")} badge={plan.rowCount} tone={existing ? "warning" : undefined} open={existing > 0}>
-        <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
-          <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
-          <span>{t("import.positions.onlyExisting", { count: existing })}</span>
-        </label>
+        {existing > 0 && (
+          <label class="label cursor-pointer justify-start gap-2 mb-2 pointer-coarse:min-h-11">
+            <input type="checkbox" class="checkbox checkbox-sm" data-only-problems />
+            <span>{t("import.positions.onlyExisting", { count: existing })}</span>
+          </label>
+        )}
         <p class="text-sm opacity-70 mb-2">{t("import.positions.bundleHint")}</p>
         <TagSuggestions />
         <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
-          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.template")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th><th>{t("import.col.notes")}</th></tr></thead>
+          <thead><tr><th>{t("import.col.designation")}</th><th>{t("import.col.itemType")}</th><th>{t("import.col.template")}</th><th>{t("import.col.count")}</th><th>{t("import.col.itemNumber")}</th><th>{t("import.col.tags")}</th>{existing > 0 && <th>{t("import.col.notes")}</th>}</tr></thead>
           <tbody>
             {plan.positions.map((p) => {
               const nums = [...p.numbers].sort((a, b) => a.localeCompare(b, "de", { numeric: true }));
@@ -338,9 +378,9 @@ function InventoryPreview({ plan, templates }: { plan: InventoryPlan; templates:
                     </div>
                   </td>
                   <td class="min-w-80"><ChipInput name={`tags_${p.items[0].id}`} label="" values={p.tags} splitOnComma caseSensitive={false} suggestionsFrom={`#${TAG_SUGGESTIONS_ID}`} /></td>
-                  <td>
+                  {existing > 0 && <td>
                     {p.duplicateNumbers.length > 0 && <span class="badge badge-info badge-sm not-italic whitespace-nowrap" title={p.duplicateNumbers.join(", ")}>{t("import.badge.existing")}</span>}
-                  </td>
+                  </td>}
                 </tr>
               );
             })}
@@ -378,7 +418,7 @@ async function handle(c: any, run: boolean) {
     );
 
     if (up.kind === "members") {
-      const plan = planMembers(parseMembers(up.rows, courses, today()), ctx.roles, ctx.existingKeys, body, today(), courses ? ctx.training : null);
+      const plan = planMembers(parseMembers(up.rows, courses, today()), ctx.roles, ctx.roleTypes, ctx.existingKeys, body, today(), courses ? ctx.training : null);
       const needsActive = plan.rows.some((r) => r.included && r.m.active && !r.m.deathDate);
       const activeMissing = needsActive && !ctx.roles.some((r) => r.id === ACTIVE_ROLE_ID);
       const canRun = plan.blockers === 0 && !activeMissing && (plan.assumedCount === 0 || body.assumed_ok === "1") && plan.rows.some((r) => r.included || (courses && r.trainings.some((x) => !x.exists)));
@@ -398,7 +438,7 @@ async function handle(c: any, run: boolean) {
             ...(courses ? [{ label: t("import.summary.trainings"), value: plan.newTrainings }, { label: t("import.summary.trainingsExisting"), value: plan.existingTrainings }] : []),
           ]}
           notices={[!canTraining && up.kind === "members" && t("import.notice.noTraining"), activeMissing && t("import.notice.activeRoleMissing"), plan.blockers > 0 && t("import.notice.incompleteRows", { count: plan.blockers }), plan.assumedCount > 0 && body.assumed_ok !== "1" && { text: t("import.notice.confirmAssumed"), href: "#assignments" }]}>
-          <MemberPreview plan={plan} roles={ctx.roles} confirmed={body.assumed_ok === "1"} />
+          <MemberPreview plan={plan} roles={ctx.roles} roleTypes={ctx.roleTypes} confirmed={body.assumed_ok === "1"} />
         </PreviewShell>,
       );
     }
@@ -449,7 +489,7 @@ const AUTOREFRESH_SCRIPT = `
     if (v) { secs.forEach((d, i) => { d.open = v.open.includes(i); }); scrollTo(0, v.y); }
   } catch {}
   form.addEventListener("change", (e) => {
-    if (!/^((map|grants|use|arole|ause|nob|cat|pcat)_|assumed_ok$)/.test(e.target.name || "")) return;
+    if (!/^((map|type|grants|use|arole|ause|nob|cat|pcat)_|assumed_ok$)/.test(e.target.name || "")) return;
     sessionStorage.setItem(SK, JSON.stringify({ y: scrollY, open: secs.flatMap((d, i) => (d.open ? [i] : [])) }));
     form.requestSubmit(document.getElementById("refresh-btn"));
   });
@@ -460,24 +500,6 @@ const OPENLINK_SCRIPT = `
 document.querySelectorAll("a[data-open]").forEach((a) => a.addEventListener("click", () => {
   const d = document.querySelector(a.getAttribute("href")); if (d) d.open = true;
 }));`;
-
-const COMBO_SCRIPT = `
-(() => {
-  const opts = [...document.querySelectorAll("#role-options option")];
-  document.querySelectorAll("input[data-combo]").forEach((inp) => {
-    const hidden = inp.nextElementSibling; let prev = inp.value;
-    // Beim Fokus leeren, sonst zeigt die Liste nur den aktuellen Treffer.
-    inp.addEventListener("focus", () => { prev = inp.value; inp.value = ""; });
-    const commit = () => {
-      const o = opts.find((x) => x.value === inp.value);
-      if (!o) { inp.value = prev; return; }
-      prev = inp.value;
-      if (hidden.value !== o.dataset.id) { hidden.value = o.dataset.id; hidden.dispatchEvent(new Event("change", { bubbles: true })); }
-    };
-    inp.addEventListener("change", commit);
-    inp.addEventListener("blur", () => { inp.value ? commit() : (inp.value = prev); });
-  });
-})();`;
 
 type Summary = { label: string; value: number; tone?: "error" | "warning" }[];
 
@@ -523,7 +545,7 @@ function PreviewShell(props: { user: any; kind: ImportKind; only?: ImportKind; f
             </Section>
           )}
         </form>
-        <script dangerouslySetInnerHTML={{ __html: DRAFT_SCRIPT + FILTER_SCRIPT + AUTOREFRESH_SCRIPT + OPENLINK_SCRIPT + COMBO_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: DRAFT_SCRIPT + FILTER_SCRIPT + AUTOREFRESH_SCRIPT + OPENLINK_SCRIPT }} />
       </div>
     </Layout>
   );
@@ -572,7 +594,7 @@ async function runMembers(plan: MemberPlan, roles: RoleOption[], _user: unknown)
       for (const { m, assignments } of rows) {
         for (const a of assignments) {
           if (a.skipped || a.roleChoice.kind !== "new" || roleIdByTitle.has(a.title)) continue;
-          const typeId = a.grants ? ROLE_TYPE_IDS.rank : ROLE_TYPE_IDS.other;
+          const typeId = a.typeId;
           const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${memberRoles.sortOrder}), 0)` }).from(memberRoles).where(eq(memberRoles.typeId, typeId));
           const [r] = await tx.insert(memberRoles).values({ title: a.title, grantsActiveStatus: a.grants, typeId, sortOrder: Number(max) + 1 }).returning({ id: memberRoles.id });
           roleIdByTitle.set(a.title, r.id);
