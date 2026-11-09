@@ -16,7 +16,7 @@ import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } f
 import { RolePopover } from "../components/role-popover.js";
 import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
-import { MembersFilterDialog } from "../components/members-filter-dialog.js";
+import { FilterDialog } from "../components/filter-dialog.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
@@ -944,21 +944,23 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
     senior: t("members.filter.age.senior", { limit: a }),
   };
   return (
-    <MembersFilterDialog
+    <FilterDialog
       id="members-filter-dialog"
       hidden={hidden}
       labels={{
         button: t("members.filter.button"), title: t("members.filter.title"), quick: t("members.filter.quick"),
         apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"),
-        unusedRoles: t("members.filter.showUnusedRoles"), status: t("members.table.status"), age: t("members.filter.age"), role: t("members.table.roles"),
       }}
-      quick={QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), status: f.status, age: f.age }))}
-      status={{ options: STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "deceased" ? "cross" : undefined })), selected: statusFilter, defaults: DEFAULT_STATUS }}
-      age={{ options: AGE_GROUPS.map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter }}
-      role={{
-        options: roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), unused: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" })),
-        selected: roleFilter, storageKey: "members.showUnusedRoles",
-      }}
+      quick={QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), values: { status: f.status, age: f.age } }))}
+      sections={[
+        { type: "chips", param: "status", title: t("members.table.status"), options: STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "deceased" ? "cross" : undefined })), selected: statusFilter, defaults: DEFAULT_STATUS },
+        { type: "chips", param: "age", title: t("members.filter.age"), options: AGE_GROUPS.map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter },
+        {
+          type: "list", param: "role", title: t("members.table.roles"),
+          options: roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), unused: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" })),
+          selected: roleFilter, unused: { label: t("members.filter.showUnusedRoles"), storageKey: "members.showUnusedRoles" },
+        },
+      ]}
     />
   );
 }
