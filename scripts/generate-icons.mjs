@@ -11,6 +11,7 @@ const out = join(root, "src", "components", "icons.generated.ts");
 
 const ICONS = {
   fire: "flame",
+  list: "list",
   "exclamation-triangle": "alert-triangle",
   "calendar-days": "calendar",
   banknotes: "cash",
@@ -60,6 +61,7 @@ const ICONS = {
   "map-pin": "map-pin",
   "map-2": "map-2",
   "current-location": "current-location",
+  world: "world",
   "world-latitude": "world-latitude",
   "world-longitude": "world-longitude",
   "clipboard-list": "clipboard-list",
