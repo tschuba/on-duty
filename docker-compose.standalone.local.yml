@@ -59,6 +59,7 @@ services:
       APP_UPSTREAM: ${APP_UPSTREAM:-app:3000}
       ZITADEL_DOMAIN: ${SERVICE_FQDN_ZITADEL}
       BUGSINK_DOMAIN: ${SERVICE_FQDN_BUGSINK:-errors.localhost}
+      OPENOBSERVE_DOMAIN: ${SERVICE_FQDN_OPENOBSERVE:-observe.localhost}
     volumes:
       - ./Caddyfile.standalone.local:/etc/caddy/Caddyfile:ro
       - ${CADDY_DATA:-caddy_data}:/data
@@ -73,26 +74,12 @@ services:
         aliases:
           - ${SERVICE_FQDN_APP}
           - ${SERVICE_FQDN_BUGSINK:-errors.localhost}
+          - ${SERVICE_FQDN_OPENOBSERVE:-observe.localhost}
           - ${SERVICE_FQDN_ZITADEL}
-
-  # Optional Observability-Backend für `pnpm stack:up --with-observability` (Profil `observability`).
-  openobserve:
-    image: public.ecr.aws/zinclabs/openobserve:latest
-    profiles: [observability]
-    restart: unless-stopped
-    environment:
-      ZO_ROOT_USER_EMAIL: admin@onduty.local
-      # OpenObserve verlangt Groß-/Kleinbuchstaben, Ziffer und Sonderzeichen
-      ZO_ROOT_USER_PASSWORD: ${SERVICE_PASSWORD_ADMIN}Aa1!
-    ports:
-      - "127.0.0.1:5080:5080"
-    volumes:
-      - openobserve-data:/data
 
 volumes:
   caddy_data:
   caddy_config:
-  openobserve-data:
 
 networks:
   default:
