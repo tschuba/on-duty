@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ToggleFilter } from "../components/toggle-filter.js";
+import { FilterDialog } from "../components/filter-dialog.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -815,8 +815,6 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
   const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined, pageSize }, { page: p });
 
-  const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined }, extra);
   const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
@@ -854,45 +852,18 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           {lendableOnly && <input type="hidden" name="lendable" value="1" />}
           {noCoordsOnly && <input type="hidden" name="nocoords" value="1" />}
         </form>
-        <MultiSelectFilter
-          param="tag"
-          autoApply
-          searchable
-          options={allTags.map((tag) => ({ value: tag, label: tag }))}
-          selected={tagFilter}
-          allLabel={t("inventory.filter.allTags")}
-          countLabel={(count) => t("inventory.filter.tagCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-          searchPlaceholder={t("common.searchPlaceholder")}
-          emptyLabel={t("inventory.filter.noTags")}
+        <FilterDialog
+          id="inventory-filter-dialog"
+          hidden={[...(search ? [["q", search] as [string, string]] : []), ...(noCoordsOnly ? [["nocoords", "1"] as [string, string]] : [])]}
+          labels={{ button: t("inventory.filter.button"), title: t("inventory.filter.title"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder") }}
+          sections={[
+            { type: "chips", param: "due", title: t("inventory.filter.due"), options: [{ value: "overdue", label: t("inventory.filter.dueOverdue") }, { value: "soon", label: t("inventory.filter.dueSoon") }], selected: dueFilter },
+            { type: "list", param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
+            { type: "list", param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
+            { type: "toggle", param: "archived", title: t("inventory.filter.showArchived"), selected: showArchived ? ["1"] : [] },
+            ...(canSeeLending ? [{ type: "toggle" as const, param: "lendable", title: t("inventory.filter.lendable"), selected: lendableOnly ? ["1"] : [] }] : []),
+          ]}
         />
-
-        <MultiSelectFilter
-          param="inspection"
-          autoApply
-          options={inspectionNames.map((n) => ({ value: n, label: n }))}
-          selected={inspectionFilter}
-          allLabel={t("inventory.filter.allInspections")}
-          countLabel={(count) => t("inventory.filter.inspectionCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
-        <MultiSelectFilter
-          param="due"
-          autoApply
-          options={[{ value: "overdue", label: t("inventory.filter.dueOverdue") }, { value: "soon", label: t("inventory.filter.dueSoon") }]}
-          selected={dueFilter}
-          allLabel={t("inventory.filter.allDue")}
-          countLabel={(count) => t("inventory.filter.dueCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
-
-        <ToggleFilter items={[
-          { label: t("inventory.filter.showArchived"), checked: showArchived, href: qs({ archived: showArchived ? undefined : "1" }) },
-          ...(canSeeLending ? [{ label: t("inventory.filter.lendable"), checked: lendableOnly, href: qs({ lendable: lendableOnly ? undefined : "1" }) }] : []),
-        ]} />
       </div>
 
       <div id="inventory-results">
