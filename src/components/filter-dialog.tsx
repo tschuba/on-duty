@@ -2,11 +2,12 @@ import { Icon } from "./icon.js";
 import type { FilterOption } from "./multi-select-filter.js";
 
 type Base = { param: string; title: string; selected: string[]; defaults?: string[] };
-// chips: Checkbox-Buttons (daisyUI `filter`); list: durchsuchbare Mehrfachliste; toggle: einzelnes Flag (Wert "1").
+// chips: Checkbox-Buttons (daisyUI `filter`); list: durchsuchbare Mehrfachliste; toggle: einzelnes Flag (Wert `value`, Standard "1");
+// mehrere toggles mit gleichem `param` bilden zusammen eine Gruppe (je mit der vollen `selected`-Liste).
 export type FilterSection =
   | (Base & { type: "chips"; options: FilterOption[] })
   | (Base & { type: "list"; options: FilterOption[]; unused?: { label: string; storageKey: string } })
-  | (Base & { type: "toggle" });
+  | (Base & { type: "toggle"; value?: string });
 export type QuickFilter = { label: string; values: Record<string, string[]> };
 
 type Props = {
@@ -22,7 +23,7 @@ const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((
 // Ein Dialog statt mehrerer Dropdowns: ein GET-Formular, "Anwenden" sendet alles auf einmal; Schnellfilter setzen Werte und senden sofort.
 // Die Komponente kennt keine Fachbegriffe, Parameternamen kommen aus den Abschnitten.
 export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props) {
-  const active = sections.filter((s) => !sameSet(s.selected, s.defaults ?? [])).length;
+  const active = new Set(sections.filter((s) => !sameSet(s.selected, s.defaults ?? [])).map((s) => s.param)).size;
   const formId = `${id}-form`;
   const def = Object.fromEntries(sections.map((s) => [s.param, s.defaults ?? []]));
   const lists = sections.filter((s) => s.type === "list");
@@ -62,7 +63,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
   );
   const toggle = (s: FilterSection & { type: "toggle" }) => (
     <label class="flex items-center gap-2 cursor-pointer text-sm pointer-coarse:min-h-11">
-      <input type="checkbox" class="toggle toggle-sm" name={s.param} value="1" checked={s.selected.includes("1")} />{s.title}
+      <input type="checkbox" class="toggle toggle-sm" name={s.param} value={s.value ?? "1"} checked={s.selected.includes(s.value ?? "1")} />{s.title}
     </label>
   );
 
@@ -70,14 +71,16 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
   const blocks: (FilterSection | FilterSection[])[] = [];
   for (const s of sections) {
     const last = blocks[blocks.length - 1];
-    if (Array.isArray(last) && (s.type === "chips" || s.type === "toggle")) last.push(s);
-    else blocks.push(s.type === "chips" ? [s] : s);
+    if (s.type === "list") blocks.push(s);
+    else if (Array.isArray(last)) last.push(s);
+    else blocks.push([s]);
   }
   const group = (b: FilterSection[]) => {
     const rows: FilterSection[][] = [];
     for (const s of b) {
       if (s.type === "chips") rows.push([s]);
-      else rows[rows.length - 1].push(s);
+      else if (rows.length) rows[rows.length - 1].push(s);
+      else rows.push([s]);
     }
     return (
       <div class="flex flex-col">
@@ -111,7 +114,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
               </div>
             </section>
           )}
-          {blocks.map((b) => Array.isArray(b) ? group(b) : b.type === "list" ? list(b) : b.type === "toggle" ? toggle(b) : null)}
+          {blocks.map((b) => Array.isArray(b) ? group(b) : list(b))}
           </div>
           <div class="modal-action">
             <button type="button" class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} data-fd-reset aria-label={labels.reset} title={labels.reset}>

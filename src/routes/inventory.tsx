@@ -857,7 +857,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           hidden={[...(search ? [["q", search] as [string, string]] : []), ...(noCoordsOnly ? [["nocoords", "1"] as [string, string]] : [])]}
           labels={{ button: t("inventory.filter.button"), title: t("inventory.filter.title"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder") }}
           sections={[
-            { type: "chips", param: "due", title: t("inventory.filter.due"), options: [{ value: "overdue", label: t("inventory.filter.dueOverdue") }, { value: "soon", label: t("inventory.filter.dueSoon") }], selected: dueFilter },
+            { type: "toggle", param: "due", value: "overdue", title: t("inventory.filter.dueOverdue"), selected: dueFilter },
+            { type: "toggle", param: "due", value: "soon", title: t("inventory.filter.dueSoon"), selected: dueFilter },
             { type: "toggle", param: "archived", title: t("inventory.filter.showArchived"), selected: showArchived ? ["1"] : [] },
             ...(canSeeLending ? [{ type: "toggle" as const, param: "lendable", title: t("inventory.filter.lendable"), selected: lendableOnly ? ["1"] : [] }] : []),
             { type: "list", param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
