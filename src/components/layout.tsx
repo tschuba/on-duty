@@ -142,7 +142,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         )}
       </nav>
       <main class="container mx-auto px-4 py-6 flex-1 flex flex-col">{children}</main>
-        <footer class="sticky bottom-0 mt-auto h-6 shrink-0 px-4 flex items-center justify-end gap-3 text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={SOURCE_REPO_URL} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">{t("common.footer.source")}</a><a href={`${SOURCE_REPO_URL}/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
+        <footer class="sticky bottom-0 mt-auto h-6 shrink-0 px-4 flex items-center justify-center gap-3 text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={SOURCE_REPO_URL} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">{t("common.footer.source")}</a><a href={`${SOURCE_REPO_URL}/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
         </div>
         {user && counts && (
           <div class="drawer-side z-50 is-drawer-close:overflow-visible">
