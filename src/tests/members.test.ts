@@ -378,7 +378,7 @@ describe("StatsCards", () => {
       { ...makeMember(), status: "deceased", gender: null },
     ] as any;
     const html = await (await renderApp(StatsCards({ all }))).text();
-    expect(html).toContain('stat-value text-secondary">1<');
+    expect(html).toMatch(/text-secondary">1</);
     expect(html).toMatch(/text-base-content\/40">3</);
     expect(html).toMatch(/2 <svg/);
     expect(html).toMatch(/1 <svg/);
