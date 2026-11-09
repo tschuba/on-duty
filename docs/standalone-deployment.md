@@ -234,7 +234,7 @@ lässt diese Adresse zu (sonst würde `DeniedURL` den Webhook blockieren, siehe
 oben).
 
 `--with-observability` startet zusätzlich OpenObserve (http://localhost:5080, Login
-`admin@onduty.local` / Admin-Passwort des Stacks) und trägt
+`admin@onduty.local` / Admin-Passwort des Stacks plus `Aa1!`) und trägt
 `OTEL_EXPORTER_OTLP_ENDPOINT` + Zugangsdaten in `.env.dev-stack` ein; `pnpm dev`
 exportiert dann Traces und Metriken (Intervall 60 s).
 

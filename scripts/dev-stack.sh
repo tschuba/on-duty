@@ -146,7 +146,7 @@ SENTRY_DSN=$DSN
 ERROR_TRACKER_URL=$ERROR_TRACKER_URL
 OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_ENDPOINT
 OPENOBSERVE_USER=admin@onduty.local
-OPENOBSERVE_PASSWORD=$(env_get SERVICE_PASSWORD_ADMIN)
+OPENOBSERVE_PASSWORD=$(env_get SERVICE_PASSWORD_ADMIN)Aa1!
 EOT
 
     echo "Migriere DB + lege Admin an..."
@@ -169,7 +169,7 @@ fi)
 $(if [[ $WITH_OBS -eq 1 ]]; then cat <<OBS
 
 OpenObserve: http://localhost:5080
-  Login: admin@onduty.local / $(env_get SERVICE_PASSWORD_ADMIN)
+  Login: admin@onduty.local / $(env_get SERVICE_PASSWORD_ADMIN)Aa1!
 OBS
 fi)
 Stoppen: pnpm stack:down — alles löschen: pnpm stack:reset (CA bleibt; mit --ca auch die CA)

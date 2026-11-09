@@ -82,7 +82,8 @@ services:
     restart: unless-stopped
     environment:
       ZO_ROOT_USER_EMAIL: admin@onduty.local
-      ZO_ROOT_USER_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
+      # OpenObserve verlangt Groß-/Kleinbuchstaben, Ziffer und Sonderzeichen
+      ZO_ROOT_USER_PASSWORD: ${SERVICE_PASSWORD_ADMIN}Aa1!
     ports:
       - "127.0.0.1:5080:5080"
     volumes:
