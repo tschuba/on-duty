@@ -18,7 +18,7 @@ const SPAN_CLASS = { 1: "sm:col-span-1", 2: "sm:col-span-2", 3: "sm:col-span-3",
 
 export const organisationRoutes = new Hono<{ Variables: Variables }>();
 
-const TAB_ORDER = ["master", "privacy", "tax"] as const;
+const TAB_ORDER = ["master", "tax", "privacy"] as const;
 
 const guard = requireAuth(["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"]);
 
