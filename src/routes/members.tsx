@@ -180,46 +180,48 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const children = genderCount("children");
 
   return (
-    <div id="members-stats" class="hidden sm:grid grid-cols-2 sm:grid-cols-6 gap-4 mb-6">
-      <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.active")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-success">{counts.active}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(active)}</div>
+    <div id="members-stats" class="hidden sm:block @container mb-6">
+    <div class="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-6 gap-2 @4xl:gap-4">
+      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
+        <div class="stat-title text-xs">{t("members.stats.active")}</div>
+        <div class="flex flex-wrap items-baseline gap-x-2">
+          <div class="stat-value text-2xl @4xl:text-3xl text-success">{counts.active}</div>
+          <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
         </div>
       </div>
-      <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.passive")}</div>
-        <div class="stat-value">{counts.passive}</div>
+      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
+        <div class="stat-title text-xs">{t("members.stats.passive")}</div>
+        <div class="stat-value text-2xl @4xl:text-3xl">{counts.passive}</div>
       </div>
-      <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.supporting")}</div>
-        <div class="stat-value text-secondary">{counts.supporting}</div>
+      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
+        <div class="stat-title text-xs">{t("members.stats.supporting")}</div>
+        <div class="stat-value text-2xl @4xl:text-3xl text-secondary">{counts.supporting}</div>
       </div>
-      <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.youth")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-info">{counts.youth}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(youth)}</div>
+      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
+        <div class="stat-title text-xs">{t("members.stats.youth")}</div>
+        <div class="flex flex-wrap items-baseline gap-x-2">
+          <div class="stat-value text-2xl @4xl:text-3xl text-info">{counts.youth}</div>
+          <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(youth)}</div>
         </div>
       </div>
-      <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.children")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-warning">{counts.children}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">{genderBreakdown(children)}</div>
+      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
+        <div class="stat-title text-xs">{t("members.stats.children")}</div>
+        <div class="flex flex-wrap items-baseline gap-x-2">
+          <div class="stat-value text-2xl @4xl:text-3xl text-warning">{counts.children}</div>
+          <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(children)}</div>
         </div>
       </div>
-      <div class="stat bg-base-200 rounded-box p-4">
-        <div class="stat-title">{t("members.stats.former")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-3">
-          <div class="stat-value text-base-content/40">{counts.left + counts.deceased}</div>
-          <div class="stat-desc text-base flex flex-1 gap-x-3 min-w-28">
+      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
+        <div class="stat-title text-xs">{t("members.stats.former")}</div>
+        <div class="flex flex-wrap items-baseline gap-x-2">
+          <div class="stat-value text-2xl @4xl:text-3xl text-base-content/40">{counts.left + counts.deceased}</div>
+          <div class="stat-desc text-sm flex gap-x-2">
             {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
             {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }
@@ -1116,10 +1118,10 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
         (function() {
           const stats = document.getElementById('members-stats');
           const savedStats = localStorage.getItem('members_statsVisible');
-          if (stats && savedStats) stats.style.display = savedStats === '1' ? 'grid' : 'none';
+          if (stats && savedStats) stats.style.display = savedStats === '1' ? 'block' : 'none';
           document.getElementById('members-stats-toggle').checked = getComputedStyle(stats).display !== 'none';
           window.toggleMembersStats = function(show) {
-            stats.style.display = show ? 'grid' : 'none';
+            stats.style.display = show ? 'block' : 'none';
             localStorage.setItem('members_statsVisible', show ? '1' : '0');
           };
           const saved = localStorage.getItem('members_pageSize');
