@@ -30,6 +30,7 @@ const ICONS = {
   "sidebar-collapse": "layout-sidebar-left-collapse",
   "sidebar-expand": "layout-sidebar-left-expand",
   "chevron-down": "chevron-down",
+  funnel: "filter",
   sun: "sun",
   moon: "moon",
   clock: "clock",

@@ -256,6 +256,13 @@ describe("age filter", () => {
     expect(filterMembers([child, adult], ["supporting"], [], ["children"])).toEqual([child]);
     expect(filterMembers([child, adult], ["supporting"], [], [])).toHaveLength(2);
   });
+
+  it("filterMembers counts youth/children statuses as active", () => {
+    const kid = { ...makeMember(), assignments: [], status: "children" } as never;
+    const teen = { ...makeMember(), assignments: [], status: "youth" } as never;
+    expect(filterMembers([kid, teen], ["active"], [], [])).toEqual([kid, teen]);
+    expect(filterMembers([kid, teen], ["passive"], [], [])).toEqual([]);
+  });
 });
 
 describe("parseListQuery", () => {
@@ -264,7 +271,7 @@ describe("parseListQuery", () => {
       search: "",
       sort: "lastName",
       dir: "asc",
-      statusFilter: ["active", "passive", "supporting", "children", "youth"],
+      statusFilter: ["active", "passive", "supporting"],
       roleFilter: [],
       ageFilter: [],
       page: 1,
@@ -273,9 +280,13 @@ describe("parseListQuery", () => {
   });
 
   it("keeps repeated status/role params as-is", () => {
-    const q = parseListQuery({}, ["active", "youth"], ["r1", "r2"], []);
-    expect(q.statusFilter).toEqual(["active", "youth"]);
+    const q = parseListQuery({}, ["active", "left"], ["r1", "r2"], []);
+    expect(q.statusFilter).toEqual(["active", "left"]);
     expect(q.roleFilter).toEqual(["r1", "r2"]);
+  });
+
+  it("maps legacy status=children|youth links to active", () => {
+    expect(parseListQuery({}, ["youth", "children", "left"], [], []).statusFilter).toEqual(["active", "left"]);
   });
 
   it("clamps page to at least 1 and rejects invalid pageSize", () => {
@@ -522,18 +533,29 @@ describe("GET /", () => {
     expect(html).not.toContain("Adler");
   });
 
-  it("renders the status filter as multi-select dropdown", async () => {
+  it("renders one filter dialog with status, age and role sections and quick filters", async () => {
     findManyResult = [];
     const html = await (await memberRoutes.request("/")).text();
-    expect(html).toContain('data-msf-param="status"');
-    for (const v of ["active", "passive", "supporting", "youth", "children", "left", "deceased"]) expect(html).toContain(`name="status" value="${v}"`);
-    expect(html).toContain(t("members.filter.currentStatus"));
+    expect(html).toContain('id="members-filter-dialog"');
+    expect(html).not.toContain("data-msf-param");
+    for (const v of ["active", "passive", "supporting", "left", "deceased"]) expect(html).toContain(`name="status" value="${v}"`);
+    for (const v of ["youth", "children"]) expect(html).not.toContain(`name="status" value="${v}"`);
+    for (const v of ["children", "youth", "adult", "senior"]) expect(html).toContain(`name="age" value="${v}"`);
+    for (const k of ["current", "activeAll", "activeYouth", "former"]) expect(html).toContain(`>${t(`members.filter.preset.${k}` as never)}</button>`);
   });
 
-  it("labels the status filter by selection", async () => {
+  it("shows no active-filter badge for the default selection and a count otherwise", async () => {
     findManyResult = [];
-    expect(await (await memberRoutes.request("/?status=active&status=youth")).text()).toContain("2 Status");
-    expect(await (await memberRoutes.request("/?status=youth")).text()).toContain(`${t("status.youth")} ▾`);
+    expect(await (await memberRoutes.request("/")).text()).not.toContain('<span class="badge badge-sm">');
+    const html = await (await memberRoutes.request("/?status=left&age=youth")).text();
+    expect(html).toContain('<span class="badge badge-sm">2</span>');
+  });
+
+  it("keeps search and sorting as hidden fields of the filter form", async () => {
+    findManyResult = [];
+    const html = await (await memberRoutes.request("/?search=an&sort=birthDate&sort_dir=desc")).text();
+    expect(html).toContain('type="hidden" name="search" value="an"');
+    expect(html).toContain('type="hidden" name="sort" value="birthDate"');
   });
 
   it("hides the add-member button for a read-only user", async () => {

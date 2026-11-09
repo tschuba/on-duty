@@ -16,7 +16,7 @@ import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } f
 import { RolePopover } from "../components/role-popover.js";
 import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
-import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { MembersFilterDialog } from "../components/members-filter-dialog.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
@@ -916,70 +916,49 @@ function MembersExportModal() {
   );
 }
 
-// ── Role filter dropdown ──────────────────────────────────────────────────────
+// ── Filter dialog ─────────────────────────────────────────────────────────────
 
-function RoleFilterDropdown({ roles, roleFilter, activeRoleIds }: {
+// Der Statusfilter kennt kein Kinder/Jugend: beides zählt als „aktiv“, die Eingrenzung übernimmt der Altersfilter.
+const STATUS_ORDER: MemberStatus[] = ["active", "passive", "supporting", "left", "deceased"];
+const DEFAULT_STATUS: MemberStatus[] = ["active", "passive", "supporting"];
+const QUICK_FILTERS: { key: string; status: MemberStatus[]; age: AgeGroup[] }[] = [
+  { key: "current", status: DEFAULT_STATUS, age: [] },
+  { key: "activeAll", status: ["active"], age: [] },
+  { key: "activeYouth", status: ["active"], age: ["children", "youth"] },
+  { key: "former", status: ["left", "deceased"], age: [] },
+];
+
+function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilter, hidden }: {
   roles: Role[];
-  roleFilter: string[];
   activeRoleIds: Set<string>;
+  statusFilter: MemberStatus[];
+  roleFilter: string[];
+  ageFilter: AgeGroup[];
+  hidden: [string, string][];
 }) {
-  return (
-    <MultiSelectFilter
-      param="role"
-      autoApply
-      searchable
-      options={roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), unused: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" }))}
-      unusedToggle={{ label: t("members.filter.showUnusedRoles"), storageKey: "members.showUnusedRoles" }}
-      selected={roleFilter}
-      allLabel={t("members.filter.allRoles")}
-      countLabel={(count) => t("members.table.roleCount", { count })}
-      applyLabel={t("common.apply")}
-      resetLabel={t("common.reset")}
-      searchPlaceholder={t("common.searchPlaceholder")}
-    />
-  );
-}
-
-function AgeFilterDropdown({ ageFilter }: { ageFilter: AgeGroup[] }) {
   const c = env.CHILDREN_AGE_LIMIT, y = env.YOUTH_AGE_LIMIT, a = env.ACTIVE_AGE_LIMIT;
-  const labels: Record<AgeGroup, string> = {
+  const ageLabels: Record<AgeGroup, string> = {
     children: t("members.filter.age.children", { limit: c }),
     youth: t("members.filter.age.youth", { from: c, to: y - 1 }),
     adult: t("members.filter.age.adult", { from: y, to: a - 1 }),
     senior: t("members.filter.age.senior", { limit: a }),
   };
   return (
-    <MultiSelectFilter
-      param="age"
-      autoApply
-      options={AGE_GROUPS.map((g) => ({ value: g, label: labels[g] }))}
-      selected={ageFilter}
-      allLabel={t("members.filter.allAges")}
-      countLabel={(count) => t("members.table.ageCount", { count })}
-      applyLabel={t("common.apply")}
-      resetLabel={t("common.reset")}
-    />
-  );
-}
-
-const STATUS_ORDER: MemberStatus[] = ["active", "passive", "supporting", "youth", "children", "left", "deceased"];
-const DEFAULT_STATUS: MemberStatus[] = ["active", "passive", "supporting", "children", "youth"];
-
-function StatusFilterDropdown({ statusFilter }: { statusFilter: MemberStatus[] }) {
-  const isDefault = statusFilter.length === DEFAULT_STATUS.length && DEFAULT_STATUS.every((s) => statusFilter.includes(s));
-  return (
-    <MultiSelectFilter
-      param="status"
-      autoApply
-      searchable
-      options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "deceased" ? "cross" : undefined }))}
-      selected={statusFilter}
-      labelOverride={isDefault ? t("members.filter.currentStatus") : undefined}
-      allLabel={t("members.filter.allStatus")}
-      countLabel={(count) => t("members.table.statusCount", { count })}
-      applyLabel={t("common.apply")}
-      resetLabel={t("common.reset")}
-      searchPlaceholder={t("common.searchPlaceholder")}
+    <MembersFilterDialog
+      id="members-filter-dialog"
+      hidden={hidden}
+      labels={{
+        button: t("members.filter.button"), title: t("members.filter.title"), quick: t("members.filter.quick"),
+        apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"),
+        unusedRoles: t("members.filter.showUnusedRoles"), status: t("members.table.status"), age: t("members.filter.age"), role: t("members.table.roles"),
+      }}
+      quick={QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), status: f.status, age: f.age }))}
+      status={{ options: STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "deceased" ? "cross" : undefined })), selected: statusFilter, defaults: DEFAULT_STATUS }}
+      age={{ options: AGE_GROUPS.map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter }}
+      role={{
+        options: roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), unused: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" })),
+        selected: roleFilter, storageKey: "members.showUnusedRoles",
+      }}
     />
   );
 }
@@ -1001,10 +980,9 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
   const search = q.search ?? "";
   const sort = (q.sort as SortKey) || "lastName";
   const dir = (q.sort_dir as "asc" | "desc") || "asc";
-  const statusParsed = statusRaw.filter((s) => STATUS_LABELS[s as MemberStatus]); // unbekannte (z. B. altes "archiviert") ignorieren
-  const statusFilter: MemberStatus[] = (statusParsed.length > 0
-    ? statusParsed
-    : ["active", "passive", "supporting", "children", "youth"]) as MemberStatus[];
+  // Unbekannte (z. B. altes "archiviert") ignorieren; alte Links mit children/youth zählen als active.
+  const statusParsed = [...new Set(statusRaw.map((s) => (s === "children" || s === "youth" ? "active" : s)).filter((s) => STATUS_ORDER.includes(s as MemberStatus)))] as MemberStatus[];
+  const statusFilter: MemberStatus[] = statusParsed.length > 0 ? statusParsed : DEFAULT_STATUS;
   const roleFilter = roleFilterRaw.filter(Boolean);
   const ageFilter = ageRaw.filter((a): a is AgeGroup => AGE_GROUPS.includes(a as AgeGroup));
   const { page, pageSize } = parsePagination(q);
@@ -1016,7 +994,7 @@ export function parseListQuery(q: Record<string, string>, statusRaw: string[], r
 
 export function filterMembers(all: MemberWithStatus[], statusFilter: MemberStatus[], roleFilter: string[], ageFilter: AgeGroup[]): MemberWithStatus[] {
   return all
-    .filter((m) => statusFilter.includes(m.status))
+    .filter((m) => statusFilter.includes(m.status === "children" || m.status === "youth" ? "active" : m.status))
     .filter((m) => ageFilter.length === 0 || ageFilter.includes(ageGroupOf(m.birthDate, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT)))
     .filter((m) => roleFilter.length === 0 || m.assignments.some((a) => !a.to && roleFilter.includes(a.memberRoleId)));
 }
@@ -1101,12 +1079,11 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
             hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
             hx-target="#members-results"
             hx-include="[name='search']"
-            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, page: 1, pageSize })}
+            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, age: ageFilter, page: 1, pageSize })}
           />
         </label>
-        <StatusFilterDropdown statusFilter={statusFilter} />
-        <RoleFilterDropdown roles={allRoles} roleFilter={roleFilter} activeRoleIds={activeRoleIds} />
-        <AgeFilterDropdown ageFilter={ageFilter} />
+        <MembersFilter roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={statusFilter} roleFilter={roleFilter} ageFilter={ageFilter}
+          hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...(search ? [["search", search] as [string, string]] : [])]} />
       </div>
 
       {tableEl}
