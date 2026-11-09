@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ToggleFilter } from "../components/toggle-filter.js";
+import { FilterDialog } from "../components/filter-dialog.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -815,8 +815,6 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
   const pageUrl = (p: number) => buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined, pageSize }, { page: p });
 
-  const qs = (extra: Record<string, string | string[] | undefined>) =>
-    buildListUrl("/inventory", { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined }, extra);
   const columnCount = 6 + (canLend ? 1 : 0);
 
   return c.html(
@@ -854,46 +852,40 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
           {lendableOnly && <input type="hidden" name="lendable" value="1" />}
           {noCoordsOnly && <input type="hidden" name="nocoords" value="1" />}
         </form>
-        <MultiSelectFilter
-          param="tag"
-          autoApply
-          searchable
-          options={allTags.map((tag) => ({ value: tag, label: tag }))}
-          selected={tagFilter}
-          allLabel={t("inventory.filter.allTags")}
-          countLabel={(count) => t("inventory.filter.tagCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-          searchPlaceholder={t("common.searchPlaceholder")}
-          emptyLabel={t("inventory.filter.noTags")}
+        <FilterDialog
+          id="inventory-filter-dialog"
+          hidden={[...(search ? [["q", search] as [string, string]] : []), ...(noCoordsOnly ? [["nocoords", "1"] as [string, string]] : [])]}
+          labels={{ button: t("inventory.filter.button"), title: t("inventory.filter.title"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults") }}
+          sections={[
+            { type: "toggle", param: "due", value: "overdue", title: t("inventory.filter.dueOverdue"), selected: dueFilter },
+            { type: "toggle", param: "due", value: "soon", title: t("inventory.filter.dueSoon"), selected: dueFilter },
+            { type: "toggle", param: "archived", title: t("inventory.filter.showArchived"), selected: showArchived ? ["1"] : [] },
+            ...(canSeeLending ? [{ type: "toggle" as const, param: "lendable", title: t("inventory.filter.lendable"), selected: lendableOnly ? ["1"] : [] }] : []),
+            { type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
+            { type: "list", param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
+          ]}
         />
-
-        <MultiSelectFilter
-          param="inspection"
-          autoApply
-          options={inspectionNames.map((n) => ({ value: n, label: n }))}
-          selected={inspectionFilter}
-          allLabel={t("inventory.filter.allInspections")}
-          countLabel={(count) => t("inventory.filter.inspectionCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
-        <MultiSelectFilter
-          param="due"
-          autoApply
-          options={[{ value: "overdue", label: t("inventory.filter.dueOverdue") }, { value: "soon", label: t("inventory.filter.dueSoon") }]}
-          selected={dueFilter}
-          allLabel={t("inventory.filter.allDue")}
-          countLabel={(count) => t("inventory.filter.dueCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
-
-        <ToggleFilter items={[
-          { label: t("inventory.filter.showArchived"), checked: showArchived, href: qs({ archived: showArchived ? undefined : "1" }) },
-          ...(canSeeLending ? [{ label: t("inventory.filter.lendable"), checked: lendableOnly, href: qs({ lendable: lendableOnly ? undefined : "1" }) }] : []),
-        ]} />
       </div>
+
+      {(() => {
+        const cur = { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined, pageSize };
+        const without = (k: keyof typeof cur, v?: string) => buildListUrl("/inventory", cur, { [k]: Array.isArray(cur[k]) ? (cur[k] as string[]).filter((x) => x !== v) : undefined });
+        const dueLabel = (v: string) => (v === "overdue" ? t("inventory.filter.dueOverdue") : t("inventory.filter.dueSoon"));
+        const chips: [string, string][] = [
+          ...tagFilter.map((v): [string, string] => [`${t("inventory.table.tags")}: ${v}`, without("tag", v)]),
+          ...inspectionFilter.map((v): [string, string] => [`${t("inventory.filter.inspection")}: ${v}`, without("inspection", v)]),
+          ...dueFilter.map((v): [string, string] => [dueLabel(v), without("due", v)]),
+          ...(showArchived ? [[t("inventory.filter.showArchived"), without("archived")] as [string, string]] : []),
+          ...(lendableOnly ? [[t("inventory.filter.lendable"), without("lendable")] as [string, string]] : []),
+        ];
+        return chips.length > 0 && (
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            {chips.map(([label, href]) => (
+              <a href={href} class="badge badge-primary badge-outline gap-1 py-3" aria-label={`${label} – ${t("common.reset")}`}>{label}<Icon name="x-mark" class="w-3 h-3" /></a>
+            ))}
+          </div>
+        );
+      })()}
 
       <div id="inventory-results">
       <div class="overflow-x-auto">

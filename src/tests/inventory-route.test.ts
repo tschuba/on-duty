@@ -251,6 +251,35 @@ describe("GET /", () => {
   });
 });
 
+describe("GET / filter dialog", () => {
+  it("renders one dialog with due, tag, inspection and archived sections; no lendable without lending:read", async () => {
+    itemsFindManyResult = [makeItem({ tags: [{ tag: "gross" }] })];
+    const html = await (await inventoryRoutes.request("/")).text();
+    expect(html).toContain('id="inventory-filter-dialog"');
+    expect(html).not.toContain("data-msf-param");
+    for (const v of ["overdue", "soon"]) expect(html).toContain(`name="due" value="${v}"`);
+    expect(html).toContain('name="tag" value="gross"');
+    expect(html).toContain('name="archived" value="1"');
+    expect(html).not.toContain('name="lendable"');
+    expect(html).not.toContain('<span class="badge badge-sm">');
+  });
+
+  it("counts sections that deviate from the default (toggle = one group) in the badge", async () => {
+    currentUser = lendingManager();
+    itemsFindManyResult = [makeItem()];
+    const html = await (await inventoryRoutes.request("/?due=overdue&due=soon&archived=1&lendable=1")).text();
+    expect(html).toContain('name="lendable" value="1" checked');
+    expect(html).toContain('<span class="badge badge-sm">3</span>');
+  });
+
+  it("keeps q and nocoords as hidden dialog fields", async () => {
+    itemsFindManyResult = [makeItem()];
+    const html = await (await inventoryRoutes.request("/?q=a&nocoords=1")).text();
+    expect(html).toContain('type="hidden" name="q" value="a"');
+    expect(html).toContain('type="hidden" name="nocoords" value="1"');
+  });
+});
+
 // ── POST / (create) ──────────────────────────────────────────────────────────
 
 describe("POST /", () => {
@@ -1192,26 +1221,6 @@ describe("race on unique number", () => {
     transaction.mockRejectedValueOnce(new Error("boom"));
     const res = await post("/", { name: "Helm" });
     expect(res.status).toBe(500);
-  });
-});
-
-describe("GET / inventory toggles", () => {
-  const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
-
-  it("archived toggle is off without a parameter and on with archived=1", async () => {
-    expect(toggleInputs(await (await inventoryRoutes.request("/")).text())[0]).not.toContain("checked");
-    const on = toggleInputs(await (await inventoryRoutes.request("/?archived=1")).text())[0];
-    expect(on).toContain("checked");
-    expect(on).not.toContain("disabled");
-  });
-
-  it("lendable toggle only with lending:read", async () => {
-    expect(toggleInputs(await (await inventoryRoutes.request("/")).text())).toHaveLength(1);
-    currentUser = lendingManager();
-    const inputs = toggleInputs(await (await inventoryRoutes.request("/?lendable=1")).text());
-    expect(inputs).toHaveLength(2);
-    expect(inputs[0]).not.toContain("checked");
-    expect(inputs[1]).toContain("checked");
   });
 });
 
