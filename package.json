@@ -15,7 +15,7 @@
     "start": "node dist/index.js",
     "stack:up": "scripts/dev-stack.sh up",
     "stack:up:errors": "scripts/dev-stack.sh up --with-errors",
-    "stack:up:obs": "scripts/dev-stack.sh up --with-observability",
+    "stack:up:observability": "scripts/dev-stack.sh up --with-observability",
     "stack:down": "scripts/dev-stack.sh down",
     "stack:reset": "scripts/dev-stack.sh reset",
     "stack:trust": "scripts/dev-stack.sh trust",

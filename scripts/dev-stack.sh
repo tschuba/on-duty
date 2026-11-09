@@ -126,7 +126,7 @@ EOT
     fi
 
     OTEL_ENDPOINT=""
-    [[ $WITH_OBS -eq 1 ]] && OTEL_ENDPOINT="http://localhost:5080/api/default"
+    [[ $WITH_OBS -eq 1 ]] && OTEL_ENDPOINT="https://observe.localhost/api/default"
 
     cat > "$APP_ENV_FILE" <<EOT
 DATABASE_URL=postgres://onduty:$(env_get SERVICE_PASSWORD_POSTGRES)@127.0.0.1:5433/onduty
@@ -145,8 +145,8 @@ REGISTRATION_ENABLED=true
 SENTRY_DSN=$DSN
 ERROR_TRACKER_URL=$ERROR_TRACKER_URL
 OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_ENDPOINT
-OPENOBSERVE_USER=admin@onduty.local
-OPENOBSERVE_PASSWORD=$(env_get SERVICE_PASSWORD_ADMIN)Aa1!
+OPENOBSERVE_USER=admin@openobserve.local
+OPENOBSERVE_PASSWORD=$(env_get SERVICE_PASSWORD_OPENOBSERVE)Aa1!
 EOT
 
     echo "Migriere DB + lege Admin an..."
@@ -168,8 +168,8 @@ BUGSINK
 fi)
 $(if [[ $WITH_OBS -eq 1 ]]; then cat <<OBS
 
-OpenObserve: http://localhost:5080
-  Login: admin@onduty.local / $(env_get SERVICE_PASSWORD_ADMIN)Aa1!
+OpenObserve: https://$(env_get SERVICE_FQDN_OPENOBSERVE)
+  Login: admin@openobserve.local / $(env_get SERVICE_PASSWORD_OPENOBSERVE)Aa1!
 OBS
 fi)
 Stoppen: pnpm stack:down — alles löschen: pnpm stack:reset (CA bleibt; mit --ca auch die CA)

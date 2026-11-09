@@ -40,11 +40,11 @@ services:
       # Link shown in /admin/config; defaults to the Bugsink issue list, empty when the `errors` profile is off.
       ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-${SERVICE_FQDN_BUGSINK:+https://${SERVICE_FQDN_BUGSINK}/issues/}}
       # Optional OpenTelemetry traces/metrics (OTLP/HTTP, e.g. OpenObserve). Empty endpoint = off.
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-${SERVICE_FQDN_OPENOBSERVE:+http://openobserve:5080/api/default}}
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-}
-      OPENOBSERVE_USER: ${OPENOBSERVE_USER:-}
-      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:-}
+      OPENOBSERVE_USER: ${OPENOBSERVE_USER:-${SERVICE_FQDN_OPENOBSERVE:+${OPENOBSERVE_ADMIN_EMAIL:-admin@openobserve.local}}}
+      OPENOBSERVE_PASSWORD: ${OPENOBSERVE_PASSWORD:-${SERVICE_PASSWORD_OPENOBSERVE:+${SERVICE_PASSWORD_OPENOBSERVE}Aa1!}}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
       SMTP_USER: ${SMTP_USER:-}
@@ -73,6 +73,39 @@ services:
         condition: service_healthy
       zitadel-init:
         condition: service_completed_successfully
+
+  # Optional observability backend (compose profile `observability`, off by default): `COMPOSE_PROFILES=observability`.
+  # Coolify: `COMPOSE_PROFILES=errors,observability` for both. Disable again by removing the profile and redeploying.
+  # OTLP is only reachable inside the compose network (app -> http://openobserve:5080/api/default); the UI gets its own domain.
+  # RAM budget: about 1 GB extra at most.
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:v1.1.2
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      SERVICE_FQDN_OPENOBSERVE_5080:
+      ZO_ROOT_USER_EMAIL: ${OPENOBSERVE_ADMIN_EMAIL:-admin@openobserve.local}
+      # OpenObserve rejects plain hex passwords (needs upper/lower case, digit, special char) -> suffix.
+      ZO_ROOT_USER_PASSWORD: ${SERVICE_PASSWORD_OPENOBSERVE}Aa1!
+      ZO_COMPACT_DATA_RETENTION_DAYS: "60"
+      # Alert mails from the same SMTP_* values as the app. OpenObserve panics on empty bool/port values, so
+      # `${SMTP_HOST:+true}` is unusable (empty when unset); the switch is a separate variable. Encryption mode follows the port.
+      ZO_SMTP_ENABLED: ${OPENOBSERVE_SMTP_ENABLED:-false}
+      ZO_SMTP_HOST: ${SMTP_HOST:-}
+      ZO_SMTP_PORT: ${SMTP_PORT:-587}
+      ZO_SMTP_USER_NAME: ${SMTP_USER:-}
+      ZO_SMTP_PASSWORD: ${SMTP_PASS:-}
+      ZO_SMTP_FROM_EMAIL: ${SMTP_FROM:-}
+    volumes:
+      # NOT backed up.
+      - openobserve-data:/data
+    healthcheck:
+      # Image has no shell/curl/wget; the binary itself is the only probe.
+      test: ["CMD", "/openobserve", "node", "status"]
+      start_period: 20s
+      interval: 15s
+      timeout: 10s
+      retries: 5
 
   # Optional error tracker (compose profile `errors`, off by default): `COMPOSE_PROFILES=errors`.
   # SQLite in its own volume, NOT backed up.
@@ -343,6 +376,7 @@ services:
         condition: service_healthy
 
 volumes:
+  openobserve-data:
   backup-status:
   tile-cache:
   bugsink-data:
