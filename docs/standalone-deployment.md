@@ -237,6 +237,7 @@ oben).
 `admin@openobserve.local` / `SERVICE_PASSWORD_OPENOBSERVE` aus `.env.standalone.dev` plus `Aa1!`) und trägt
 `OTEL_EXPORTER_OTLP_ENDPOINT` + Zugangsdaten in `.env.dev-stack` ein; `pnpm dev`
 exportiert dann Traces und Metriken (Intervall 60 s).
+Wer vor Ticket 112 schon `stack:up:obs` genutzt hat: Das alte Volume `openobserve-data` behält die damaligen Zugangsdaten (Login 401, Healthcheck bleibt `starting`) — einmalig `pnpm stack:reset`.
 
 Aufräumen: `pnpm stack:down` (Container stoppen, Volumes bleiben) bzw.
 `pnpm stack:reset` (alles löschen, inkl. `.env.standalone.dev`,
