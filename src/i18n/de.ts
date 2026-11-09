@@ -1165,7 +1165,6 @@ export const de = {
   "inventory.filter.inspectionCount": "{count} Prüfarten",
   "inventory.filter.button": "Filter",
   "inventory.filter.title": "Inventar filtern",
-  "inventory.filter.due": "Fälligkeit",
   "inventory.filter.inspection": "Prüfart",
   "inventory.filter.dueOverdue": "Überfällig",
   "inventory.filter.dueSoon": "In 30 Tagen fällig",

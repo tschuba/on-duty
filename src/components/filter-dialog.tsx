@@ -114,7 +114,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
               </div>
             </section>
           )}
-          {blocks.map((b) => Array.isArray(b) ? group(b) : list(b))}
+          {blocks.map((b) => Array.isArray(b) ? group(b) : b.type === "list" ? list(b) : null)}
           </div>
           <div class="modal-action">
             <button type="button" class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} data-fd-reset aria-label={labels.reset} title={labels.reset}>
