@@ -17,6 +17,9 @@ services:
   zitadel-init:
     image: on-duty-standalone-local:latest
 
+  openobserve-init:
+    image: on-duty-standalone-local:latest
+
   zitadel-init-hooks:
     image: on-duty-standalone-local:latest
     environment:

@@ -97,7 +97,7 @@ EOT
     "${COMPOSE[@]}" --profile app build app
     SERVICES=(db zitadel zitadel-login zitadel-init caddy)
     [[ $WITH_ERRORS -eq 1 ]] && SERVICES+=(bugsink bugsink-init)
-    [[ $WITH_OBS -eq 1 ]] && SERVICES+=(openobserve)
+    [[ $WITH_OBS -eq 1 ]] && SERVICES+=(openobserve openobserve-init)
     "${COMPOSE[@]}" up -d "${SERVICES[@]}"
 
     echo "Warte auf zitadel-init..."

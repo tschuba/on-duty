@@ -107,6 +107,19 @@ services:
       timeout: 10s
       retries: 5
 
+  # One-shot: imports docs/observability/dashboard.json once (skipped when a dashboard with the same title exists).
+  openobserve-init:
+    image: ghcr.io/tschuba/on-duty:${APP_VERSION:-latest}
+    profiles: [observability]
+    restart: "no"
+    command: ["node", "scripts/openobserve-init.mjs"]
+    environment:
+      OPENOBSERVE_USER: ${OPENOBSERVE_ADMIN_EMAIL:-admin@openobserve.local}
+      OPENOBSERVE_PASSWORD: ${SERVICE_PASSWORD_OPENOBSERVE}Aa1!
+    depends_on:
+      openobserve:
+        condition: service_healthy
+
   # Optional error tracker (compose profile `errors`, off by default): `COMPOSE_PROFILES=errors`.
   # SQLite in its own volume, NOT backed up.
   bugsink:

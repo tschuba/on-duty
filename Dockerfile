@@ -25,6 +25,8 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./public
 COPY --from=build /app/drizzle ./drizzle
 COPY scripts/zitadel-init.mjs ./scripts/zitadel-init.mjs
+COPY scripts/openobserve-init.mjs ./scripts/openobserve-init.mjs
+COPY docs/observability/dashboard.json ./docs/observability/dashboard.json
 COPY branding ./branding
 COPY LICENSE ./LICENSE
 EXPOSE 3000
