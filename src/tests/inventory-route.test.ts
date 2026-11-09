@@ -484,7 +484,7 @@ describe("lendable flag on POST /:id", () => {
 
 describe("GET /map", () => {
   const located = (o: Record<string, unknown> = {}) => makeItem({ latitude: "49.5", longitude: "11.2", ...o });
-  const markersOf = (html: string) => JSON.parse(html.match(/data-markers="([^"]*)"/)![1].replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'"));
+  const markersOf = (html: string) => JSON.parse(html.match(/data-markers="([^"]*)"/)![1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&amp;/g, "&"));
 
   it("renders markers with popup, status and icon", async () => {
     itemsFindManyResult = [located({

@@ -1,6 +1,6 @@
 {
   "name": "on-duty",
-  "version": "0.116.0",
+  "version": "0.116.1",
   "type": "module",
   "license": "AGPL-3.0-or-later",
   "repository": "github:tschuba/on-duty",
@@ -63,7 +63,7 @@
     "sanitize-html": "^2.18.1",
     "trix": "^2.1.19",
     "vanilla-calendar-pro": "^3.4.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@fontsource/inter": "^5.1.0",
