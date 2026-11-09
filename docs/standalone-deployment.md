@@ -295,6 +295,31 @@ Optional und standardmäßig aus. Aktivieren: in Coolify `COMPOSE_PROFILES=obser
 - Aufbewahrung 60 Tage (`ZO_COMPACT_DATA_RETENTION_DAYS`). Speicher: Volume `openobserve-data`, **kein Backup**. RAM: höchstens ca. 1 GB zusätzlich.
 - Alert-Mails: mit `OPENOBSERVE_SMTP_ENABLED=true` über dieselben `SMTP_*`-Werte wie die App (Verschlüsselung ergibt sich aus dem Port). Standard ist aus, weil OpenObserve bei leeren Werten nicht startet.
 
+#### OpenObserve: Betrieb, Dashboard, Alerts
+
+**Ersteinrichtung:** `COMPOSE_PROFILES=errors,observability` setzen (bzw. nur `observability`), deployen, in der UI mit `OPENOBSERVE_ADMIN_EMAIL` und `SERVICE_PASSWORD_OPENOBSERVE` + `Aa1!` anmelden. Lokal (`.env.standalone` / `.env.standalone.dev`) gilt dieselbe Variable `OPENOBSERVE_ADMIN_EMAIL`.
+
+**Dashboard importieren:** *Dashboards → Import* → `docs/observability/dashboard.json`. Bereiche: Routen (Latenz, Anzahl, Fehlerrate), langsamste Requests (Request-ID, Dauer), DB (Dauer pro Tabelle/Statement), Laufzeit (Event-Loop, Heap, Pool). Änderungen in der UI bauen und neu exportieren, die JSON nicht von Hand editieren.
+
+- Metriken (Wert in Spalte `value`): `nodejs_eventloop_delay_p99` (auch `_max`, `_mean`, Sekunden), `v8js_memory_heap_used`, `v8js_memory_heap_limit` (Bytes), Pool: `db_client_connection_count` (Label `db_client_connection_state` = `used`/`idle`), `db_client_connection_max`, `db_client_connection_pending_requests`.
+- Pool-Werte sind 60-s-Momentstände; kurze Spitzen sind nicht sichtbar. Das Pool-Label (`unknown_host:unknown_port/unknown_database`) nicht zum Filtern verwenden.
+- DB-Dauer pro Tabelle/Statement aus den Spans (`db_collection_name`, `db_operation_name`), nicht aus `db_client_operation_duration`: das Histogramm hat die Tabelle nicht als Label und entsteht nur für Queries mit Parent-Span.
+
+**Alerts (manuell in der UI, E-Mail):** Voraussetzung `OPENOBSERVE_SMTP_ENABLED=true` und `SMTP_HOST`; leeres `SMTP_HOST` = keine Alerts.
+
+1. *Alerts → Destinations*: Typ E-Mail, Empfänger eintragen.
+2. *Alerts → Alerts*: zwei Alerts im Typ „SQL“ auf dem Stream `default` (Traces), Intervall z. B. 5 min:
+   - **Fehlerrate 5xx**: Anteil der Root-Spans mit `http_response_status_code >= 500` an allen Root-Spans im Zeitfenster.
+   - **p95 gesamt**: `approx_percentile_cont(duration, 0.95)` über Root-Spans (`duration` in µs).
+3. Feldnamen vor dem Anlegen in *Logs/Traces* prüfen (hängen von der Instrumentierung ab). Schwellwerte erst nach einigen Wochen Daten festlegen.
+4. Test-Versand an der laufenden Instanz prüfen (Alert bearbeiten → Test bzw. Schwellwert kurz absenken), sonst ist nicht sicher, dass SMTP funktioniert.
+
+**Betrieb:** Die Aufbewahrung (60 Tage) begrenzt die Zeit, nicht das Volumen. Größe des Volumes `openobserve-data` gelegentlich prüfen (`docker system df -v`); bei Wachstum `OTEL_TRACES_SAMPLER_ARG` senken (z. B. `0.2`). Nach Produktivstart Event-Loop-Lag und Heap im Dashboard beobachten.
+
+**Grenzen der Ursachenanalyse:** Keine Query-Parameter (nur Statement ohne Werte), keine DB-Interna (Locks, Pläne); `EXPLAIN` bei Bedarf manuell in der Datenbank.
+
+**Datenschutz:** Spans enthalten das Pseudonym `user_id` und werden 60 Tage gespeichert. Ob Vereine dies in ihrer Datenschutzerklärung nennen müssen, ist nicht rechtlich geprüft; im Zweifel Hinweis ergänzen.
+
 ### Bugsink mitliefern (Compose-Profil `errors`)
 
 Optional und standardmäßig aus. Aktivieren: in Coolify die Variable `COMPOSE_PROFILES=errors` setzen und neu deployen. Ohne Profil starten weder `bugsink` noch `bugsink-init`. (Coolify beachtet Profile ggf. nicht, siehe Coolify-Issue #6395; dann `bugsink`/`bugsink-init` in eine eigene Compose-Datei auslagern.)
