@@ -204,7 +204,7 @@ Basis sind dieselben Compose-Dateien wie oben, nur ohne das Compose-Profil
 `app`.
 
 ```bash
-pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors
+pnpm stack:up          # optional mit Bugsink: pnpm stack:up:errors; mit OpenObserve: pnpm stack:up:obs
 pnpm stack:trust       # einmalig pro Rechner, danach Browser neu starten
 pnpm dev               # → https://app.localhost
 ```
@@ -232,6 +232,11 @@ Datei gewinnt) und verbindet sich mit dem Stack. Caddy proxyt dafür auf
 `host.docker.internal:3000` statt auf `app:3000`; Zitadels `HTTPClient.DenyList`
 lässt diese Adresse zu (sonst würde `DeniedURL` den Webhook blockieren, siehe
 oben).
+
+`--with-observability` startet zusätzlich OpenObserve (http://localhost:5080, Login
+`admin@onduty.local` / Admin-Passwort des Stacks) und trägt
+`OTEL_EXPORTER_OTLP_ENDPOINT` + Zugangsdaten in `.env.dev-stack` ein; `pnpm dev`
+exportiert dann Traces und Metriken (Intervall 60 s).
 
 Aufräumen: `pnpm stack:down` (Container stoppen, Volumes bleiben) bzw.
 `pnpm stack:reset` (alles löschen, inkl. `.env.standalone.dev`,

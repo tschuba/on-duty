@@ -4,7 +4,7 @@
 # Basis sind docker-compose.standalone.yml + docker-compose.standalone.local.yml
 # (ohne Profil `app` → kein on-duty-Container).
 #
-#   scripts/dev-stack.sh up [--with-errors] | down | reset [--ca] | trust
+#   scripts/dev-stack.sh up [--with-errors] [--with-observability] | down | reset [--ca] | trust
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,10 +21,12 @@ COMPOSE=(docker compose -p "$PROJECT" -f docker-compose.standalone.yml -f docker
 CMD=${1:-}
 shift || true
 WITH_ERRORS=0
+WITH_OBS=0
 DROP_CA=0
 for arg in "$@"; do
   case "$arg" in
     --with-errors) WITH_ERRORS=1 ;;
+    --with-observability) WITH_OBS=1 ;;
     --ca) DROP_CA=1 ;;
     *) echo "Unbekannte Option: $arg" >&2; exit 1 ;;
   esac
@@ -81,6 +83,7 @@ untrust_ca() {
 case "$CMD" in
   up)
     [[ $WITH_ERRORS -eq 1 ]] && COMPOSE+=(--profile errors)
+    [[ $WITH_OBS -eq 1 ]] && COMPOSE+=(--profile observability)
     ensure_standalone_env
     # Host-Modus: Caddy und Zitadel-Webhook erreichen die App über den Host.
     grep -q '^CADDY_DATA=' "$ENV_FILE" || echo "CADDY_DATA=./$CA_DIR" >> "$ENV_FILE"
@@ -94,6 +97,7 @@ EOT
     "${COMPOSE[@]}" --profile app build app
     SERVICES=(db zitadel zitadel-login zitadel-init caddy)
     [[ $WITH_ERRORS -eq 1 ]] && SERVICES+=(bugsink bugsink-init)
+    [[ $WITH_OBS -eq 1 ]] && SERVICES+=(openobserve)
     "${COMPOSE[@]}" up -d "${SERVICES[@]}"
 
     echo "Warte auf zitadel-init..."
@@ -121,6 +125,9 @@ EOT
       ERROR_TRACKER_URL="https://errors.localhost"
     fi
 
+    OTEL_ENDPOINT=""
+    [[ $WITH_OBS -eq 1 ]] && OTEL_ENDPOINT="http://localhost:5080/api/default"
+
     cat > "$APP_ENV_FILE" <<EOT
 DATABASE_URL=postgres://onduty:$(env_get SERVICE_PASSWORD_POSTGRES)@127.0.0.1:5433/onduty
 ORG_NAME="$(env_get ORG_NAME)"
@@ -137,6 +144,9 @@ ZITADEL_WEBHOOK_SECRET_FILE=$PWD/$OUT_DIR/webhook.secret
 REGISTRATION_ENABLED=true
 SENTRY_DSN=$DSN
 ERROR_TRACKER_URL=$ERROR_TRACKER_URL
+OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_ENDPOINT
+OPENOBSERVE_USER=admin@onduty.local
+OPENOBSERVE_PASSWORD=$(env_get SERVICE_PASSWORD_ADMIN)
 EOT
 
     echo "Migriere DB + lege Admin an..."
@@ -156,14 +166,20 @@ Bugsink: https://$(env_get SERVICE_FQDN_BUGSINK)
   Login: admin@bugsink.local / $(env_get SERVICE_PASSWORD_BUGSINK)
 BUGSINK
 fi)
+$(if [[ $WITH_OBS -eq 1 ]]; then cat <<OBS
+
+OpenObserve: http://localhost:5080
+  Login: admin@onduty.local / $(env_get SERVICE_PASSWORD_ADMIN)
+OBS
+fi)
 Stoppen: pnpm stack:down — alles löschen: pnpm stack:reset (CA bleibt; mit --ca auch die CA)
 EOT
     ;;
   down)
-    [[ -f "$ENV_FILE" ]] && "${COMPOSE[@]}" --profile errors --profile app down
+    [[ -f "$ENV_FILE" ]] && "${COMPOSE[@]}" --profile errors --profile observability --profile app down
     ;;
   reset)
-    [[ -f "$ENV_FILE" ]] && "${COMPOSE[@]}" --profile errors --profile app down -v
+    [[ -f "$ENV_FILE" ]] && "${COMPOSE[@]}" --profile errors --profile observability --profile app down -v
     rm -rf "$ENV_FILE" "$APP_ENV_FILE" "$OUT_DIR"
     if [[ $DROP_CA -eq 1 ]]; then
       untrust_ca
@@ -176,7 +192,7 @@ EOT
     if ca_trusted; then echo "CA ist bereits vertraut."; else trust_ca && echo "CA installiert. Browser neu starten. Firefox: security.enterprise_roots.enabled = true."; fi
     ;;
   *)
-    echo "Usage: $0 up [--with-errors] | down | reset [--ca] | trust" >&2
+    echo "Usage: $0 up [--with-errors] [--with-observability] | down | reset [--ca] | trust" >&2
     exit 1
     ;;
 esac

@@ -75,9 +75,23 @@ services:
           - ${SERVICE_FQDN_BUGSINK:-errors.localhost}
           - ${SERVICE_FQDN_ZITADEL}
 
+  # Optional Observability-Backend für `pnpm stack:up --with-observability` (Profil `observability`).
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    profiles: [observability]
+    restart: unless-stopped
+    environment:
+      ZO_ROOT_USER_EMAIL: admin@onduty.local
+      ZO_ROOT_USER_PASSWORD: ${SERVICE_PASSWORD_ADMIN}
+    ports:
+      - "127.0.0.1:5080:5080"
+    volumes:
+      - openobserve-data:/data
+
 volumes:
   caddy_data:
   caddy_config:
+  openobserve-data:
 
 networks:
   default:
