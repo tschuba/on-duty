@@ -72,7 +72,7 @@ vi.mock("../middleware/auth.js", async () => {
   };
 });
 
-const { setRsvp, resetRsvp, loadOpenMembers } = await vi.importActual<typeof import("../lib/events.js")>("../lib/events.js");
+const { setRsvp, resetRsvp, loadOpenMembers, countPendingRsvps } = await vi.importActual<typeof import("../lib/events.js")>("../lib/events.js");
 const { eventRoutes } = await import("../routes/events.js");
 
 const future = new Date("2999-01-01T10:00:00Z");
@@ -311,5 +311,19 @@ describe("member view locks", () => {
   it("cancelled: members see the cancelled lock", async () => {
     eventRow = mkEvent({ cancelledAt: new Date() });
     expect(await page()).toContain(t("events.rsvp.lock.cancelled"));
+  });
+});
+
+describe("countPendingRsvps", () => {
+  beforeEach(() => { queue = []; });
+  it("returns the SQL count for an active member", async () => {
+    queue = [[{ id: "m1", exitDate: null, deathDate: null }], [{ n: 2 }]];
+    expect(await countPendingRsvps("u1")).toBe(2);
+  });
+  it("is 0 without a member or for an exited member", async () => {
+    queue = [[]];
+    expect(await countPendingRsvps("u1")).toBe(0);
+    queue = [[{ id: "m1", exitDate: "2020-01-01", deathDate: null }]];
+    expect(await countPendingRsvps("u1")).toBe(0);
   });
 });

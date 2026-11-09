@@ -8,6 +8,11 @@
 	reverse_proxy bugsink:8000
 }
 
+{$OPENOBSERVE_DOMAIN} {
+	tls internal
+	reverse_proxy openobserve:5080
+}
+
 {$ZITADEL_DOMAIN} {
 	# Login V2 (eigener zitadel-login-Container, Next.js) bedient die
 	# gehostete Login-UI unter /ui/v2/login/*; alles andere (API, gRPC-Web,
