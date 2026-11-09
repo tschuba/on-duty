@@ -949,7 +949,7 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
       hidden={hidden}
       labels={{
         button: t("members.filter.button"), title: t("members.filter.title"), quick: t("members.filter.quick"),
-        apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"),
+        apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults"),
       }}
       quick={QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), values: { status: f.status, age: f.age } }))}
       sections={[

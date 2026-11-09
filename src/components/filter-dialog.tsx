@@ -13,7 +13,7 @@ export type QuickFilter = { label: string; values: Record<string, string[]> };
 type Props = {
   id: string;
   hidden: [string, string][];
-  labels: { button: string; title: string; quick?: string; apply: string; close: string; reset: string; searchPlaceholder: string };
+  labels: { button: string; title: string; quick?: string; apply: string; close: string; reset: string; searchPlaceholder: string; noResults: string };
   sections: FilterSection[];
   quick?: QuickFilter[];
 };
@@ -27,6 +27,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
   const formId = `${id}-form`;
   const def = Object.fromEntries(sections.map((s) => [s.param, s.defaults ?? []]));
   const lists = sections.filter((s) => s.type === "list");
+  const multiList = lists.length > 1;
   const unusedKeys = Object.fromEntries(lists.flatMap((s) => (s.type === "list" && s.unused ? [[s.param, s.unused.storageKey]] : [])));
 
   const chips = (s: FilterSection & { type: "chips" }) => (
@@ -38,13 +39,13 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
     </fieldset>
   );
   const list = (s: FilterSection & { type: "list" }) => (
-    <section data-fd-list={s.param}>
-      <h4 class="font-semibold text-sm mb-2 flex items-center gap-2">
+    <section data-fd-list={s.param} class={`border border-base-300 rounded-box p-3${multiList ? "" : " md:col-span-2"}`}>
+      <h4 class="font-semibold text-base mb-3 flex items-center gap-2">
         {s.title}
         <span class="badge badge-primary badge-sm" data-fd-count hidden={s.selected.length === 0}>{s.selected.length}</span>
       </h4>
       <label class="input flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={labels.searchPlaceholder} class="grow min-w-0" data-fd-search /></label>
-      {s.unused && <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-xs opacity-60"><input type="checkbox" class="toggle toggle-xs" data-fd-unused />{s.unused.label}</label>}
+      {s.unused && <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-sm text-base-content/80"><input type="checkbox" class="toggle toggle-xs" data-fd-unused />{s.unused.label}</label>}
       <ul class={`space-y-0.5 min-h-24 overflow-y-auto ${s.compact ? "max-h-40" : "max-h-[40dvh]"}`}>
         {s.options.map((o, i) => (
           <>
@@ -59,6 +60,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
           </>
         ))}
       </ul>
+      <p class="px-2 py-3 text-sm text-base-content/70" data-fd-empty hidden>{labels.noResults}</p>
     </section>
   );
   const toggle = (s: FilterSection & { type: "toggle" }) => (
@@ -83,7 +85,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
       else rows.push([s]);
     }
     return (
-      <div class="flex flex-col">
+      <div class="flex flex-col md:col-span-2">
         {rows.map((r, i) => (
           <>
             {i > 0 && <hr class="my-2 mx-auto w-1/2 border-base-content/30" />}
@@ -105,9 +107,9 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
         <form id={formId} method="get" class="modal-box max-w-2xl flex flex-col max-h-[90dvh]">
           {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
           <h3 class="font-bold text-lg mb-4">{labels.title}</h3>
-          <div class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-6">
+          <div class="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 content-start">
           {quick.length > 0 && (
-            <section class="bg-base-200 rounded-box p-3">
+            <section class="bg-base-200 rounded-box p-3 md:col-span-2">
               <h4 class="font-semibold text-sm mb-2">{labels.quick}</h4>
               <div class="flex flex-wrap gap-1">
                 {quick.map((f) => <button type="button" class="btn btn-sm btn-outline" data-fd-quick data-values={JSON.stringify(f.values)}>{f.label}</button>)}
@@ -142,6 +144,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
               if (!li.dataset.title) return;
               li.hidden = (!!li.dataset.unused && !(u && u.checked)) || li.dataset.title.indexOf(term) < 0;
             });
+            s.querySelector('[data-fd-empty]').hidden = lis.some(function(li) { return li.dataset.title && !li.hidden; });
             lis.forEach(function(li, i) {
               if (!('fdGroup' in li.dataset)) return;
               var any = false;
