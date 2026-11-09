@@ -20,5 +20,7 @@ coverage/
 tile-cache/
 data/
 docs/
+!docs/observability/
+!docs/observability/dashboard.json
 *.md
 # Tailwind liest nur src/ und public/js (@source in src/styles/app.css); Doku darf das CSS nicht beeinflussen.
