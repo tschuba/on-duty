@@ -68,8 +68,8 @@ export function deriveMemberStatus(
 
   const age = ageInYears(member.birthDate, today);
   if (age < activeAgeLimit && assignments.some((a) => a.role.grantsActiveStatus && !a.to)) {
-    if (age < childrenAgeLimit) return "children";
-    return age < youthAgeLimit ? "youth" : "active";
+    const group = ageGroupOf(member.birthDate, childrenAgeLimit, youthAgeLimit, activeAgeLimit, today);
+    return group === "children" ? "children" : group === "youth" ? "youth" : "active";
   }
 
   const cutoff = ageLimitDate(member.birthDate, activeAgeLimit);

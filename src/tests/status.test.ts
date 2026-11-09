@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveMemberStatus } from "../lib/status.js";
+import { ageGroupOf, deriveMemberStatus } from "../lib/status.js";
 
 const YOUTH_LIMIT = 18;
 const CHILDREN_LIMIT = 12;
@@ -102,5 +102,19 @@ describe("deriveMemberStatus", () => {
   it("active on day before age limit, passive on the limit day", () => {
     expect(deriveMemberStatus(member({ birthDate: age(65, 1) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("active");
     expect(deriveMemberStatus(member({ birthDate: age(65, 0) }), [assignment(activeRole)], CHILDREN_LIMIT, YOUTH_LIMIT, 65)).toBe("passive");
+  });
+});
+
+describe("age boundaries stay in sync (deriveMemberStatus vs ageGroupOf)", () => {
+  const today = new Date(2026, 5, 15);
+  const born = (years: number) => `${2026 - years}-06-15`;
+  const role = [assignment(activeRole)];
+  it.each([
+    [11, "children", "children"], [12, "youth", "youth"],
+    [17, "youth", "youth"], [18, "adult", "active"],
+    [64, "adult", "active"], [65, "senior", "passive"],
+  ] as const)("age %i → group %s, status %s", (years, group, status) => {
+    expect(ageGroupOf(born(years), 12, 18, 65, today)).toBe(group);
+    expect(deriveMemberStatus(member({ birthDate: born(years) }), role, 12, 18, 65, today)).toBe(status);
   });
 });
