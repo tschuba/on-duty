@@ -66,13 +66,30 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
     </label>
   );
 
-  // Aufeinanderfolgende `chips` bilden eine Gruppe mit Trennlinie.
+  // Aufeinanderfolgende `chips` bilden eine Gruppe mit Trennlinie; direkt folgende `toggle` stehen in der Zeile der letzten Chips.
   const blocks: (FilterSection | FilterSection[])[] = [];
   for (const s of sections) {
     const last = blocks[blocks.length - 1];
-    if (s.type === "chips" && Array.isArray(last)) last.push(s);
+    if (Array.isArray(last) && (s.type === "chips" || s.type === "toggle")) last.push(s);
     else blocks.push(s.type === "chips" ? [s] : s);
   }
+  const group = (b: FilterSection[]) => {
+    const rows: FilterSection[][] = [];
+    for (const s of b) {
+      if (s.type === "chips") rows.push([s]);
+      else rows[rows.length - 1].push(s);
+    }
+    return (
+      <div class="flex flex-col">
+        {rows.map((r, i) => (
+          <>
+            {i > 0 && <hr class="my-2 mx-auto w-1/2 border-base-content/30" />}
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2">{r.map((s) => (s.type === "chips" ? chips(s) : s.type === "toggle" ? toggle(s) : null))}</div>
+          </>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -94,9 +111,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
               </div>
             </section>
           )}
-          {blocks.map((b) => Array.isArray(b)
-            ? <div class="flex flex-col">{b.map((s, i) => <>{i > 0 && <hr class="my-2 mx-auto w-1/2 border-base-content/30" />}{s.type === "chips" && chips(s)}</>)}</div>
-            : b.type === "list" ? list(b) : b.type === "toggle" ? toggle(b) : null)}
+          {blocks.map((b) => Array.isArray(b) ? group(b) : b.type === "list" ? list(b) : b.type === "toggle" ? toggle(b) : null)}
           </div>
           <div class="modal-action">
             <button type="button" class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} data-fd-reset aria-label={labels.reset} title={labels.reset}>
