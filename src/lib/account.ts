@@ -33,3 +33,11 @@ export async function deleteOwnAccount(userId: string, isAdmin: boolean): Promis
 export function resolveAccountUrl(accountUrl: string | undefined, provider: string): string | undefined {
   return accountUrl ? new URL(accountUrl, provider).href : undefined;
 }
+
+export const MAX_NAME_LENGTH = 100;
+
+// Trims and collapses whitespace; null when empty or too long.
+export function normalizeName(raw: string): string | null {
+  const name = raw.trim().replace(/\s+/g, " ");
+  return name && name.length <= MAX_NAME_LENGTH ? name : null;
+}

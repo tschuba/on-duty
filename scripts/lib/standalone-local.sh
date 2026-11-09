@@ -31,6 +31,13 @@ SERVICE_PASSWORD_BUGSINK=$(openssl rand -hex 16)
 EOF
 fi
 
+if [[ ${WITH_OBS:-0} -eq 1 ]] && ! grep -q '^SERVICE_FQDN_OPENOBSERVE=' "$ENV_FILE"; then
+  cat >> "$ENV_FILE" <<EOF
+SERVICE_FQDN_OPENOBSERVE=observe.localhost
+SERVICE_PASSWORD_OPENOBSERVE=$(openssl rand -hex 16)
+EOF
+fi
+
 # Dummy-SMTP: zitadel-init trägt die Werte nur als Konfiguration in Zitadel ein, ein Mailserver ist nicht nötig.
 if ! grep -q '^SMTP_HOST=' "$ENV_FILE"; then
   cat >> "$ENV_FILE" <<EOF

@@ -24,9 +24,13 @@ vi.mock("../db/index.js", () => ({
 
 vi.mock("../lib/inventory.js", () => ({ countOverdueInspections: async () => 0 }));
 
+let pendingRsvps = 0;
+vi.mock("../lib/events.js", () => ({ countPendingRsvps: async () => pendingRsvps }));
+
 const { Layout } = await import("../components/layout.js");
 
 beforeEach(() => {
+  pendingRsvps = 0;
   openApplicationsFixture = [];
   openDonationsFixture = [];
 });
@@ -122,3 +126,12 @@ describe("Sidebar — Aktiv-Erkennung und Zähler", () => {
   });
 });
 
+
+describe("events count badge", () => {
+  it("shows pending rsvp count on Termine and hides it at 0", async () => {
+    pendingRsvps = 3;
+    expect(await renderAt("/", "members:read")).toMatch(/Termine[\s\S]{0,200}badge-warning[^>]*>3</);
+    pendingRsvps = 0;
+    expect(await renderAt("/", "members:read")).not.toMatch(/Termine[\s\S]{0,200}badge-warning[^>]*>\d</);
+  });
+});

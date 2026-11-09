@@ -21,7 +21,7 @@ vi.mock("../db/index.js", () => {
 const sendMail = vi.fn();
 vi.mock("../lib/mail.js", () => ({ sendMail: (...a: unknown[]) => sendMail(...a) }));
 
-import { deleteBlock, deleteOwnAccount, countOtherAdmins, resolveAccountUrl } from "../lib/account.js";
+import { deleteBlock, deleteOwnAccount, countOtherAdmins, resolveAccountUrl, normalizeName } from "../lib/account.js";
 import { onUserRegistered, countPendingUsers } from "../lib/registration.js";
 import { checkRole, clearDefaultRoleIfDeleted, setSetting, roleHasPermissions } from "../lib/settings.js";
 import { LOCAL_ADMIN_ACCOUNT_ID } from "../lib/constants.js";
@@ -108,5 +108,14 @@ describe("resolveAccountUrl", () => {
   it("keeps absolute URLs and handles unset", () => {
     expect(resolveAccountUrl("https://other.example/me", "https://auth.example.com")).toBe("https://other.example/me");
     expect(resolveAccountUrl(undefined, "https://auth.example.com")).toBeUndefined();
+  });
+});
+
+describe("normalizeName", () => {
+  it("trims and collapses whitespace", () => expect(normalizeName("  Max   Muster \n")).toBe("Max Muster"));
+  it("rejects empty", () => expect(normalizeName("  ")).toBeNull());
+  it("limits to 100 chars", () => {
+    expect(normalizeName("a".repeat(100))).not.toBeNull();
+    expect(normalizeName("a".repeat(101))).toBeNull();
   });
 });
