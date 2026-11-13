@@ -73,6 +73,8 @@ export const de = {
   "organisation.tabs.master": "Stammdaten",
   "privacy.maps": "Karten",
   "privacy.mapsText": "Kartenkacheln werden über unseren Server von OpenStreetMap geladen. An OpenStreetMap gehen nur die Kachelkoordinaten, weder Ihre IP-Adresse noch andere Nutzerdaten. Die Standortbestimmung des Geräts läuft nur auf Klick, Koordinaten werden nicht ohne Speichern übertragen.",
+  "privacy.mails": "Termin-Mails",
+  "privacy.mailsText": "Mitglieder mit hinterlegter E-Mail-Adresse erhalten Mails zu Terminen des Vereins (neu, geändert, abgesagt). Jede Mail enthält einen Link zum Abbestellen; Zu- und Absagen sind per Link ohne Anmeldung möglich. Gespeichert werden die Abbestellung und ein Versandprotokoll (Termin, Zeitpunkt, Erfolg).",
   "organisation.tabs.privacy": "Datenschutzerklärung",
   "organisation.tabs.tax": "Steuerdaten",
   "organisation.receiptRequired": "Pflichtangabe für Zuwendungsbestätigungen",
