@@ -1542,6 +1542,8 @@ export const de = {
   "events.form.duration.3h": "3 Std.",
   "events.form.duration.halfDay": "halber Tag",
   "events.form.duration.fullDay": "1 Tag",
+  "events.settings": "Einstellungen",
+  "events.infoMail.section": "Termin-Mails",
   "events.infoMail.button": "Info-Mail zu Termin-Mails senden",
   "events.infoMail.title": "Info-Mail zu Termin-Mails senden?",
   "events.infoMail.text": "Die Mail kündigt die Termin-Mails an und enthält den Link zum Abbestellen. Wer sie schon erhalten hat, bekommt sie nicht erneut.",

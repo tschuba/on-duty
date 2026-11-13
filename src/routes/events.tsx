@@ -430,12 +430,12 @@ eventRoutes.get("/", requireAuth(), async (c) => {
       <PageHeader title={t("events.title")} actions={<>
         {canManage ? (
           <div class="dropdown dropdown-end">
-            <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={`${t("events.publicLink")}: ${publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}`}>
-              <Icon name="link" class="h-5 w-5" />
-              <span class="hidden sm:inline">{t("events.publicLink")}</span>
-              <span class={`inline-block h-2 w-2 rounded-full ${publicEnabled ? "bg-success" : "bg-error"}`} />
+            <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={t("events.settings")}>
+              <Icon name="cog-6-tooth" class="h-5 w-5" />
+              <span class="hidden sm:inline">{t("events.settings")}</span>
             </div>
             <div tabindex={0} class="dropdown-content bg-base-200 rounded-box z-10 w-72 p-3 shadow space-y-2">
+              <h3 class="text-xs font-semibold uppercase opacity-60">{t("events.publicLink")}</h3>
               <form method="post" action="/events/public-settings">
                 <label class="label cursor-pointer justify-between gap-3">
                   <span class="text-sm">{publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}</span>
@@ -457,6 +457,8 @@ eventRoutes.get("/", requireAuth(), async (c) => {
               <ImpressumHint />
               {infoMail && (
                 <>
+                  <div class="divider my-1" />
+                  <h3 class="text-xs font-semibold uppercase opacity-60">{t("events.infoMail.section")}</h3>
                   <button type="button" class="btn btn-sm btn-ghost w-full justify-start" onclick="document.getElementById('info-mail-dialog').showModal()">
                     <Icon name="envelope" class="h-4 w-4" />{t("events.infoMail.button")}
                   </button>
