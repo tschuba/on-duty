@@ -51,7 +51,7 @@
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.7.14",
     "drizzle-orm": "^0.45.4",
-    "hono": "^4.13.14",
+    "hono": "^4.13.16",
     "import-in-the-middle": "^3.5.3",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
