@@ -171,17 +171,17 @@ export async function infoMailRecipients(): Promise<EventMailRecipient[]> {
   return all.filter((r) => r.state === "send" && !sentTo.has(r.personId));
 }
 
-// Eine Mail je Adresse, im Hintergrund; gibt die Zahl der Empfänger zurück (0 = nichts zu tun).
-export async function sendEventInfoMail(): Promise<number> {
+// Eine Mail je Adresse, im Hintergrund; gibt die Zahl der Empfänger zurück (0 = nichts zu tun) bzw. "no-template", wenn die Vorlage fehlt oder ungültig ist.
+export async function sendEventInfoMail(): Promise<number | "no-template"> {
   const rs = await infoMailRecipients();
   if (!rs.length) return 0;
-  void sendInfoGroups(rs).catch((err) => logger.error({ err }, "[event-mail] info mail failed"));
+  const tpl = await resolveTemplate(INFO_TEMPLATE);
+  if (!tpl) return "no-template";
+  void sendInfoGroups(rs, tpl).catch((err) => logger.error({ err }, "[event-mail] info mail failed"));
   return rs.length;
 }
 
-async function sendInfoGroups(rs: EventMailRecipient[]): Promise<void> {
-  const tpl = await resolveTemplate(INFO_TEMPLATE);
-  if (!tpl) return;
+async function sendInfoGroups(rs: EventMailRecipient[], tpl: NonNullable<Awaited<ReturnType<typeof resolveTemplate>>>): Promise<void> {
   const groups = new Map<string, EventMailRecipient[]>();
   for (const r of rs) groups.set(r.email.toLowerCase(), [...(groups.get(r.email.toLowerCase()) ?? []), r]);
   for (const group of groups.values()) {

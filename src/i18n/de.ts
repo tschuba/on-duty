@@ -1547,6 +1547,7 @@ export const de = {
   "events.infoMail.button": "Info-Mail zu Termin-Mails senden",
   "events.infoMail.title": "Info-Mail zu Termin-Mails senden?",
   "events.infoMail.text": "Die Mail kündigt die Termin-Mails an und enthält den Link zum Abbestellen. Wer sie schon erhalten hat, bekommt sie nicht erneut.",
+  "events.infoMail.noTemplate": "Mailvorlage „event-mail-info“ fehlt oder ist ungültig, nichts versendet.",
   "events.infoMail.none": "Niemand mehr zu informieren.",
   "events.notify.title": "Mitglieder per Mail benachrichtigen?",
   "events.notify.counts": "{send} Mitglieder erhalten die Mail, {noEmail} ohne Adresse, {optedOut} abbestellt.",

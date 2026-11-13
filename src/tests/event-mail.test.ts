@@ -17,7 +17,7 @@ vi.mock("../lib/mail.js", () => ({ sendMail: (o: any) => sendMail(o) }));
 vi.mock("../lib/mail-templates.js", () => ({ resolveTemplate: async () => ({ key: "event-created" }), whenText: () => "W", buildVars: (_k: string, rec: any, r: any[]) => ({ n: r.length, all: rec.optOutAllUrl }) }));
 vi.mock("../lib/events.js", () => ({ invitedMembers: async () => ["m1", "m2", "m3", "m4"], isActiveMember: (m: any) => !m.exitDate && !m.deathDate }));
 
-const { eventMailRecipients, sendEventMails, startEventMails, eventChanges, createdTargets, eventDelivery, sendChangeMails, setEventMailsEnabled, infoMailRecipients } = await import("../lib/event-mail.js");
+const { eventMailRecipients, sendEventMails, startEventMails, eventChanges, createdTargets, eventDelivery, sendChangeMails, setEventMailsEnabled, infoMailRecipients, sendEventInfoMail } = await import("../lib/event-mail.js");
 const future = new Date(Date.now() + 86400000);
 const ev: any = { id: "e1", visibility: "loggedIn", endsAt: future };
 const row = (n: number, email: string | null) => ({ memberId: `m${n}`, personId: `p${n}`, firstName: `F${n}`, lastName: "L", email });
@@ -150,5 +150,22 @@ describe("infoMailRecipients", () => {
     // members (active), persons+members join, opted-out, mail_log sent
     queue = [[{ id: "m1" }, { id: "m2" }, { id: "m3" }, { id: "m4" }, { id: "m5", exitDate: "2020-01-01" }], [row(1, "a@x.de"), row(2, "b@x.de"), row(3, null), row(4, "d@x.de")], [{ personId: "p4" }], [{ personId: "p2" }]];
     expect((await infoMailRecipients()).map((r) => r.memberId)).toEqual(["m1"]);
+  });
+});
+
+describe("sendEventInfoMail", () => {
+  const members = [{ id: "m1" }, { id: "m2" }];
+  it("second run reaches only new members", async () => {
+    queue = [members, [row(1, "a@x.de"), row(2, "b@x.de")], [], []];
+    expect(await sendEventInfoMail()).toBe(2);
+    await vi.waitFor(() => expect(logged.flat()).toHaveLength(2));
+    const sent = logged.flat().map((l: any) => ({ personId: l.personId }));
+    expect(logged.flat().every((l: any) => l.template === "event-mail-info" && l.status === "sent")).toBe(true);
+    queue = [[...members, { id: "m3" }], [row(1, "a@x.de"), row(2, "b@x.de"), row(3, "c@x.de")], [], sent];
+    expect(await sendEventInfoMail()).toBe(1);
+  });
+  it("returns 0 when nobody is left", async () => {
+    queue = [members, [row(1, "a@x.de")], [], [{ personId: "p1" }]];
+    expect(await sendEventInfoMail()).toBe(0);
   });
 });

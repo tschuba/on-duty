@@ -416,7 +416,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const allTags = [...EVENT_TAGS.map((d) => d.key as string), ...freeTags];
   const tagFilter = parseMulti(normalizeEventTags(c.req.queries("tag") ?? []), allTags);
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
-  const infoMail = canManage && isSmtpConfigured() ? await infoMailRecipients() : null;
+  const infoMail = canManage ? await infoMailRecipients() : null;
 
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
   let rows = await withRsvpInfo(await fetchEvents(user, undefined), user);
@@ -511,8 +511,11 @@ eventRoutes.post("/public-settings", manage, async (c) => {
 
 eventRoutes.post("/info-mail", manage, async (c) => {
   if (!isSmtpConfigured()) setFlash(c, t("events.notify.noSmtp"), "error");
-  else if (await sendEventInfoMail()) setFlash(c, t("events.notify.sent"), "success");
-  else setFlash(c, t("events.infoMail.none"), "error");
+  else {
+    const n = await sendEventInfoMail();
+    if (n === "no-template") setFlash(c, t("events.infoMail.noTemplate"), "error");
+    else setFlash(c, n ? t("events.notify.sent") : t("events.infoMail.none"), n ? "success" : "error");
+  }
   return c.redirect("/events");
 });
 
