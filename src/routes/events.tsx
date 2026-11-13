@@ -23,7 +23,7 @@ import { PublicFooter } from "../components/public-form.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { isSmtpConfigured } from "../lib/mail.js";
-import { countRecipients, eventMailRecipients, startEventMails } from "../lib/event-mail.js";
+import { countRecipients, createdTargets, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
@@ -841,16 +841,24 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
   const nNo = deleteRows.length - nYes;
   const summary = [nYes && t(nYes === 1 ? "events.rsvpCountYesOne" : "events.rsvpCountYesMany", { n: nYes }), nNo && t(nNo === 1 ? "events.rsvpCountNoOne" : "events.rsvpCountNoMany", { n: nNo })].filter(Boolean).join(" und ");
   const confirmDelete = summary ? t("events.confirmDeleteRsvps", { title: ev.title, summary }) : t("events.confirmDelete", { title: ev.title });
+  const smtp = isSmtpConfigured();
+  const cancelKind = ev.cancelledAt ? "uncancel" : "cancel";
+  const askMail = smtp && ev.endsAt > now(); // Rückfrage nur sinnvoll, wenn Mails überhaupt rausgehen können
   const cancelAction = canManage && (ev.cancelledAt
-    ? <HeaderAction icon="arrow-uturn-left" label={t("events.uncancel")} class="btn-outline" attrs={{ "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" }} />
-    : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" attrs={{ "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" }} />);
+    ? <HeaderAction icon="arrow-uturn-left" label={t("events.uncancel")} class="btn-outline" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" } })} />
+    : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
   const deleteAction = canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
-  const notify = canManage && c.req.query("notify") === "created" && isSmtpConfigured() ? await eventMailRecipients(ev) : null;
+  const notify = canManage && smtp && c.req.query("notify") === "created" && !ev.cancelledAt ? await createdTargets(ev) : null;
+  const cancelRecipients = canManage && askMail ? await eventMailRecipients(ev) : [];
+  const catchUp = canManage && smtp && !ev.cancelledAt && ev.endsAt > now() ? await createdTargets(ev) : null;
+  const delivery = canManage ? await eventDelivery(ev, smtp) : [];
   return c.html(
     <Layout title={ev.title} user={user}>
       <div class="max-w-2xl mx-auto">
-      {notify && <NotifyDialog eventId={ev.id} recipients={notify} />}
+      {notify && <MailChoiceDialog id="notify-dialog" auto action={`/events/${ev.id}/notify`} title={t("events.notify.title")} sections={[{ title: t("events.notify.kind.created"), recipients: notify.recipients }]} defaultSend />}
+      {canManage && askMail && <MailChoiceDialog id="cancel-dialog" action={`/events/${ev.id}/${cancelKind}`} title={t(ev.cancelledAt ? "events.notify.uncancelTitle" : "events.notify.cancelTitle", { title: ev.title })} sections={[{ title: t(ev.cancelledAt ? "events.notify.kind.uncancelled" : "events.notify.kind.cancelled"), recipients: cancelRecipients }]} defaultSend={false} />}
       <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{cancelAction}{deleteAction}</>} />} />
+      {catchUp && catchUp.recipients.some((r) => r.state === "send") && <a class="btn btn-outline btn-sm mb-2" href={`/events/${ev.id}?notify=created`}>{t(catchUp.mode === "failed" ? "events.notify.retry" : "events.notify.catchUp")}</a>}
       <LocalTimes tz={tz} />
       <ViewGrid>
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.start")}</div><div class="font-medium"><EventTimeLabel ev={ev} tz={tz} /></div></div>
@@ -869,6 +877,7 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
         <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
       </ViewGrid>
       {ev.rsvpEnabled && <RsvpSection ev={ev} user={user} tz={tz} />}
+      {canManage && <DeliverySection rows={delivery} />}
       <script dangerouslySetInnerHTML={{ __html: `document.body.addEventListener('htmx:beforeSwap', function (e) {
         if (e.detail.xhr.status === 422 && e.detail.requestConfig.elt.closest('#rsvp-section')) { e.detail.shouldSwap = true; e.detail.isError = false; }
       });` }} />
@@ -920,6 +929,25 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
     );
   }
 
+  const changes = eventChanges(snapshot(existing), { startsAt: result.startsAt, endsAt: result.endsAt, allDay: values.allDay, location: values.location || null, rsvpDeadline: result.rsvpDeadline }, tz);
+  const oldInvitees = new Set(existing.invitees.map((x) => x.memberId));
+  const added = values.visibility === "members" ? values.memberIds.filter((m) => !oldInvitees.has(m)) : [];
+  // Mails nur für anstehende, nicht abgesagte Termine: Mitglieder wissen von der Absage, die Wiederaufnahme-Mail trägt den neuen Stand.
+  const smtp = isSmtpConfigured() && !existing.cancelledAt && result.endsAt >= now();
+
+  // Rückfrage vor dem Speichern: alter Stand = DB, neuer Stand = Formular; nichts muss zwischengespeichert werden.
+  if (smtp && (changes.length || added.length) && body.notify === undefined) {
+    const all = values.visibility === "members" ? await mailRecipientsFor(values.memberIds) : await eventMailRecipients({ id, visibility: values.visibility, endsAt: result.endsAt });
+    const sections: MailSection[] = [];
+    if (changes.length) sections.push({ title: t("events.notify.kind.changed"), lines: changes, recipients: all.filter((r) => !added.includes(r.memberId)) });
+    if (added.length) sections.push({ title: t("events.notify.kind.invited"), recipients: all.filter((r) => added.includes(r.memberId)) });
+    return c.html(
+      <Layout title={t("events.form.editTitle")} user={user}>
+        <MailChoiceDialog id="notify-dialog" open action={`/events/${id}/edit`} fields={body} title={t("events.notify.title")} sections={sections} defaultSend={false} backHref={`/events/${id}`} />
+      </Layout>,
+    );
+  }
+
   await db.transaction(async (tx) => {
     await tx.update(events).set({
       title: values.title, location: values.location || null, ...dbCoords(values.coordinates), description: values.description || null,
@@ -928,6 +956,10 @@ eventRoutes.post("/:id/edit", manage, async (c) => {
     await saveEventTagsAndInvitees(tx as never, id, values.tags, values.visibility, values.memberIds);
   });
 
+  if (smtp && body.notify === "send") {
+    const updated = await db.query.events.findFirst({ where: eq(events.id, id) });
+    if (updated) sendChangeMails(updated, { changes, added });
+  }
   setFlash(c, t("events.form.saved"), "success");
   return c.redirect(`/events/${id}`);
 });
@@ -945,30 +977,64 @@ eventRoutes.post("/:id/delete", manage, async (c) => {
 
 // ── Mail-Benachrichtigung ────────────────────────────────────────────────────
 
-// Modal nach dem Anlegen (?notify=created); öffnet sich beim Laden. Empfänger werden beim Senden serverseitig neu berechnet.
-function NotifyDialog({ eventId, recipients }: { eventId: string; recipients: Awaited<ReturnType<typeof eventMailRecipients>> }) {
-  const n = countRecipients(recipients);
-  const names = recipients.filter((r) => r.state === "send").map((r) => `${r.firstName} ${r.lastName}`);
+interface MailSection { title: string; lines?: string[]; recipients: EventMailRecipient[] }
+
+// Rückfrage-Modal. Zwei POST-Formulare (Ohne Mail / Mail senden) mit den Formularwerten als Hidden-Fields und notify=skip|send.
+// open: Seite besteht nur aus dem Modal (vor dem Speichern); sonst öffnet ein Skript es beim Laden (id) bzw. der Auslöser per showModal().
+function MailChoiceDialog({ id, open, auto, action, fields = {}, title, sections, defaultSend, backHref }: { id: string; open?: boolean; auto?: boolean; action: string; fields?: Record<string, unknown>; title: string; sections: MailSection[]; defaultSend: boolean; backHref?: string }) {
+  const hidden = (notify: string) => (
+    <>
+      {Object.entries(fields).filter(([k]) => k !== "notify").flatMap(([k, v]) => (Array.isArray(v) ? v : [v]).filter((x) => typeof x === "string").map((x) => <input type="hidden" name={k} value={x as string} />))}
+      <input type="hidden" name="notify" value={notify} />
+    </>
+  );
   return (
     <>
-      <dialog id="notify-dialog" class="modal">
+      <dialog id={id} class={`modal${open ? " modal-open" : ""}`}>
         <div class="modal-box">
-          <h3 class="font-bold text-lg">{t("events.notify.title")}</h3>
-          <p class="py-2 opacity-70">{t("events.notify.counts", n)}</p>
-          {names.length > 0 && <details><summary class="cursor-pointer text-sm">{t("events.notify.names")}</summary><p class="text-sm py-2">{names.join(", ")}</p></details>}
+          <h3 class="font-bold text-lg">{title}</h3>
+          {sections.map(({ title: sTitle, lines, recipients }) => {
+            const names = recipients.filter((r) => r.state === "send").map((r) => `${r.firstName} ${r.lastName}`);
+            return (
+              <div class="py-2">
+                <div class="font-semibold">{sTitle}</div>
+                {lines && <ul class="list-disc pl-5 text-sm">{lines.map((l) => <li>{l}</li>)}</ul>}
+                <p class="py-1 opacity-70">{t("events.notify.counts", countRecipients(recipients))}</p>
+                {names.length > 0 && <details><summary class="cursor-pointer text-sm">{t("events.notify.names")}</summary><p class="text-sm py-2">{names.join(", ")}</p></details>}
+              </div>
+            );
+          })}
           <div class="modal-action">
-            <form method="dialog"><button class="btn">{t("events.notify.skip")}</button></form>
-            <form method="post" action={`/events/${eventId}/notify`}><button type="submit" class="btn btn-primary" autofocus>{t("events.notify.send")}</button></form>
+            {backHref && <a href={backHref} class="btn btn-ghost">{t("common.cancel")}</a>}
+            <form method="post" action={action}>{hidden("skip")}<button type="submit" class="btn" autofocus={!defaultSend}>{t("events.notify.skip")}</button></form>
+            <form method="post" action={action}>{hidden("send")}<button type="submit" class="btn btn-primary" autofocus={defaultSend}>{t("events.notify.send")}</button></form>
           </div>
         </div>
-        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+        {!open && <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>}
       </dialog>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('notify-dialog').showModal()" }} />
+      {auto && <script dangerouslySetInnerHTML={{ __html: `document.getElementById('${id}').showModal()` }} />}
     </>
   );
 }
 
-// POST /events/:id/notify — Versand im Hintergrund, Antwort blockiert nicht.
+const DELIVERY_BADGE: Record<DeliveryState, string> = { sent: "badge-success", failed: "badge-error", "no-email": "badge-ghost", "opted-out": "badge-ghost", "no-smtp": "badge-warning", pending: "badge-outline" };
+
+// Versandstatus je Mitglied (letzter mail_log-Eintrag bzw. berechneter Grund).
+function DeliverySection({ rows }: { rows: Awaited<ReturnType<typeof eventDelivery>> }) {
+  if (!rows.length) return null;
+  return (
+    <details class="mt-6">
+      <summary class="cursor-pointer font-semibold">{t("events.delivery.title")}</summary>
+      <table class="table table-sm mt-2">
+        <tbody>
+          {rows.map((r) => <tr><td>{r.lastName}, {r.firstName}</td><td><span class={`badge badge-sm ${DELIVERY_BADGE[r.delivery]}`}>{t(`events.delivery.${r.delivery}`)}</span></td></tr>)}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
+// POST /events/:id/notify — „Neuer Termin“ (Anlegen/Nachholen), Versand im Hintergrund.
 eventRoutes.post("/:id/notify", manage, async (c) => {
   const ev = await db.query.events.findFirst({ where: eq(events.id, c.req.param("id")) });
   if (!ev) return c.notFound();
@@ -983,10 +1049,12 @@ eventRoutes.post("/:id/notify", manage, async (c) => {
 for (const [path, cancelledAt] of [["cancel", () => now()], ["uncancel", () => null]] as const) {
   eventRoutes.post(`/:id/${path}`, manage, async (c) => {
     const id = c.req.param("id");
-    const [row] = await db.update(events).set({ cancelledAt: cancelledAt() }).where(eq(events.id, id)).returning({ id: events.id });
+    const { notify } = await c.req.parseBody();
+    const [row] = await db.update(events).set({ cancelledAt: cancelledAt() }).where(eq(events.id, id)).returning();
     if (!row) return c.notFound();
-    c.header("HX-Redirect", `/events/${id}`);
-    return c.body(null, 204);
+    if (notify === "send" && isSmtpConfigured()) sendChangeMails(row, { cancel: path === "cancel" ? "cancelled" : "uncancelled" });
+    if (c.req.header("HX-Request")) { c.header("HX-Redirect", `/events/${id}`); return c.body(null, 204); }
+    return c.redirect(`/events/${id}`);
   });
 }
 

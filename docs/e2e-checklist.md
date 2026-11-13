@@ -23,6 +23,14 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 - [ ] Paginierung + Seitengröße-Wechsel bleibt bei aktiven Filtern korrekt
 - [ ] Statistik-Karten zeigen korrekte Zahlen
 
+## Termin-Mails
+
+- [ ] Neuer Termin: Modal mit Zählern, „Mail senden“ verschickt; „Ohne Mail“ → Button „Mitglieder benachrichtigen“ auf der Detailseite, danach kein Doppelversand
+- [ ] Termin bearbeiten: Änderung an Zeit, Ort oder Anmeldefrist → Modal „alt → neu“ vor dem Speichern; Änderung nur an Titel/Beschreibung → kein Modal
+- [ ] Absage und Wiederaufnahme: Modal, „Mail senden“ verschickt die passende Mail
+- [ ] Mail-Versand-Abschnitt zeigt je Mitglied gesendet / keine Adresse / abbestellt / fehlgeschlagen
+- [ ] Opt-Out-Checkbox im Konto und im Mitgliederformular wirkt (abbestellt = keine Mail)
+
 ## Jubiläen & Geburtstage
 
 - [ ] Quick-Buttons (3 / 6 / 12 Monate) setzen Datumsbereich korrekt
