@@ -1,4 +1,5 @@
 import { env } from "../env.js";
+import { logger } from "./logger.js";
 
 // Erweiterungspunkt: heute eine feste Zone für die ganze Wehr, später ggf. pro Request/Org.
 export function resolveTimezone(_c?: unknown): string {
@@ -51,14 +52,27 @@ export function toLocalInput(date: Date, tz: string): string {
 }
 export const toLocalDate = (date: Date, tz: string) => toLocalInput(date, tz).slice(0, 10);
 
-export function formatDateTime(date: Date, tz: string): string {
-  return new Intl.DateTimeFormat("de-DE", { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(date);
+// Heute fest "de"; 83_Mehrsprachigkeit füllt die Kette recipient.locale → APP_LOCALE → de.
+export function resolveLocale(_recipient?: unknown): string {
+  return "de";
 }
-export function formatDay(date: Date, tz: string): string {
-  return new Intl.DateTimeFormat("de-DE", { timeZone: tz, weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+// Unbekannte Locale (Intl kennt sie nicht) → "de".
+function intlLocale(locale: string): string {
+  try {
+    if (Intl.DateTimeFormat.supportedLocalesOf([locale]).length) return locale === "de" ? "de-DE" : locale;
+  } catch { /* malformed tag */ }
+  logger.warn({ locale }, "[datetime] unsupported locale, falling back to de");
+  return "de-DE";
 }
-export function formatTime(date: Date, tz: string): string {
-  return new Intl.DateTimeFormat("de-DE", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(date);
+
+export function formatDateTime(date: Date, tz: string, locale = "de"): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), { timeZone: tz, dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+export function formatDay(date: Date, tz: string, locale = "de"): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), { timeZone: tz, weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+}
+export function formatTime(date: Date, tz: string, locale = "de"): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(date);
 }
 // Ganztägig: Start 00:00 am ersten, Ende 23:59 am letzten Tag (Wanduhr in `tz`).
 export function allDayBounds(startDay: string, endDay: string, tz: string): { startsAt: Date; endsAt: Date } | null {
