@@ -22,6 +22,8 @@ import { getSettings, setSetting } from "../lib/settings.js";
 import { PublicFooter } from "../components/public-form.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
+import { isSmtpConfigured } from "../lib/mail.js";
+import { countRecipients, eventMailRecipients, sendEventMails } from "../lib/event-mail.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
@@ -801,7 +803,7 @@ eventRoutes.post("/new", manage, async (c) => {
   });
 
   setFlash(c, t("events.form.created"), "success");
-  return c.redirect(`/events/${newId}`);
+  return c.redirect(`/events/${newId}${isSmtpConfigured() ? "?notify=created" : ""}`);
 });
 
 async function fetchEventForEdit(id: string) {
@@ -843,9 +845,11 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
     ? <HeaderAction icon="arrow-uturn-left" label={t("events.uncancel")} class="btn-outline" attrs={{ "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" }} />
     : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" attrs={{ "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" }} />);
   const deleteAction = canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
+  const notify = canManage && c.req.query("notify") === "created" && isSmtpConfigured() ? await eventMailRecipients(ev) : null;
   return c.html(
     <Layout title={ev.title} user={user}>
       <div class="max-w-2xl mx-auto">
+      {notify && <NotifyDialog eventId={ev.id} recipients={notify} />}
       <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{cancelAction}{deleteAction}</>} />} />
       <LocalTimes tz={tz} />
       <ViewGrid>
@@ -937,6 +941,43 @@ eventRoutes.post("/:id/delete", manage, async (c) => {
   setFlash(c, t("events.form.deleted"), "success");
   c.header("HX-Redirect", "/events");
   return c.body(null, 204);
+});
+
+// ── Mail-Benachrichtigung ────────────────────────────────────────────────────
+
+// Modal nach dem Anlegen (?notify=created); öffnet sich beim Laden. Empfänger werden beim Senden serverseitig neu berechnet.
+function NotifyDialog({ eventId, recipients }: { eventId: string; recipients: Awaited<ReturnType<typeof eventMailRecipients>> }) {
+  const n = countRecipients(recipients);
+  const names = recipients.filter((r) => r.state === "send").map((r) => `${r.firstName} ${r.lastName}`);
+  return (
+    <>
+      <dialog id="notify-dialog" class="modal">
+        <div class="modal-box">
+          <h3 class="font-bold text-lg">{t("events.notify.title")}</h3>
+          <p class="py-2 opacity-70">{t("events.notify.counts", n)}</p>
+          {names.length > 0 && <details><summary class="cursor-pointer text-sm">{t("events.notify.names")}</summary><p class="text-sm py-2">{names.join(", ")}</p></details>}
+          <div class="modal-action">
+            <form method="dialog"><button class="btn">{t("events.notify.skip")}</button></form>
+            <form method="post" action={`/events/${eventId}/notify`}><button type="submit" class="btn btn-primary" autofocus>{t("events.notify.send")}</button></form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+      </dialog>
+      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('notify-dialog').showModal()" }} />
+    </>
+  );
+}
+
+// POST /events/:id/notify — Versand im Hintergrund, Antwort blockiert nicht.
+eventRoutes.post("/:id/notify", manage, async (c) => {
+  const ev = await db.query.events.findFirst({ where: eq(events.id, c.req.param("id")) });
+  if (!ev) return c.notFound();
+  if (!isSmtpConfigured()) setFlash(c, t("events.notify.noSmtp"), "error");
+  else {
+    void sendEventMails(ev);
+    setFlash(c, t("events.notify.sent"), "success");
+  }
+  return c.redirect(`/events/${ev.id}`);
 });
 
 // ── Terminabsage ─────────────────────────────────────────────────────────────
