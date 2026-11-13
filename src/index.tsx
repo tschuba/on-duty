@@ -27,6 +27,7 @@ import { yearRoutes } from "./routes/anniversary-years.js";
 import { trainingRoutes } from "./routes/training.js";
 import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
+import { mailTemplateRoutes } from "./routes/mail-templates.js";
 import { eventRoutes } from "./routes/events.js";
 import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
@@ -144,6 +145,7 @@ app.route("/applications", applicationRoutes);
 // Anniversary routes
 app.route("/anniversaries", anniversaryRoutes);
 app.route("/events", eventRoutes);
+app.route("/mail/templates", mailTemplateRoutes);
 
 // Donation routes
 app.route("/donations", donationRoutes);
