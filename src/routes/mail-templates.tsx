@@ -7,9 +7,11 @@ import { HTTP_STATUS } from "../lib/constants.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDay } from "../lib/datetime.js";
 import { env } from "../env.js";
-import { CATALOG, buildVars, mayEdit, renderMail, validateTemplate, type MailRecipient } from "../lib/mail-templates.js";
+import { CATALOG, buildVars, mayEdit, renderMail, validateTemplate, type MailRecipient, type VarSpec } from "../lib/mail-templates.js";
 import { listTemplates, resetOverride, saveOverride, type TemplateView } from "../lib/mail-template-store.js";
 import { t } from "../i18n/index.js";
+import { Icon } from "../components/icon.js";
+import { Field } from "../components/field.js";
 
 export const mailTemplateRoutes = new Hono<{ Variables: Variables }>();
 mailTemplateRoutes.use("*", requireAuth()); // Recht je Vorlage wird im Handler geprüft
@@ -73,12 +75,27 @@ f.addEventListener('input',function(){dirty=true});f.addEventListener('submit',f
 window.addEventListener('beforeunload',function(e){if(dirty){e.preventDefault();e.returnValue=${JSON.stringify(msg)}}});
 f.querySelectorAll('input,textarea').forEach(function(el){el.addEventListener('focus',function(){last=el})});
 document.querySelectorAll('[data-ph]').forEach(function(b){b.addEventListener('click',function(){var v='{{'+b.dataset.ph+'}}',s=last.selectionStart||0,e=last.selectionEnd||0;
-last.setRangeText(v,s,e,'end');last.focus();dirty=true})});
-var col=document.getElementById('ph-col'),pg=document.getElementById('ph-toggle'),pane=document.getElementById('pane-edit'),sv=localStorage.getItem('mailPlaceholders');
-function setPh(o){col.classList.toggle('hidden',!o);pg.setAttribute('aria-pressed',o);pane.classList.toggle('md:grid-cols-[1fr_16rem]',o);localStorage.setItem('mailPlaceholders',o)}
-setPh(sv===null?window.innerWidth>=768:sv==='true');pg.addEventListener('click',function(){setPh(pg.getAttribute('aria-pressed')!=='true')});
+last.setRangeText(v,s,e,'end');if(!md.matches)setPh(false);last.focus();dirty=true})});
+var pg=document.getElementById('ph-toggle'),cl=document.getElementById('ph-close'),pane=document.getElementById('pane-edit'),md=matchMedia('(min-width: 768px)');
+function setPh(o,save){pane.dataset.open=o;pg.setAttribute('aria-expanded',o);cl.setAttribute('aria-expanded',o);if(!o)side('ph');if(save&&md.matches)try{localStorage.setItem('mailPlaceholders',o)}catch(e){}}
+function shut(){setPh(false,true);(md.matches?cl:pg).focus()}
+var sv=null;try{sv=localStorage.getItem('mailPlaceholders')}catch(e){}
+setPh(md.matches&&sv!=='false');pg.addEventListener('click',function(){setPh(pane.dataset.open!=='true',true)});
+document.getElementById('ph-backdrop').addEventListener('click',shut);cl.addEventListener('click',function(){if(md.matches){setPh(pane.dataset.open!=='true',true)}else shut()});
+document.getElementById('ph-col').addEventListener('keydown',function(e){if(e.key==='Escape'){e.stopPropagation();shut()}});
+function side(n){var t=n==='tech';document.getElementById('side-ph').classList.toggle('hidden',t);document.getElementById('side-tech').classList.toggle('hidden',!t);
+document.querySelectorAll('[data-side]').forEach(function(o){o.classList.toggle('tab-active',o.dataset.side===n)})}
+document.querySelectorAll('[data-side]').forEach(function(b){b.addEventListener('click',function(){side(b.dataset.side)})});
+var se=document.getElementById('ph-search'),nf=function(x){return x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')};
+se.addEventListener('input',function(){var q=nf(se.value.trim()),any=false;
+document.querySelectorAll('#side-ph section[data-g]').forEach(function(d){var n=0;
+d.querySelectorAll('li[data-s]').forEach(function(li){var m=!q||nf(li.dataset.s).indexOf(q)>-1;li.hidden=!m;if(m)n++});
+d.hidden=n===0;if(n)any=true});
+document.getElementById('ph-empty').classList.toggle('hidden',any)});
+se.addEventListener('keydown',function(e){if(e.key==='Escape'&&se.value){e.stopPropagation();se.value='';se.dispatchEvent(new Event('input'))}
+if(e.key==='Enter'){e.preventDefault();var v=document.querySelectorAll('#side-ph li[data-s]:not([hidden]) [data-ph]');if(v.length===1)v[0].click()}});
 document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){var p=b.dataset.tab==='preview';
-document.getElementById('pane-edit').classList.toggle('hidden',p);document.getElementById('pane-preview').classList.toggle('hidden',!p);
+document.getElementById('pane-edit').classList.toggle('hidden',p);document.getElementById('pane-preview').classList.toggle('hidden',!p);pg.disabled=cl.disabled=p;
 document.querySelectorAll('[data-tab]').forEach(function(o){o.classList.toggle('tab-active',o===b)})})})})();`;
 
 const SAMPLE_PEOPLE: MailRecipient[] = [
@@ -91,6 +108,10 @@ const SAMPLE_RECORD = {
   changes: "Ort: Halle → Gerätehaus", optOutAllUrl: "https://portal.example.org/o/all", orgContactEmail: "info@example.org",
   settingsUrl: "https://portal.example.org/link/abc", validMinutes: 30,
 };
+
+const GROUPS = ["event", "recipient", "org", "link"] as const;
+const groupOf = (k: string, v: VarSpec) =>
+  v.source === "link" ? "link" : k.startsWith("event.") ? "event" : k.startsWith("org.") || k === "type" ? "org" : "recipient";
 
 function Editor({ user, back, tpl, values, errors, expected, conflict }: { user: Variables["user"]; back: string; tpl: TemplateView; values: { subject: string; body: string }; errors: string[]; expected: string; conflict?: boolean }) {
   const key = tpl.key, entry = CATALOG[key];
@@ -105,45 +126,67 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
             <FormActions formId="tpl-form" />
           </>}
         />
-        <p class="mb-4">{tpl.override ? t("mailTemplates.status.custom", stamp(tpl.override)) : t("mailTemplates.status.system")}</p>
+        {tpl.override ? <p class="mb-4">{t("mailTemplates.status.custom", stamp(tpl.override))}</p> : <div role="status" class="alert alert-info alert-soft mb-4">{t("mailTemplates.status.system")}</div>}
         {conflict && <div role="alert" class="alert alert-error mb-4"><span>{t("mailTemplates.conflict")} <a class="link" href={`/mail/templates/${key}`}>{t("mailTemplates.conflict.reload")}</a></span></div>}
-        <div role="tablist" class="tabs tabs-border mb-4">
+        <div class="flex items-center justify-between gap-2 mb-4">
+        <div role="tablist" class="tabs tabs-border">
           <button type="button" role="tab" class="tab tab-active" data-tab="edit">{t("common.edit")}</button>
           <button type="button" role="tab" class="tab" data-tab="preview" hx-post={`/mail/templates/${key}/preview`} hx-include="#tpl-form" hx-target="#preview">{t("mailTemplates.preview")}</button>
         </div>
-        <button type="button" id="ph-toggle" class="btn btn-sm btn-outline rounded-full mb-2" aria-pressed="true" aria-controls="ph-col">{"{ } "}{t("mailTemplates.placeholders")}</button>
+        <button type="button" id="ph-toggle" class="btn btn-ghost btn-square md:hidden" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")}><Icon name="sidebar-expand" class="h-5 w-5 text-gold" /></button>
+        </div>
         <div id="pane-preview" class="hidden"><div id="preview" /></div>
-        <div id="pane-edit" class="grid gap-4">
-          <form id="tpl-form" method="post" action={`/mail/templates/${key}${fromQs(back)}`} class="space-y-4">
+        <div id="pane-edit" data-open="false" class="group grid gap-4 md:grid-cols-[1fr_3.25rem] md:data-[open=true]:grid-cols-[1fr_22rem] md:data-[open=false]:relative md:data-[open=false]:grid-cols-1">
+          <div id="ph-backdrop" class="fixed inset-0 z-40 bg-black/40 md:hidden group-data-[open=false]:hidden" aria-hidden="true" />
+          <form id="tpl-form" method="post" action={`/mail/templates/${key}${fromQs(back)}`} class="space-y-4 min-w-0">
             <input type="hidden" name="updatedAt" value={expected} />
-            <div>
-              <label class="label" for="tpl-subject">{t("mailTemplates.field.subject")}</label>
-              <input id="tpl-subject" name="subject" class="input w-full font-mono" value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} />
-              {errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}
-            </div>
-            <div>
-              <label class="label" for="tpl-body">{t("mailTemplates.field.body")}</label>
-              <textarea id="tpl-body" name="body" rows={18} class="textarea w-full font-mono" required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
-              {bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}
-            </div>
-            <details class="text-sm opacity-80">
-              <summary class="cursor-pointer">{t("mailTemplates.technical")}</summary>
-              <dl class="mt-2">
-                <dt class="font-medium">{t("mailTemplates.technical.category")}</dt><dd>{T(`mail.type.${entry.category}`)}</dd>
-                <dt class="font-medium">{t("mailTemplates.technical.audience")}</dt><dd>{T(`mailTemplates.audience.${tpl.audience}`)}</dd>
-                <dt class="font-medium">{t("mailTemplates.technical.prefix")}</dt><dd><code>{tpl.prefix}</code></dd>
-                <dt class="font-medium">{t("mailTemplates.technical.headers")}</dt>
-                <dd><code class="block">X-On-Duty-Category: {tpl.category}</code><code class="block">X-On-Duty-Event: {tpl.key}</code><code class="block">X-On-Duty-Audience: {tpl.audience}</code></dd>
-              </dl>
-            </details>
+            <Field label={t("mailTemplates.field.subject")} required class="md:group-data-[open=false]:pr-12" after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
+              <input id="tpl-subject" name="subject" class="input w-full font-mono" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} />
+            </Field>
+            <Field label={t("mailTemplates.field.body")} required after={bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}>
+              <textarea id="tpl-body" name="body" rows={18} class="textarea w-full font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
+            </Field>
           </form>
-          <aside id="ph-col" aria-label={t("mailTemplates.placeholders")}>
-            <h2 class="font-semibold mb-2">{t("mailTemplates.placeholders")} <button type="button" class="btn btn-ghost btn-xs" aria-label={t("common.close")} onclick="document.getElementById('ph-toggle').click()">×</button></h2>
-            <ul class="space-y-1 text-sm">
-              {Object.entries(entry.vars).filter(([k, v]) => !k.includes("[]") && v.type !== "list").map(([k, v]) => (
-                <li><button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-ph={k} title={`${v.example}`}>+ {v.desc}</button></li>
-              ))}
-            </ul>
+          <aside id="ph-col" aria-label={t("mailTemplates.placeholders")} class="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-auto bg-base-100 shadow-xl transition-transform group-data-[open=false]:invisible group-data-[open=false]:translate-x-full md:static md:inset-auto md:z-auto md:w-auto md:max-w-none md:self-start md:sticky md:top-32 md:overflow-hidden md:rounded-box md:border md:border-base-300 md:shadow-none md:group-data-[open=false]:visible md:group-data-[open=false]:translate-x-0 md:group-data-[open=false]:absolute md:group-data-[open=false]:-top-px md:group-data-[open=false]:-right-px md:group-data-[open=false]:w-[calc(2.5rem+2px)] md:group-data-[open=false]:border-transparent md:group-data-[open=false]:overflow-visible motion-reduce:transition-none">
+            <div class="bg-base-300 flex items-center justify-between gap-1 p-0 md:group-data-[open=false]:justify-center md:group-data-[open=false]:bg-transparent">
+              <div role="tablist" class="tabs tabs-sm md:group-data-[open=false]:hidden">
+                <button type="button" role="tab" class="tab tab-active font-bold" data-side="ph">{t("mailTemplates.placeholders")}</button>
+                <button type="button" role="tab" class="tab font-bold" data-side="tech">{t("mailTemplates.technical")}</button>
+              </div>
+              <button type="button" id="ph-close" class="btn btn-ghost btn-square btn-md md:inline-flex md:tooltip md:tooltip-left" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")} data-tip={t("mailTemplates.sidebar")}>
+                <Icon name="sidebar-expand" class="h-5 w-5 text-gold md:group-data-[open=false]:hidden" />
+                <Icon name="sidebar-collapse" class="h-5 w-5 text-gold hidden md:group-data-[open=false]:block" />
+              </button>
+            </div>
+            <div id="side-ph" class="md:group-data-[open=false]:hidden p-2 space-y-2 text-sm">
+              <input id="ph-search" type="search" class="input input-sm w-full" placeholder={t("mailTemplates.search")} aria-label={t("mailTemplates.search")} autocomplete="off" />
+              <p id="ph-empty" class="hidden text-base-content/60 p-1" role="status">{t("mailTemplates.search.empty")}</p>
+              {GROUPS.map((g) => {
+                const items = Object.entries(entry.vars).filter(([k, v]) => !k.includes("[]") && v.type !== "list" && groupOf(k, v) === g);
+                return items.length > 0 && (
+                  <section data-g>
+                    <h3 class="px-1 pt-1 text-xs font-bold uppercase tracking-wide text-base-content/60">{t(`mailTemplates.group.${g}`)}</h3>
+                    <ul class="space-y-1 p-1">
+                      {items.map(([k, v]) => (
+                        <li data-s={`${k} ${v.desc} ${v.example}`}>
+                          <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal flex-col items-start gap-0" data-ph={k} title={k}>
+                            <span>+ {v.desc}{v.optional && <span class="text-base-content/60"> ({t("mailTemplates.optional")})</span>}</span>
+                            {v.example && <span class="font-normal text-xs text-base-content/60 break-all">{v.example}</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+            <dl id="side-tech" class="hidden text-sm p-3 space-y-3">
+              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.category")}</dt><dd>{T(`mail.type.${entry.category}`)}</dd></div>
+              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.audience")}</dt><dd>{T(`mailTemplates.audience.${tpl.audience}`)}</dd></div>
+              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.prefix")}</dt><dd><code>{tpl.prefix}</code></dd></div>
+              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.headers")}</dt>
+                <dd class="break-all"><code class="block">X-On-Duty-Category: {tpl.category}</code><code class="block">X-On-Duty-Event: {tpl.key}</code><code class="block">X-On-Duty-Audience: {tpl.audience}</code></dd></div>
+            </dl>
           </aside>
         </div>
         {tpl.override && (

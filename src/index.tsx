@@ -58,7 +58,8 @@ app.route("/", healthRoutes);
 app.route("/", pwaRoutes);
 app.route("/api/public/v1", publicApiRoutes);
 
-// Static assets
+// Static assets (ohne Hash im Namen: immer revalidieren, sonst zeigt Chrome nach Deploys altes CSS/JS)
+for (const p of ["/css/*", "/js/*"]) app.use(p, async (c, next) => { await next(); c.header("Cache-Control", "no-cache"); });
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
 app.use("/js/*", serveStatic({ root: "./public" }));
