@@ -64,7 +64,7 @@ const EVENT_VARS: Record<string, VarSpec> = {
 
 const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`.trim();
 
-function whenText(e: EventMailRecord["event"], tz: string, locale: string): string {
+export function whenText(e: Pick<EventMailRecord["event"], "startsAt" | "endsAt" | "allDay">, tz: string, locale: string): string {
   const sameDay = toLocalDate(e.startsAt, tz) === toLocalDate(e.endsAt, tz);
   const until = t("mail.event.until");
   if (e.allDay) {
