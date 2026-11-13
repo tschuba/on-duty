@@ -589,6 +589,13 @@
       "when": 1794606211240,
       "tag": "0083_member_settings_link_template",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1794607813240,
+      "tag": "0084_event_info_mail_template",
+      "breakpoints": true
     }
   ]
 }

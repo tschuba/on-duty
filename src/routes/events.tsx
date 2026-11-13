@@ -23,7 +23,7 @@ import { PublicFooter } from "../components/public-form.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { isSmtpConfigured } from "../lib/mail.js";
-import { countRecipients, createdTargets, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
+import { countRecipients, createdTargets, infoMailRecipients, sendEventInfoMail, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
@@ -416,6 +416,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const allTags = [...EVENT_TAGS.map((d) => d.key as string), ...freeTags];
   const tagFilter = parseMulti(normalizeEventTags(c.req.queries("tag") ?? []), allTags);
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
+  const infoMail = canManage ? await infoMailRecipients() : null;
 
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
   let rows = await withRsvpInfo(await fetchEvents(user, undefined), user);
@@ -429,12 +430,12 @@ eventRoutes.get("/", requireAuth(), async (c) => {
       <PageHeader title={t("events.title")} actions={<>
         {canManage ? (
           <div class="dropdown dropdown-end">
-            <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={`${t("events.publicLink")}: ${publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}`}>
-              <Icon name="link" class="h-5 w-5" />
-              <span class="hidden sm:inline">{t("events.publicLink")}</span>
-              <span class={`inline-block h-2 w-2 rounded-full ${publicEnabled ? "bg-success" : "bg-error"}`} />
+            <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={t("events.settings")}>
+              <Icon name="cog-6-tooth" class="h-5 w-5" />
+              <span class="hidden sm:inline">{t("events.settings")}</span>
             </div>
             <div tabindex={0} class="dropdown-content bg-base-200 rounded-box z-10 w-72 p-3 shadow space-y-2">
+              <h3 class="text-xs font-semibold uppercase opacity-60">{t("events.publicLink")}</h3>
               <form method="post" action="/events/public-settings">
                 <label class="label cursor-pointer justify-between gap-3">
                   <span class="text-sm">{publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}</span>
@@ -454,11 +455,34 @@ eventRoutes.get("/", requireAuth(), async (c) => {
                 </div>
               ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
               <ImpressumHint />
+              {infoMail && (
+                <>
+                  <div class="divider my-1" />
+                  <h3 class="text-xs font-semibold uppercase opacity-60">{t("events.infoMail.section")}</h3>
+                  <button type="button" class="btn btn-sm btn-ghost w-full justify-start" onclick="document.getElementById('info-mail-dialog').showModal()">
+                    <Icon name="envelope" class="h-4 w-4" />{t("events.infoMail.button")}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : publicEnabled && <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
         {canManage && <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" />}
       </>} />
+      {infoMail && (
+        <dialog id="info-mail-dialog" class="modal">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg">{t("events.infoMail.title")}</h3>
+            <p class="py-2">{t("events.infoMail.text")}</p>
+            <p class="py-1 opacity-70">{infoMail.length ? t("events.notify.counts", countRecipients(infoMail)) : t("events.infoMail.none")}</p>
+            <div class="modal-action">
+              <form method="dialog"><button class="btn">{t("common.cancel")}</button></form>
+              <form method="post" action="/events/info-mail"><button type="submit" class="btn btn-primary" disabled={!infoMail.length}>{t("events.notify.send")}</button></form>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+        </dialog>
+      )}
       <LocalTimes tz={tz} />
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: eventTagLabel(tag) }))} selected={tagFilter}
@@ -482,6 +506,16 @@ eventRoutes.post("/public-settings", manage, async (c) => {
   const body = await c.req.parseBody();
   await setSetting("eventsPublicEnabled", body.enabled === "1" ? "true" : "false");
   setFlash(c, t("events.publicSettings.saved"), "success");
+  return c.redirect("/events");
+});
+
+eventRoutes.post("/info-mail", manage, async (c) => {
+  if (!isSmtpConfigured()) setFlash(c, t("events.notify.noSmtp"), "error");
+  else {
+    const n = await sendEventInfoMail();
+    if (n === "no-template") setFlash(c, t("events.infoMail.noTemplate"), "error");
+    else setFlash(c, n ? t("events.notify.sent") : t("events.infoMail.none"), n ? "success" : "error");
+  }
   return c.redirect("/events");
 });
 

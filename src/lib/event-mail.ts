@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { mailLog, mailPreferences, members, persons } from "../db/schema/index.js";
-import { invitedMembers, type Event } from "./events.js";
+import { invitedMembers, isActiveMember, type Event } from "./events.js";
 import { linkUrl } from "./links.js";
 import { sendMail } from "./mail.js";
 import { buildVars, resolveTemplate, whenText, type MailRecipient } from "./mail-templates.js";
@@ -153,6 +153,50 @@ export async function sendEventMails(event: Event, template = "event-created", o
     }
     try {
       await db.insert(mailLog).values(group.map((r) => ({ personId: r.personId, template, eventId: event.id, status: sent ? "sent" as const : "failed" as const })));
+    } catch (err) {
+      logger.error({ err }, "[event-mail] mail_log insert failed");
+    }
+  }
+}
+
+// ---- Info-Mail zu Termin-Mails (#152) ----------------------------------------
+
+const INFO_TEMPLATE = "event-mail-info";
+
+// Aktive Mitglieder mit Adresse, nicht abbestellt, ohne erfolgreich versendete Info-Mail.
+export async function infoMailRecipients(): Promise<EventMailRecipient[]> {
+  const all = await mailRecipientsFor((await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)).filter(isActiveMember).map((m) => m.id));
+  const done = await db.select({ personId: mailLog.personId }).from(mailLog).where(and(eq(mailLog.template, INFO_TEMPLATE), eq(mailLog.status, "sent")));
+  const sentTo = new Set(done.map((d) => d.personId));
+  return all.filter((r) => r.state === "send" && !sentTo.has(r.personId));
+}
+
+// Eine Mail je Adresse, im Hintergrund; gibt die Zahl der Empfänger zurück (0 = nichts zu tun) bzw. "no-template", wenn die Vorlage fehlt oder ungültig ist.
+export async function sendEventInfoMail(): Promise<number | "no-template"> {
+  const rs = await infoMailRecipients();
+  if (!rs.length) return 0;
+  const tpl = await resolveTemplate(INFO_TEMPLATE);
+  if (!tpl) return "no-template";
+  void sendInfoGroups(rs, tpl).catch((err) => logger.error({ err }, "[event-mail] info mail failed"));
+  return rs.length;
+}
+
+async function sendInfoGroups(rs: EventMailRecipient[], tpl: NonNullable<Awaited<ReturnType<typeof resolveTemplate>>>): Promise<void> {
+  const groups = new Map<string, EventMailRecipient[]>();
+  for (const r of rs) groups.set(r.email.toLowerCase(), [...(groups.get(r.email.toLowerCase()) ?? []), r]);
+  for (const group of groups.values()) {
+    const rcpts: MailRecipient[] = group.map((r) => ({ firstName: r.firstName, lastName: r.lastName, email: r.email, optOutUrl: linkUrl({ p: "mail.optout", m: r.memberId, t: EVENT_TOPIC }) }));
+    const multiple = group.length > 1;
+    const vars = buildVars(INFO_TEMPLATE, { optOutAllUrl: multiple ? linkUrl({ p: "mail.optout-address", m: group[0].memberId, t: EVENT_TOPIC }) : undefined }, rcpts);
+    const headers = multiple ? undefined : { "List-Unsubscribe": `<${rcpts[0].optOutUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+    let sent = false;
+    try {
+      ({ sent } = await sendMail({ key: INFO_TEMPLATE, to: group[0].email, vars, template: tpl, headers }));
+    } catch (err) {
+      logger.error({ err }, "[event-mail] info send failed");
+    }
+    try {
+      await db.insert(mailLog).values(group.map((r) => ({ personId: r.personId, template: INFO_TEMPLATE, status: sent ? "sent" as const : "failed" as const })));
     } catch (err) {
       logger.error({ err }, "[event-mail] mail_log insert failed");
     }
