@@ -26,10 +26,12 @@ export interface InfoMailRecord { optOutAllUrl?: string; orgContactEmail?: strin
 export interface SettingsMailRecord { settingsUrl: string; validMinutes: number; orgContactEmail?: string }
 
 interface CatalogEntry {
+  name: string; description: string; // Klartext für die Oberfläche
   category: "event" | "member";
   audience: "member";
   vars: Record<string, VarSpec>;
-  required: { name: string; list?: string }[]; // ohne list: Variable auf oberster Ebene
+  required: { name: string; list?: string; label: string }[]; // label: Klartextname für Fehlermeldungen/Checkliste
+  // ohne list: Variable auf oberster Ebene
   build: (record: any, recipients: MailRecipient[]) => MailVars;
 }
 
@@ -108,14 +110,16 @@ function buildEventVars(r: EventMailRecord, recipients: MailRecipient[]): MailVa
 }
 
 const eventEntry: CatalogEntry = {
+  name: "", description: "",
   category: "event",
   audience: "member",
   vars: { ...GLOBAL_VARS, ...EVENT_VARS },
-  required: [{ name: "optOutUrl", list: "recipients" }],
+  required: [{ name: "optOutUrl", list: "recipients", label: t("mailTemplates.required.optOutUrl") }],
   build: buildEventVars,
 };
 
 const settingsEntry: CatalogEntry = {
+  name: "", description: "",
   category: "member",
   audience: "member",
   vars: {
@@ -123,7 +127,7 @@ const settingsEntry: CatalogEntry = {
     settingsUrl: { type: "text", desc: "Link zur Einstellungsseite (zeitlich begrenzt)", example: "https://portal.example.org/link/abc", source: "link" },
     validMinutes: { type: "text", desc: "Gültigkeit des Links in Minuten", example: "30", source: "data" },
   },
-  required: [{ name: "settingsUrl" }],
+  required: [{ name: "settingsUrl", label: t("mailTemplates.required.settingsUrl") }],
   build: (r: SettingsMailRecord) => ({ settingsUrl: r.settingsUrl, validMinutes: String(r.validMinutes) }),
 };
 
@@ -140,14 +144,15 @@ const infoEntry: CatalogEntry = {
   }),
 };
 
-export const CATALOG: Record<string, CatalogEntry> = {
+const named = (key: string, e: CatalogEntry): CatalogEntry => ({ ...e, name: t(`mailTemplates.name.${key}` as never), description: t(`mailTemplates.desc.${key}` as never) });
+export const CATALOG: Record<string, CatalogEntry> = Object.fromEntries(Object.entries({
   "member-settings-link": settingsEntry,
   "event-created": eventEntry,
   "event-updated": eventEntry,
   "event-cancelled": eventEntry,
   "event-uncancelled": eventEntry,
   "event-mail-info": infoEntry,
-};
+}).map(([k, e]) => [k, named(k, e)]));
 
 // Einziger Einstieg für Versand und Editor-Vorschau: ergänzt die globalen Variablen.
 export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord | InfoMailRecord, recipients: MailRecipient[]): MailVars {
@@ -167,28 +172,51 @@ export function buildVars(key: string, record: EventMailRecord | SettingsMailRec
 type Token = [string, string, number, number, Token[]?];
 export interface TemplateInput { prefix?: string | null; subject: string; body: string }
 
+const lineOf = (text: string, idx: number) => text.slice(0, idx).split("\n").length;
+const distance = (a: string, b: string) => {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+};
+// Tippfehler-Vorschlag: nächster Katalogname bis Abstand 3.
+function suggest(entry: CatalogEntry, name: string): string | undefined {
+  const best = Object.keys(entry.vars).filter((k) => !k.includes("[]")).map((k) => [k, distance(k, name)] as const).sort((a, b) => a[1] - b[1])[0];
+  return best && best[1] <= 3 ? best[0] : undefined;
+}
+
 export function validateTemplate(key: string, input: TemplateInput): string[] {
   const entry = CATALOG[key]; // kein Eintrag = freie Vorlage: unbekannte Variablen erlaubt (werden Felder)
   const errors: string[] = [];
   const seen = new Set<string>();
   const isRoot = (n: string) => !!entry?.vars[n] && !n.includes("[]");
-  const walk = (tokens: Token[], list: string | null, field: string) => {
+  const walk = (tokens: Token[], list: string | null, field: string, text: string) => {
     for (const tok of tokens) {
       const [type, name] = tok;
       if (type === ">") { errors.push(`${field}: Partials sind nicht erlaubt`); continue; }
       if (!["name", "&", "#", "^"].includes(type)) continue;
       const inList = list && entry?.vars[`${list}[].${name}`];
       if (inList) seen.add(`${list}[].${name}`);
-      else if (entry && name !== "." && !isRoot(name)) errors.push(`${field}: unbekannte Variable „${name}“`);
+      else if (entry && name !== "." && !isRoot(name)) {
+        const hint = suggest(entry, name);
+        errors.push(`${field}: Zeile ${lineOf(text, tok[2])}: unbekannte Variable „${name}“${hint ? `. Meintest du „${hint}“?` : ""}`);
+      }
       else seen.add(name);
-      if (type === "#" || type === "^") walk(tok[4] ?? [], entry?.vars[name]?.type === "list" ? name : list, field);
+      if (type === "#" || type === "^") walk(tok[4] ?? [], entry?.vars[name]?.type === "list" ? name : list, field, text);
     }
   };
   for (const [field, text] of [["prefix", input.prefix ?? ""], ["subject", input.subject], ["body", input.body]] as const) {
-    try { walk(Mustache.parse(text) as Token[], null, field); } catch (err) { errors.push(`${field}: ${(err as Error).message}`); }
+    try { walk(Mustache.parse(text) as Token[], null, field, text); } catch (err) {
+      const m = /^(.*) at (\d+)$/.exec((err as Error).message);
+      const unclosed = m && /^Unclosed section "(.*)"$/.exec(m[1]);
+      errors.push(`${field}: ${m ? `Zeile ${lineOf(text, Number(m[2]))}: ${unclosed ? `Block „${unclosed[1]}“ ist nicht geschlossen` : m[1]}` : (err as Error).message}`);
+    }
   }
   for (const r of entry?.required ?? []) {
-    if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.name}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
+    if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.label}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
   }
   return errors;
 }
@@ -237,11 +265,13 @@ export function renderMail(row: Pick<ResolvedTemplate, "prefix" | "subject" | "b
 }
 
 // Recht je Vorlage: system:admin immer, sonst eines aus editPermissions der system-Zeile.
+export const mayEdit = (user: { permissions: Set<string> }, editPermissions: string[] | null | undefined) =>
+  user.permissions.has("system:admin") || !!editPermissions?.some((p) => user.permissions.has(p));
+
 export async function canEdit(user: { permissions: Set<string> }, key: string): Promise<boolean> {
-  if (user.permissions.has("system:admin")) return true;
   const [row] = await db.select({ p: mailTemplates.editPermissions }).from(mailTemplates)
     .where(and(eq(mailTemplates.key, key), eq(mailTemplates.locale, "de"), eq(mailTemplates.variant, "system")));
-  return !!row?.p?.some((p) => user.permissions.has(p));
+  return mayEdit(user, row?.p);
 }
 
 // ---- Doku-Generat (pnpm mail:docs) ----------------------------------------

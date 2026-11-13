@@ -27,6 +27,7 @@ import { yearRoutes } from "./routes/anniversary-years.js";
 import { trainingRoutes } from "./routes/training.js";
 import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
+import { mailTemplateRoutes } from "./routes/mail-templates.js";
 import { eventRoutes } from "./routes/events.js";
 import { donationRoutes } from "./routes/donations.js";
 import { donorRoutes } from "./routes/donors.js";
@@ -57,7 +58,8 @@ app.route("/", healthRoutes);
 app.route("/", pwaRoutes);
 app.route("/api/public/v1", publicApiRoutes);
 
-// Static assets
+// Static assets (ohne Hash im Namen: immer revalidieren, sonst zeigt Chrome nach Deploys altes CSS/JS)
+for (const p of ["/css/*", "/js/*"]) app.use(p, async (c, next) => { await next(); c.header("Cache-Control", "no-cache"); });
 app.use("/css/*", serveStatic({ root: "./public" }));
 app.use("/fonts/*", serveStatic({ root: "./public" }));
 app.use("/js/*", serveStatic({ root: "./public" }));
@@ -144,6 +146,7 @@ app.route("/applications", applicationRoutes);
 // Anniversary routes
 app.route("/anniversaries", anniversaryRoutes);
 app.route("/events", eventRoutes);
+app.route("/mail/templates", mailTemplateRoutes);
 
 // Donation routes
 app.route("/donations", donationRoutes);

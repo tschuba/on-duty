@@ -57,6 +57,21 @@ describe("mail templates", () => {
     expect(validateTemplate("custom-x", { subject: "{{anything}}", body: "x" })).toEqual([]);
   });
 
+  it("errors carry the line and a typo suggestion", () => {
+    const errs = validateTemplate("event-created", { subject: "x", body: "a\nb\n{{event.titel}}{{#recipients}}{{optOutUrl}}{{/recipients}}" });
+    expect(errs[0]).toBe("body: Zeile 3: unbekannte Variable „event.titel“. Meintest du „event.title“?");
+    expect(validateTemplate("event-created", { subject: "x", body: "a\n{{#recipients}}" })[0]).toMatch(/Zeile 2/);
+  });
+
+  it("catalog entries have plain-text names and required labels", () => {
+    for (const e of Object.values(CATALOG)) {
+      expect(e.name).toBeTruthy();
+      expect(e.description).toBeTruthy();
+      for (const r of e.required) expect(r.label).toBeTruthy();
+    }
+    expect(validateTemplate("event-created", { subject: "x", body: "a\n{{#recipients}}" })[0]).toBe("body: Zeile 2: Block „recipients“ ist nicht geschlossen");
+  });
+
   it("no HTML escaping, newlines removed from subject", () => {
     const out = renderMail({ prefix: "", subject: "{{event.title}}", body: "{{event.title}}" }, { event: { title: "A & <B>\nX" } });
     expect(out.text).toBe("A & <B>\nX");
