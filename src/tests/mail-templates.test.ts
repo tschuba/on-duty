@@ -11,7 +11,7 @@ vi.mock("../db/index.js", () => ({ db: { select } }));
 const { CATALOG, buildVars, validateTemplate, renderMail, resolveTemplate, catalogDocs } = await import("../lib/mail-templates.js");
 
 // Standardtexte direkt aus der Seed-Migration.
-const sql = ["0081_mail_templates_seed", "0083_member_settings_link_template"].map((f) => readFileSync(`drizzle/${f}.sql`, "utf8")).join("\n");
+const sql = ["0081_mail_templates_seed", "0083_member_settings_link_template", "0084_event_info_mail_template"].map((f) => readFileSync(`drizzle/${f}.sql`, "utf8")).join("\n");
 const seeded = [...sql.matchAll(/\('([\w-]+)', 'de', 'system'.*?\$s\$(.*?)\$s\$, \$b\$(.*?)\$b\$/gs)].map((m) => ({ key: m[1], subject: m[2], body: m[3] }));
 
 const record = { event: { id: "e1", title: "Übung", startsAt: new Date("2026-04-12T16:00:00Z"), endsAt: new Date("2026-04-12T18:00:00Z"), allDay: false, location: "Gerätehaus", rsvpEnabled: true, rsvpDeadline: null, maxParticipants: 20 } };
@@ -30,8 +30,12 @@ describe("mail templates", () => {
     expect(out.subject).toMatch(/^\[Feuerwehr Test\|Termin\] /);
     expect(out.text).not.toMatch(/\{\{|undefined/);
     expect(out.text).toContain("https://o/2");
-    expect(out.text).toContain(key === "event-cancelled" ? "Keine Termin-Mails" : "https://y/1");
-    if (key === "event-cancelled") expect(out.text).not.toContain("https://y/1");
+    expect(out.text).toContain(key === "event-cancelled" || key === "event-mail-info" ? "Keine Termin-Mails" : "https://y/1");
+    if (key === "event-cancelled" || key === "event-mail-info") expect(out.text).not.toContain("https://y/1");
+  });
+
+  it("event-mail-info requires optOutUrl in recipients", () => {
+    expect(validateTemplate("event-mail-info", { subject: "x", body: "hi" })[0]).toMatch(/Pflichtplatzhalter/);
   });
 
   it("member-settings-link renders and requires settingsUrl", () => {

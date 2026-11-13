@@ -53,6 +53,7 @@ Termin-Mails (Vorlagen in der DB, Standardtexte „du“):
 | Termin geändert | `[on-duty\|Termin] Termin geändert: …` | `event-updated` | `member` |
 | Termin abgesagt | `[on-duty\|Termin] Termin abgesagt: …` | `event-cancelled` | `member` |
 | Absage zurückgenommen | `[on-duty\|Termin] Termin findet statt: …` | `event-uncancelled` | `member` |
+| Info-Mail „Künftig Termine per Mail“ (Button im Zahnrad-Dropdown auf `/events`, erreicht nur Mitglieder ohne bereits versendete Info-Mail) | `[on-duty\|Termin] Künftig Termine per Mail` | `event-mail-info` | `member` |
 
 Einstellungslink (Transaktionsmail, kein Opt-Out-Thema):
 

@@ -150,3 +150,24 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipients[].rsvpNoUrl` | text, optional | link | Absage-Link (nur bei Anmeldung) | https://portal.example.org/r/no |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
 | `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+
+## `event-mail-info`
+
+Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipients`.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `recipient.name` | text | person | Voller Name des Empfängers | Anna Beispiel |
+| `recipient.firstName` | text | person | Vorname des Empfängers | Anna |
+| `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
+| `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
+| `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
+| `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
+| `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
+| `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
+| `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
+| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |

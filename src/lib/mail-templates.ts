@@ -22,6 +22,7 @@ export interface EventMailRecord {
 }
 export interface MailRecipient { firstName: string; lastName: string; email: string; optOutUrl: string; rsvpYesUrl?: string; rsvpNoUrl?: string }
 
+export interface InfoMailRecord { optOutAllUrl?: string; orgContactEmail?: string }
 export interface SettingsMailRecord { settingsUrl: string; validMinutes: number; orgContactEmail?: string }
 
 interface CatalogEntry {
@@ -126,16 +127,30 @@ const settingsEntry: CatalogEntry = {
   build: (r: SettingsMailRecord) => ({ settingsUrl: r.settingsUrl, validMinutes: String(r.validMinutes) }),
 };
 
+// Info-Mail zu Termin-Mails: nur Anrede, Mitgliederblöcke und Opt-Out-Links, kein Termin.
+const INFO_KEYS = ["addressee", "multiple", "recipients", "recipients[].name", "recipients[].optOutUrl", "optOutAllUrl"];
+const infoEntry: CatalogEntry = {
+  ...eventEntry,
+  vars: { ...GLOBAL_VARS, ...Object.fromEntries(INFO_KEYS.map((k) => [k, EVENT_VARS[k]])) },
+  build: (r: InfoMailRecord, recipients: MailRecipient[]) => ({
+    addressee: recipients.map((p) => p.firstName).join(", "),
+    multiple: recipients.length > 1,
+    recipients: recipients.map((p) => ({ name: fullName(p), optOutUrl: p.optOutUrl })),
+    optOutAllUrl: recipients.length > 1 ? (r.optOutAllUrl ?? "") : "",
+  }),
+};
+
 export const CATALOG: Record<string, CatalogEntry> = {
   "member-settings-link": settingsEntry,
   "event-created": eventEntry,
   "event-updated": eventEntry,
   "event-cancelled": eventEntry,
   "event-uncancelled": eventEntry,
+  "event-mail-info": infoEntry,
 };
 
 // Einziger Einstieg für Versand und Editor-Vorschau: ergänzt die globalen Variablen.
-export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord, recipients: MailRecipient[]): MailVars {
+export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord | InfoMailRecord, recipients: MailRecipient[]): MailVars {
   const entry = CATALOG[key];
   if (!entry) throw new Error(`unknown mail template key: ${key}`);
   const first = recipients[0];

@@ -23,7 +23,7 @@ import { PublicFooter } from "../components/public-form.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { isSmtpConfigured } from "../lib/mail.js";
-import { countRecipients, createdTargets, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
+import { countRecipients, createdTargets, infoMailRecipients, sendEventInfoMail, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
@@ -416,6 +416,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
   const allTags = [...EVENT_TAGS.map((d) => d.key as string), ...freeTags];
   const tagFilter = parseMulti(normalizeEventTags(c.req.queries("tag") ?? []), allTags);
   const publicEnabled = (await getSettings()).eventsPublicEnabled === "true";
+  const infoMail = canManage && isSmtpConfigured() ? await infoMailRecipients() : null;
 
   // shortcut: lädt alle sichtbaren Termine für Kalendertage/Monatsliste, bei sehr vielen Terminen auf Monatsabfragen umstellen.
   let rows = await withRsvpInfo(await fetchEvents(user, undefined), user);
@@ -454,11 +455,32 @@ eventRoutes.get("/", requireAuth(), async (c) => {
                 </div>
               ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
               <ImpressumHint />
+              {infoMail && (
+                <>
+                  <button type="button" class="btn btn-sm btn-ghost w-full justify-start" onclick="document.getElementById('info-mail-dialog').showModal()">
+                    <Icon name="envelope" class="h-4 w-4" />{t("events.infoMail.button")}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : publicEnabled && <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
         {canManage && <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" />}
       </>} />
+      {infoMail && (
+        <dialog id="info-mail-dialog" class="modal">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg">{t("events.infoMail.title")}</h3>
+            <p class="py-2">{t("events.infoMail.text")}</p>
+            <p class="py-1 opacity-70">{infoMail.length ? t("events.notify.counts", countRecipients(infoMail)) : t("events.infoMail.none")}</p>
+            <div class="modal-action">
+              <form method="dialog"><button class="btn">{t("common.cancel")}</button></form>
+              <form method="post" action="/events/info-mail"><button type="submit" class="btn btn-primary" disabled={!infoMail.length}>{t("events.notify.send")}</button></form>
+            </div>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
+        </dialog>
+      )}
       <LocalTimes tz={tz} />
       <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
         <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: eventTagLabel(tag) }))} selected={tagFilter}
@@ -482,6 +504,13 @@ eventRoutes.post("/public-settings", manage, async (c) => {
   const body = await c.req.parseBody();
   await setSetting("eventsPublicEnabled", body.enabled === "1" ? "true" : "false");
   setFlash(c, t("events.publicSettings.saved"), "success");
+  return c.redirect("/events");
+});
+
+eventRoutes.post("/info-mail", manage, async (c) => {
+  if (!isSmtpConfigured()) setFlash(c, t("events.notify.noSmtp"), "error");
+  else if (await sendEventInfoMail()) setFlash(c, t("events.notify.sent"), "success");
+  else setFlash(c, t("events.infoMail.none"), "error");
   return c.redirect("/events");
 });
 
