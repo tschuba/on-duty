@@ -50,8 +50,8 @@ mailTemplateRoutes.get("/", async (c) => {
                   {list.filter((x) => CATALOG[x.key].category === g).map((x) => (
                     <tr class="cursor-pointer hover" onclick={`location.href='/mail/templates/${x.key}'`}>
                       <td>
-                        <a href={`/mail/templates/${x.key}`} class="font-medium link link-hover">{T(`mailTemplates.name.${x.key}`)}</a>
-                        <div class="text-sm opacity-60">{T(`mailTemplates.desc.${x.key}`)}</div>
+                        <a href={`/mail/templates/${x.key}`} class="font-medium link link-hover">{CATALOG[x.key].name}</a>
+                        <div class="text-sm opacity-60">{CATALOG[x.key].description}</div>
                       </td>
                       <td>{x.override ? t("mailTemplates.state.custom", stamp(x.override)) : t("mailTemplates.state.system")}</td>
                     </tr>
@@ -72,6 +72,9 @@ window.addEventListener('beforeunload',function(e){if(dirty){e.preventDefault();
 f.querySelectorAll('input,textarea').forEach(function(el){el.addEventListener('focus',function(){last=el})});
 document.querySelectorAll('[data-ph]').forEach(function(b){b.addEventListener('click',function(){var v='{{'+b.dataset.ph+'}}',s=last.selectionStart||0,e=last.selectionEnd||0;
 last.setRangeText(v,s,e,'end');last.focus();dirty=true})});
+var col=document.getElementById('ph-col'),pg=document.getElementById('ph-toggle'),pane=document.getElementById('pane-edit'),sv=localStorage.getItem('mailPlaceholders');
+function setPh(o){col.classList.toggle('hidden',!o);pg.setAttribute('aria-pressed',o);pane.classList.toggle('md:grid-cols-[1fr_16rem]',o);localStorage.setItem('mailPlaceholders',o)}
+setPh(sv===null?window.innerWidth>=768:sv==='true');pg.addEventListener('click',function(){setPh(pg.getAttribute('aria-pressed')!=='true')});
 document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){var p=b.dataset.tab==='preview';
 document.getElementById('pane-edit').classList.toggle('hidden',p);document.getElementById('pane-preview').classList.toggle('hidden',!p);
 document.querySelectorAll('[data-tab]').forEach(function(o){o.classList.toggle('tab-active',o===b)})})})})();`;
@@ -91,10 +94,10 @@ function Editor({ user, tpl, values, errors, expected, conflict }: { user: Varia
   const key = tpl.key, entry = CATALOG[key];
   const bodyErr = errors.filter((e) => !e.startsWith("subject:"));
   return (
-    <Layout title={T(`mailTemplates.name.${key}`)} user={user}>
+    <Layout title={entry.name} user={user}>
       <div class="max-w-5xl mx-auto">
         <PageHeader
-          title={T(`mailTemplates.name.${key}`)} backHref="/mail/templates" subtitle={T(`mailTemplates.desc.${key}`)}
+          title={entry.name} backHref="/mail/templates" subtitle={entry.description}
           actions={<>
             {tpl.override && <HeaderAction icon="arrow-uturn-left" label={t("mailTemplates.reset")} class="btn-outline" onclick="document.getElementById('reset-dialog').showModal()" />}
             <FormActions formId="tpl-form" />
@@ -106,8 +109,9 @@ function Editor({ user, tpl, values, errors, expected, conflict }: { user: Varia
           <button type="button" role="tab" class="tab tab-active" data-tab="edit">{t("common.edit")}</button>
           <button type="button" role="tab" class="tab" data-tab="preview" hx-post={`/mail/templates/${key}/preview`} hx-include="#tpl-form" hx-target="#preview">{t("mailTemplates.preview")}</button>
         </div>
+        <button type="button" id="ph-toggle" class="btn btn-sm btn-outline rounded-full mb-2" aria-pressed="true" aria-controls="ph-col">{"{ } "}{t("mailTemplates.placeholders")}</button>
         <div id="pane-preview" class="hidden"><div id="preview" /></div>
-        <div id="pane-edit" class="grid gap-4 md:grid-cols-[1fr_16rem]">
+        <div id="pane-edit" class="grid gap-4">
           <form id="tpl-form" method="post" action={`/mail/templates/${key}`} class="space-y-4">
             <input type="hidden" name="updatedAt" value={expected} />
             <div>
@@ -126,11 +130,13 @@ function Editor({ user, tpl, values, errors, expected, conflict }: { user: Varia
                 <dt class="font-medium">{t("mailTemplates.technical.category")}</dt><dd>{T(`mail.type.${entry.category}`)}</dd>
                 <dt class="font-medium">{t("mailTemplates.technical.audience")}</dt><dd>{T(`mailTemplates.audience.${tpl.audience}`)}</dd>
                 <dt class="font-medium">{t("mailTemplates.technical.prefix")}</dt><dd><code>{tpl.prefix}</code></dd>
+                <dt class="font-medium">{t("mailTemplates.technical.headers")}</dt>
+                <dd><code class="block">X-On-Duty-Category: {tpl.category}</code><code class="block">X-On-Duty-Event: {tpl.key}</code><code class="block">X-On-Duty-Audience: {tpl.audience}</code></dd>
               </dl>
             </details>
           </form>
-          <aside aria-label={t("mailTemplates.placeholders")}>
-            <h2 class="font-semibold mb-2">{t("mailTemplates.placeholders")}</h2>
+          <aside id="ph-col" aria-label={t("mailTemplates.placeholders")}>
+            <h2 class="font-semibold mb-2">{t("mailTemplates.placeholders")} <button type="button" class="btn btn-ghost btn-xs" aria-label={t("common.close")} onclick="document.getElementById('ph-toggle').click()">×</button></h2>
             <ul class="space-y-1 text-sm">
               {Object.entries(entry.vars).filter(([k, v]) => !k.includes("[]") && v.type !== "list").map(([k, v]) => (
                 <li><button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-ph={k} title={`${v.example}`}>+ {v.desc}</button></li>

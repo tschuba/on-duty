@@ -26,10 +26,12 @@ export interface InfoMailRecord { optOutAllUrl?: string; orgContactEmail?: strin
 export interface SettingsMailRecord { settingsUrl: string; validMinutes: number; orgContactEmail?: string }
 
 interface CatalogEntry {
+  name: string; description: string; // Klartext für die Oberfläche
   category: "event" | "member";
   audience: "member";
   vars: Record<string, VarSpec>;
-  required: { name: string; list?: string }[]; // ohne list: Variable auf oberster Ebene
+  required: { name: string; list?: string; label: string }[]; // label: Klartextname für Fehlermeldungen/Checkliste
+  // ohne list: Variable auf oberster Ebene
   build: (record: any, recipients: MailRecipient[]) => MailVars;
 }
 
@@ -108,14 +110,16 @@ function buildEventVars(r: EventMailRecord, recipients: MailRecipient[]): MailVa
 }
 
 const eventEntry: CatalogEntry = {
+  name: "", description: "",
   category: "event",
   audience: "member",
   vars: { ...GLOBAL_VARS, ...EVENT_VARS },
-  required: [{ name: "optOutUrl", list: "recipients" }],
+  required: [{ name: "optOutUrl", list: "recipients", label: t("mailTemplates.required.optOutUrl") }],
   build: buildEventVars,
 };
 
 const settingsEntry: CatalogEntry = {
+  name: "", description: "",
   category: "member",
   audience: "member",
   vars: {
@@ -123,7 +127,7 @@ const settingsEntry: CatalogEntry = {
     settingsUrl: { type: "text", desc: "Link zur Einstellungsseite (zeitlich begrenzt)", example: "https://portal.example.org/link/abc", source: "link" },
     validMinutes: { type: "text", desc: "Gültigkeit des Links in Minuten", example: "30", source: "data" },
   },
-  required: [{ name: "settingsUrl" }],
+  required: [{ name: "settingsUrl", label: t("mailTemplates.required.settingsUrl") }],
   build: (r: SettingsMailRecord) => ({ settingsUrl: r.settingsUrl, validMinutes: String(r.validMinutes) }),
 };
 
@@ -140,14 +144,15 @@ const infoEntry: CatalogEntry = {
   }),
 };
 
-export const CATALOG: Record<string, CatalogEntry> = {
+const named = (key: string, e: CatalogEntry): CatalogEntry => ({ ...e, name: t(`mailTemplates.name.${key}` as never), description: t(`mailTemplates.desc.${key}` as never) });
+export const CATALOG: Record<string, CatalogEntry> = Object.fromEntries(Object.entries({
   "member-settings-link": settingsEntry,
   "event-created": eventEntry,
   "event-updated": eventEntry,
   "event-cancelled": eventEntry,
   "event-uncancelled": eventEntry,
   "event-mail-info": infoEntry,
-};
+}).map(([k, e]) => [k, named(k, e)]));
 
 // Einziger Einstieg für Versand und Editor-Vorschau: ergänzt die globalen Variablen.
 export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord | InfoMailRecord, recipients: MailRecipient[]): MailVars {
@@ -206,11 +211,12 @@ export function validateTemplate(key: string, input: TemplateInput): string[] {
   for (const [field, text] of [["prefix", input.prefix ?? ""], ["subject", input.subject], ["body", input.body]] as const) {
     try { walk(Mustache.parse(text) as Token[], null, field, text); } catch (err) {
       const m = /^(.*) at (\d+)$/.exec((err as Error).message);
-      errors.push(`${field}: ${m ? `Zeile ${lineOf(text, Number(m[2]))}: ${m[1]}` : (err as Error).message}`);
+      const unclosed = m && /^Unclosed section "(.*)"$/.exec(m[1]);
+      errors.push(`${field}: ${m ? `Zeile ${lineOf(text, Number(m[2]))}: ${unclosed ? `Block „${unclosed[1]}“ ist nicht geschlossen` : m[1]}` : (err as Error).message}`);
     }
   }
   for (const r of entry?.required ?? []) {
-    if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.name}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
+    if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.label}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
   }
   return errors;
 }
