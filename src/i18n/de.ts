@@ -899,6 +899,8 @@ export const de = {
   "mailTemplates.required.optOutUrl": "Abmelde-Link",
   "mailTemplates.required.settingsUrl": "Einstellungs-Link",
   "mailTemplates.technical.headers": "Header",
+  "mailTemplates.empty": "Für dich gibt es keine Mail-Vorlagen, die du ändern darfst.",
+  "mailTemplates.back": "← Zurück",
   "mailTemplates.title": "Mail-Vorlagen",
   "mailTemplates.col.name": "Vorlage",
   "mailTemplates.col.state": "Zustand",

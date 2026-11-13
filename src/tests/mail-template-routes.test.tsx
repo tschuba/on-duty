@@ -37,9 +37,11 @@ describe("mail template routes", () => {
     expect(html).toContain("Auslieferungszustand");
   });
 
-  it("403 without any editable template and for a foreign template", async () => {
-    perms = new Set(["lending:manage"]);
-    expect((await mailTemplateRoutes.request("/")).status).toBe(403);
+  it("empty list with a hint without any editable template; 403 for a foreign template", async () => {
+    perms = new Set();
+    const list = await mailTemplateRoutes.request("/");
+    expect(list.status).toBe(200);
+    expect(await list.text()).toContain("keine Mail-Vorlagen");
     perms = new Set(["events:manage"]);
     expect((await mailTemplateRoutes.request("/member-settings-link")).status).toBe(403);
     expect((await post("/member-settings-link/reset", {})).status).toBe(403);
@@ -83,6 +85,15 @@ describe("mail template routes", () => {
     expect(ok).toContain("Übung Atemschutz");
     const bad = await (await post("/event-created/preview", { subject: "{{x}}", body: "y" })).text();
     expect(bad).toContain("alert-error");
+  });
+
+  it("back link follows ?from only for internal paths", async () => {
+    const back = async (q: string) => await (await mailTemplateRoutes.request(`/event-created${q}`)).text();
+    expect(await back("?from=/events")).toContain('href="/events"');
+    expect(await back("?from=//evil.example")).toContain('href="/mail/templates"');
+    expect(await back("?from=https://evil.example")).toContain('href="/mail/templates"');
+    const res = await post("/event-created?from=/events", { subject: "S", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}", updatedAt: "" });
+    expect(res.headers.get("location")).toBe("/mail/templates/event-created?from=%2Fevents");
   });
 
   it("reset deletes the override", async () => {

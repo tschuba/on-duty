@@ -23,6 +23,7 @@ import { PublicFooter } from "../components/public-form.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { isSmtpConfigured } from "../lib/mail.js";
+import { MailTemplateLinks } from "../components/mail-template-links.js";
 import { countRecipients, createdTargets, infoMailRecipients, sendEventInfoMail, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
@@ -455,8 +456,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
                 </div>
               ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
               <ImpressumHint />
-              <div class="divider my-1" />
-              <a href="/mail/templates" class="btn btn-sm btn-ghost w-full justify-start"><Icon name="envelope" class="h-4 w-4" />{t("mailTemplates.settings")}</a>
+              <MailTemplateLinks keys={["event-created", "event-updated", "event-cancelled", "event-uncancelled", "event-mail-info"]} from="/events" />
               {infoMail && (
                 <>
                   <div class="divider my-1" />

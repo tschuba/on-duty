@@ -27,6 +27,8 @@ async function load(user: Variables["user"], key: string): Promise<TemplateView>
   if (!mayEdit(user, tpl.editPermissions)) return forbidden();
   return tpl;
 }
+// ?from nur als interner Pfad ("/x", nicht "//x" oder "/\\x"), sonst Liste.
+const backTo = (from?: string) => (from && /^\/(?![/\\])/.test(from) ? from : "/mail/templates");
 const stamp = (u: { updatedAt: Date; updatedBy: string | null }) => ({
   name: u.updatedBy ?? t("mailTemplates.unknownUser" as never), date: formatDay(u.updatedAt, env.APP_TIMEZONE).replace(/^[^,]*,\s*/, ""),
 });
@@ -34,12 +36,12 @@ const stamp = (u: { updatedAt: Date; updatedBy: string | null }) => ({
 mailTemplateRoutes.get("/", async (c) => {
   const user = c.get("user");
   const list = await editable(user);
-  if (!list.length) return forbidden();
   const groups = [...new Set(list.map((x) => CATALOG[x.key].category))];
   return c.html(
     <Layout title={t("mailTemplates.title")} user={user}>
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("mailTemplates.title")} />
+        {!list.length && <p class="opacity-70">{t("mailTemplates.empty")}</p>}
         {groups.map((g) => (
           <section class="mb-6">
             <h2 class="text-lg font-semibold mb-2">{T(`mail.type.${g}`)}</h2>
@@ -90,14 +92,14 @@ const SAMPLE_RECORD = {
   settingsUrl: "https://portal.example.org/link/abc", validMinutes: 30,
 };
 
-function Editor({ user, tpl, values, errors, expected, conflict }: { user: Variables["user"]; tpl: TemplateView; values: { subject: string; body: string }; errors: string[]; expected: string; conflict?: boolean }) {
+function Editor({ user, back, tpl, values, errors, expected, conflict }: { user: Variables["user"]; back: string; tpl: TemplateView; values: { subject: string; body: string }; errors: string[]; expected: string; conflict?: boolean }) {
   const key = tpl.key, entry = CATALOG[key];
   const bodyErr = errors.filter((e) => !e.startsWith("subject:"));
   return (
     <Layout title={entry.name} user={user}>
       <div class="max-w-5xl mx-auto">
         <PageHeader
-          title={entry.name} backHref="/mail/templates" subtitle={entry.description}
+          title={entry.name} backHref={back} backLabel={back === "/mail/templates" ? undefined : t("mailTemplates.back")} subtitle={entry.description}
           actions={<>
             {tpl.override && <HeaderAction icon="arrow-uturn-left" label={t("mailTemplates.reset")} class="btn-outline" onclick="document.getElementById('reset-dialog').showModal()" />}
             <FormActions formId="tpl-form" />
@@ -112,7 +114,7 @@ function Editor({ user, tpl, values, errors, expected, conflict }: { user: Varia
         <button type="button" id="ph-toggle" class="btn btn-sm btn-outline rounded-full mb-2" aria-pressed="true" aria-controls="ph-col">{"{ } "}{t("mailTemplates.placeholders")}</button>
         <div id="pane-preview" class="hidden"><div id="preview" /></div>
         <div id="pane-edit" class="grid gap-4">
-          <form id="tpl-form" method="post" action={`/mail/templates/${key}`} class="space-y-4">
+          <form id="tpl-form" method="post" action={`/mail/templates/${key}${fromQs(back)}`} class="space-y-4">
             <input type="hidden" name="updatedAt" value={expected} />
             <div>
               <label class="label" for="tpl-subject">{t("mailTemplates.field.subject")}</label>
@@ -149,7 +151,7 @@ function Editor({ user, tpl, values, errors, expected, conflict }: { user: Varia
             <div class="modal-box">
               <p>{t("mailTemplates.reset.body")}</p>
               <pre class="mt-3 text-sm whitespace-pre-wrap font-mono bg-base-200 p-3 rounded-box">{tpl.system.subject}{"\n\n"}{tpl.system.body}</pre>
-              <form method="post" action={`/mail/templates/${key}/reset`} class="modal-action">
+              <form method="post" action={`/mail/templates/${key}/reset${fromQs(back)}`} class="modal-action">
                 <button type="button" class="btn" onclick="document.getElementById('reset-dialog').close()">{t("common.cancel")}</button>
                 <button type="submit" class="btn btn-error">{t("mailTemplates.reset")}</button>
               </form>
@@ -162,6 +164,7 @@ function Editor({ user, tpl, values, errors, expected, conflict }: { user: Varia
   );
 }
 
+const fromQs = (back: string) => (back === "/mail/templates" ? "" : `?from=${encodeURIComponent(back)}`);
 const readForm = async (c: any) => {
   const f = await c.req.parseBody();
   return { subject: String(f.subject ?? "").trim(), body: String(f.body ?? "").replace(/\r\n/g, "\n"), expected: String(f.updatedAt ?? "") };
@@ -170,7 +173,7 @@ const readForm = async (c: any) => {
 mailTemplateRoutes.get("/:key", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
   const cur = tpl.override ?? tpl.system;
-  return c.html(<Editor user={c.get("user")} tpl={tpl} values={cur} errors={[]} expected={tpl.override?.updatedAt.toISOString() ?? ""} />);
+  return c.html(<Editor user={c.get("user")} back={backTo(c.req.query("from"))} tpl={tpl} values={cur} errors={[]} expected={tpl.override?.updatedAt.toISOString() ?? ""} />);
 });
 
 mailTemplateRoutes.post("/:key", async (c) => {
@@ -179,11 +182,11 @@ mailTemplateRoutes.post("/:key", async (c) => {
   const { subject, body, expected } = await readForm(c);
   const errors = validateTemplate(tpl.key, { prefix: tpl.prefix, subject, body });
   const again = (errs: string[], conflict = false) =>
-    c.html(<Editor user={c.get("user")} tpl={tpl} values={{ subject, body }} errors={errs} expected={expected} conflict={conflict} />, conflict ? HTTP_STATUS.CONFLICT : HTTP_STATUS.UNPROCESSABLE_ENTITY);
+    c.html(<Editor user={c.get("user")} back={backTo(c.req.query("from"))} tpl={tpl} values={{ subject, body }} errors={errs} expected={expected} conflict={conflict} />, conflict ? HTTP_STATUS.CONFLICT : HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (errors.length) return again(errors);
   if ((await saveOverride(tpl, { subject, body }, user.id, expected)) === "conflict") return again([], true);
   setFlash(c, t("mailTemplates.flash.saved"), "success");
-  return c.redirect(`/mail/templates/${tpl.key}`);
+  return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
 });
 
 mailTemplateRoutes.post("/:key/preview", async (c) => {
@@ -199,5 +202,5 @@ mailTemplateRoutes.post("/:key/reset", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
   await resetOverride(tpl.key);
   setFlash(c, t("mailTemplates.flash.reset"), "success");
-  return c.redirect(`/mail/templates/${tpl.key}`);
+  return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
 });
