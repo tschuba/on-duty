@@ -239,6 +239,8 @@ oben).
 exportiert dann Traces und Metriken (Intervall 60 s).
 Wer vor Ticket 112 schon `stack:up:obs` genutzt hat: Das alte Volume `openobserve-data` behält die damaligen Zugangsdaten (Login 401, Healthcheck bleibt `starting`) — einmalig `pnpm stack:reset`.
 
+Mails: Der lokale Stack enthält Mailpit als Test-SMTP (`localhost:1025`, Web-UI http://localhost:8025); `.env.dev-stack` setzt `SMTP_*` darauf, nichts verlässt den Rechner. Bei einer bereits vorhandenen `.env.standalone.dev` steht noch der alte Dummy-Host: `SMTP_HOST=mailpit`/`SMTP_PORT=1025` dort eintragen oder `pnpm stack:reset`.
+
 Aufräumen: `pnpm stack:down` (Container stoppen, Volumes bleiben) bzw.
 `pnpm stack:reset` (alles löschen, inkl. `.env.standalone.dev`,
 `.env.dev-stack`, `.dev-stack/`; `.dev-stack-ca/` und damit die CA bleiben).

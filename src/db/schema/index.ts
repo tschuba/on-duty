@@ -12,3 +12,4 @@ export * from "./lending";
 export * from "./app-settings";
 export * from "./events";
 export * from "./training";
+export * from "./mail";

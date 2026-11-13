@@ -139,3 +139,7 @@ Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft*
 ## Lizenz
 
 Beiträge stehen unter der [AGPL-3.0-or-later](LICENSE) (inbound = outbound). Es gibt kein Contributor License Agreement (CLA): Du unterschreibst nichts Zusätzliches, und deine Beiträge stehen unter derselben Lizenz wie das Projekt.
+
+## Mail-Vorlagen
+
+Neue Mail = Katalogeintrag in `src/lib/mail-templates.ts` (Variablen, Pflichtplatzhalter, Beispiele, Builder) + Migration mit der `system`-Zeile in `mail_templates` + `pnpm mail:docs` (erzeugt `docs/mail-variables.md`; ein Test prüft, dass sie aktuell ist).

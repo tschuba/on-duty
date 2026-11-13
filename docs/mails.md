@@ -15,15 +15,17 @@ Enthält `ORG_NAME` eines dieser Zeichen, meldet der App-Start das: eine Warnung
 | `Mitgliedsantrag` | `membership` | Eingang, Zusage, Absage von Mitgliedsanträgen |
 | `Verleih` | `lend` | Verleih-Anfragen |
 | `Registrierung` | `registration` | Freigabe neuer Benutzer |
+| `Termin` | `event` | Termin-Mails (neu, geändert, abgesagt, findet statt) |
+| `Mitteilung` | `custom` | Freie Vorlagen (vorbereitet, noch ohne Versand) |
 | `Benutzerkonto` | – (nur Zitadel) | E-Mail-Bestätigung, Passwort-Reset, Einladung |
 
-Die Typ-Labels sind Teil der Schnittstelle: Filter dürfen sich darauf verlassen, sie werden nicht ohne Ankündigung umbenannt (`mail.type.*` in `src/i18n/de.ts`).
+Bei on-duty-Mails mit Vorlage (Termin-Mails) lassen sich Betreff und Text im Editor ändern; das Präfix nur bei freien Vorlagen. Betreff-Filter sind daher nur eingeschränkt stabil, verlässlich sind nur die Header `X-On-Duty-*`. Für Zitadel-Mails („Benutzerkonto“, keine eigenen Header möglich) bleibt das Label fest und ist der einzige Filteranker. Variablen der Vorlagen: [mail-variables.md](mail-variables.md).
 
 **Header** (nur on-duty-Mails; Zitadel kann keine eigenen Header setzen):
 
-- `X-On-Duty-Category`: `membership` | `lend` | `registration`
+- `X-On-Duty-Category`: `membership` | `lend` | `registration` | `event` | `custom`
 - `X-On-Duty-Event`: siehe Tabelle unten (stabil, nicht lokalisiert)
-- `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene)
+- `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene) | `member` (Mitglieder)
 
 **Sonstiges:** `From` ist überall `SMTP_FROM` (auch bei Zitadel). Reiner Text, keine Anhänge, kein `Reply-To`. Versand über nodemailer (`src/lib/mail.ts`, Port `SMTP_PORT`, Standard 587/STARTTLS). Ohne `SMTP_HOST`/`SMTP_FROM` wird nichts gesendet. Adressen auf `.invalid` werden bei Admin-Benachrichtigungen übersprungen.
 
@@ -41,6 +43,17 @@ Die Typ-Labels sind Teil der Schnittstelle: Filter dürfen sich darauf verlassen
 | Neue Registrierung wartet auf Freigabe | alle Admins (Rollen mit Rechten) | `[on-duty\|Registrierung] Neue Registrierung wartet auf Freigabe` | `registration-pending` | `staff` |
 
 ¹ Org-Einstellung `notificationEmail`, sonst `orgContactEmail`; beides leer → keine Mail.
+
+Termin-Mails (Vorlagen in der DB, Standardtexte „du“):
+
+| Auslöser | Betreff (Standard) | Event | Audience |
+|---|---|---|---|
+| Neuer Termin | `[on-duty\|Termin] Neuer Termin: <Titel>, <Datum>` | `event-created` | `member` |
+| Termin geändert | `[on-duty\|Termin] Termin geändert: …` | `event-updated` | `member` |
+| Termin abgesagt | `[on-duty\|Termin] Termin abgesagt: …` | `event-cancelled` | `member` |
+| Absage zurückgenommen | `[on-duty\|Termin] Termin findet statt: …` | `event-uncancelled` | `member` |
+
+Rezepte mit konkretem Betreff gelten nur für das feste Präfix, nicht für den änderbaren Betreff.
 
 ## Mails von Zitadel
 
