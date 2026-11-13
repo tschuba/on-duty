@@ -53,6 +53,8 @@ Termin-Mails (Vorlagen in der DB, Standardtexte „du“):
 | Termin abgesagt | `[on-duty\|Termin] Termin abgesagt: …` | `event-cancelled` | `member` |
 | Absage zurückgenommen | `[on-duty\|Termin] Termin findet statt: …` | `event-uncancelled` | `member` |
 
+Versand: nach „Mail senden“ im Modal auf der Termin-Detailseite, eine Mail je Adresse (gemeinsame Adressen mit einem Block je Mitglied). Jede Mail enthält Opt-Out-Links (`/link/<Token>`, signiert, ohne Login); bei genau einem Mitglied zusätzlich `List-Unsubscribe` und `List-Unsubscribe-Post`. Abbestellungen stehen in `mail_preferences`, das Versandprotokoll in `mail_log`.
+
 Rezepte mit konkretem Betreff gelten nur für das feste Präfix, nicht für den änderbaren Betreff.
 
 ## Mails von Zitadel

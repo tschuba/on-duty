@@ -26,6 +26,18 @@ export interface TemplateMailOptions {
   to: string;
   vars: MailVars;
   template?: ResolvedTemplate; // bereits aufgelöst (ein resolveTemplate je Versand an mehrere Empfänger)
+  headers?: Record<string, string>; // z. B. List-Unsubscribe; überschreibt Vorlagen-Header nicht für X-On-Duty-*
+}
+
+// Ein Pool-Transport für alle Mails (Massenversand); env ändert sich zur Laufzeit nicht.
+let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
+function getTransport(): ReturnType<typeof nodemailer.createTransport> {
+  return (transport ??= nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT ? Number(env.SMTP_PORT) : 587,
+    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+    pool: true,
+  }));
 }
 
 const RESERVED_HEADER = /^(x-on-duty-|from$|to$|subject$|list-unsubscribe)/i;
@@ -51,7 +63,7 @@ export async function sendMail(opts: MailOptions | TemplateMailOptions): Promise
     const tpl = opts.template ?? (await resolveTemplate(opts.key));
     if (!tpl) return { sent: false };
     ({ subject, text } = renderMail(tpl, opts.vars));
-    headers = { ...extraHeaders(tpl), "X-On-Duty-Category": tpl.category, "X-On-Duty-Event": tpl.key, "X-On-Duty-Audience": tpl.audience };
+    headers = { ...extraHeaders(tpl), "X-On-Duty-Category": tpl.category, "X-On-Duty-Event": tpl.key, "X-On-Duty-Audience": tpl.audience, ...opts.headers };
   } else {
     subject = `[${mailLabel(env.ORG_NAME)}|${t(`mail.type.${opts.category}`)}] ${opts.subject}`;
     text = opts.text;
@@ -63,12 +75,7 @@ export async function sendMail(opts: MailOptions | TemplateMailOptions): Promise
   }
 
   try {
-    const transport = nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT ? Number(env.SMTP_PORT) : 587,
-      auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
-    });
-    await transport.sendMail({ from: env.SMTP_FROM, to, subject, text, headers });
+    await getTransport().sendMail({ from: env.SMTP_FROM, to, subject, text, headers });
     return { sent: true };
   } catch (err) {
     logger.error({ err, subject }, "[mail] sending failed");

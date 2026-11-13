@@ -15,6 +15,7 @@ import { hookRoutes } from "./routes/hooks.js";
 import { loginRoutes } from "./routes/login.js";
 import { applyRoutes } from "./routes/apply.js";
 import { lendRoutes } from "./routes/lend.js";
+import { linkRoutes } from "./routes/links.js";
 import { impressumRoutes } from "./routes/impressum.js";
 import { datenschutzRoutes } from "./routes/datenschutz.js";
 import { memberRoutes } from "./routes/members.js";
@@ -81,6 +82,9 @@ app.route("/impressum", impressumRoutes);
 
 // Public loan request form — no auth guard, see backlog "Verleih-Anfrageformular"
 app.route("/lend", lendRoutes);
+
+// Signed token links from mails (RSVP, opt-out) — public, see backlog 149
+app.route("/link", linkRoutes);
 
 // Optional provider webhooks (signature-verified, inactive unless configured)
 app.route("/hooks", hookRoutes);
