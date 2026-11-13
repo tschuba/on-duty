@@ -22,12 +22,14 @@ export interface EventMailRecord {
 }
 export interface MailRecipient { firstName: string; lastName: string; email: string; optOutUrl: string; rsvpYesUrl?: string; rsvpNoUrl?: string }
 
+export interface SettingsMailRecord { settingsUrl: string; validMinutes: number; orgContactEmail?: string }
+
 interface CatalogEntry {
-  category: "event";
+  category: "event" | "member";
   audience: "member";
   vars: Record<string, VarSpec>;
-  required: { name: string; list: string }[];
-  build: (record: EventMailRecord, recipients: MailRecipient[]) => MailVars;
+  required: { name: string; list?: string }[]; // ohne list: Variable auf oberster Ebene
+  build: (record: any, recipients: MailRecipient[]) => MailVars;
 }
 
 const GLOBAL_VARS: Record<string, VarSpec> = {
@@ -112,7 +114,20 @@ const eventEntry: CatalogEntry = {
   build: buildEventVars,
 };
 
+const settingsEntry: CatalogEntry = {
+  category: "member",
+  audience: "member",
+  vars: {
+    ...GLOBAL_VARS,
+    settingsUrl: { type: "text", desc: "Link zur Einstellungsseite (zeitlich begrenzt)", example: "https://portal.example.org/link/abc", source: "link" },
+    validMinutes: { type: "text", desc: "Gültigkeit des Links in Minuten", example: "30", source: "data" },
+  },
+  required: [{ name: "settingsUrl" }],
+  build: (r: SettingsMailRecord) => ({ settingsUrl: r.settingsUrl, validMinutes: String(r.validMinutes) }),
+};
+
 export const CATALOG: Record<string, CatalogEntry> = {
+  "member-settings-link": settingsEntry,
   "event-created": eventEntry,
   "event-updated": eventEntry,
   "event-cancelled": eventEntry,
@@ -120,7 +135,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
 };
 
 // Einziger Einstieg für Versand und Editor-Vorschau: ergänzt die globalen Variablen.
-export function buildVars(key: string, record: EventMailRecord, recipients: MailRecipient[]): MailVars {
+export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord, recipients: MailRecipient[]): MailVars {
   const entry = CATALOG[key];
   if (!entry) throw new Error(`unknown mail template key: ${key}`);
   const first = recipients[0];
@@ -150,6 +165,7 @@ export function validateTemplate(key: string, input: TemplateInput): string[] {
       const inList = list && entry?.vars[`${list}[].${name}`];
       if (inList) seen.add(`${list}[].${name}`);
       else if (entry && name !== "." && !isRoot(name)) errors.push(`${field}: unbekannte Variable „${name}“`);
+      else seen.add(name);
       if (type === "#" || type === "^") walk(tok[4] ?? [], entry?.vars[name]?.type === "list" ? name : list, field);
     }
   };
@@ -157,7 +173,7 @@ export function validateTemplate(key: string, input: TemplateInput): string[] {
     try { walk(Mustache.parse(text) as Token[], null, field); } catch (err) { errors.push(`${field}: ${(err as Error).message}`); }
   }
   for (const r of entry?.required ?? []) {
-    if (!seen.has(`${r.list}[].${r.name}`)) errors.push(`Pflichtplatzhalter „${r.name}“ fehlt (innerhalb von „${r.list}“)`);
+    if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.name}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
   }
   return errors;
 }
@@ -222,7 +238,7 @@ export function catalogDocs(): string {
       ...Object.entries(vars).map(([k, v]) => `| \`${k}\` | ${v.type}${v.optional ? ", optional" : ""} | ${v.source} | ${cell(v.desc)} | ${cell(v.example)} |`)].join("\n");
   const out = ["<!-- Generiert mit `pnpm mail:docs` aus src/lib/mail-templates.ts – nicht von Hand ändern. -->", "", "# Mail-Variablen", ""];
   for (const [key, e] of Object.entries(CATALOG)) {
-    out.push(`## \`${key}\``, "", `Kategorie \`${e.category}\`, Audience \`${e.audience}\`. Pflichtplatzhalter: ${e.required.map((r) => `\`${r.name}\` in \`${r.list}\``).join(", ") || "keine"}.`, "", table(e.vars), "");
+    out.push(`## \`${key}\``, "", `Kategorie \`${e.category}\`, Audience \`${e.audience}\`. Pflichtplatzhalter: ${e.required.map((r) => `\`${r.name}\`${r.list ? ` in \`${r.list}\`` : ""}`).join(", ") || "keine"}.`, "", table(e.vars), "");
   }
   return out.join("\n");
 }

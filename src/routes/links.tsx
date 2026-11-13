@@ -9,7 +9,8 @@ import { t } from "../i18n/index.js";
 import { env } from "../env.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
-import { verifyLinkToken, type LinkPayload } from "../lib/links.js";
+import { isExpired, verifyLinkToken, type LinkPayload } from "../lib/links.js";
+import { loadSettings, saveSettings } from "../lib/member-settings.js";
 import { invitedMembers, isActiveMember, setRsvp, type SetRsvpResult } from "../lib/events.js";
 import { setOptOut } from "../lib/event-mail.js";
 import { members } from "../db/schema/index.js";
@@ -37,7 +38,33 @@ async function guard(c: Context, token: string): Promise<{ payload: LinkPayload 
     recordFailedAttempt(ip);
     return { res: c.html(<Page title={t("link.invalid.title")}><p>{t("link.invalid.body")}</p></Page>, HTTP_STATUS.NOT_FOUND) as never };
   }
+  if (isExpired(payload)) return { res: c.html(<Page title={t("link.expired.title")}><p>{t("link.expired.body")}</p><p class="mt-4"><a class="btn btn-primary" href="/me">{t("link.expired.new")}</a></p></Page>, HTTP_STATUS.GONE) as never };
   return { payload };
+}
+
+// Einstellungsseite (Backlog 151); GET zeigt nur an, gespeichert wird per POST.
+async function SettingsPage({ token, memberId, saved }: { token: string; memberId: string; saved?: boolean }) {
+  const people = await loadSettings(memberId);
+  return (
+    <Page title={t("link.member_settings.title")}>
+      {saved && <div role="status" class="alert alert-success mb-4">{t("link.member_settings.saved")}</div>}
+      {!people.length ? <p>{t("link.member_settings.empty")}</p> : (
+        <form method="post" action={`/link/${token}`} class="space-y-4">
+          {people.map((p) => (
+            <section class="border border-base-300 rounded-box p-4 space-y-2">
+              {people.length > 1 && <h2 class="text-lg font-semibold">{`${p.firstName} ${p.lastName}`.trim()}</h2>}
+              {people.length > 1 ? <h3 class="font-medium opacity-70">{t("link.member_settings.mail")}</h3> : <h2 class="text-lg font-semibold">{t("link.member_settings.mail")}</h2>}
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="events" value={p.personId} class="checkbox" checked={p.events} />
+                <span>{t("mail.prefs.events")}</span>
+              </label>
+            </section>
+          ))}
+          <button type="submit" class="btn btn-primary">{t("link.member_settings.save")}</button>
+        </form>
+      )}
+    </Page>
+  );
 }
 
 const RSVP_REASON: Record<Exclude<SetRsvpResult, "ok">, string> = {
@@ -47,6 +74,7 @@ const RSVP_REASON: Record<Exclude<SetRsvpResult, "ok">, string> = {
 linkRoutes.get("/:token", async (c) => {
   const g = await guard(c, c.req.param("token"));
   if ("res" in g) return g.res;
+  if (g.payload.p === "member.settings") return c.html(<SettingsPage token={c.req.param("token")} memberId={g.payload.m} />);
   const key = g.payload.p.replace(".", "_");
   return c.html(
     <Page title={t(`link.${key}.title` as never)}>
@@ -62,6 +90,12 @@ linkRoutes.post("/:token", async (c) => {
   const g = await guard(c, c.req.param("token"));
   if ("res" in g) return g.res;
   const { p, m, e, t: topic } = g.payload;
+
+  if (p === "member.settings") {
+    const body = await c.req.parseBody({ all: true });
+    await saveSettings(m, [body.events ?? []].flat().map(String));
+    return c.html(<SettingsPage token={c.req.param("token")} memberId={m} saved />);
+  }
 
   if (p === "mail.optout" || p === "mail.optout-address") {
     const ok = await setOptOut(m, topic!, true, p === "mail.optout" ? "person" : "address", p === "mail.optout" ? "link" : "address-link");

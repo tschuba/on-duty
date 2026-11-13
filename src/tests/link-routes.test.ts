@@ -14,6 +14,9 @@ vi.mock("../components/layout.js", () => ({ Layout: ({ children }: any) => child
 vi.mock("../components/public-form.js", () => ({ PublicFooter: () => null, clientIp: () => "1.1.1.1" }));
 const setRsvp = vi.fn();
 const setOptOut = vi.fn(async () => true);
+const saveSettings = vi.fn(async () => {});
+let settingsPeople = [{ personId: "p1", firstName: "Anna", lastName: "B", events: false }];
+vi.mock("../lib/member-settings.js", () => ({ loadSettings: async () => settingsPeople, saveSettings: (...a: any[]) => (saveSettings as any)(...a) }));
 vi.mock("../lib/events.js", () => ({ invitedMembers: async () => ["m1"], isActiveMember: () => true, setRsvp: (...a: any[]) => setRsvp(...a) }));
 vi.mock("../lib/event-mail.js", () => ({ setOptOut: (...a: any[]) => (setOptOut as any)(...a) }));
 
@@ -21,13 +24,34 @@ const { linkRoutes } = await import("../routes/links.js");
 const { signLinkToken } = await import("../lib/links.js");
 const post = (token: string) => linkRoutes.request(`/${token}`, { method: "POST" });
 
-beforeEach(() => { queue = []; setRsvp.mockReset(); setOptOut.mockClear(); });
+beforeEach(() => { queue = []; setRsvp.mockReset(); setOptOut.mockClear(); saveSettings.mockClear(); });
 
 describe("link routes", () => {
   it("GET changes nothing", async () => {
     const res = await linkRoutes.request(`/${signLinkToken({ p: "mail.optout", m: "m1", t: "events" })}`);
     expect(res.status).toBe(200);
     expect(setOptOut).not.toHaveBeenCalled();
+  });
+  it("settings: GET changes nothing, POST saves checked persons, expired link is 410", async () => {
+    const tok = signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() + 60_000 });
+    expect((await linkRoutes.request(`/${tok}`)).status).toBe(200);
+    expect(saveSettings).not.toHaveBeenCalled();
+    const res = await linkRoutes.request(`/${tok}`, { method: "POST", body: new URLSearchParams({ events: "p1" }) });
+    expect(res.status).toBe(200);
+    expect(saveSettings).toHaveBeenCalledWith("m1", ["p1"]);
+    saveSettings.mockClear();
+    const old = signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() - 1 });
+    expect((await linkRoutes.request(`/${old}`, { method: "POST" })).status).toBe(410);
+    expect(saveSettings).not.toHaveBeenCalled();
+  });
+  it("settings: name headings only when the address has several persons", async () => {
+    const tok = signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() + 60_000 });
+    expect(await (await linkRoutes.request(`/${tok}`)).text()).not.toContain("Anna B");
+    settingsPeople = [...settingsPeople, { personId: "p2", firstName: "Ben", lastName: "B", events: true }];
+    const html = await (await linkRoutes.request(`/${tok}`)).text();
+    expect(html).toContain("Anna B");
+    expect(html).toContain("Ben B");
+    settingsPeople = settingsPeople.slice(0, 1);
   });
   it("rejects a tampered token", async () => {
     expect((await post("abc.def")).status).toBe(404);

@@ -16,6 +16,7 @@ Enthält `ORG_NAME` eines dieser Zeichen, meldet der App-Start das: eine Warnung
 | `Verleih` | `lend` | Verleih-Anfragen |
 | `Registrierung` | `registration` | Freigabe neuer Benutzer |
 | `Termin` | `event` | Termin-Mails (neu, geändert, abgesagt, findet statt) |
+| `Mitglied` | `member` | Einstellungslink für Mitglieder ohne Login (`/me`) |
 | `Mitteilung` | `custom` | Freie Vorlagen (vorbereitet, noch ohne Versand) |
 | `Benutzerkonto` | – (nur Zitadel) | E-Mail-Bestätigung, Passwort-Reset, Einladung |
 
@@ -23,7 +24,7 @@ Bei on-duty-Mails mit Vorlage (Termin-Mails) lassen sich Betreff und Text im Edi
 
 **Header** (nur on-duty-Mails; Zitadel kann keine eigenen Header setzen):
 
-- `X-On-Duty-Category`: `membership` | `lend` | `registration` | `event` | `custom`
+- `X-On-Duty-Category`: `membership` | `lend` | `registration` | `event` | `member` | `custom`
 - `X-On-Duty-Event`: siehe Tabelle unten (stabil, nicht lokalisiert)
 - `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene) | `member` (Mitglieder)
 
@@ -52,6 +53,14 @@ Termin-Mails (Vorlagen in der DB, Standardtexte „du“):
 | Termin geändert | `[on-duty\|Termin] Termin geändert: …` | `event-updated` | `member` |
 | Termin abgesagt | `[on-duty\|Termin] Termin abgesagt: …` | `event-cancelled` | `member` |
 | Absage zurückgenommen | `[on-duty\|Termin] Termin findet statt: …` | `event-uncancelled` | `member` |
+
+Einstellungslink (Transaktionsmail, kein Opt-Out-Thema):
+
+| Auslöser | Betreff (Standard) | Event | Audience |
+|---|---|---|---|
+| Anfrage auf `/me` mit bekannter Adresse | `[on-duty\|Mitglied] Deine Einstellungen bei <Org>` | `member-settings-link` | `member` |
+
+Der Link (`/link/<Token>`, 30 Minuten gültig) öffnet die Einstellungsseite für alle aktiven Personen mit dieser Adresse; Versand wird in `mail_log` protokolliert, Änderungen setzen `source = settings`.
 
 Versand: nach „Mail senden“ im Modal auf der Termin-Detailseite (nach Anlegen, nach Änderung von Zeit, Ort oder Anmeldefrist, nach Absage/Wiederaufnahme; „Neuer Termin“ lässt sich über „Mitglieder benachrichtigen“ / „Fehlgeschlagene erneut senden“ nachholen; den Versandstatus je Mitglied zeigt der Abschnitt „Mail-Versand“; Opt-Out auch per Checkbox im Konto bzw. Mitgliederformular), eine Mail je Adresse (gemeinsame Adressen mit einem Block je Mitglied). Jede Mail enthält Opt-Out-Links (`/link/<Token>`, signiert, ohne Login); bei genau einem Mitglied zusätzlich `List-Unsubscribe` und `List-Unsubscribe-Post`. Abbestellungen stehen in `mail_preferences`, das Versandprotokoll in `mail_log`.
 

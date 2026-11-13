@@ -9,7 +9,7 @@ export function isSmtpConfigured(): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_FROM);
 }
 
-export type MailCategory = "membership" | "lend" | "registration" | "event" | "custom";
+export type MailCategory = "membership" | "lend" | "registration" | "event" | "member" | "custom";
 export type MailAudience = "staff" | "applicant" | "member";
 
 export interface MailOptions {

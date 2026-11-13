@@ -11,7 +11,7 @@ vi.mock("../db/index.js", () => ({ db: { select } }));
 const { CATALOG, buildVars, validateTemplate, renderMail, resolveTemplate, catalogDocs } = await import("../lib/mail-templates.js");
 
 // Standardtexte direkt aus der Seed-Migration.
-const sql = readFileSync("drizzle/0081_mail_templates_seed.sql", "utf8");
+const sql = ["0081_mail_templates_seed", "0083_member_settings_link_template"].map((f) => readFileSync(`drizzle/${f}.sql`, "utf8")).join("\n");
 const seeded = [...sql.matchAll(/\('([\w-]+)', 'de', 'system'.*?\$s\$(.*?)\$s\$, \$b\$(.*?)\$b\$/gs)].map((m) => ({ key: m[1], subject: m[2], body: m[3] }));
 
 const record = { event: { id: "e1", title: "Übung", startsAt: new Date("2026-04-12T16:00:00Z"), endsAt: new Date("2026-04-12T18:00:00Z"), allDay: false, location: "Gerätehaus", rsvpEnabled: true, rsvpDeadline: null, maxParticipants: 20 } };
@@ -26,11 +26,21 @@ describe("mail templates", () => {
   it.each(seeded)("renders $key from its seeded text", ({ key, subject, body }) => {
     expect(validateTemplate(key, { prefix: "[{{org.name}}|{{type}}]", subject, body })).toEqual([]);
     const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, buildVars(key, { ...record, changes: "Ort: A → B" }, [anna, ben]));
+    if (key === "member-settings-link") return;
     expect(out.subject).toMatch(/^\[Feuerwehr Test\|Termin\] /);
     expect(out.text).not.toMatch(/\{\{|undefined/);
     expect(out.text).toContain("https://o/2");
     expect(out.text).toContain(key === "event-cancelled" ? "Keine Termin-Mails" : "https://y/1");
     if (key === "event-cancelled") expect(out.text).not.toContain("https://y/1");
+  });
+
+  it("member-settings-link renders and requires settingsUrl", () => {
+    const { subject, body } = seeded.find((s) => s.key === "member-settings-link")!;
+    const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, buildVars("member-settings-link", { settingsUrl: "https://s/1", validMinutes: 30 }, []));
+    expect(out.subject).toBe("[Feuerwehr Test|Mitglied] Deine Einstellungen bei Feuerwehr Test");
+    expect(out.text).toContain("https://s/1");
+    expect(out.text).not.toMatch(/\{\{|undefined/);
+    expect(validateTemplate("member-settings-link", { subject: "x", body: "hi" })[0]).toMatch(/Pflichtplatzhalter/);
   });
 
   it("validation: unknown variable, missing or misplaced required placeholder, partial", () => {

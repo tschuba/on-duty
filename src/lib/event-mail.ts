@@ -183,7 +183,7 @@ export async function isOptedOut(personId: string, topic = EVENT_TOPIC): Promise
 }
 
 // Formular-Checkbox → nur schreiben, wenn sich der Wert ändert (sonst bliebe die ursprüngliche Quelle erhalten).
-export async function setEventMailsEnabled(personId: string, enabled: boolean, source: "account" | "admin"): Promise<void> {
+export async function setEventMailsEnabled(personId: string, enabled: boolean, source: "account" | "admin" | "settings"): Promise<void> {
   if ((await isOptedOut(personId)) === !enabled) return;
   await savePreference([personId], EVENT_TOPIC, !enabled, source);
 }

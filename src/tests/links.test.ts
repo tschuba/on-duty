@@ -18,6 +18,10 @@ describe("link tokens", () => {
     expect(verifyLinkToken(`${body}.x${sig}`)).toBeNull();
     expect(verifyLinkToken("garbage")).toBeNull();
   });
+  it("member.settings requires exp", () => {
+    expect(verifyLinkToken(signLinkToken({ p: "member.settings", m: "m1" }))).toBeNull();
+    expect(verifyLinkToken(signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() + 1000 }))).not.toBeNull();
+  });
   it("rejects unknown purpose and missing required fields", () => {
     expect(verifyLinkToken(signLinkToken({ p: "nope", m: "m1" }))).toBeNull();
     expect(verifyLinkToken(signLinkToken({ p: "event.rsvp-no", m: "m1" }))).toBeNull();
