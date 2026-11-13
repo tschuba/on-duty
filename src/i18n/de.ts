@@ -1547,6 +1547,7 @@ export const de = {
   "events.notify.send": "Mail senden",
   "events.notify.skip": "Ohne Mail",
   "events.notify.sent": "Mails werden versendet.",
+  "events.notify.already": "Die Mail zu diesem Termin wurde bereits versendet.",
   "events.notify.noSmtp": "Mailversand nicht konfiguriert.",
   "link.invalid.title": "Link ungültig",
   "link.invalid.body": "Dieser Link ist ungültig oder wurde verändert.",

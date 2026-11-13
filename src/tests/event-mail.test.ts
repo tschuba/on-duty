@@ -7,7 +7,7 @@ process.env.ORG_NAME = "Test";
 let queue: any[][] = [];
 const logged: any[] = [];
 function chain(): any {
-  const c: any = { from: () => c, innerJoin: () => c, where: () => c, then: (r: any, j: any) => Promise.resolve(queue.shift() ?? []).then(r, j) };
+  const c: any = { from: () => c, innerJoin: () => c, where: () => c, limit: () => c, then: (r: any, j: any) => Promise.resolve(queue.shift() ?? []).then(r, j) };
   return c;
 }
 vi.mock("../db/index.js", () => ({ db: { select: () => chain(), insert: () => ({ values: (v: any) => { logged.push(v); return Promise.resolve(); } }) } }));
@@ -16,7 +16,7 @@ vi.mock("../lib/mail.js", () => ({ sendMail: (o: any) => sendMail(o) }));
 vi.mock("../lib/mail-templates.js", () => ({ resolveTemplate: async () => ({ key: "event-created" }), buildVars: (_k: string, rec: any, r: any[]) => ({ n: r.length, all: rec.optOutAllUrl }) }));
 vi.mock("../lib/events.js", () => ({ invitedMembers: async () => ["m1", "m2", "m3", "m4"] }));
 
-const { eventMailRecipients, sendEventMails } = await import("../lib/event-mail.js");
+const { eventMailRecipients, sendEventMails, startEventMails } = await import("../lib/event-mail.js");
 const future = new Date(Date.now() + 86400000);
 const ev: any = { id: "e1", visibility: "loggedIn", endsAt: future };
 const row = (n: number, email: string | null) => ({ memberId: `m${n}`, personId: `p${n}`, firstName: `F${n}`, lastName: "L", email });
@@ -52,5 +52,18 @@ describe("sendEventMails", () => {
     sendMail.mockResolvedValueOnce({ sent: false });
     await sendEventMails(ev);
     expect(logged.flat()[0].status).toBe("failed");
+  });
+});
+
+describe("startEventMails", () => {
+  it("refuses when already sent (mail_log)", async () => {
+    queue = [[{ id: "l1" }]];
+    expect(await startEventMails(ev)).toBe(false);
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+  it("lets only one of two concurrent calls through", async () => {
+    queue = [[], [], [row(1, "a@x.de")], []];
+    const [a, b] = await Promise.all([startEventMails(ev), startEventMails(ev)]);
+    expect([a, b].sort()).toEqual([false, true]);
   });
 });

@@ -23,7 +23,7 @@ import { PublicFooter } from "../components/public-form.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { isSmtpConfigured } from "../lib/mail.js";
-import { countRecipients, eventMailRecipients, sendEventMails } from "../lib/event-mail.js";
+import { countRecipients, eventMailRecipients, startEventMails } from "../lib/event-mail.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
@@ -973,10 +973,8 @@ eventRoutes.post("/:id/notify", manage, async (c) => {
   const ev = await db.query.events.findFirst({ where: eq(events.id, c.req.param("id")) });
   if (!ev) return c.notFound();
   if (!isSmtpConfigured()) setFlash(c, t("events.notify.noSmtp"), "error");
-  else {
-    void sendEventMails(ev);
-    setFlash(c, t("events.notify.sent"), "success");
-  }
+  else if (await startEventMails(ev)) setFlash(c, t("events.notify.sent"), "success");
+  else setFlash(c, t("events.notify.already"), "error");
   return c.redirect(`/events/${ev.id}`);
 });
 

@@ -35,6 +35,27 @@ export const countRecipients = (rs: EventMailRecipient[]) => ({
   optedOut: rs.filter((r) => r.state === "opted-out").length,
 });
 
+// Doppelversand-Schutz: schon erfolgreich verschickt (mail_log) oder gerade im Versand (gleicher Prozess).
+// inFlight wird vor dem ersten await gesetzt, damit zwei gleichzeitige Requests nicht beide durchkommen.
+const inFlight = new Set<string>();
+
+// Startet den Versand im Hintergrund; false = für diesen Termin wurde schon (oder wird gerade) versendet.
+export async function startEventMails(event: Event, template = "event-created"): Promise<boolean> {
+  const key = `${template}:${event.id}`;
+  if (inFlight.has(key)) return false;
+  inFlight.add(key);
+  try {
+    const sent = await db.select({ id: mailLog.id }).from(mailLog)
+      .where(and(eq(mailLog.eventId, event.id), eq(mailLog.template, template), eq(mailLog.status, "sent"))).limit(1);
+    if (sent.length) { inFlight.delete(key); return false; }
+  } catch (err) {
+    inFlight.delete(key);
+    throw err;
+  }
+  void sendEventMails(event, template).finally(() => inFlight.delete(key));
+  return true;
+}
+
 // Eine Mail je Adresse (getrimmt, Kleinschreibung), Block je Mitglied. Läuft im Hintergrund; Fehler sind Log-and-skip.
 export async function sendEventMails(event: Event, template = "event-created"): Promise<void> {
   const groups = new Map<string, EventMailRecipient[]>();
