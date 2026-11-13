@@ -216,7 +216,7 @@ export async function canEdit(user: { permissions: Set<string> }, key: string): 
 // ---- Doku-Generat (pnpm mail:docs) ----------------------------------------
 
 export function catalogDocs(): string {
-  const cell = (s: string) => s.replace(/\|/g, "\\|");
+  const cell = (s: string) => s.replace(/[\\|]/g, "\\$&");
   const table = (vars: Record<string, VarSpec>) =>
     ["| Variable | Typ | Quelle | Beschreibung | Beispiel |", "|---|---|---|---|---|",
       ...Object.entries(vars).map(([k, v]) => `| \`${k}\` | ${v.type}${v.optional ? ", optional" : ""} | ${v.source} | ${cell(v.desc)} | ${cell(v.example)} |`)].join("\n");
