@@ -36,3 +36,10 @@ describe("custom template validation", () => {
     expect(out.text).toContain("heute");
   });
 });
+
+describe("custom mail send", () => {
+  it("renders a custom template with field values and globals", () => {
+    const out = renderMail({ prefix: "", subject: "{{ort}}", body: "Hallo {{recipient.firstName}}, {{wann}}" }, { ort: "Halle", wann: "heute", recipient: { firstName: "Anna" } });
+    expect(out).toEqual({ subject: "Halle", text: "Hallo Anna, heute" });
+  });
+});

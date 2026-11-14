@@ -16,6 +16,9 @@ import { PERMISSION_LABELS } from "../components/permission-badges.js";
 import type { CustomMeta } from "../db/schema/mail.js";
 import { t } from "../i18n/index.js";
 import { Icon } from "../components/icon.js";
+import { countSend, customRecipients, isSending, startCustomMail } from "../lib/custom-mail.js";
+import { isSmtpConfigured } from "../lib/mail.js";
+import { countRecipients } from "../lib/event-mail.js";
 import { Field, FieldGroup } from "../components/field.js";
 import { PermissionPicker } from "../components/permission-picker.js";
 
@@ -127,6 +130,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
           title={cf?.isNew ? t("mailTemplates.new") : entry.name} backHref={back} backLabel={back === "/mail/templates" ? undefined : t("mailTemplates.back")} subtitle={entry.description}
           actions={<>
             {tpl.override && <HeaderAction icon="arrow-uturn-left" label={t("mailTemplates.reset")} class="btn-outline" onclick="document.getElementById('reset-dialog').showModal()" />}
+            {cf && !cf.isNew && <HeaderAction icon="envelope" label={t("mailTemplates.send")} href={`/mail/templates/${key}/send${fromQs(back)}`} />}
             {cf && !cf.isNew && <HeaderAction icon="trash" label={t("mailTemplates.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-dialog').showModal()" />}
             <FormActions formId="tpl-form" />
           </>}
@@ -441,6 +445,7 @@ mailTemplateRoutes.post("/:key/preview", async (c) => {
 mailTemplateRoutes.post("/:key/delete", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
   if (!tpl.custom) return notFound();
+  if (isSending(tpl.key)) { setFlash(c, t("mailTemplates.delete.busy"), "error"); return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`); }
   await deleteCustom(tpl.key);
   setFlash(c, t("mailTemplates.flash.deleted"), "success");
   return c.redirect(backTo(c.req.query("from")));
@@ -451,5 +456,54 @@ mailTemplateRoutes.post("/:key/reset", async (c) => {
   if (tpl.custom) return notFound();
   await resetOverride(tpl.key);
   setFlash(c, t("mailTemplates.flash.reset"), "success");
+  return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
+});
+
+// ---- Manueller Versand (Backlog 156): Recht = editPermissions, alle Felder Pflicht ----------------
+
+async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, errors: string[] = [], status?: number) {
+  const back = backTo(c.req.query("from"));
+  const meta = tpl.custom!.meta;
+  const counts = countRecipients(await customRecipients(tpl.custom!.topic));
+  const smtp = isSmtpConfigured();
+  return c.html(
+    <Layout title={meta.name} user={c.get("user")}>
+      <div class="max-w-2xl mx-auto">
+        <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`} />
+        {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e}</li>)}</ul></div>}
+        {!smtp && <div role="alert" class="alert alert-warning mb-4">{t("mailTemplates.send.noSmtp")}</div>}
+        <p class="mb-1">{T("mailTemplates.send.recipients", { topic: tpl.custom!.topic })}</p>
+        <p class="mb-4 opacity-70">{T("mailTemplates.send.counts", { send: counts.send, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
+        <form method="post" action={`/mail/templates/${tpl.key}/send${fromQs(back)}`} class="space-y-4" onsubmit={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send }))})`}>
+          {meta.fields.map((f) => (
+            <Field label={f.label || fieldLabel(f.name)} required>
+              <textarea name={`f_${f.name}`} rows={3} class="textarea w-full" required placeholder={f.label || fieldLabel(f.name)}>{values[f.name] ?? f.example ?? ""}</textarea>
+            </Field>
+          ))}
+          <button type="submit" class="btn btn-primary" disabled={!smtp || !counts.send}>{t("mailTemplates.send")}</button>
+        </form>
+      </div>
+    </Layout>, status);
+}
+
+mailTemplateRoutes.get("/:key/send", async (c) => {
+  const tpl = await load(c.get("user"), c.req.param("key"));
+  if (!tpl.custom) return notFound();
+  return sendForm(c, tpl, {});
+});
+
+mailTemplateRoutes.post("/:key/send", async (c) => {
+  const tpl = await load(c.get("user"), c.req.param("key"));
+  if (!tpl.custom) return notFound();
+  const f = await c.req.parseBody();
+  const values = Object.fromEntries(tpl.custom.meta.fields.map((x) => [x.name, String(f[`f_${x.name}`] ?? "").replace(/\r\n/g, "\n").trim()]));
+  const fail = (msg: string, status: number) => sendForm(c, tpl, values, [msg], status);
+  if (Object.values(values).some((v) => !v)) return fail(t("mailTemplates.send.missing"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  if (!isSmtpConfigured()) return fail(t("mailTemplates.send.noSmtp"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  const res = await startCustomMail(tpl.key, values);
+  if (res === "busy") return fail(t("mailTemplates.send.busy"), HTTP_STATUS.CONFLICT);
+  if (res === "invalid") return fail(t("mailTemplates.send.invalid"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  if (res === "none") return fail(t("mailTemplates.send.noRecipients"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
+  setFlash(c, T("mailTemplates.send.started", { count: res }), "success");
   return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
 });

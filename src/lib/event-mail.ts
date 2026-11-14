@@ -22,12 +22,12 @@ export async function eventMailRecipients(event: Pick<Event, "id" | "visibility"
 }
 
 // Mitglieder-IDs → Empfänger inkl. Zustand (Adresse/Abbestellung).
-export async function mailRecipientsFor(ids: string[]): Promise<EventMailRecipient[]> {
+export async function mailRecipientsFor(ids: string[], topic = EVENT_TOPIC): Promise<EventMailRecipient[]> {
   if (!ids.length) return [];
   const rows = await db.select({ memberId: members.id, personId: persons.id, firstName: persons.firstName, lastName: persons.lastName, email: persons.email })
     .from(members).innerJoin(persons, eq(persons.id, members.personId)).where(inArray(members.id, ids));
   const out = await db.select({ personId: mailPreferences.personId }).from(mailPreferences)
-    .where(and(eq(mailPreferences.topic, EVENT_TOPIC), eq(mailPreferences.optedOut, true), inArray(mailPreferences.personId, rows.map((r) => r.personId))));
+    .where(and(eq(mailPreferences.topic, topic), eq(mailPreferences.optedOut, true), inArray(mailPreferences.personId, rows.map((r) => r.personId))));
   const optedOut = new Set(out.map((o) => o.personId));
   return rows.map((r): EventMailRecipient => {
     const email = (r.email ?? "").trim();
