@@ -261,7 +261,7 @@ async function notifyDecision(request: NonNullable<Awaited<ReturnType<typeof fet
   if (!request.person.email) return { notified: false, contact };
   const key = approved ? "lend-approved" : "lend-rejected";
   const { firstName, lastName, email } = request.person;
-  const vars = buildVars(key, { itemName: request.lendingItem.inventoryItem.name, statusUrl: `${env.OIDC_APP_URL}/lend/status/${request.statusToken}` }, [{ firstName, lastName, email: request.person.email }]);
+  const vars = buildVars(key, { itemName: request.lendingItem.inventoryItem.name, statusUrl: `${env.OIDC_APP_URL}/lend/status/${request.statusToken}`, orgContactEmail: config.orgContactEmail }, [{ firstName, lastName, email: request.person.email }]);
   const result = await sendMail({ key, to: request.person.email, vars });
   return { notified: result.sent, contact };
 }

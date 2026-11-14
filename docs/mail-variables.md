@@ -149,6 +149,7 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
 | `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
 | `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
+| `you` | text | data | „dich“ / „euch“ | dich |
 | `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
 | `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |

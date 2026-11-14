@@ -40,10 +40,11 @@ describe("mail templates", () => {
   });
 
   it("application-approved rejoin variant", () => {
-    const { subject, body } = seeded.find((s) => s.key === "application-approved")!;
+    const subject = "";
+    const body = readFileSync("drizzle/0089_application_approved_wording.sql", "utf8").match(/\$b\$(.*?)\$b\$/s)![1];
     const text = (rejoin: boolean) => renderMail({ prefix: "", subject, body }, buildVars("application-approved", { rejoin }, [anna])).text;
-    expect(text(true)).toContain("nun wieder Mitglied");
-    expect(text(false)).toContain("nun Mitglied");
+    expect(text(true)).toContain("wieder dabei");
+    expect(text(false)).not.toContain("wieder dabei");
   });
 
   it.each(seeded.filter((s) => !EXISTING.includes(s.key)))("renders $key from its seeded text", ({ key, subject, body }) => {

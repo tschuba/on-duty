@@ -307,7 +307,8 @@ async function notifyManager(itemName: string, requestId: string) {
 // Eingangsbestätigung an den Antragsteller — nur mit E-Mail und SMTP; ohne Mail bleibt notifiedAt null (Admin-Hinweis auf der Detailseite).
 async function notifyApplicant(applicant: { firstName: string; lastName: string; email: string | null }, itemName: string, token: string): Promise<Date | null> {
   if (!applicant.email) return null;
-  const vars = buildVars("lend-submitted", { itemName, statusUrl: `${env.OIDC_APP_URL}/lend/status/${token}` }, [{ ...applicant, email: applicant.email }]);
+  const { orgContactEmail } = await loadOrgConfig();
+  const vars = buildVars("lend-submitted", { itemName, statusUrl: `${env.OIDC_APP_URL}/lend/status/${token}`, orgContactEmail }, [{ ...applicant, email: applicant.email }]);
   const result = await sendMail({ key: "lend-submitted", to: applicant.email, vars });
   return result.sent ? new Date() : null;
 }

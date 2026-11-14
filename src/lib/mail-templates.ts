@@ -23,7 +23,7 @@ export interface EventMailRecord {
 export interface MailRecipient { firstName: string; lastName: string; email: string; optOutUrl?: string; rsvpYesUrl?: string; rsvpNoUrl?: string }
 
 export interface InfoMailRecord { optOutAllUrl?: string; orgContactEmail?: string }
-export interface SimpleMailRecord { applicantName?: string; rejoin?: boolean; itemName?: string; requestUrl?: string; statusUrl?: string; userName?: string; userEmail?: string }
+export interface SimpleMailRecord { applicantName?: string; rejoin?: boolean; itemName?: string; requestUrl?: string; statusUrl?: string; userName?: string; userEmail?: string; orgContactEmail?: string }
 export interface SettingsMailRecord { settingsUrl: string; validMinutes: number; orgContactEmail?: string }
 
 interface CatalogEntry {
@@ -133,13 +133,14 @@ const settingsEntry: CatalogEntry = {
 };
 
 // Info-Mail zu Termin-Mails: nur Anrede, Mitgliederblöcke und Opt-Out-Links, kein Termin.
-const INFO_KEYS = ["addressee", "multiple", "recipients", "recipients[].name", "recipients[].optOutUrl", "optOutAllUrl"];
+const INFO_KEYS = ["addressee", "you", "multiple", "recipients", "recipients[].name", "recipients[].optOutUrl", "optOutAllUrl"];
 const infoEntry: CatalogEntry = {
   ...eventEntry,
   vars: { ...GLOBAL_VARS, ...Object.fromEntries(INFO_KEYS.map((k) => [k, EVENT_VARS[k]])) },
   build: (r: InfoMailRecord, recipients: MailRecipient[]) => ({
     addressee: recipients.map((p) => p.firstName).join(", "),
     multiple: recipients.length > 1,
+    you: t(recipients.length > 1 ? "mail.event.you.many" : "mail.event.you.one"),
     recipients: recipients.map((p) => ({ name: fullName(p), optOutUrl: p.optOutUrl })),
     optOutAllUrl: recipients.length > 1 ? (r.optOutAllUrl ?? "") : "",
   }),
@@ -187,7 +188,7 @@ export function buildVars(key: string, record: EventMailRecord | SettingsMailRec
   const first = recipients[0];
   return {
     ...entry.build(record, recipients),
-    org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: (record as InfoMailRecord).orgContactEmail ?? "" },
+    org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: (record as SimpleMailRecord).orgContactEmail ?? "" },
     type: t(`mail.type.${entry.category}`),
     recipient: first ? { name: fullName(first), firstName: first.firstName, lastName: first.lastName, email: first.email } : {},
   };
