@@ -103,3 +103,33 @@ describe("mail placeholders editor", () => {
     expect(ev().defaultPrevented).toBe(false);
   });
 });
+
+describe("placeholder highlight mirror", () => {
+  const hl = () => [...document.querySelectorAll<HTMLElement>("[aria-hidden] [data-hl]")];
+  const mir = () => area().previousElementSibling as HTMLElement;
+  it("highlights placeholders and block tags only, escapes HTML, keeps incomplete tags as text", () => {
+    type(area() as any, "a <b> {{x.y}} {{#c}}t{{/c}} {{^c}} {{unfertig");
+    expect(hl().map((e) => [e.dataset.hl, e.textContent])).toEqual([["ph", "{{x.y}}"], ["block", "{{#c}}"], ["block", "{{/c}}"], ["block", "{{^c}}"]]);
+    expect(mir().textContent).toBe(area().value);
+    expect(mir().querySelector("b")).toBeNull();
+    expect(mir().getAttribute("aria-hidden")).toBe("true");
+  });
+  it("follows scroll, insertion and subject field", () => {
+    document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
+    expect(hl()[0].textContent).toBe("{{a.name}}");
+    area().scrollTop = 5; area().dispatchEvent(new Event("scroll"));
+    expect(mir().scrollTop).toBe(area().scrollTop);
+    const s = document.querySelector<HTMLInputElement>("[name=subject]")!;
+    type(s, "Hi {{a.name}}");
+    expect((s.previousElementSibling as HTMLElement).textContent).toBe("Hi {{a.name}}");
+  });
+  it("grows with the field (box follows the field)", () => {
+    const a = area() as HTMLTextAreaElement;
+    Object.defineProperty(a, "offsetHeight", { configurable: true, value: 321 });
+    a.style.borderLeft = a.style.borderRight = "1px solid"; // jsdom liefert sonst keine Border-Breite
+    Object.defineProperty(a, "clientWidth", { configurable: true, value: 400 });
+    a.dispatchEvent(new Event("input"));
+    expect(mir().style.height).toBe("321px");
+    expect(mir().style.width).toBe("402px"); // clientWidth + Border
+  });
+});
