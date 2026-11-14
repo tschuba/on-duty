@@ -131,7 +131,7 @@ describe("mail template routes", () => {
   });
 
   it("preview saves nothing, needs edit permission, subject equals send subject", async () => {
-    const res = await post("/event-created/preview", { subject: "Hallo {{event.title}}", body: "x" });
+    const res = await post("/event-created/preview", { subject: "Hallo {{event.title}}", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}" });
     expect(res.status).toBe(200);
     expect(saveOverride).not.toHaveBeenCalled();
     expect(resetOverride).not.toHaveBeenCalled();
