@@ -31,6 +31,7 @@ describe("mail templates", () => {
     const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, vars);
     expect(out.subject).toMatch(/^\[Feuerwehr Test\|(Mitgliedsantrag|Verleih|Registrierung)\] \S/);
     expect(out.text).not.toMatch(/\{\{|undefined/);
+    expect(out).toMatchSnapshot();
     if (CATALOG[key].audience === "applicant") expect(out.text).toContain("Hallo Anna,");
     else expect(out.text).not.toContain("Hallo");
     // jede Variable aus dem Builder steht mit source im Katalog

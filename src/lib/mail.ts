@@ -1,24 +1,10 @@
 import nodemailer from "nodemailer";
 import { env } from "../env.js";
 import { logger } from "./logger.js";
-import { t } from "../i18n/index.js";
-import { mailLabel } from "./mail-label.js";
 import { renderMail, resolveTemplate, type MailVars, type ResolvedTemplate } from "./mail-templates.js";
 
 export function isSmtpConfigured(): boolean {
   return Boolean(env.SMTP_HOST && env.SMTP_FROM);
-}
-
-export type MailCategory = "membership" | "lend" | "registration" | "event" | "member" | "custom";
-export type MailAudience = "staff" | "applicant" | "member";
-
-export interface MailOptions {
-  to: string;
-  category: MailCategory;
-  event: string; // stable, not localized, e.g. "application-approved"
-  audience: MailAudience;
-  subject: string;
-  text: string;
 }
 
 export interface TemplateMailOptions {
@@ -53,22 +39,16 @@ function extraHeaders(tpl: ResolvedTemplate): Record<string, string> {
 }
 
 // Einheitliches Schema (docs/mails.md): Betreff "[<ORG_NAME>|<Typ>] …" plus X-On-Duty-Category/-Event/-Audience.
-// Neue Signatur { key, to, vars }: Texte, Präfix und Header kommen aus mail_templates; die alte bleibt bis #155.
+// Texte, Präfix und Header kommen aus mail_templates.
 // Log-and-skip by design (see backlog "Digitale Anträge"): the submit/approve/reject
 // workflow must never fail just because notifications aren't configured or the SMTP
 // server is unreachable. Callers surface `sent: false` to the user as an inline hint.
-export async function sendMail(opts: MailOptions | TemplateMailOptions): Promise<{ sent: boolean }> {
-  let subject: string, text: string, to = opts.to, headers: Record<string, string>;
-  if ("key" in opts) {
-    const tpl = opts.template ?? (await resolveTemplate(opts.key));
-    if (!tpl) return { sent: false };
-    ({ subject, text } = renderMail(tpl, opts.vars));
-    headers = { ...extraHeaders(tpl), "X-On-Duty-Category": tpl.category, "X-On-Duty-Event": tpl.key, "X-On-Duty-Audience": tpl.audience, ...opts.headers };
-  } else {
-    subject = `[${mailLabel(env.ORG_NAME)}|${t(`mail.type.${opts.category}`)}] ${opts.subject}`;
-    text = opts.text;
-    headers = { "X-On-Duty-Category": opts.category, "X-On-Duty-Event": opts.event, "X-On-Duty-Audience": opts.audience };
-  }
+export async function sendMail(opts: TemplateMailOptions): Promise<{ sent: boolean }> {
+  const to = opts.to;
+  const tpl = opts.template ?? (await resolveTemplate(opts.key));
+  if (!tpl) return { sent: false };
+  const { subject, text } = renderMail(tpl, opts.vars);
+  const headers = { ...extraHeaders(tpl), "X-On-Duty-Category": tpl.category, "X-On-Duty-Event": tpl.key, "X-On-Duty-Audience": tpl.audience, ...opts.headers };
   if (!isSmtpConfigured()) {
     logger.warn({ subject }, "[mail] SMTP not configured, email not sent");
     return { sent: false };
