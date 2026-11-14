@@ -20,7 +20,7 @@ vi.mock("../lib/event-mail.js", async (orig) => ({
   eventMailRecipients: async () => recipients,
   mailRecipientsFor: async (ids: string[]) => recipients.filter((r) => ids.includes(r.memberId)),
   createdTargets: async () => targets,
-  eventDelivery: async () => [],
+  eventDelivery: async () => [{ memberId: "m", firstName: "F", lastName: "L", delivery: "pending" }],
   startEventMails: vi.fn(async () => true),
   sendChangeMails: (...a: unknown[]) => sendChangeMails(...a),
 }));

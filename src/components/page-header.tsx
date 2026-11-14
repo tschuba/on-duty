@@ -4,8 +4,8 @@ import type { IconName } from "./icons.generated.js";
 import { t } from "../i18n/index.js";
 
 // Icon + Label einer Aktion; das Label verschwindet per Container-Query (der nächste @container-Vorfahr zählt).
-export function ActionContent({ icon, label, variant = "secondary" }: { icon: IconName; label: string; variant?: "primary" | "secondary" }) {
-  const hide = variant === "primary" ? "@max-md:hidden" : "@max-xl:hidden";
+export function ActionContent({ icon, label, variant = "secondary", hide: hideOverride }: { icon: IconName; label: string; variant?: "primary" | "secondary"; hide?: string }) {
+  const hide = hideOverride ?? (variant === "primary" ? "@max-md:hidden" : "@max-xl:hidden");
   return (<>
     <Icon name={icon} class="h-5 w-5 shrink-0" />
     <span class={hide}>{label}</span>
@@ -14,7 +14,8 @@ export function ActionContent({ icon, label, variant = "secondary" }: { icon: Ic
 
 // Aktions-Button für den Seitenkopf. Label wird per Container-Query ausgeblendet:
 // Stufe 1 (schmal) Sekundär, Stufe 2 (sehr schmal) auch Primär. aria-label/title bleiben immer.
-export function HeaderAction({ variant = "secondary", icon, label, href, form, type, onclick, class: cls = "btn-neutral", name, value, attrs, disabled }: {
+export function HeaderAction({ variant = "secondary", icon, label, href, form, type, onclick, class: cls = "btn-neutral", name, value, attrs, disabled, hideLabel }: {
+  hideLabel?: string; // überschreibt die Container-Query-Klasse, die das Label ausblendet (z. B. "hidden" = immer nur Icon)
   variant?: "primary" | "secondary";
   icon: IconName;
   label: string;
@@ -28,7 +29,7 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
   attrs?: Record<string, string>; // z. B. hx-get für Modal-Auslöser
   disabled?: string; // Grund: gesetzt → Button deaktiviert, Grund als Tooltip (am Wrapper, da disabled-Buttons keinen zeigen)
 }) {
-  const inner = <ActionContent icon={icon} label={label} variant={variant} />;
+  const inner = <ActionContent icon={icon} label={label} variant={variant} hide={hideLabel} />;
   const cls2 = `btn ${cls}`;
   if (disabled) return (
     <span class="inline-flex" title={disabled}>

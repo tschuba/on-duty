@@ -1,12 +1,13 @@
 import { Hono, type Context } from "hono";
-import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { events, eventTags, members, persons } from "../db/schema/index.js";
+import { events, eventTags, mailLog, members, persons } from "../db/schema/index.js";
 import { requireAuth, type Variables, type AuthedUser } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Icon } from "../components/icon.js";
+import type { IconName } from "../components/icons.generated.js";
 import { LocationPicker } from "../components/location-picker.js";
 import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
 import { Section } from "../components/section.js";
@@ -852,19 +853,17 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
   const askMail = smtp && ev.endsAt > now(); // Rückfrage nur sinnvoll, wenn Mails überhaupt rausgehen können
   const cancelAction = canManage && (ev.cancelledAt
     ? <HeaderAction icon="arrow-uturn-left" label={t("events.uncancel")} class="btn-outline" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" } })} />
-    : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
-  const deleteAction = canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
+    : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" hideLabel="@max-2xl:hidden" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
+  const deleteAction = canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" hideLabel="@max-2xl:hidden" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
   const notify = canManage && smtp && c.req.query("notify") === "created" && !ev.cancelledAt ? await createdTargets(ev) : null;
   const cancelRecipients = canManage && askMail ? await eventMailRecipients(ev) : [];
-  const catchUp = canManage && smtp && !ev.cancelledAt && ev.endsAt > now() ? await createdTargets(ev) : null;
-  const delivery = canManage ? await eventDelivery(ev, smtp) : [];
+  const delivery = canManage ? await eventDelivery(ev) : [];
   return c.html(
     <Layout title={ev.title} user={user}>
       <div class="max-w-2xl mx-auto">
       {notify && <MailChoiceDialog id="notify-dialog" auto action={`/events/${ev.id}/notify`} title={t("events.notify.title")} sections={[{ title: t("events.notify.kind.created"), recipients: notify.recipients }]} defaultSend />}
       {canManage && askMail && <MailChoiceDialog id="cancel-dialog" action={`/events/${ev.id}/${cancelKind}`} title={t(ev.cancelledAt ? "events.notify.uncancelTitle" : "events.notify.cancelTitle", { title: ev.title })} sections={[{ title: t(ev.cancelledAt ? "events.notify.kind.uncancelled" : "events.notify.kind.cancelled"), recipients: cancelRecipients }]} defaultSend={false} />}
-      <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{cancelAction}{deleteAction}</>} />} />
-      {catchUp && catchUp.recipients.some((r) => r.state === "send") && <a class="btn btn-outline btn-sm mb-2" href={`/events/${ev.id}?notify=created`}>{t(catchUp.mode === "failed" ? "events.notify.retry" : "events.notify.catchUp")}</a>}
+      <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{canManage && <HeaderAction icon="mailbox" label={t("events.mailLog.link")} href={`/events/${ev.id}/mail-log`} class="btn-outline" hideLabel="hidden" />}{cancelAction}{deleteAction}</>} />} />
       <LocalTimes tz={tz} />
       <ViewGrid>
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.start")}</div><div class="font-medium"><EventTimeLabel ev={ev} tz={tz} /></div></div>
@@ -883,7 +882,7 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
         <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
       </ViewGrid>
       {ev.rsvpEnabled && <RsvpSection ev={ev} user={user} tz={tz} />}
-      {canManage && <DeliverySection rows={delivery} />}
+      {canManage && !ev.rsvpEnabled && <DeliverySection ev={ev} rows={delivery} />}
       <script dangerouslySetInnerHTML={{ __html: `document.body.addEventListener('htmx:beforeSwap', function (e) {
         if (e.detail.xhr.status === 422 && e.detail.requestConfig.elt.closest('#rsvp-section')) { e.detail.shouldSwap = true; e.detail.isError = false; }
       });` }} />
@@ -999,17 +998,35 @@ function MailChoiceDialog({ id, open, auto, action, fields = {}, title, sections
       <dialog id={id} class={`modal${open ? " modal-open" : ""}`}>
         <div class="modal-box">
           <h3 class="font-bold text-lg">{title}</h3>
-          {sections.map(({ title: sTitle, lines, recipients }) => {
-            const names = recipients.filter((r) => r.state === "send").map((r) => `${r.firstName} ${r.lastName}`);
-            return (
-              <div class="py-2">
-                <div class="font-semibold">{sTitle}</div>
-                {lines && <ul class="list-disc pl-5 text-sm">{lines.map((l) => <li>{l}</li>)}</ul>}
-                <p class="py-1 opacity-70">{t("events.notify.counts", countRecipients(recipients))}</p>
-                {names.length > 0 && <details><summary class="cursor-pointer text-sm">{t("events.notify.names")}</summary><p class="text-sm py-2">{names.join(", ")}</p></details>}
-              </div>
-            );
-          })}
+          <div class="space-y-4 pt-3">
+            {sections.map(({ title: sTitle, lines, recipients }) => {
+              const c = countRecipients(recipients);
+              return (
+                <div class="space-y-3">
+                  <p class="text-sm"><span class="opacity-70">{t("events.notify.template")}:</span> <span class="font-semibold">{sTitle}</span></p>
+                  {lines && <ul class="list-disc pl-5 text-sm">{lines.map((l) => <li>{l}</li>)}</ul>}
+                  <StatBar items={[
+                        { label: t("events.notify.recipients"), value: recipients.length },
+                        { label: t("events.notify.stat.send"), value: c.send, icon: DELIVERY_ICON.pending!.icon, tone: "text-success" },
+                        ...(c.noEmail ? [{ label: t("events.delivery.no-email"), value: c.noEmail, icon: DELIVERY_ICON["no-email"]!.icon, tone: DELIVERY_ICON["no-email"]!.tone }] : []),
+                        ...(c.optedOut ? [{ label: t("events.delivery.opted-out"), value: c.optedOut, icon: DELIVERY_ICON["opted-out"]!.icon, tone: DELIVERY_ICON["opted-out"]!.tone }] : []),
+                  ]} />
+                  <Section title={t("events.notify.recipients")} collapsible={false}>
+                    <div class="p-3">
+                      <ul class="max-h-48 overflow-y-auto text-sm">
+                        {recipients.filter((r) => r.state !== "no-email").map((r) => (
+                          <li class="flex items-center gap-2 py-0.5">
+                            <DeliveryBadge state={r.state === "send" ? "pending" : r.state} tip="tooltip-right relative z-10" />
+                            <span class={r.state === "send" ? "" : "opacity-60"}>{r.firstName} {r.lastName}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </Section>
+                </div>
+              );
+            })}
+          </div>
           <div class="modal-action">
             {backHref && <a href={backHref} class="btn btn-ghost">{t("common.cancel")}</a>}
             <form method="post" action={action}>{hidden("skip")}<button type="submit" class="btn" autofocus={!defaultSend}>{t("events.notify.skip")}</button></form>
@@ -1023,22 +1040,111 @@ function MailChoiceDialog({ id, open, auto, action, fields = {}, title, sections
   );
 }
 
-const DELIVERY_BADGE: Record<DeliveryState, string> = { sent: "badge-success", failed: "badge-error", "no-email": "badge-ghost", "opted-out": "badge-ghost", "no-smtp": "badge-warning", pending: "badge-outline" };
+const DELIVERY_BADGE: Record<DeliveryState, string> = { sent: "badge-success", failed: "badge-error", "no-email": "badge-ghost", "opted-out": "badge-ghost", pending: "badge-outline" };
+
+// Nachholen/erneut versuchen: nur wenn Mails möglich sind und noch Empfänger offen sind.
+async function CatchUpButton({ ev, header }: { ev: Event; header?: boolean }) {
+  if (!isSmtpConfigured() || ev.cancelledAt || ev.endsAt <= now()) return <></>;
+  const catchUp = await createdTargets(ev);
+  if (!catchUp.recipients.some((r) => r.state === "send")) return <></>;
+  const label = t(catchUp.mode === "failed" ? "events.notify.retry" : "events.notify.catchUp");
+  if (header) return <HeaderAction variant="primary" icon="send" label={label} href={`/events/${ev.id}?notify=created`} class="btn-primary" />;
+  return <a class="tooltip btn btn-primary btn-square btn-sm" data-tip={label} aria-label={label} href={`/events/${ev.id}?notify=created`}><Icon name="send" class="h-5 w-5" /></a>;
+}
 
 // Versandstatus je Mitglied (letzter mail_log-Eintrag bzw. berechneter Grund).
-function DeliverySection({ rows }: { rows: Awaited<ReturnType<typeof eventDelivery>> }) {
+function DeliverySection({ ev, rows }: { ev: Event; rows: Awaited<ReturnType<typeof eventDelivery>> }) {
   if (!rows.length) return null;
   return (
-    <details class="mt-6">
-      <summary class="cursor-pointer font-semibold">{t("events.delivery.title")}</summary>
-      <table class="table table-sm mt-2">
-        <tbody>
-          {rows.map((r) => <tr><td>{r.lastName}, {r.firstName}</td><td><span class={`badge badge-sm ${DELIVERY_BADGE[r.delivery]}`}>{t(`events.delivery.${r.delivery}`)}</span></td></tr>)}
-        </tbody>
-      </table>
-    </details>
+    <div class="mt-8">
+      <Section title={t("events.delivery.title")} badge={rows.length} collapsible={false}>
+        {!isSmtpConfigured() && <div role="alert" class="alert alert-warning mb-4">{t("events.notify.noSmtp")}</div>}
+        <div class="mb-4"><StatBar items={deliveryItems(rows.map((r) => r.delivery), <CatchUpButton ev={ev} />)} /></div>
+        <table class="table w-full">
+          <thead><tr><th>{t("events.rsvp.colMember")}</th><th class="text-right">{t("events.delivery.colStatus")}</th></tr></thead>
+          <tbody>
+            {rows.filter((r) => r.delivery !== "no-email").map((r) => <tr><td>{r.lastName}, {r.firstName}</td><td class="text-right"><DeliveryBadge state={r.delivery} /></td></tr>)}
+          </tbody>
+        </table>
+      </Section>
+    </div>
   );
 }
+
+const DELIVERY_ICON: Partial<Record<DeliveryState, { icon: IconName; tone: string }>> = {
+  sent: { icon: "mail-check", tone: "text-success" },
+  failed: { icon: "mail-exclamation", tone: "text-error" },
+  pending: { icon: "mail-fast", tone: "opacity-60" },
+  "opted-out": { icon: "mail-off", tone: "opacity-60" },
+  "no-email": { icon: "at-off", tone: "opacity-60" },
+};
+
+function DeliveryBadge({ state, tip = "" }: { state: DeliveryState; tip?: string }) {
+  const label = t(`events.delivery.${state}`);
+  const i = DELIVERY_ICON[state];
+  // Opacity gehört aufs Icon: auf dem Wrapper würde sie die Sprechblase (::before) mit durchscheinend machen.
+  if (i) return <span class={`tooltip ${tip} inline-flex`} data-tip={label} role="img" aria-label={label}><Icon name={i.icon} class={`h-5 w-5 ${i.tone}`} /></span>;
+  return <span class={`badge badge-sm ${DELIVERY_BADGE[state]}`}>{label}</span>;
+}
+
+type StatItem = { label: string; value: string | number; icon?: IconName; tone?: string; action?: unknown };
+
+// daisyUI-Stats über einer Tabelle.
+function StatBar({ items }: { items: StatItem[] }) {
+  if (!items.length) return null;
+  return (
+    <div class={`stats stats-horizontal border border-base-300 max-w-full ${items.some((i) => i.action) ? "overflow-visible" : "overflow-x-auto"}`}> {/* overflow würde den Tooltip der Aktion abschneiden */}
+      {items.map((i) => (
+        <div class="stat px-4 py-2">
+          <div class="stat-title">{i.label}</div>
+          <div class="flex items-center justify-between gap-2">
+            <div class={`stat-value text-2xl flex items-center gap-2 ${i.tone ?? ""}`}>{i.icon && <Icon name={i.icon} class="h-6 w-6" />}{i.value}</div>
+            {i.action}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Anzahl je Versandstatus; nur Status mit Treffern.
+function deliveryItems(states: Iterable<DeliveryState>, pendingAction?: unknown): StatItem[] {
+  const n = new Map<DeliveryState, number>();
+  for (const st of states) n.set(st, (n.get(st) ?? 0) + 1);
+  return (Object.keys(DELIVERY_BADGE) as DeliveryState[]).filter((st) => n.has(st)).map((st) => ({ label: t(`events.delivery.${st}`), value: n.get(st)!, icon: DELIVERY_ICON[st]?.icon, tone: DELIVERY_ICON[st]?.tone, action: st === "pending" ? pendingAction : undefined }));
+}
+
+// Mail-Spalte der Anmeldetabelle: nur für Führung und nur, wenn es Empfänger gibt.
+async function deliveryByMember(ev: Event) {
+  const rows = await eventDelivery(ev);
+  return rows.length ? new Map(rows.map((r) => [r.memberId, r.delivery])) : null;
+}
+
+// GET /events/:id/mail-log — Versandprotokoll des Termins (alle Vorlagen, neueste zuerst).
+eventRoutes.get("/:id/mail-log", manage, async (c) => {
+  const ev = await db.query.events.findFirst({ where: eq(events.id, c.req.param("id")) });
+  if (!ev) return c.notFound();
+  const rows = await db.select({ status: mailLog.status, template: mailLog.template, at: mailLog.sentAt, firstName: persons.firstName, lastName: persons.lastName }).from(mailLog)
+    .innerJoin(persons, eq(persons.id, mailLog.personId)).where(eq(mailLog.eventId, ev.id)).orderBy(desc(mailLog.sentAt)).limit(200);
+  const tz = resolveTimezone(c);
+  return c.html(
+    <Layout title={ev.title} user={c.get("user")!}>
+      <div class="max-w-2xl mx-auto">
+        <PageHeader title={t("events.mailLog.title", { title: ev.title })} backHref={`/events/${ev.id}`} actions={<CatchUpButton ev={ev} header />} />
+        {!rows.length ? <p class="opacity-70">{t("events.mailLog.empty")}</p> : (
+          <div class="overflow-x-auto"><table class="table table-zebra w-full">
+            <thead><tr><th>{t("mailTemplates.log.col.when")}</th><th>{t("mailTemplates.log.col.person")}</th><th>{t("events.mailLog.template")}</th><th class="text-center">{t("mailTemplates.log.col.status")}</th></tr></thead>
+            <tbody>{rows.map((r) => (
+              <tr><td>{formatDateTime(r.at, tz)}</td><td>{r.lastName}, {r.firstName}</td><td class="opacity-70">{r.template}</td>
+                <td class="text-center"><DeliveryBadge state={r.status} /></td></tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        {rows.length === 200 && <p class="text-sm opacity-60 mt-2">{t("mailTemplates.log.limit")}</p>}
+      </div>
+    </Layout>,
+  );
+});
 
 // POST /events/:id/notify — „Neuer Termin“ (Anlegen/Nachholen), Versand im Hintergrund.
 eventRoutes.post("/:id/notify", manage, async (c) => {
@@ -1085,10 +1191,11 @@ function RsvpButton({ status, mine, disabled, url, resetUrl, vals = {}, size = "
   );
 }
 
-function RsvpRow({ m, base, cancelled, sort = "name", dir = "asc" }: { m: { id: string; name: string; status: RsvpStatus | null }; base: string; cancelled: boolean; sort?: string; dir?: string }) {
+function RsvpRow({ m, base, cancelled, sort = "name", dir = "asc", mail }: { m: { id: string; name: string; status: RsvpStatus | null }; base: string; cancelled: boolean; sort?: string; dir?: string; mail?: Map<string, DeliveryState> | null }) {
   return (
     <tr data-name={m.name.toLowerCase()}>
       <td>{m.name}</td>
+      {mail && <td class="text-center">{mail.has(m.id) && <DeliveryBadge state={mail.get(m.id)!} />}</td>}
       <td class="text-right">
         <span class="join">
           {(["yes", "no"] as const).map((st) => (
@@ -1107,6 +1214,7 @@ async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }:
   const invitedIds = manager || member ? await invitedMembers(ev) : [];
   const selfInvited = !!member && invitedIds.includes(member.id);
   const open = manager ? await loadOpenMembers(ev, rows) : [];
+  const mail = manager ? await deliveryByMember(ev) : null;
   const yes = countYes(rows);
   const no = rows.filter((r) => r.active && r.status === "no").length;
   const mine = rows.find((r) => r.memberId === member?.id)?.status ?? null;
@@ -1130,12 +1238,7 @@ async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }:
   );
   return (
     <div id={SECTION} class="mt-8">
-    <Section title={t("events.rsvp.title")} badge={manager ? people.length : undefined} extra={manager && (
-      <>
-        <span class="badge badge-sm badge-success" title={t("events.rsvp.groupYes")}>{ev.maxParticipants == null ? yes : `${yes}/${ev.maxParticipants}`}</span>
-        <span class="badge badge-sm badge-error" title={t("events.rsvp.groupNo")}>{no}</span>
-      </>
-    )} badge2={manager && full && !lock ? t("events.rsvp.overbooked") : undefined} tone={manager && ev.maxParticipants != null && yes > ev.maxParticipants ? "warning" : undefined} collapsible={false} actions={selfInvited && (
+    <Section title={t("events.rsvp.title")} badge={manager ? people.length : undefined} badge2={manager && full && !lock ? t("events.rsvp.overbooked") : undefined} tone={manager && ev.maxParticipants != null && yes > ev.maxParticipants ? "warning" : undefined} collapsible={false} actions={selfInvited && (
       <span class="flex items-center gap-2">
         {!mine && <span class="text-sm opacity-70 max-md:hidden">{t("events.rsvp.unanswered")}</span>}
         <span class="join">
@@ -1147,8 +1250,15 @@ async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }:
       <div class="space-y-4">
         {notice && <div role="alert" class="alert alert-warning">{notice}</div>}
         {reason && <p class="text-sm opacity-70">{reason}</p>}
+        {mail && !isSmtpConfigured() && <div role="alert" class="alert alert-warning">{t("events.notify.noSmtp")}</div>}
       {manager && (
         <div class="space-y-4">
+          <StatBar items={[
+            { label: t("events.rsvp.groupOpen"), value: open.length, icon: "clock", tone: "opacity-60" },
+            { label: t("events.rsvp.groupYes"), value: ev.maxParticipants == null ? yes : `${yes}/${ev.maxParticipants}`, icon: "check", tone: "text-success" },
+            { label: t("events.rsvp.groupNo"), value: no, icon: "x-mark", tone: "text-error" },
+            ...(mail ? deliveryItems(mail.values(), <CatchUpButton ev={ev} />) : []),
+          ]} />
           <input type="search" class="input w-full" data-rsvp-filter placeholder={t("events.rsvp.filter")} aria-label={t("events.rsvp.filter")} />
           <script dangerouslySetInnerHTML={{ __html: `(function(){
             var i = document.querySelector('[data-rsvp-filter]');
@@ -1158,9 +1268,9 @@ async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }:
             });
           })();` }} />
           <table class="table w-full">
-            <thead><tr>{th("name", t("events.rsvp.colMember"))}{th("status", t("events.rsvp.colStatus"), "text-right")}</tr></thead>
+            <thead><tr>{th("name", t("events.rsvp.colMember"))}{mail && <th class="text-center">{t("events.delivery.title")}</th>}{th("status", t("events.rsvp.colStatus"), "text-right")}</tr></thead>
             <tbody>
-              {people.length === 0 ? <tr data-rsvp-empty><td colspan={2} class="text-center opacity-50 py-4">{t("events.rsvp.empty")}</td></tr> : people.map((m) => <RsvpRow m={m} base={base} cancelled={lock === "cancelled"} sort={sort} dir={dir} />)}
+              {people.length === 0 ? <tr data-rsvp-empty><td colspan={mail ? 3 : 2} class="text-center opacity-50 py-4">{t("events.rsvp.empty")}</td></tr> : people.map((m) => <RsvpRow m={m} base={base} cancelled={lock === "cancelled"} sort={sort} dir={dir} mail={mail} />)}
             </tbody>
           </table>
           {lock !== "cancelled" && (
@@ -1241,7 +1351,7 @@ eventRoutes.get("/:id/rsvp/:memberId/row", manage, async (c) => {
   const [m] = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)
     .innerJoin(persons, eq(persons.id, members.personId)).where(eq(members.id, c.req.param("memberId")!));
   if (!m || !isActiveMember(m)) return c.notFound();
-  return c.html(<RsvpRow m={{ id: m.id, name: `${m.lastName}, ${m.firstName}`, status: null }} base={`/events/${ev.id}/rsvp`} cancelled={false} />);
+  return c.html(<RsvpRow m={{ id: m.id, name: `${m.lastName}, ${m.firstName}`, status: null }} base={`/events/${ev.id}/rsvp`} cancelled={false} mail={await deliveryByMember(ev)} />);
 });
 
 // POST /events/:id/rsvp/:memberId — Stellvertretung (aktive Mitglieder, auch ohne Login oder Einladung).
