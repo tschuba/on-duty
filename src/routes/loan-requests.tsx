@@ -12,7 +12,9 @@ import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { buildListUrl } from "../lib/list-query.js";
 import { checkAvailability, cleanupRejectedLoanRequests, matchCandidates } from "../lib/lending.js";
+import { env } from "../env.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import { loadOrgConfig } from "../lib/org-config.js";
 import { getSettings } from "../lib/settings.js";
 
@@ -257,17 +259,10 @@ async function notifyDecision(request: NonNullable<Awaited<ReturnType<typeof fet
   const config = await loadOrgConfig();
   const contact = request.person.email ?? request.person.phone;
   if (!request.person.email) return { notified: false, contact };
-  const subject = approved ? t("lend.mail.approvedSubject") : t("lend.mail.rejectedSubject");
-  const body = approved ? t("lend.mail.approvedBody") : t("lend.mail.rejectedBody");
-  const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`;
-  const result = await sendMail({
-    to: request.person.email,
-    category: "lend",
-    event: approved ? "lend-approved" : "lend-rejected",
-    audience: "applicant",
-    subject,
-    text: `${body}\n\n${statusUrl}`,
-  });
+  const key = approved ? "lend-approved" : "lend-rejected";
+  const { firstName, lastName, email } = request.person;
+  const vars = buildVars(key, { itemName: request.lendingItem.inventoryItem.name, statusUrl: `${env.OIDC_APP_URL}/lend/status/${request.statusToken}` }, [{ firstName, lastName, email: request.person.email }]);
+  const result = await sendMail({ key, to: request.person.email, vars });
   return { notified: result.sent, contact };
 }
 

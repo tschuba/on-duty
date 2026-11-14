@@ -20,7 +20,7 @@ Enthält `ORG_NAME` eines dieser Zeichen, meldet der App-Start das: eine Warnung
 | `Mitteilung` | `custom` | Freie Vorlagen (vorbereitet, noch ohne Versand) |
 | `Benutzerkonto` | – (nur Zitadel) | E-Mail-Bestätigung, Passwort-Reset, Einladung |
 
-Bei on-duty-Mails mit Vorlage (Termin-Mails) lassen sich Betreff und Text im Editor ändern; das Präfix nur bei freien Vorlagen. Betreff-Filter sind daher nur eingeschränkt stabil, verlässlich sind nur die Header `X-On-Duty-*`. Für Zitadel-Mails („Benutzerkonto“, keine eigenen Header möglich) bleibt das Label fest und ist der einzige Filteranker. Variablen der Vorlagen: [mail-variables.md](mail-variables.md).
+Bei allen on-duty-Mails (Texte stehen als Vorlagen in der DB; die Betreffs in den Tabellen sind nur der Ausgangswert) lassen sich Betreff und Text im Editor ändern; das Präfix nur bei freien Vorlagen. Betreff-Filter sind daher nur eingeschränkt stabil, verlässlich sind nur die Header `X-On-Duty-*`. Für Zitadel-Mails („Benutzerkonto“, keine eigenen Header möglich) bleibt das Label fest und ist der einzige Filteranker. Variablen der Vorlagen: [mail-variables.md](mail-variables.md).
 
 **Header** (nur on-duty-Mails; Zitadel kann keine eigenen Header setzen):
 
@@ -35,8 +35,8 @@ Bei on-duty-Mails mit Vorlage (Termin-Mails) lassen sich Betreff und Text im Edi
 | Auslöser | Empfänger | Betreff | Event | Audience |
 |---|---|---|---|---|
 | Mitgliedsantrag eingegangen | Benachrichtigungsadresse¹ | `[on-duty\|Mitgliedsantrag] Neuer Antrag eingegangen: <Name>` | `application-submitted` | `staff` |
-| Mitgliedsantrag angenommen | Antragsteller | `[on-duty\|Mitgliedsantrag] Ihr Antrag wurde angenommen` | `application-approved` | `applicant` |
-| Mitgliedsantrag abgelehnt | Antragsteller | `[on-duty\|Mitgliedsantrag] Ihr Antrag wurde abgelehnt` | `application-rejected` | `applicant` |
+| Mitgliedsantrag angenommen | Antragsteller | `[on-duty\|Mitgliedsantrag] Dein Antrag wurde angenommen` | `application-approved` | `applicant` |
+| Mitgliedsantrag abgelehnt | Antragsteller | `[on-duty\|Mitgliedsantrag] Dein Antrag wurde abgelehnt` | `application-rejected` | `applicant` |
 | Verleih-Anfrage eingegangen | Benachrichtigungsadresse¹ | `[on-duty\|Verleih] Neue Verleih-Anfrage: <Gegenstand>` | `lend-notify` | `staff` |
 | Verleih-Anfrage: Eingangsbestätigung | Antragsteller (falls E-Mail) | `[on-duty\|Verleih] Deine Verleih-Anfrage ist eingegangen` | `lend-submitted` | `applicant` |
 | Verleih-Anfrage genehmigt | Antragsteller | `[on-duty\|Verleih] Deine Verleih-Anfrage wurde genehmigt` | `lend-approved` | `applicant` |

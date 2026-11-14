@@ -171,3 +171,124 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
 | `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+
+## `application-submitted`
+
+Kategorie `membership`, Audience `staff`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `applicant.name` | text | person | Name des Antragstellers | Anna Beispiel |
+
+## `application-approved`
+
+Kategorie `membership`, Audience `applicant`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `recipient.name` | text | person | Voller Name des Empfängers | Anna Beispiel |
+| `recipient.firstName` | text | person | Vorname des Empfängers | Anna |
+| `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
+| `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
+| `rejoin` | boolean | data | Wieder Mitglied nach Austritt | ja |
+
+## `application-rejected`
+
+Kategorie `membership`, Audience `applicant`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `recipient.name` | text | person | Voller Name des Empfängers | Anna Beispiel |
+| `recipient.firstName` | text | person | Vorname des Empfängers | Anna |
+| `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
+| `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
+
+## `lend-notify`
+
+Kategorie `lend`, Audience `staff`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `item.name` | text | data | Name des Gegenstands | Zelt |
+| `request.url` | text | link | Anfrage in der Verwaltung | https://portal.example.org/inventory/requests/1 |
+
+## `lend-submitted`
+
+Kategorie `lend`, Audience `applicant`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `recipient.name` | text | person | Voller Name des Empfängers | Anna Beispiel |
+| `recipient.firstName` | text | person | Vorname des Empfängers | Anna |
+| `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
+| `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
+| `item.name` | text | data | Name des Gegenstands | Zelt |
+| `request.statusUrl` | text | link | Statusseite der Anfrage | https://portal.example.org/lend/status/abc |
+
+## `lend-approved`
+
+Kategorie `lend`, Audience `applicant`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `recipient.name` | text | person | Voller Name des Empfängers | Anna Beispiel |
+| `recipient.firstName` | text | person | Vorname des Empfängers | Anna |
+| `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
+| `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
+| `item.name` | text | data | Name des Gegenstands | Zelt |
+| `request.statusUrl` | text | link | Statusseite der Anfrage | https://portal.example.org/lend/status/abc |
+
+## `lend-rejected`
+
+Kategorie `lend`, Audience `applicant`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `recipient.name` | text | person | Voller Name des Empfängers | Anna Beispiel |
+| `recipient.firstName` | text | person | Vorname des Empfängers | Anna |
+| `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
+| `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
+| `item.name` | text | data | Name des Gegenstands | Zelt |
+| `request.statusUrl` | text | link | Statusseite der Anfrage | https://portal.example.org/lend/status/abc |
+
+## `registration-pending`
+
+Kategorie `registration`, Audience `staff`. Pflichtplatzhalter: keine.
+
+| Variable | Typ | Quelle | Beschreibung | Beispiel |
+|---|---|---|---|---|
+| `org.name` | text | data | Name der Organisation | Feuerwehr Musterstadt |
+| `org.url` | text | data | Basis-URL des Portals | https://portal.example.org |
+| `org.contactEmail` | text, optional | data | Kontaktadresse der Organisation | info@example.org |
+| `type` | text | data | Typ-Label der Mail | Termin |
+| `user.name` | text | person | Name des Benutzers | Anna Beispiel |
+| `user.email` | text | person | Adresse des Benutzers | anna@example.org |
+| `admin.url` | text | link | Benutzerverwaltung | https://portal.example.org/admin/users |

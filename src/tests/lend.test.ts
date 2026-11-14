@@ -170,7 +170,7 @@ describe("POST /lend/:itemId", () => {
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validBody()),
     });
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "verwalter@example.com", category: "lend", event: "lend-notify", audience: "staff" }));
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "verwalter@example.com", key: "lend-notify" }));
   });
 
   it("skips the manager mail when notificationEmail is unset", async () => {
@@ -191,7 +191,7 @@ describe("POST /lend/:itemId", () => {
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validBody()),
     });
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@example.com", category: "lend", event: "lend-submitted", audience: "applicant" }));
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@example.com", key: "lend-submitted" }));
   });
 
   it("skips the confirmation mail when no email was given", async () => {
