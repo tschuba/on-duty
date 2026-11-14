@@ -3,14 +3,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const DOM = `<script data-leave="Verlassen?"></script>
 <form id="tpl-form"><input name="subject"><textarea name="body"></textarea></form>
-<button id="ph-toggle"></button><button id="ph-close"></button><div id="ph-backdrop"></div>
-<div id="pane-edit"></div><div id="pane-preview" class="hidden"></div>
+<button id="ph-toggle"></button><button id="ph-close"></button><div id="ph-backdrop"></div><div id="ph-resize"></div>
+<div id="pane-edit"></div>
 <div id="ph-col"><input id="ph-search">
 <button data-side="ph" class="tab-active"></button><button data-side="tech"></button>
 <div id="side-ph"><section data-g><ul>
 <li data-s="Café"><button data-ph="a.cafe"></button></li><li data-s="Name"><button data-ph="a.name"></button></li></ul></section>
 <button data-cond="a.name"></button></div><div id="side-tech" class="hidden"></div><p id="ph-empty" class="hidden"></p></div>
-<button data-tab="entry" class="hidden"></button><button data-tab="preview" data-case></button>`;
+<input type="radio" name="t" data-tab="edit" checked><input type="radio" name="t" data-tab="entry" class="tab"><input type="radio" name="t" data-tab="preview" data-case class="hidden">`;
 
 const $ = (id: string) => document.getElementById(id)!;
 const area = () => document.querySelector<HTMLTextAreaElement>("textarea")!;
@@ -88,8 +88,11 @@ describe("mail placeholders editor", () => {
   it("preview/entry tabs", () => {
     // Der Eintrags-Tab springt zur zuletzt gewählten Vorschau-Variante.
     document.querySelector<HTMLElement>("[data-tab=entry]")!.click();
-    expect($("pane-edit").classList.contains("hidden")).toBe(true);
     expect(($("ph-toggle") as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector("[data-tab=entry]")!.classList.contains("hidden")).toBe(true);
+    expect(document.querySelector("[data-case]")!.classList.contains("hidden")).toBe(false);
+    document.querySelector<HTMLElement>("[data-tab=edit]")!.click();
+    expect(($("ph-toggle") as HTMLButtonElement).disabled).toBe(false);
   });
   it("warns on leave only when dirty", () => {
     const ev = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e; };
