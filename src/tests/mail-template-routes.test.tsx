@@ -97,14 +97,14 @@ describe("mail template routes", () => {
     for (const l of ["Standard", "Ohne Ort", "Ohne Anmeldung", "Mehrere Mitglieder an der Adresse"]) expect(page).toContain(l);
     expect(page).toContain('data-case="multiple"');
     expect(page).toContain('data-tab="entry"'); // Fall-Tabs erst nach Klick auf „Vorschau“ sichtbar (hidden)
-    expect(page).toMatch(/class="btn [^"]*hidden[^"]*"[^>]*data-tab="preview" data-case="default"/);
+    expect(page).toMatch(/class="tab hidden [^"]*"[^>]*data-tab="preview" data-case="default"/);
     expect(std).toContain("ORT|");
     expect(std).toContain("VORSCHAU");
     expect(await html("noLocation")).not.toContain("ORT");
     expect(await html("noRsvp")).not.toContain("RSVP");
     expect(await html("multiple")).toContain("MEHR");
     perms = new Set(["system:admin"]);
-    expect(await (await mailTemplateRoutes.request("/member-settings-link")).text()).toContain(">Vorschau<");
+    expect(await (await mailTemplateRoutes.request("/member-settings-link")).text()).toContain('aria-label="Vorschau"');
   });
 
   it("preview renders every case of every template without errors", async () => {

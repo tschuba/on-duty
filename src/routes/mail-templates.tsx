@@ -93,26 +93,16 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
         />
         {tpl.override ? <p class="mb-4">{t("mailTemplates.status.custom", stamp(tpl.override))}</p> : <div role="status" class="alert alert-info alert-soft mb-4">{t("mailTemplates.status.system")}</div>}
         {conflict && <div role="alert" class="alert alert-error mb-4"><span>{t("mailTemplates.conflict")} <a class="link" href={`/mail/templates/${key}`}>{t("mailTemplates.conflict.reload")}</a></span></div>}
-        <div class="flex items-center justify-between gap-2 mb-4">
-        <div role="tablist" class="tabs tabs-border flex-wrap items-center gap-y-1">
-          <button type="button" role="tab" class="tab tab-active" data-tab="edit">{t("common.edit")}</button>
-          {entry.previewCases.length > 1 && <button type="button" role="tab" class="tab" data-tab="entry">{t("mailTemplates.preview")}</button>}
-          {(() => {
-            const multi = entry.previewCases.length > 1;
-            const btns = entry.previewCases.map((x) => (
-              <button type="button" role="tab" aria-label={x.label} class={multi ? "btn btn-sm join-item hidden [&.tab-active]:btn-primary" : "tab"} data-tab="preview" data-case={x.id} hx-post={`/mail/templates/${key}/preview`} hx-include="#tpl-form" hx-vals={JSON.stringify({ case: x.id })} hx-target="#preview">
-                {multi ? x.label : t("mailTemplates.preview")}
-              </button>
-            ));
-            return multi ? <div class="join ml-2" role="presentation">{btns}</div> : btns;
-          })()}
+        <div class="flex justify-end mb-2 md:hidden">
+          <button type="button" id="ph-toggle" class="btn btn-ghost btn-square" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")}><Icon name="sidebar-expand" class="h-5 w-5 text-gold" /></button>
         </div>
-        <button type="button" id="ph-toggle" class="btn btn-ghost btn-square md:hidden" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")}><Icon name="sidebar-expand" class="h-5 w-5 text-gold" /></button>
-        </div>
-        <div id="pane-preview" class="hidden"><div id="preview" /></div>
-        <div id="pane-edit" data-open="false" class="group grid gap-4 md:grid-cols-[1fr_3.25rem] md:data-[open=true]:grid-cols-[1fr_22rem] md:data-[open=false]:relative md:data-[open=false]:grid-cols-1">
+        <div role="tablist" class="tabs tabs-lift">
+          <input type="radio" name="tpl-tabs" class="tab" aria-label={t("common.edit")} data-tab="edit" checked />
+          <div class="tab-content bg-base-100 border-base-300 p-4">
+        <div id="pane-edit" data-open="false" class="group grid gap-4 md:grid-rows-[minmax(0,1fr)] md:grid-cols-[1fr_3.25rem] md:relative md:data-[open=true]:grid-cols-[1fr_var(--ph-w,22rem)] md:data-[open=false]:grid-cols-1">
+          <div id="ph-resize" role="separator" aria-orientation="vertical" class="hidden md:group-data-[open=true]:block absolute inset-y-0 z-10 w-2 cursor-col-resize rounded hover:bg-base-300 touch-none" style="right:calc(var(--ph-w,22rem) + 0.25rem)" />
           <div id="ph-backdrop" class="fixed inset-0 z-40 bg-black/40 md:hidden group-data-[open=false]:hidden" aria-hidden="true" />
-          <form id="tpl-form" method="post" action={`/mail/templates/${key}${fromQs(back)}`} class="space-y-4 min-w-0">
+          <form id="tpl-form" method="post" action={`/mail/templates/${key}${fromQs(back)}`} class="space-y-4 min-w-0 md:overflow-y-auto">
             <input type="hidden" name="updatedAt" value={expected} />
             <Field label={t("mailTemplates.field.subject")} required class="md:group-data-[open=false]:pr-12" after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
               <input id="tpl-subject" name="subject" class="input w-full font-mono" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} />
@@ -121,8 +111,8 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
               <textarea id="tpl-body" name="body" rows={18} class="textarea w-full font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
             </Field>
           </form>
-          <aside id="ph-col" aria-label={t("mailTemplates.placeholders")} class="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-auto bg-base-100 shadow-xl transition-transform group-data-[open=false]:invisible group-data-[open=false]:translate-x-full md:static md:inset-auto md:z-auto md:w-auto md:max-w-none md:self-start md:sticky md:top-32 md:overflow-hidden md:rounded-box md:border md:border-base-300 md:shadow-none md:group-data-[open=false]:visible md:group-data-[open=false]:translate-x-0 md:group-data-[open=false]:absolute md:group-data-[open=false]:-top-px md:group-data-[open=false]:-right-px md:group-data-[open=false]:w-[calc(2.5rem+2px)] md:group-data-[open=false]:border-transparent md:group-data-[open=false]:overflow-visible motion-reduce:transition-none">
-            <div class="bg-base-300 flex items-center justify-between gap-1 p-0 md:group-data-[open=false]:justify-center md:group-data-[open=false]:bg-transparent">
+          <aside id="ph-col" aria-label={t("mailTemplates.placeholders")} class="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-auto bg-base-100 shadow-xl transition-transform group-data-[open=false]:invisible group-data-[open=false]:translate-x-full md:static md:inset-auto md:z-auto md:w-auto md:max-w-none md:group-data-[open=true]:[contain:size] md:overflow-y-auto md:rounded-box md:border md:border-base-300 md:shadow-none md:group-data-[open=false]:visible md:group-data-[open=false]:translate-x-0 md:group-data-[open=false]:absolute md:group-data-[open=false]:-top-px md:group-data-[open=false]:-right-px md:group-data-[open=false]:w-[calc(2.5rem+2px)] md:group-data-[open=false]:border-transparent md:group-data-[open=false]:overflow-visible motion-reduce:transition-none">
+            <div class="bg-base-300 md:sticky md:top-0 md:z-10 flex items-center justify-between gap-1 p-0 md:group-data-[open=false]:justify-center md:group-data-[open=false]:bg-transparent">
               <div role="tablist" class="tabs tabs-sm md:group-data-[open=false]:hidden">
                 <button type="button" role="tab" class="tab tab-active font-bold" data-side="ph">{t("mailTemplates.placeholders")}</button>
                 <button type="button" role="tab" class="tab font-bold" data-side="tech">{t("mailTemplates.technical")}</button>
@@ -175,6 +165,15 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
                 <dd class="break-all"><code class="block">X-On-Duty-Category: {tpl.category}</code><code class="block">X-On-Duty-Event: {tpl.key}</code><code class="block">X-On-Duty-Audience: {tpl.audience}</code></dd></div>
             </dl>
           </aside>
+        </div>
+          </div>
+          {entry.previewCases.length > 1 && <input type="radio" name="tpl-tabs" class="tab" aria-label={t("mailTemplates.preview")} data-tab="entry" />}
+          {entry.previewCases.map((x) => (
+            <>
+              <input type="radio" name="tpl-tabs" class={entry.previewCases.length > 1 ? "tab hidden text-secondary checked:font-semibold [--tab-bg:var(--color-base-200)] [--tab-border-color:var(--color-secondary)]" : "tab"} aria-label={entry.previewCases.length > 1 ? x.label : t("mailTemplates.preview")} data-tab="preview" data-case={x.id} hx-post={`/mail/templates/${key}/preview`} hx-include="#tpl-form" hx-vals={JSON.stringify({ case: x.id })} hx-target={`#preview-${x.id}`} />
+              <div class="tab-content bg-base-100 border-secondary p-4"><div id={`preview-${x.id}`} /></div>
+            </>
+          ))}
         </div>
         {tpl.override && (
           <dialog id="reset-dialog" class="modal">
@@ -237,7 +236,7 @@ mailTemplateRoutes.post("/:key/preview", async (c) => {
     <div>
       <div class="border border-base-300 rounded-box overflow-hidden" aria-live="polite">
         <div class="bg-base-200 border-b border-base-300 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-base-content/60 mb-1">{t("mailTemplates.preview.head")} · {t("mailTemplates.preview.sample")}</p>
+          <p class="text-xs uppercase tracking-wide text-secondary mb-1">{t("mailTemplates.preview.head")} · {t("mailTemplates.preview.sample")}</p>
           <p class="font-semibold">{out.subject}</p>
         </div>
         <div class="whitespace-pre-wrap text-sm p-4 bg-base-100">{out.text}</div>

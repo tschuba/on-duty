@@ -86,16 +86,40 @@ se.addEventListener("keydown", (e) => {
   }
 });
 
+// Radio-Tabs (daisyUI tabs-lift). „Vorschau“ (entry) springt zur zuletzt gewählten Variante und wird durch die Varianten-Tabs ersetzt.
 const cs = document.querySelectorAll<HTMLElement>("[data-case]"), en = document.querySelector<HTMLElement>("[data-tab=entry]");
 let lc = cs[0];
-document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => b.addEventListener("click", () => {
+document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => b.addEventListener("change", () => {
   const k = b.dataset.tab;
   if (k === "entry") { lc.click(); return; }
   const p = k === "preview";
   if (p) lc = b;
-  $("pane-edit").classList.toggle("hidden", p);
-  $("pane-preview").classList.toggle("hidden", !p);
   pg.disabled = cl.disabled = p;
   if (en) { en.classList.toggle("hidden", p); cs.forEach((o) => o.classList.toggle("hidden", !p)); }
-  document.querySelectorAll<HTMLElement>("[data-tab]").forEach((o) => o.classList.toggle("tab-active", o === b));
 }));
+
+// Breite der Platzhalter-Spalte per Ziehgriff (Desktop), gemerkt in localStorage.
+const rz = $("ph-resize");
+const setW = (w: number) => pane.style.setProperty("--ph-w", `${Math.min(Math.max(w, 256), pane.clientWidth * 0.6)}px`);
+try { const w = localStorage.getItem("mailPlaceholdersWidth"); if (w) setW(+w); } catch { /* privater Modus */ }
+rz.addEventListener("pointerdown", (e) => {
+  rz.setPointerCapture(e.pointerId);
+  const move = (m: PointerEvent) => setW(pane.getBoundingClientRect().right - m.clientX);
+  const up = () => {
+    rz.removeEventListener("pointermove", move); rz.removeEventListener("pointerup", up);
+    try { localStorage.setItem("mailPlaceholdersWidth", String(parseFloat(pane.style.getPropertyValue("--ph-w")))); } catch { /* privater Modus */ }
+  };
+  rz.addEventListener("pointermove", move); rz.addEventListener("pointerup", up);
+});
+
+// Höhe des Editor-Bereichs: füllt von seiner Oberkante bis zur Oberkante des Footers (nur Desktop).
+function fit() {
+  const top = pane.getBoundingClientRect().top;
+  if (!md.matches) { pane.style.height = ""; return; }
+  const main = pane.closest("main"), foot = document.querySelector("footer");
+  // Reserve unter dem Bereich: Tab-Padding + Rahmen (17px), Seiten-Padding unten, Footer
+  const below = 17 + (main ? parseFloat(getComputedStyle(main).paddingBottom) : 0) + (foot?.offsetHeight ?? 0);
+  if (top > 0) pane.style.height = `${Math.max(320, innerHeight - top - below)}px`;
+}
+fit();
+addEventListener("resize", fit);
