@@ -130,6 +130,17 @@ describe("mail template routes", () => {
     for (const e of Object.values(CATALOG)) for (const r of e.required) expect(r.label.length).toBeGreaterThan(0);
   });
 
+  it("preview saves nothing, needs edit permission, subject equals send subject", async () => {
+    const res = await post("/event-created/preview", { subject: "Hallo {{event.title}}", body: "x" });
+    expect(res.status).toBe(200);
+    expect(saveOverride).not.toHaveBeenCalled();
+    expect(resetOverride).not.toHaveBeenCalled();
+    const { renderMail, previewVars } = await import("../lib/mail-templates.js");
+    const { subject } = renderMail({ prefix: "[{{org.name}}]", subject: "Hallo {{event.title}}", body: "x" }, previewVars("event-created"));
+    expect(await res.text()).toContain(subject.replace(/&/g, "&amp;"));
+    expect((await post("/member-settings-link/preview", { subject: "S", body: "{{settingsUrl}}" })).status).toBe(403);
+  });
+
   it("back link follows ?from only for internal paths", async () => {
     const back = async (q: string) => await (await mailTemplateRoutes.request(`/event-created${q}`)).text();
     expect(await back("?from=/events")).toContain('href="/events"');
