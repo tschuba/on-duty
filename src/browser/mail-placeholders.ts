@@ -27,7 +27,7 @@ export function insert(text: string, wrap?: { open: string; close: string; inner
   }
   if (!md.matches) setPh(false);
   last.focus();
-  dirty = true;
+  last.dispatchEvent(new Event("input", { bubbles: true })); // zeichnet den Spiegel neu, setzt dirty
 }
 
 document.querySelectorAll<HTMLElement>("[data-ph]").forEach((b) => b.addEventListener("click", () => insert(`{{${b.dataset.ph}}}`)));
@@ -123,3 +123,54 @@ function fit() {
 }
 fit();
 addEventListener("resize", fit);
+
+// Platzhalter-Hervorhebung: deckungsgleicher Spiegel hinter Betreff/Text (Feld bleibt Input/Textarea, kein contenteditable).
+// shortcut: Spiegel statt Chips; Chips/Rich-Text siehe 161. Der Spiegel dient später auch der Cursorposition (169).
+const tok = (c: string) => `color-mix(in oklab, var(--color-${c}) `;
+const MARK = ``;
+const PH = `${MARK}background:rgba(59,130,246,.28);border-radius:3px;color:color-mix(in oklab, #3b82f6 65%, var(--color-base-content));`;
+const BLOCK = `${MARK}background:${tok("secondary")}24%, transparent);border-radius:3px;color:color-mix(in oklab, #8b5cf6 65%, var(--color-base-content));`;
+
+export function mirror(field: Field) {
+  const m = document.createElement("div");
+  m.setAttribute("aria-hidden", "true");
+  m.className = field.className;
+  m.style.cssText = `display:block;position:absolute;overflow:hidden;pointer-events:none;z-index:0;background:transparent;border-color:transparent;box-shadow:none;white-space:${field instanceof HTMLTextAreaElement ? "pre-wrap;overflow-wrap:break-word" : "pre"}`;
+  // Der Spiegel liegt im (relativ positionierten) floating-label direkt vor dem Feld.
+  field.before(m);
+  field.classList.add("relative", "bg-transparent");
+  // Der Spiegel zeichnet den Text (farbig); das Feld zeigt nur noch Cursor und Auswahl.
+  field.style.color = "transparent"; field.style.caretColor = "var(--color-base-content)";
+  const draw = () => {
+    const cs = getComputedStyle(field);
+    // Spiegel exakt auf die Box des Felds legen; ein Scrollbar verengt dessen Textbreite (clientWidth).
+    const bw = parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+    m.style.left = `${field.offsetLeft}px`;
+    m.style.top = `${field.offsetTop}px`;
+    // Input: Chrome meldet clientWidth um ~24px zu klein, daher offsetWidth; Textarea: clientWidth (Scrollbar).
+    m.style.width = `${field instanceof HTMLInputElement ? field.offsetWidth : field.clientWidth + bw}px`;
+    m.style.height = `${field.offsetHeight}px`;
+    // Einzeiliges Feld: daisyUI zentriert den Text vertikal, der Spiegel tut es über line-height.
+    if (field instanceof HTMLInputElement) { m.style.paddingTop = m.style.paddingBottom = "0"; m.style.lineHeight = `${field.clientHeight}px`; }
+    m.replaceChildren();
+    let i = 0;
+    for (const x of field.value.matchAll(/\{\{[^}]*\}\}/g)) {
+      m.append(field.value.slice(i, x.index));
+      const s = document.createElement("span");
+      s.textContent = x[0];
+      s.dataset.hl = /^\{\{[#/^]/.test(x[0]) ? "block" : "ph";
+      s.style.cssText = s.dataset.hl === "block" ? BLOCK : PH;
+      m.append(s);
+      i = x.index! + x[0].length;
+    }
+    m.append(field.value.slice(i));
+    m.scrollTop = field.scrollTop;
+    m.scrollLeft = field.scrollLeft;
+  };
+  field.addEventListener("input", draw);
+  field.addEventListener("scroll", draw);
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(draw).observe(field);
+  draw();
+  return draw;
+}
+["subject", "body"].forEach((n) => mirror(f.elements.namedItem(n) as Field));
