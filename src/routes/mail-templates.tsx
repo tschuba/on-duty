@@ -539,7 +539,7 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
       <div class="max-w-2xl mx-auto">
         <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`}
           actions={<>
-            <HeaderAction icon="clipboard-list" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />
+            <HeaderAction icon="mailbox" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />
             <HeaderAction variant="primary" class="btn-primary" icon="envelope" label={t("mailTemplates.send")} form="send-form" attrs={{ formmethod: "post", ...(!smtp || !counts.send ? { disabled: "" } : {}) }} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send, mails: counts.mails }))})`} />
           </>} />
         {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e}</li>)}</ul></div>}

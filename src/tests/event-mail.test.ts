@@ -118,12 +118,8 @@ describe("createdTargets", () => {
 describe("eventDelivery", () => {
   it("maps each reason", async () => {
     queue = [[{ personId: "p1", status: "failed" }, { personId: "p1", status: "sent" }, { personId: "p4", status: "failed" }], [row(1, "a@x.de"), row(2, null), row(3, "c@x.de"), row(4, "d@x.de"), row(5, "e@x.de")], [{ personId: "p3" }]];
-    const r = await eventDelivery(ev, true);
+    const r = await eventDelivery(ev);
     expect(r.map((x) => x.delivery)).toEqual(["sent", "no-email", "opted-out", "failed", "pending"]);
-  });
-  it("flags missing smtp", async () => {
-    queue = [[], [row(1, "a@x.de")], []];
-    expect((await eventDelivery(ev, false))[0].delivery).toBe("no-smtp");
   });
 });
 

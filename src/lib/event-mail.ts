@@ -85,10 +85,10 @@ async function latestStatus(eventId: string, template?: string): Promise<Map<str
 
 // ---- Versandstatus ---------------------------------------------------------
 
-export type DeliveryState = "sent" | "failed" | "no-email" | "opted-out" | "no-smtp" | "pending";
-export async function eventDelivery(event: Pick<Event, "id" | "visibility" | "endsAt">, smtp: boolean): Promise<(EventMailRecipient & { delivery: DeliveryState })[]> {
+export type DeliveryState = "sent" | "failed" | "no-email" | "opted-out" | "pending";
+export async function eventDelivery(event: Pick<Event, "id" | "visibility" | "endsAt">): Promise<(EventMailRecipient & { delivery: DeliveryState })[]> {
   const [rs, latest] = await Promise.all([eventMailRecipients(event, true), latestStatus(event.id)]);
-  return rs.map((r) => ({ ...r, delivery: r.state === "no-email" ? "no-email" : r.state === "opted-out" ? "opted-out" : latest.get(r.personId) ?? (smtp ? "pending" : "no-smtp") }));
+  return rs.map((r) => ({ ...r, delivery: r.state === "no-email" ? "no-email" : r.state === "opted-out" ? "opted-out" : latest.get(r.personId) ?? "pending" }));
 }
 
 // ---- Versand ----------------------------------------------------------------
