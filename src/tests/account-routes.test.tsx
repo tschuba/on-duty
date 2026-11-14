@@ -24,6 +24,9 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 vi.mock("../lib/account.js", async (orig) => ({ ...(await orig<typeof import("../lib/account.js")>()), deleteOwnAccount: (...a: unknown[]) => (deleteOwnAccount as any)(...a) }));
+const setEventMailsEnabled = vi.fn(async () => undefined);
+let optedOut = false;
+vi.mock("../lib/event-mail.js", () => ({ isOptedOut: async () => optedOut, setEventMailsEnabled: (...a: unknown[]) => (setEventMailsEnabled as any)(...a) }));
 vi.mock("../lib/flash.js", () => ({ setFlash: vi.fn() }));
 vi.mock("../auth.js", () => ({ auth: { api: { signOut: (...a: unknown[]) => (signOut as any)(...a) } } }));
 vi.mock("../db/index.js", () => {
@@ -36,6 +39,8 @@ const { accountRoutes, pendingRoutes } = await import("../routes/account.js");
 const app = new Hono().route("/account", accountRoutes).route("/pending", pendingRoutes);
 
 beforeEach(() => {
+  optedOut = false;
+  setEventMailsEnabled.mockClear();
   user = { id: "u1", name: "Max", email: "max@x.de", emailVerified: true, permissions: new Set<string>() };
   roleRows = [];
   block = null;
@@ -140,5 +145,32 @@ describe("/account/name", () => {
     user.id = LOCAL_ADMIN_ACCOUNT_ID;
     expect((await postName("X")).status).toBe(403);
     expect(updateSet).not.toHaveBeenCalled();
+  });
+});
+
+describe("event mail preference", () => {
+  const postPref = (body: Record<string, string>) => app.request("/account/mail-prefs", { method: "POST", body: new URLSearchParams(body) });
+  const linked = () => { roleRows = [{ id: "p1" }]; }; // der db-Mock liefert für jede Abfrage roleRows: erste Zeile = verknüpfte Person
+  it("hides the checkbox without a linked person", async () => {
+    expect(await (await app.request("/account")).text()).not.toContain('name="events"');
+  });
+  it("shows it checked, or unchecked when opted out", async () => {
+    linked();
+    expect(await (await app.request("/account")).text()).toMatch(/name="events"[^>]*checked/);
+    optedOut = true;
+    expect(await (await app.request("/account")).text()).not.toMatch(/name="events"[^>]*checked/);
+  });
+  it("saves the choice with source=account and redirects", async () => {
+    linked();
+    const res = await postPref({ events: "on" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/account");
+    expect(setEventMailsEnabled).toHaveBeenCalledWith("p1", true, "account");
+    await postPref({});
+    expect(setEventMailsEnabled).toHaveBeenLastCalledWith("p1", false, "account");
+  });
+  it("does nothing without a linked person", async () => {
+    await postPref({ events: "on" });
+    expect(setEventMailsEnabled).not.toHaveBeenCalled();
   });
 });

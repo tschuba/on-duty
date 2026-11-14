@@ -18,6 +18,8 @@ const txInsert = vi.fn((table: any) => ({
   }),
 }));
 
+const sendMail = vi.fn(() => Promise.resolve({ sent: true }));
+vi.mock("../lib/mail.js", () => ({ sendMail }));
 const transaction = vi.fn(async (cb: any) => cb({ insert: txInsert }));
 
 vi.mock("../db/index.js", () => ({
@@ -128,7 +130,8 @@ describe("POST /apply", () => {
       headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": freshIp() },
       body: formBody(validMembership()),
     });
-    expect(res.status).toBe(302); // never fails even though SMTP isn't configured in tests
+    expect(res.status).toBe(302);
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ key: "application-submitted", to: "vorstand@example.com" }));
   });
 
   it("blocks submission and skips inserts when the form is inactive", async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseLocal, toLocalInput, allDayBounds, dayAfter } from "../lib/datetime.js";
+import { formatDay, resolveLocale, parseLocal, toLocalInput, allDayBounds, dayAfter } from "../lib/datetime.js";
 
 const TZ = "Europe/Berlin";
 describe("datetime", () => {
@@ -26,5 +26,11 @@ describe("datetime", () => {
     expect(b.startsAt.toISOString()).toBe("2026-03-27T23:00:00.000Z");
     expect(b.endsAt.toISOString()).toBe("2026-03-29T21:59:00.000Z");
     expect(dayAfter("2026-03-28", TZ).toISOString()).toBe("2026-03-28T23:00:00.000Z");
+  });
+  it("Locale-Parameter, unbekannte Locale fällt auf de zurück", () => {
+    const d = new Date("2026-04-12T10:00:00Z");
+    expect(resolveLocale()).toBe("de");
+    expect(formatDay(d, TZ, "xx-invalid-locale-zzzzzzzzz")).toBe(formatDay(d, TZ));
+    expect(formatDay(d, TZ, "en-US")).not.toBe(formatDay(d, TZ));
   });
 });

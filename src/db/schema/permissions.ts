@@ -18,7 +18,7 @@ export const permissionEnum = pgEnum("permission", [
   "applications:read",
   "applications:record",
   "applications:review",
-  "applications:manage-forms",
+  "applications:manage",
   "inventory:read",
   "inventory:manage",
   "inventory:configure",

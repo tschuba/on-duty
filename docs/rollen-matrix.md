@@ -18,7 +18,7 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `applications:read`        |   | ✔ |   | ✔ |   |   |   |
 | `applications:record`      |   | ✔ |   | ✔ |   |   |   |
 | `applications:review`      |   |   |   | ✔ |   |   |   |
-| `applications:manage-forms`| ✔ | ✔ |   | ✔ |   |   |   |
+| `applications:manage`      | ✔ | ✔ |   | ✔ |   |   |   |
 | `inventory:read`           |   |   | ✔ | ✔ | ✔ |   |   |
 | `inventory:manage`         |   |   |   | ✔ | ✔ |   |   |
 | `inventory:configure`      |   |   |   | ✔ | ✔ |   |   |

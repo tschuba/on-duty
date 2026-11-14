@@ -12,7 +12,9 @@ import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { verifyCap } from "../lib/cap.js";
+import { env } from "../env.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import { parseRequestValues, validateRequest, type RequestValues } from "../lib/loan-request.js";
 import { blockedDays, checkAvailability } from "../lib/lending.js";
 import { HTTP_STATUS } from "../lib/constants.js";
@@ -225,7 +227,7 @@ export function formatPeriod(r: Pick<RequestWithItem, "plannedFrom" | "plannedTo
 const STATUS_BADGE = { open: "badge-info", approved: "badge-success", rejected: "badge-error" } as const;
 
 function StatusPage({ request, justSubmitted }: { request: RequestWithItem; justSubmitted: boolean }) {
-  const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`;
+  const statusUrl = `${env.OIDC_APP_URL}/lend/status/${request.statusToken}`;
   const date = (d: Date) => d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   return (
     <Layout title={t("lend.status.title")}>
@@ -299,28 +301,15 @@ async function notifyManager(itemName: string, requestId: string) {
   const config = await loadOrgConfig();
   const to = notificationRecipient(config);
   if (!to) return;
-  await sendMail({
-    to,
-    category: "lend",
-    event: "lend-notify",
-    audience: "staff",
-    subject: t("lend.mail.notifySubject", { name: itemName }),
-    text: t("lend.mail.notifyBody", { name: itemName, url: `${process.env.OIDC_APP_URL ?? ""}/inventory/requests/${requestId}` }),
-  });
+  await sendMail({ key: "lend-notify", to, vars: buildVars("lend-notify", { itemName, requestUrl: `${env.OIDC_APP_URL}/inventory/requests/${requestId}` }, []) });
 }
 
 // Eingangsbestätigung an den Antragsteller — nur mit E-Mail und SMTP; ohne Mail bleibt notifiedAt null (Admin-Hinweis auf der Detailseite).
-async function notifyApplicant(email: string | null, token: string): Promise<Date | null> {
-  if (!email) return null;
-  const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${token}`;
-  const result = await sendMail({
-    to: email,
-    category: "lend",
-    event: "lend-submitted",
-    audience: "applicant",
-    subject: t("lend.mail.submittedSubject"),
-    text: `${t("lend.mail.submittedBody")}\n\n${statusUrl}`,
-  });
+async function notifyApplicant(applicant: { firstName: string; lastName: string; email: string | null }, itemName: string, token: string): Promise<Date | null> {
+  if (!applicant.email) return null;
+  const { orgContactEmail } = await loadOrgConfig();
+  const vars = buildVars("lend-submitted", { itemName, statusUrl: `${env.OIDC_APP_URL}/lend/status/${token}`, orgContactEmail }, [{ ...applicant, email: applicant.email }]);
+  const result = await sendMail({ key: "lend-submitted", to: applicant.email, vars });
   return result.sent ? new Date() : null;
 }
 
@@ -384,7 +373,7 @@ lendRoutes.post("/:itemId", async (c) => {
   });
 
   await notifyManager(item.inventoryItem.name, requestId);
-  const notifiedAt = await notifyApplicant(values.email || null, token);
+  const notifiedAt = await notifyApplicant({ firstName: values.firstName, lastName: values.lastName, email: values.email || null }, item.inventoryItem.name, token);
   if (notifiedAt) await db.update(loanRequests).set({ notifiedAt }).where(eq(loanRequests.id, requestId));
   return c.redirect(`/lend/status/${token}?submitted=1`);
 });

@@ -1,3 +1,4 @@
+import { isOptedOut, setEventMailsEnabled } from "../lib/event-mail.js";
 import { RowAction } from "../components/row-action.js";
 import type { Context } from "hono";
 import { EmailField, Field, PhoneField, ViewField, ViewGrid } from "../components/field.js";
@@ -26,6 +27,7 @@ import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import { TrainingSection, sortRecords } from "./training.js";
 import { trainingRecords } from "../db/schema/index.js";
 
@@ -675,9 +677,11 @@ memberRoutes.post("/status-preview", requireAuth("members:write"), async (c) => 
 function MemberFormFields({
   m,
   errors,
+  eventMails = true,
 }: {
   m?: Partial<Member>;
   errors?: Record<string, string>;
+  eventMails?: boolean;
 }) {
   function field(
     name: keyof Member,
@@ -755,6 +759,11 @@ function MemberFormFields({
         {field("mobile", t("members.form.mobile"), "tel")}
         {field("email", t("members.form.email"), "email")}
       </div>
+      <input type="hidden" name="eventMailsForm" value="1" />
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="eventMails" class="checkbox" checked={eventMails} />
+        <span>{t("mail.prefs.events")}</span>
+      </label>
       </div>
       </Section>
     </>
@@ -1584,8 +1593,8 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   });
 
   if (applicationId && notifyApplicant && personFields.email) {
-    const bodyKey = linkMemberId && linkedWasArchived ? "applications.mail.approvedBodyRejoin" : "applications.mail.approvedBody";
-    await sendMail({ to: personFields.email, category: "membership", event: "application-approved", audience: "applicant", subject: t("applications.mail.approvedSubject"), text: t(bodyKey) });
+    const rejoin = !!(linkMemberId && linkedWasArchived);
+    await sendMail({ key: "application-approved", to: personFields.email, vars: buildVars("application-approved", { rejoin }, [{ firstName: personFields.firstName, lastName: personFields.lastName, email: personFields.email }]) });
   }
 
   setFlash(c, t("members.flash.created"), "success");
@@ -1786,7 +1795,7 @@ memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
     <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
       <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadgeSlot saved={m.status} /></>} backHref={backHref(c)} subtitle={t("common.requiredLegend")} actions={<><FormActions formId="member-form" cancelHref={`/members/${m.id}`} /></>} />
       <form id="member-form" method="post" action={`/members/${m.id}`} class="space-y-4 max-w-4xl">
-        <MemberFormFields m={m} />
+        <MemberFormFields m={m} eventMails={!(await isOptedOut(m.personId))} />
         {canReadBank && <BankDataSection m={m} editable={canWriteBank} />}
         <Section title={t("members.form.assignments")} open actions={!(m.exitDate || m.deathDate) && <AssignmentAddButton memberId={m.id} />}>
         <AssignmentsBox rows={m.assignments.map(toRowData)} memberId={m.id} readOnly={!!(m.exitDate || m.deathDate)} />
@@ -1949,6 +1958,7 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     }
   });
 
+  if (body.eventMailsForm) await setEventMailsEnabled(existing.personId, body.eventMails === "on", "admin");
   setFlash(c, t("members.flash.saved"), "success");
   return c.redirect(`/members/${id}`);
 });

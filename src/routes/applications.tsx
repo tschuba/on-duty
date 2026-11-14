@@ -1,3 +1,4 @@
+import { loadOrgConfig } from "../lib/org-config.js";
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
 import { EmailField, Field } from "../components/field.js";
@@ -17,6 +18,7 @@ import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-ra
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import {
   isFormCurrentlyActive,
   loadApplicationForms,
@@ -161,7 +163,7 @@ applicationRoutes.get("/", guard, async (c) => {
   const rows = sortApplications((await fetchApplications()).filter((a) => statusFilter.includes(a.status) && inRange(a)), sort, dir);
   const presets = rangePresets(todayStr(), "past");
   const forms = await loadApplicationForms();
-  const canManageForms = user.permissions.has("applications:manage-forms");
+  const canManageForms = user.permissions.has("applications:manage");
 
   function filterUrl(next: ApplicationStatus[]) {
     return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, ...rp }, { status: next });
@@ -623,7 +625,7 @@ applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
     .where(eq(applications.id, id));
 
   if (notifyApplicant && app.person.email) {
-    await sendMail({ to: app.person.email, category: "membership", event: "application-rejected", audience: "applicant", subject: t("applications.mail.rejectedSubject"), text: t("applications.mail.rejectedBody") });
+    await sendMail({ key: "application-rejected", to: app.person.email, vars: buildVars("application-rejected", { orgContactEmail: (await loadOrgConfig()).orgContactEmail }, [{ firstName: app.person.firstName, lastName: app.person.lastName, email: app.person.email }]) });
   }
 
   setFlash(c, t("applications.flash.rejected"), "success");
@@ -632,7 +634,7 @@ applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
 
 // POST /applications/forms/:type — de-/activate a public application form,
 // gated by its own permission (separate from applications:review).
-applicationRoutes.post("/forms/:type", requireAuth("applications:manage-forms"), async (c) => {
+applicationRoutes.post("/forms/:type", requireAuth("applications:manage"), async (c) => {
   const type = c.req.param("type");
   if (type !== "membership" && type !== "youth") return c.notFound();
 

@@ -24,6 +24,17 @@ export function recordFailedAttempt(ip: string): void {
   store.set(ip, entry);
 }
 
+// Je Adresse höchstens eine Mail pro Fenster (Backlog 151); true = darf senden und merkt sich den Versand.
+const ADDRESS_WINDOW_MS = 5 * 60 * 1000;
+const sentTo = new Map<string, number>();
+export function takeAddressSlot(address: string): boolean {
+  const now = Date.now();
+  for (const [k, at] of sentTo) if (at + ADDRESS_WINDOW_MS < now) sentTo.delete(k);
+  if (sentTo.has(address)) return false;
+  sentTo.set(address, now);
+  return true;
+}
+
 export function resetRateLimit(ip: string): void {
   store.delete(ip);
 }

@@ -43,6 +43,17 @@ services:
       # host.docker.internal darauf auf (IPv4 auf Linux/host-gateway, IPv6-ULA auf macOS).
       ZITADEL_HTTPCLIENT_DENYLIST: "localhost,0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,198.18.0.0/15,::/128,::1/128,fe80::/10"
 
+  # Test-SMTP: fängt alle Mails ab (kein Versand nach außen). Web-UI http://localhost:8025, SMTP localhost:1025 / mailpit:1025.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
   db:
     ports:
       - "127.0.0.1:5433:5432"
