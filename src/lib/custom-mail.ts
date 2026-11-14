@@ -1,6 +1,7 @@
+import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { mailLog, members } from "../db/schema/index.js";
-import { isActiveMember } from "./events.js";
+import { mailLog, memberRoleAssignments, members } from "../db/schema/index.js";
+import { findMembersByStatus, isActiveMember } from "./events.js";
 import { mailRecipientsFor, type EventMailRecipient } from "./event-mail.js";
 import { linkUrl } from "./links.js";
 import { sendMail } from "./mail.js";
@@ -13,22 +14,37 @@ import { t } from "../i18n/index.js";
 const inFlight = new Set<string>();
 export const isSending = (key: string) => inFlight.has(key);
 
-// shortcut: Empfänger = alle aktiven Mitglieder; Auswahl nach Tags/Funktionen/Einzelnen später.
-export async function customRecipients(topic: string): Promise<EventMailRecipient[]> {
-  const rows = await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members);
-  return mailRecipientsFor(rows.filter(isActiveMember).map((m) => m.id), topic);
+// Auswahl: Vereinigung aus Statusgruppen und aktuell vergebenen Funktionen; leer = alle aktiven Mitglieder.
+export interface Selection { statuses: string[]; roleIds: string[] }
+
+export async function customRecipients(topic: string, sel: Selection = { statuses: [], roleIds: [] }): Promise<EventMailRecipient[]> {
+  let ids: string[];
+  if (!sel.statuses.length && !sel.roleIds.length) {
+    ids = (await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)).filter(isActiveMember).map((m) => m.id);
+  } else {
+    const byStatus = await findMembersByStatus(); // nur aktive Mitglieder
+    const active = new Set(Object.values(byStatus).flat().map((m) => m.id));
+    const picked = new Set(sel.statuses.flatMap((st) => (byStatus as Record<string, { id: string }[]>)[st]?.map((m) => m.id) ?? []));
+    if (sel.roleIds.length) {
+      const rows = await db.select({ id: memberRoleAssignments.memberId }).from(memberRoleAssignments)
+        .where(and(inArray(memberRoleAssignments.memberRoleId, sel.roleIds), isNull(memberRoleAssignments.to)));
+      rows.forEach((r) => active.has(r.id) && picked.add(r.id));
+    }
+    ids = [...picked];
+  }
+  return mailRecipientsFor(ids, topic);
 }
 
 export const countSend = (rs: EventMailRecipient[]) => rs.filter((r) => r.state === "send").length;
 
 // Startet den Versand im Hintergrund (eine Mail je Adresse). Ergebnis: Empfängerzahl oder Grund des Abbruchs.
-export async function startCustomMail(key: string, values: Record<string, string>): Promise<number | "busy" | "invalid" | "none"> {
+export async function startCustomMail(key: string, values: Record<string, string>, sel?: Selection): Promise<number | "busy" | "invalid" | "none"> {
   if (inFlight.has(key)) return "busy";
   inFlight.add(key);
   try {
     const tpl = await resolveTemplate(key);
     if (!tpl?.topic) { inFlight.delete(key); return "invalid"; }
-    const rs = (await customRecipients(tpl.topic)).filter((r) => r.state === "send");
+    const rs = (await customRecipients(tpl.topic, sel)).filter((r) => r.state === "send");
     if (!rs.length) { inFlight.delete(key); return "none"; }
     void run(key, tpl, rs, values).catch((err) => logger.error({ err }, "[custom-mail] failed")).finally(() => inFlight.delete(key));
     return rs.length;

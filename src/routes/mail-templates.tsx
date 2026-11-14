@@ -12,6 +12,9 @@ import { createCustom, deleteCustom, keyTaken, listTemplates, listTopics, resetO
 import { parseHeaders } from "../lib/mail-headers.js";
 import { SLUG_RE } from "../lib/slug.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
+import { db } from "../db/index.js";
+import { memberRoles } from "../db/schema/index.js";
+import { asc } from "drizzle-orm";
 import { PERMISSION_LABELS } from "../components/permission-badges.js";
 import type { CustomMeta } from "../db/schema/mail.js";
 import { t } from "../i18n/index.js";
@@ -461,46 +464,65 @@ mailTemplateRoutes.post("/:key/reset", async (c) => {
 
 // ---- Manueller Versand (Backlog 156): Recht = editPermissions, alle Felder Pflicht ----------------
 
-async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, errors: string[] = [], status?: number) {
+const STATUSES = ["active", "youth", "children", "passive", "supporting"] as const;
+const readSelection = (f: Record<string, unknown>) => ({ statuses: asArray(f.status).filter((x) => (STATUSES as readonly string[]).includes(x)), roleIds: asArray(f.role) });
+
+// Ein Formular: Änderung der Auswahl lädt per GET neu (Zähler, Feldwerte bleiben in der Query), „Versenden“ sendet per POST.
+async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, sel: ReturnType<typeof readSelection>, errors: string[] = [], status?: number) {
   const back = backTo(c.req.query("from"));
   const meta = tpl.custom!.meta;
-  const counts = countRecipients(await customRecipients(tpl.custom!.topic));
+  const counts = countRecipients(await customRecipients(tpl.custom!.topic, sel));
+  const roles = await db.select({ id: memberRoles.id, title: memberRoles.title }).from(memberRoles).orderBy(asc(memberRoles.sortOrder));
   const smtp = isSmtpConfigured();
+  const action = `/mail/templates/${tpl.key}/send${fromQs(back)}`;
   return c.html(
     <Layout title={meta.name} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
         <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`} />
         {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e}</li>)}</ul></div>}
         {!smtp && <div role="alert" class="alert alert-warning mb-4">{t("mailTemplates.send.noSmtp")}</div>}
-        <p class="mb-1">{T("mailTemplates.send.recipients", { topic: tpl.custom!.topic })}</p>
-        <p class="mb-4 opacity-70">{T("mailTemplates.send.counts", { send: counts.send, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
-        <form method="post" action={`/mail/templates/${tpl.key}/send${fromQs(back)}`} class="space-y-4" onsubmit={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send }))})`}>
+        <form method="get" action={action} class="space-y-4" onchange="if(event.target.closest('[data-sel]'))this.submit()">
+          {back !== "/mail/templates" && <input type="hidden" name="from" value={back} />}
+          <FieldGroup legend={t("mailTemplates.send.selection")}>
+            <p class="text-sm opacity-70">{T("mailTemplates.send.selection.hint", { topic: tpl.custom!.topic })}</p>
+            <div class="flex flex-wrap gap-3" data-sel>
+              {STATUSES.map((st) => <label class="label cursor-pointer gap-2"><input type="checkbox" name="status" value={st} class="checkbox checkbox-sm" checked={sel.statuses.includes(st)} />{T(`status.${st}`)}</label>)}
+            </div>
+            {roles.length > 0 && <div class="flex flex-wrap gap-3" data-sel>
+              {roles.map((r) => <label class="label cursor-pointer gap-2"><input type="checkbox" name="role" value={r.id} class="checkbox checkbox-sm" checked={sel.roleIds.includes(r.id)} />{r.title}</label>)}
+            </div>}
+          </FieldGroup>
+          <p class="font-medium" role="status">{T("mailTemplates.send.counts", { send: counts.send, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
           {meta.fields.map((f) => (
             <Field label={f.label || fieldLabel(f.name)} required>
               <textarea name={`f_${f.name}`} rows={3} class="textarea w-full" required placeholder={f.label || fieldLabel(f.name)}>{values[f.name] ?? f.example ?? ""}</textarea>
             </Field>
           ))}
-          <button type="submit" class="btn btn-primary" disabled={!smtp || !counts.send}>{t("mailTemplates.send")}</button>
+          <button type="submit" formmethod="post" class="btn btn-primary" disabled={!smtp || !counts.send} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send }))})`}>{t("mailTemplates.send")}</button>
         </form>
       </div>
     </Layout>, status);
 }
 
+const readValues = (tpl: TemplateView, f: Record<string, unknown>) =>
+  Object.fromEntries(tpl.custom!.meta.fields.map((x) => [x.name, String(asArray(f[`f_${x.name}`])[0] ?? "").replace(/\r\n/g, "\n").trim()]));
+
 mailTemplateRoutes.get("/:key/send", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
   if (!tpl.custom) return notFound();
-  return sendForm(c, tpl, {});
+  const q = c.req.queries();
+  return sendForm(c, tpl, readValues(tpl, q), readSelection(q));
 });
 
 mailTemplateRoutes.post("/:key/send", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
   if (!tpl.custom) return notFound();
-  const f = await c.req.parseBody();
-  const values = Object.fromEntries(tpl.custom.meta.fields.map((x) => [x.name, String(f[`f_${x.name}`] ?? "").replace(/\r\n/g, "\n").trim()]));
-  const fail = (msg: string, status: number) => sendForm(c, tpl, values, [msg], status);
+  const f = await c.req.parseBody({ all: true });
+  const values = readValues(tpl, f), sel = readSelection(f);
+  const fail = (msg: string, status: number) => sendForm(c, tpl, values, sel, [msg], status);
   if (Object.values(values).some((v) => !v)) return fail(t("mailTemplates.send.missing"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (!isSmtpConfigured()) return fail(t("mailTemplates.send.noSmtp"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
-  const res = await startCustomMail(tpl.key, values);
+  const res = await startCustomMail(tpl.key, values, sel);
   if (res === "busy") return fail(t("mailTemplates.send.busy"), HTTP_STATUS.CONFLICT);
   if (res === "invalid") return fail(t("mailTemplates.send.invalid"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (res === "none") return fail(t("mailTemplates.send.noRecipients"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
