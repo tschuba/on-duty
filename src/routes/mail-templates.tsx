@@ -133,7 +133,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
                     <h3 class="px-1 pt-1 text-xs font-bold uppercase tracking-wide text-base-content/60">{t(`mailTemplates.group.${g}`)}</h3>
                     <ul class="space-y-1 p-1">
                       {items.map(([k, v]) => (
-                        <li data-s={`${k} ${v.desc} ${v.example}`} class={cond(k, v) ? "rounded-box bg-base-200 p-1 space-y-1" : undefined}>
+                        <li data-s={`${k} ${v.desc} ${v.example}`} data-k={k} data-d={v.desc} data-e={v.example || undefined} class={cond(k, v) ? "rounded-box bg-base-200 p-1 space-y-1" : undefined}>
                           {cond(k, v) ? (
                             <>
                               <p class="px-1 text-xs">{v.desc}{v.optional && <span class="text-base-content/60"> ({t("mailTemplates.optional")})</span>}{v.example && <span class="block text-base-content/60 break-all">{v.example}</span>}</p>
@@ -188,7 +188,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
           </dialog>
         )}
         <script id="ph-data" type="application/json" dangerouslySetInnerHTML={{ __html: JSON.stringify(phData).replace(/</g, "\\u003c") }} />
-        <script src="/js/mail-placeholders.min.js" data-leave={t("mailTemplates.leaveWarning")} defer></script>
+        <script src="/js/mail-placeholders.min.js" data-leave={t("mailTemplates.leaveWarning")} data-tip-if={t("mailTemplates.tip.onlyIf")} data-tip-end={t("mailTemplates.tip.end")} defer></script>
       </div>
     </Layout>
   );

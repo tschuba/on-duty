@@ -128,8 +128,63 @@ addEventListener("resize", fit);
 // shortcut: Spiegel statt Chips; Chips/Rich-Text siehe 161. Der Spiegel dient später auch der Cursorposition (169).
 const tok = (c: string) => `color-mix(in oklab, var(--color-${c}) `;
 const MARK = ``;
-const PH = `${MARK}background:rgba(59,130,246,.28);border-radius:3px;color:color-mix(in oklab, #3b82f6 65%, var(--color-base-content));`;
-const BLOCK = `${MARK}background:${tok("secondary")}24%, transparent);border-radius:3px;color:color-mix(in oklab, #8b5cf6 65%, var(--color-base-content));`;
+const BG_PH = "rgba(59,130,246,.28)", BG_BLOCK = `${tok("secondary")}24%, transparent)`;
+const PH = `${MARK}background:${BG_PH};border-radius:3px;color:color-mix(in oklab, #3b82f6 65%, var(--color-base-content));`;
+const BLOCK = `${MARK}background:${BG_BLOCK};border-radius:3px;color:color-mix(in oklab, #8b5cf6 65%, var(--color-base-content));`;
+
+// Wechselseitige Hervorhebung: Platzhalter-Name im Text <-> Eintrag in der Seitenleiste.
+const nameOf = (tok: string) => tok.replace(/^\{\{[#/^&]?\s*|\s*\}\}$/g, "");
+function setHot(n: string) {
+  document.querySelectorAll<HTMLElement>("[data-n]").forEach((o) => {
+    const on = !!n && o.dataset.n === n;
+    o.style.outline = on ? "2px solid var(--color-primary)" : "";
+    o.style.background = on ? (o.dataset.hl === "block" ? "color-mix(in oklab, #8b5cf6 55%, transparent)" : "rgba(59,130,246,.6)") : o.dataset.hl === "block" ? BG_BLOCK : BG_PH;
+  });
+  document.querySelectorAll<HTMLElement>("#side-ph li[data-s]").forEach((li) => {
+    const b = li.querySelector<HTMLElement>("[data-ph],[data-cond]");
+    const on = !!n && (b?.dataset.ph ?? b?.dataset.cond) === n;
+    li.style.outline = on ? "2px solid var(--color-primary)" : "";
+    li.style.background = on ? "color-mix(in oklab, var(--color-primary) 25%, transparent)" : "";
+    li.style.borderRadius = on ? "var(--radius-field, 0.25rem)" : "";
+  });
+}
+// Tooltip (Klartextname + Beispielwert) für Platzhalter im Text; Texte stammen aus dem Script-Tag (i18n).
+const ds = document.querySelector<HTMLScriptElement>("script[data-leave]")!.dataset;
+const info = new Map<string, { d: string; e: string; l?: boolean }>();
+// Listen (z. B. recipients) haben keinen Eintrag in der Seitenleiste, stehen aber in #ph-data.
+try { for (const v of JSON.parse($("ph-data")?.textContent ?? "[]")) info.set(v.name, { d: v.desc, e: v.example ?? "", l: v.type === "list" }); } catch { /* ohne Daten nur Seitenleiste */ }
+document.querySelectorAll<HTMLElement>("#side-ph li[data-k]").forEach((li) => info.set(li.dataset.k!, { d: li.dataset.d ?? "", e: li.dataset.e ?? "" }));
+const tip = document.createElement("div");
+tip.id = "ph-tip"; tip.setAttribute("role", "tooltip");
+// daisyUI-Tooltip: ein unsichtbarer Wrapper deckt den Platzhalter ab, das Tooltip hängt an dessen Unterkante.
+tip.className = "tooltip tooltip-open tooltip-bottom fixed z-50 hidden pointer-events-none";
+document.body.append(tip);
+let tipField: Field | null = null;
+function hideTip() { tip.classList.add("hidden"); tipField?.removeAttribute("aria-describedby"); tipField = null; }
+function showTip(span: HTMLElement | undefined, field: Field) {
+  const raw = span?.textContent ?? "", n = span?.dataset.n ?? "", i = info.get(n) ?? info.get(`${[...info.keys()].find((k) => k.endsWith(`[].${n}`))}`);
+  const parts = !span || !i ? [] : raw.startsWith("{{/") ? [ds.tipEnd!] : raw.startsWith("{{^") ? [] : raw.startsWith("{{#") && !i.l ? [`${ds.tipIf}: ${i.d}`] : [i.d, i.e];
+  const [head, ex] = parts.filter(Boolean);
+  if (!head) { hideTip(); return; }
+  // Erklärung normal, Beispielwert darunter, abgesetzt: Monospace, gedämpft, mit Trennlinie.
+  const c = document.createElement("div");
+  c.className = "tooltip-content text-left";
+  c.append(head);
+  if (ex) { const e = document.createElement("div"); e.className = "mt-1 pt-1 border-t border-current/30 font-mono opacity-70"; e.textContent = ex; c.append(e); }
+  tip.replaceChildren(c);
+  const r = span!.getBoundingClientRect();
+  tip.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+  tip.classList.remove("hidden");
+  field.setAttribute("aria-describedby", "ph-tip"); tipField = field;
+}
+addEventListener("scroll", hideTip, true);
+addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); }, true);
+
+const side0 = $("side-ph");
+side0.addEventListener("mouseover", (e) => { const li = (e.target as HTMLElement).closest<HTMLElement>("li[data-s]"); const b = li?.querySelector<HTMLElement>("[data-ph],[data-cond]"); setHot(b?.dataset.ph ?? b?.dataset.cond ?? ""); });
+side0.addEventListener("mouseleave", () => setHot(""));
+side0.addEventListener("focusin", (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ph],[data-cond]"); setHot(b?.dataset.ph ?? b?.dataset.cond ?? ""); });
+side0.addEventListener("focusout", () => setHot(""));
 
 export function mirror(field: Field) {
   const m = document.createElement("div");
@@ -160,6 +215,7 @@ export function mirror(field: Field) {
       s.textContent = x[0];
       s.dataset.hl = /^\{\{[#/^]/.test(x[0]) ? "block" : "ph";
       s.style.cssText = s.dataset.hl === "block" ? BLOCK : PH;
+      s.dataset.n = nameOf(x[0]);
       m.append(s);
       i = x.index! + x[0].length;
     }
@@ -167,6 +223,27 @@ export function mirror(field: Field) {
     m.scrollTop = field.scrollTop;
     m.scrollLeft = field.scrollLeft;
   };
+  // Das Feld fängt die Maus ab: Treffer gegen die Rechtecke der Spiegel-Spans prüfen.
+  (field as HTMLElement).addEventListener("mousemove", (e: MouseEvent) => {
+    const hit = [...m.querySelectorAll<HTMLElement>("span[data-n]")].find((o) => [...o.getClientRects()].some((r) => e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom));
+    setHot(hit?.dataset.n ?? "");
+    showTip(hit, field);
+  });
+  field.addEventListener("mouseleave", () => { setHot(""); hideTip(); });
+  // Tastatur/Touch: Cursor im Token zeigt nach kurzer Verzögerung dasselbe Tooltip.
+  let t: ReturnType<typeof setTimeout>;
+  const caret = () => {
+    clearTimeout(t); hideTip();
+    if (document.activeElement !== field) return;
+    const c = field.selectionStart ?? 0;
+    let k = -1;
+    [...field.value.matchAll(/\{\{[^}]*\}\}/g)].forEach((x, j) => { if (c >= x.index! && c <= x.index! + x[0].length) k = j; });
+    if (k >= 0) t = setTimeout(() => showTip(m.querySelectorAll<HTMLElement>("span[data-n]")[k], field), 400);
+  };
+  field.addEventListener("keyup", caret);
+  field.addEventListener("click", caret);
+  field.addEventListener("blur", () => { clearTimeout(t); hideTip(); });
+  field.addEventListener("input", () => { clearTimeout(t); hideTip(); });
   field.addEventListener("input", draw);
   field.addEventListener("scroll", draw);
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(draw).observe(field);
