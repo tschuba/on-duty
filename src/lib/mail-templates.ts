@@ -253,10 +253,54 @@ const distance = (a: string, b: string) => {
   return prev[b.length];
 };
 // Tippfehler-Vorschlag: nächster Katalogname bis Abstand 3.
-function suggest(entry: CatalogEntry, name: string): string | undefined {
-  const best = Object.keys(entry.vars).filter((k) => !k.includes("[]")).map((k) => [k, distance(k, name)] as const).sort((a, b) => a[1] - b[1])[0];
+function suggest(names: string[], name: string): string | undefined {
+  const best = names.filter((k) => !k.includes("[]")).map((k) => [k, distance(k, name)] as const).sort((a, b) => a[1] - b[1])[0];
   return best && best[1] <= 3 ? best[0] : undefined;
 }
+
+// Freie Vorlagen: Globale Variablen sind erlaubt, alles andere muss ein Feldname sein (flach, ohne Punkt, nicht reserviert).
+const FIELD_RE = /^[a-z][a-z0-9_]*$/;
+const RESERVED = new Set(["you", "addressee", "multiple", "recipients", "optOutAllUrl"]);
+const isField = (n: string) => FIELD_RE.test(n) && !RESERVED.has(n);
+function customNameError(name: string): string | undefined {
+  if (GLOBAL_VARS[name] || isField(name)) return undefined;
+  if (RESERVED.has(name)) return `„${name}“ ist reserviert und kann nicht als Feld verwendet werden`;
+  const hint = name.includes(".") ? suggest(Object.keys(GLOBAL_VARS), name) : undefined;
+  return `unbekannte Variable „${name}“${hint ? `. Meintest du „${hint}“?` : ". Feldnamen: Kleinbuchstaben, Ziffern und Unterstrich, ohne Punkt"}`;
+}
+
+// Namen, die in einer freien Vorlage zu Feldern werden (Reihenfolge des ersten Auftretens).
+export function customFields(input: TemplateInput): string[] {
+  const out = new Set<string>();
+  const walk = (tokens: Token[]) => {
+    for (const tok of tokens) {
+      if (!["name", "&", "#", "^"].includes(tok[0])) continue;
+      if (!GLOBAL_VARS[tok[1]] && isField(tok[1])) out.add(tok[1]);
+      if (tok[0] === "#" || tok[0] === "^") walk(tok[4] ?? []);
+    }
+  };
+  for (const text of [input.prefix ?? "", input.subject, input.body]) { try { walk(Mustache.parse(text) as Token[]); } catch { /* Syntaxfehler meldet validateTemplate */ } }
+  return [...out];
+}
+
+// Vorschau-Variablen freier Vorlagen: org echt, recipient als Beispiel, Felder mit Beispieltext;
+// ohne Beispieltext steht eine Markierung (\u0001name\u0002), die die Vorschau hervorhebt.
+export function customPreviewVars(fields: { name: string; example?: string }[]): MailVars {
+  const vars: MailVars = {
+    org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: "" }, type: t("mail.type.custom"),
+    recipient: { name: "Anna Beispiel", firstName: "Anna", lastName: "Beispiel", email: "anna@example.org" },
+  };
+  for (const f of fields) vars[f.name] = f.example || `\u0001${f.name}\u0002`;
+  return vars;
+}
+
+// Sidebar-Einträge freier Vorlagen: globale Variablen plus Felder.
+export const customVars = (fields: { name: string; label?: string; example?: string }[]): Record<string, VarSpec> => ({
+  ...GLOBAL_VARS,
+  ...Object.fromEntries(fields.map((f) => [f.name, { type: "text", desc: f.label || fieldLabel(f.name), example: f.example ?? "", source: "data" } as VarSpec])),
+});
+// treffpunkt_uhrzeit → „Treffpunkt uhrzeit“
+export const fieldLabel = (n: string) => { const s = n.replace(/_/g, " "); return s[0].toUpperCase() + s.slice(1); };
 
 export function validateTemplate(key: string, input: TemplateInput): string[] {
   const entry = CATALOG[key]; // kein Eintrag = freie Vorlage: unbekannte Variablen erlaubt (werden Felder)
@@ -271,9 +315,10 @@ export function validateTemplate(key: string, input: TemplateInput): string[] {
       const inList = list && entry?.vars[`${list}[].${name}`];
       if (inList) seen.add(`${list}[].${name}`);
       else if (entry && name !== "." && !isRoot(name)) {
-        const hint = suggest(entry, name);
+        const hint = suggest(Object.keys(entry.vars), name);
         errors.push(`${field}: Zeile ${lineOf(text, tok[2])}: unbekannte Variable „${name}“${hint ? `. Meintest du „${hint}“?` : ""}`);
       }
+      else if (!entry && name !== "." && customNameError(name)) errors.push(`${field}: Zeile ${lineOf(text, tok[2])}: ${customNameError(name)}`);
       else seen.add(name);
       if (type === "#" || type === "^") walk(tok[4] ?? [], entry?.vars[name]?.type === "list" ? name : list, field, text);
     }
@@ -334,13 +379,13 @@ export function renderMail(row: Pick<ResolvedTemplate, "prefix" | "subject" | "b
   return { subject: prefix ? `${prefix} ${subject}` : subject, text: Mustache.render(row.body, vars, {}, plain) };
 }
 
-// Recht je Vorlage: system:admin immer, sonst eines aus editPermissions der system-Zeile.
+// Recht je Vorlage: system:admin immer, sonst eines aus editPermissions der system-/custom-Zeile.
 export const mayEdit = (user: { permissions: Set<string> }, editPermissions: string[] | null | undefined) =>
   user.permissions.has("system:admin") || !!editPermissions?.some((p) => user.permissions.has(p));
 
 export async function canEdit(user: { permissions: Set<string> }, key: string): Promise<boolean> {
   const [row] = await db.select({ p: mailTemplates.editPermissions }).from(mailTemplates)
-    .where(and(eq(mailTemplates.key, key), eq(mailTemplates.locale, "de"), eq(mailTemplates.variant, "system")));
+    .where(and(eq(mailTemplates.key, key), eq(mailTemplates.locale, "de"), inArray(mailTemplates.variant, ["system", "custom"])));
   return mayEdit(user, row?.p);
 }
 

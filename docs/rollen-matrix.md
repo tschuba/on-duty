@@ -40,8 +40,9 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 | `anniversary-years:read`   | ✔ | ✔ |   | ✔ | ✔ |   |   |
 | `anniversary-years:write`  | ✔ | ✔ |   |   |   |   |   |
 | `anniversary-years:delete` | ✔ |   |   |   |   |   |   |
+| `mail:templates`           | ✔ |   |   |   |   |   |   |
 
 ## Hinweis
 
-- Änderungen an Standardrollen brauchen immer eine Migration, weil der Seed nur fehlende Einträge ergänzt (zuletzt `drizzle/0026_role_permissions_backfill.sql`).
+- Änderungen an Standardrollen brauchen eine Migration, wenn ein Recht auf bestehende (auch selbst angelegte) Rollen kopiert werden soll; die Vergabe nur an eine Standardrolle übernimmt der Seed (Vorbild `events:manage`). Der Seed ergänzt nur fehlende Einträge, daher: der Seed nur fehlende Einträge ergänzt (zuletzt `drizzle/0026_role_permissions_backfill.sql`).
 - Neue Permission-Werte (Enum) und ihre Vergabe an Standardrollen dürfen nicht in derselben Migration stehen, und Drizzle führt alle offenen Migrationen in einer Transaktion aus (Postgres: „unsafe use of new value"). Deshalb legt eine Migration nur den Enum-Wert an, die Vergabe übernimmt `APP_ROLES` im Seed beim nächsten Start (`src/entrypoint.ts` führt Migration und Seed nacheinander aus).

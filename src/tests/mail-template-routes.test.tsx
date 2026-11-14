@@ -19,7 +19,8 @@ const sys = (key: string, perm: string, body = "Hi {{#recipients}}{{optOutUrl}}{
 let templates: any[] = [];
 const saveOverride = vi.fn(async () => "ok" as "ok" | "conflict");
 const resetOverride = vi.fn(async () => {});
-vi.mock("../lib/mail-template-store.js", () => ({ listTemplates: async () => templates, saveOverride, resetOverride }));
+const createCustom = vi.fn(async () => "ok" as "ok" | "conflict");
+vi.mock("../lib/mail-template-store.js", () => ({ listTemplates: async () => templates, saveOverride, resetOverride, listTopics: async () => ["mitteilung"], keyTaken: async (k: string) => k === "taken", createCustom, saveCustom: vi.fn(), deleteCustom: vi.fn() }));
 
 const { mailTemplateRoutes } = await import("../routes/mail-templates.js");
 const post = (path: string, f: Record<string, string>) => mailTemplateRoutes.request(path, { method: "POST", body: formBody(f), headers: { "content-type": "application/x-www-form-urlencoded" } });
@@ -186,5 +187,24 @@ describe("mail template routes", () => {
   it("reset deletes the override", async () => {
     expect((await post("/event-created/reset", {})).status).toBe(302);
     expect(resetOverride).toHaveBeenCalledWith("event-created");
+  });
+});
+
+describe("custom template routes", () => {
+  it("/new is not swallowed by /:key; 403 without mail:templates", async () => {
+    expect((await mailTemplateRoutes.request("/new")).status).toBe(403);
+    perms = new Set(["mail:templates"]);
+    const res = await mailTemplateRoutes.request("/new");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('name="key"');
+    const ok = { name: "Plan", key: "plan", topic: "t", audience: "member", subject: "s", body: "{{ort}}" };
+    const bad = (o: Record<string, string>) => post("/new", { ...ok, editPermissions: "mail:templates", ...o });
+    expect((await bad({ key: "taken" })).status).toBe(422);
+    expect((await bad({ editPermissions: "system:admin" })).status).toBe(422); // fremdes Recht
+    expect((await bad({ body: "{{a.b}}" })).status).toBe(422);
+    expect(createCustom).not.toHaveBeenCalled();
+    expect((await bad({})).status).toBe(302);
+    expect(createCustom).toHaveBeenCalled();
+    expect((await post("/new", { name: "", key: "x", topic: "t", audience: "member", subject: "s", body: "b", editPermissions: "system:admin" })).status).toBe(422);
   });
 });

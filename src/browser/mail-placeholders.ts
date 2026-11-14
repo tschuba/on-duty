@@ -1,4 +1,6 @@
 // Platzhalter-Spalte im Mail-Vorlagen-Editor (Einfügen, Spalte, Suche, Tabs, Leave-Warnung).
+import { slugify } from "../lib/slug.js";
+import { parseHeaders } from "../lib/mail-headers.js";
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
@@ -371,4 +373,23 @@ for (const n of ["subject", "body"]) {
   }) as EventListener);
   x.addEventListener("click", acClose);
   x.addEventListener("blur", acClose);
+}
+
+// Freie Vorlagen: key folgt dem Namen, bis er von Hand geändert wird; Header-Regeln wie auf dem Server (gemeinsame Funktion).
+const nameEl = f.elements.namedItem("name") as HTMLInputElement | null, keyEl = f.elements.namedItem("key") as HTMLInputElement | null;
+if (nameEl && keyEl) {
+  let manual = keyEl.value !== "" && keyEl.value !== slugify(nameEl.value);
+  keyEl.addEventListener("input", () => { manual = true; });
+  nameEl.addEventListener("input", () => { if (!manual) keyEl.value = slugify(nameEl.value); });
+}
+const hdr = f.elements.namedItem("headers") as HTMLTextAreaElement | null;
+if (hdr) {
+  const check = () => {
+    const errs = parseHeaders(hdr.value).errors;
+    hdr.setCustomValidity(errs[0] ?? "");
+    const out = document.getElementById("err-headers");
+    if (out) out.textContent = errs.join(" ");
+  };
+  hdr.addEventListener("input", check);
+  check();
 }

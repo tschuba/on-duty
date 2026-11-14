@@ -1,9 +1,11 @@
-import { boolean, check, index, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, jsonb, check, index, pgEnum, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { permissionEnum } from "./permissions";
 import { users } from "./auth";
 import { persons } from "./persons";
 import { events } from "./events";
+
+export interface CustomMeta { name: string; description?: string; fields: { name: string; label?: string; example?: string }[] }
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const mailTemplateVariantEnum = pgEnum("mail_template_variant", ["system", "override", "custom"]);
@@ -26,6 +28,7 @@ export const mailTemplates = pgTable(
     body: text("body").notNull(),
     headersMode: mailHeadersModeEnum("headers_mode"),
     extraHeaders: text("extra_headers"), // JSON, nur bei headersMode = extendable
+    meta: jsonb("meta").$type<CustomMeta>(), // nur bei variant = custom: Name, Beschreibung, Felder
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     updatedBy: text("updated_by").references(() => users.id, { onDelete: "set null" }),
   },
@@ -36,6 +39,7 @@ export const mailTemplates = pgTable(
       sql`(${t.variant} = 'override' AND ${t.category} IS NULL AND ${t.audience} IS NULL AND ${t.editPermissions} IS NULL AND ${t.topic} IS NULL AND ${t.prefix} IS NULL AND ${t.headersMode} IS NULL AND ${t.extraHeaders} IS NULL)
         OR (${t.variant} <> 'override' AND ${t.category} IS NOT NULL AND ${t.audience} IS NOT NULL AND ${t.headersMode} IS NOT NULL AND cardinality(${t.editPermissions}) >= 1)`,
     ),
+    check("mail_templates_meta_check", sql`(${t.variant} = 'custom') = (${t.meta} IS NOT NULL)`),
     check("mail_templates_custom_topic_check", sql`${t.variant} <> 'custom' OR ${t.topic} IS NOT NULL`),
   ],
 );

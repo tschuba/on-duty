@@ -28,6 +28,8 @@ Bei allen on-duty-Mails (Texte stehen als Vorlagen in der DB; die Betreffs in de
 - `X-On-Duty-Event`: siehe Tabelle unten (stabil, nicht lokalisiert)
 - `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene) | `member` (Mitglieder)
 
+**Freie Vorlagen** (`variant = custom`, Recht `mail:templates` zum Anlegen; Bearbeiten/Löschen nach `editPermissions`): Name, Beschreibung und Felder stehen in `mail_templates.meta`. Jeder Platzhalter, der nicht global ist, wird beim Speichern zum Feld (`[a-z][a-z0-9_]*`, ohne Punkt; `org.*`, `recipient.*`, `type`, `you` u. a. reserviert). Header: `X-On-Duty-Event: custom-<key>` bleibt fest. Zusatz-Header im Editor, eine Zeile je Header (`X-Name: Wert`); erlaubt sind nur Namen mit `X-` (nicht `X-On-Duty-*`), Werte ohne Zeilenumbruch. Prüfung: `src/lib/mail-headers.ts` (Editor und Server gemeinsam).
+
 **Sonstiges:** `From` ist überall `SMTP_FROM` (auch bei Zitadel). Reiner Text, keine Anhänge, kein `Reply-To`. Versand über nodemailer (`src/lib/mail.ts`, Port `SMTP_PORT`, Standard 587/STARTTLS). Ohne `SMTP_HOST`/`SMTP_FROM` wird nichts gesendet. Adressen auf `.invalid` werden bei Admin-Benachrichtigungen übersprungen.
 
 ## Mails von on-duty

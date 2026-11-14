@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "../env.js";
 import { logger } from "./logger.js";
+import { checkHeader } from "./mail-headers.js";
 import { renderMail, resolveTemplate, type MailVars, type ResolvedTemplate } from "./mail-templates.js";
 
 export function isSmtpConfigured(): boolean {
@@ -26,12 +27,10 @@ function getTransport(): ReturnType<typeof nodemailer.createTransport> {
   }));
 }
 
-const RESERVED_HEADER = /^(x-on-duty-|from$|to$|subject$|list-unsubscribe)/i;
-
 function extraHeaders(tpl: ResolvedTemplate): Record<string, string> {
   if (tpl.headersMode !== "extendable" || !tpl.extraHeaders) return {};
   try {
-    return Object.fromEntries(Object.entries(JSON.parse(tpl.extraHeaders) as Record<string, string>).filter(([k]) => !RESERVED_HEADER.test(k)));
+    return Object.fromEntries(Object.entries(JSON.parse(tpl.extraHeaders) as Record<string, string>).filter(([k, v]) => typeof v === "string" && !checkHeader(k, v)));
   } catch {
     logger.warn({ key: tpl.key }, "[mail] invalid extraHeaders JSON ignored");
     return {};

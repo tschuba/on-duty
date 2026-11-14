@@ -41,6 +41,7 @@ export const permissionEnum = pgEnum("permission", [
   "anniversary-years:write",
   "anniversary-years:delete",
   "events:manage",
+  "mail:templates",
   "training:read",
   "training:write",
   "training:delete",
