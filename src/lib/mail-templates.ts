@@ -34,7 +34,10 @@ interface CatalogEntry {
   required: { name: string; list?: string; label: string }[]; // label: Klartextname für Fehlermeldungen/Checkliste
   // ohne list: Variable auf oberster Ebene
   build: (record: any, recipients: MailRecipient[]) => MailVars;
+  previewCases: PreviewCase[]; // Fälle der Editor-Vorschau; Fall 1 = Standard
 }
+// Fall = Override auf die Beispieldaten; garantiert seine Bedingung (auch den Terminzustand).
+export interface PreviewCase { id: string; label: string; people?: number; patch?: (e: EventMailRecord["event"]) => Partial<EventMailRecord["event"]> }
 
 const GLOBAL_VARS: Record<string, VarSpec> = {
   "org.name": { type: "text", desc: "Name der Organisation", example: "Feuerwehr Musterstadt", source: "data" },
@@ -114,7 +117,7 @@ const eventEntry: CatalogEntry = {
   name: "", description: "",
   category: "event",
   audience: "member",
-  vars: { ...GLOBAL_VARS, ...EVENT_VARS },
+  vars: { ...GLOBAL_VARS, ...EVENT_VARS }, previewCases: [],
   required: [{ name: "optOutUrl", list: "recipients", label: t("mailTemplates.required.optOutUrl") }],
   build: buildEventVars,
 };
@@ -122,7 +125,7 @@ const eventEntry: CatalogEntry = {
 const settingsEntry: CatalogEntry = {
   name: "", description: "",
   category: "member",
-  audience: "member",
+  audience: "member", previewCases: [],
   vars: {
     ...GLOBAL_VARS,
     settingsUrl: { type: "text", desc: "Link zur Einstellungsseite (zeitlich begrenzt)", example: "https://portal.example.org/link/abc", source: "link" },
@@ -150,13 +153,30 @@ const infoEntry: CatalogEntry = {
 const STAFF_GLOBAL = Object.fromEntries(Object.entries(GLOBAL_VARS).filter(([k]) => !k.startsWith("recipient.")));
 const V = (desc: string, example: string, source: VarSource): VarSpec => ({ type: "text", desc, example, source });
 const simple = (category: CatalogEntry["category"], audience: CatalogEntry["audience"], vars: Record<string, VarSpec>, build: (r: SimpleMailRecord) => MailVars): CatalogEntry =>
-  ({ name: "", description: "", category, audience, vars: { ...(audience === "staff" ? STAFF_GLOBAL : GLOBAL_VARS), ...vars }, required: [], build });
+  ({ name: "", description: "", previewCases: [], category, audience, vars: { ...(audience === "staff" ? STAFF_GLOBAL : GLOBAL_VARS), ...vars }, required: [], build });
 const lendApplicant = simple("lend", "applicant", {
   "item.name": V("Name des Gegenstands", "Zelt", "data"),
   "request.statusUrl": V("Statusseite der Anfrage", "https://portal.example.org/lend/status/abc", "link"),
 }, (r) => ({ item: { name: r.itemName }, request: { statusUrl: r.statusUrl } }));
 
-const named = (key: string, e: CatalogEntry): CatalogEntry => ({ ...e, name: t(`mailTemplates.name.${key}` as never), description: t(`mailTemplates.desc.${key}` as never) });
+const C = (id: string, label: string, o: Partial<PreviewCase> = {}): PreviewCase => ({ id, label: t(`mailTemplates.case.${label}` as never), ...o });
+const eventCases = (state: Partial<EventMailRecord["event"]>): PreviewCase[] => [
+  C("default", "default", { patch: () => ({ ...state, location: "Gerätehaus", rsvpEnabled: true }) }),
+  C("noLocation", "noLocation", { patch: () => ({ ...state, location: "", rsvpEnabled: true }) }),
+  C("noRsvp", "noRsvp", { patch: () => ({ ...state, location: "Gerätehaus", rsvpEnabled: false }) }),
+  C("multiple", "multiple", { people: 2, patch: () => ({ ...state, location: "Gerätehaus", rsvpEnabled: true }) }),
+];
+const CASES: Record<string, PreviewCase[]> = {
+  "event-created": eventCases({ cancelledAt: null }),
+  "event-updated": eventCases({ cancelledAt: null }),
+  "event-cancelled": eventCases({ cancelledAt: new Date("2026-04-01T08:00:00Z") }).filter((c) => c.id !== "noRsvp"),
+  "event-uncancelled": eventCases({ cancelledAt: null }),
+  "event-mail-info": [C("default", "default"), C("multiple", "multiple", { people: 2 })],
+};
+const named = (key: string, e: CatalogEntry): CatalogEntry => ({
+  ...e, name: t(`mailTemplates.name.${key}` as never), description: t(`mailTemplates.desc.${key}` as never),
+  previewCases: CASES[key] ?? [{ id: "default", label: t("mailTemplates.preview") }],
+});
 export const CATALOG: Record<string, CatalogEntry> = Object.fromEntries(Object.entries({
   "event-created": eventEntry,
   "event-updated": eventEntry,
@@ -192,6 +212,29 @@ export function buildVars(key: string, record: EventMailRecord | SettingsMailRec
     type: t(`mail.type.${entry.category}`),
     recipient: first ? { name: fullName(first), firstName: first.firstName, lastName: first.lastName, email: first.email } : {},
   };
+}
+
+// ---- Beispieldaten für die Vorschau (nie Echtdaten) ------------------------
+
+const PH = (p: string) => `https://portal.example.org/${p}/VORSCHAU`; // erkennbarer Platzhalter-Link
+const SAMPLE_PEOPLE: MailRecipient[] = [
+  { firstName: "Anna", lastName: "Beispiel", email: "anna@example.org", optOutUrl: PH("optout"), rsvpYesUrl: PH("rsvp-ja"), rsvpNoUrl: PH("rsvp-nein") },
+  { firstName: "Ben", lastName: "Beispiel", email: "ben@example.org", optOutUrl: PH("optout"), rsvpYesUrl: PH("rsvp-ja"), rsvpNoUrl: PH("rsvp-nein") },
+];
+const SAMPLE_RECORD = {
+  event: { id: "VORSCHAU", title: "Übung Atemschutz", startsAt: new Date("2026-04-12T16:00:00Z"), endsAt: new Date("2026-04-12T18:00:00Z"), allDay: false, location: "Gerätehaus", rsvpEnabled: true, rsvpDeadline: null, maxParticipants: 20, cancelledAt: null },
+  changes: "Ort: Halle → Gerätehaus", optOutAllUrl: PH("optout-alle"), orgContactEmail: "info@example.org",
+  settingsUrl: PH("link"), validMinutes: 30,
+  applicantName: "Anna Beispiel", rejoin: false, itemName: "Zelt", requestUrl: PH("anfrage"),
+  statusUrl: PH("status"), userName: "Anna Beispiel", userEmail: "anna@example.org",
+};
+
+// Einziger Einstieg der Vorschau: Beispieldaten des Falls (unbekannte Fall-ID = Standard), keine Fachdaten.
+export function previewVars(key: string, caseId?: string): MailVars {
+  const cases = CATALOG[key].previewCases;
+  const c = cases.find((x) => x.id === caseId) ?? cases[0];
+  const record = { ...SAMPLE_RECORD, event: { ...SAMPLE_RECORD.event, ...c.patch?.(SAMPLE_RECORD.event) } };
+  return buildVars(key, record, SAMPLE_PEOPLE.slice(0, c.people ?? 1));
 }
 
 // ---- Validierung ----------------------------------------------------------

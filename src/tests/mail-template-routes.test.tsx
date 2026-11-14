@@ -87,6 +87,49 @@ describe("mail template routes", () => {
     expect(bad).toContain("alert-error");
   });
 
+  it("preview cases: tabs, condition holds, no real data", async () => {
+    const body = "{{#event.location}}ORT{{/event.location}}|{{#multiple}}MEHR{{/multiple}}|{{#event.rsvpEnabled}}RSVP{{/event.rsvpEnabled}}{{#recipients}}{{optOutUrl}}{{/recipients}}";
+    const html = async (c: string) => (await (await post("/event-created/preview", { subject: "S", body, case: c })).text());
+    const std = await html("default");
+    expect(std).not.toContain("tablist"); // Fälle stehen in der Tab-Zeile des Editors, nicht in der Vorschau
+    const page = await (await mailTemplateRoutes.request("/event-created")).text();
+    for (const l of ["Standard", "Ohne Ort", "Ohne Anmeldung", "Mehrere Mitglieder an der Adresse"]) expect(page).toContain(l);
+    expect(page).toContain('data-case="multiple"');
+    expect(page).toContain('data-tab="entry"'); // Fall-Tabs erst nach Klick auf „Vorschau“ sichtbar (hidden)
+    expect(page).toMatch(/class="btn [^"]*hidden[^"]*"[^>]*data-tab="preview" data-case="default"/);
+    expect(std).toContain("ORT|");
+    expect(std).toContain("VORSCHAU");
+    expect(await html("noLocation")).not.toContain("ORT");
+    expect(await html("noRsvp")).not.toContain("RSVP");
+    expect(await html("multiple")).toContain("MEHR");
+    perms = new Set(["system:admin"]);
+    expect(await (await mailTemplateRoutes.request("/member-settings-link")).text()).toContain(">Vorschau<");
+  });
+
+  it("preview renders every case of every template without errors", async () => {
+    const { CATALOG, previewVars, renderMail } = await import("../lib/mail-templates.js");
+    for (const [key, e] of Object.entries(CATALOG)) for (const c of e.previewCases) {
+      expect(() => renderMail({ prefix: "[{{org.name}}]", subject: "x", body: "y" }, previewVars(key, c.id))).not.toThrow();
+    }
+    const cancelled = previewVars("event-cancelled", "default") as any;
+    expect(cancelled.event.rsvpEnabled).toBe(false);
+  });
+
+  it("preview errors carry line and missing required placeholders", async () => {
+    const html = await (await post("/event-created/preview", { subject: "S", body: "a\n{{x}}" })).text();
+    expect(html).toContain('data-line="2"');
+    expect(html).toContain('data-missing="optOutUrl"');
+  });
+
+  it("preview never touches the db and subject equals the send subject", async () => {
+    const { CATALOG, previewVars, renderMail } = await import("../lib/mail-templates.js");
+    const row = { prefix: "[{{org.name}}]", subject: "{{event.title}}", body: "x" };
+    const res = await post("/event-created/preview", { subject: row.subject, body: "{{#recipients}}{{optOutUrl}}{{/recipients}}" });
+    expect(res.status).toBe(200); // db ist {}: jeder Zugriff würfe
+    expect(await res.text()).toContain(renderMail(row, previewVars("event-created", "default")).subject);
+    for (const e of Object.values(CATALOG)) for (const r of e.required) expect(r.label.length).toBeGreaterThan(0);
+  });
+
   it("back link follows ?from only for internal paths", async () => {
     const back = async (q: string) => await (await mailTemplateRoutes.request(`/event-created${q}`)).text();
     expect(await back("?from=/events")).toContain('href="/events"');
