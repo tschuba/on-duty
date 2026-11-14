@@ -19,7 +19,10 @@ const sys = (key: string, perm: string, body = "Hi {{#recipients}}{{optOutUrl}}{
 let templates: any[] = [];
 const saveOverride = vi.fn(async () => "ok" as "ok" | "conflict");
 const resetOverride = vi.fn(async () => {});
-vi.mock("../lib/mail-template-store.js", () => ({ listTemplates: async () => templates, saveOverride, resetOverride }));
+const createCustom = vi.fn(async () => "ok" as "ok" | "conflict");
+const saveCustom = vi.fn(async (..._a: unknown[]) => "ok" as "ok" | "conflict");
+const deleteCustom = vi.fn(async () => {});
+vi.mock("../lib/mail-template-store.js", () => ({ listTemplates: async () => templates, saveOverride, resetOverride, listTopics: async () => ["mitteilung"], keyTaken: async (k: string) => k === "taken", createCustom, saveCustom, deleteCustom }));
 
 const { mailTemplateRoutes } = await import("../routes/mail-templates.js");
 const post = (path: string, f: Record<string, string>) => mailTemplateRoutes.request(path, { method: "POST", body: formBody(f), headers: { "content-type": "application/x-www-form-urlencoded" } });
@@ -186,5 +189,97 @@ describe("mail template routes", () => {
   it("reset deletes the override", async () => {
     expect((await post("/event-created/reset", {})).status).toBe(302);
     expect(resetOverride).toHaveBeenCalledWith("event-created");
+  });
+});
+
+describe("custom template routes", () => {
+  it("/new is not swallowed by /:key; 403 without mail:templates", async () => {
+    expect((await mailTemplateRoutes.request("/new")).status).toBe(403);
+    perms = new Set(["mail:templates"]);
+    const res = await mailTemplateRoutes.request("/new");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('name="key"');
+    const ok = { name: "Plan", key: "plan", topic: "t", audience: "member", subject: "s", body: "{{ort}}" };
+    const bad = (o: Record<string, string>) => post("/new", { ...ok, editPermissions: "mail:templates", ...o });
+    expect((await bad({ key: "taken" })).status).toBe(422);
+    expect((await bad({ editPermissions: "system:admin" })).status).toBe(422); // fremdes Recht
+    expect((await bad({ body: "{{a.b}}" })).status).toBe(422);
+    expect(createCustom).not.toHaveBeenCalled();
+    expect((await bad({})).status).toBe(302);
+    expect(createCustom).toHaveBeenCalled();
+    expect((await post("/new", { name: "", key: "x", topic: "t", audience: "member", subject: "s", body: "b", editPermissions: "system:admin" })).status).toBe(422);
+  });
+
+  const cust = (o: Record<string, unknown> = {}) => ({
+    key: "plan", category: "custom", audience: "member", prefix: "[Alt]", editPermissions: ["mail:templates"], system: { subject: "s", body: "{{ort}}" }, override: null,
+    custom: { topic: "uebung", meta: { name: "Plan", fields: [{ name: "ort" }] }, extraHeaders: JSON.stringify({ "X-Foo": "bar" }), updatedAt: new Date("2026-01-02T03:04:05Z") }, ...o,
+  });
+  const edit = { name: "Plan", subject: "s", body: "{{ort}}", updatedAt: "2026-01-02T03:04:05.000Z" };
+
+  it("lists custom templates in their own group, after the system ones", async () => {
+    perms = new Set(["mail:templates"]);
+    templates = [cust(), sys("event-created", "mail:templates")];
+    const html = await (await mailTemplateRoutes.request("/")).text();
+    expect(html).toContain("Eigene Vorlagen");
+    expect(html.indexOf("Neuer Termin")).toBeLessThan(html.indexOf("Eigene Vorlagen"));
+  });
+
+  it("delete: 403 without edit permission, 404 for system templates, removes custom ones", async () => {
+    templates = [cust()];
+    perms = new Set(["events:manage"]);
+    expect((await post("/plan/delete", {})).status).toBe(403);
+    perms = new Set(["mail:templates"]);
+    templates = [sys("event-created", "mail:templates")];
+    expect((await post("/event-created/delete", {})).status).toBe(404);
+    expect(deleteCustom).not.toHaveBeenCalled();
+    templates = [cust()];
+    expect((await post("/plan/delete", {})).status).toBe(302);
+    expect(deleteCustom).toHaveBeenCalledWith("plan");
+  });
+
+  it("save: 409 on concurrent edit, 422 on invalid body, key/topic/audience/perms stay fixed", async () => {
+    perms = new Set(["mail:templates"]);
+    templates = [cust()];
+    saveCustom.mockResolvedValueOnce("conflict");
+    expect((await post("/plan", edit)).status).toBe(409);
+    expect((await post("/plan", { ...edit, body: "{{a.b}}" })).status).toBe(422);
+    saveCustom.mockClear();
+    const res = await post("/plan", { ...edit, key: "other", topic: "x", audience: "staff", editPermissions: "system:admin" });
+    expect(res.status).toBe(302);
+    expect(saveCustom).toHaveBeenCalledWith("plan", expect.objectContaining({ topic: "uebung", audience: "member", editPermissions: ["mail:templates"] }), "u1", edit.updatedAt);
+  });
+
+  it("prefix and key/topic/audience/perms fields only on custom templates; prefix editable, key only when new", async () => {
+    perms = new Set(["mail:templates"]);
+    templates = [cust(), sys("event-created", "mail:templates")];
+    const custom = await (await mailTemplateRoutes.request("/plan")).text();
+    expect(custom).toContain('name="prefix"');
+    expect(custom).not.toContain('name="key"'); // nur beim Anlegen
+    const system = await (await mailTemplateRoutes.request("/event-created")).text();
+    expect(system).not.toContain('name="prefix"');
+    expect(system).not.toContain('name="hn"');
+  });
+
+  it("header rows roundtrip: saved, shown again, reserved ones rejected", async () => {
+    perms = new Set(["mail:templates"]);
+    templates = [cust()];
+    saveCustom.mockClear();
+    expect((await post("/plan", { ...edit, hn: "X-Foo", hv: "bar" })).status).toBe(302);
+    expect(saveCustom.mock.calls[0][1]).toEqual(expect.objectContaining({ extraHeaders: { "X-Foo": "bar" } }));
+    const page = await (await mailTemplateRoutes.request("/plan")).text();
+    expect(page).toContain('name="hn"');
+    expect(page).toMatch(/name="hn"[^>]*value="X-Foo"/);
+    expect(page).toMatch(/name="hv"[^>]*value="bar"/);
+    const bad = await post("/plan", { ...edit, hn: "X-On-Duty-Id", hv: "1" });
+    expect(bad.status).toBe(422);
+    expect(await bad.text()).toContain("ist reserviert");
+  });
+
+  it("new: audience radios are required, permission picker lists only own permissions", async () => {
+    perms = new Set(["mail:templates"]);
+    const html = await (await mailTemplateRoutes.request("/new")).text();
+    for (const a of ["member", "staff", "applicant"]) expect(html).toMatch(new RegExp(`type="radio"[^>]*name="audience"[^>]*value="${a}"|name="audience"[^>]*value="${a}"`));
+    expect(html).toMatch(/name="audience"[^>]*required|required[^>]*name="audience"/);
+    expect(html).not.toContain("Systemverwaltung");
   });
 });

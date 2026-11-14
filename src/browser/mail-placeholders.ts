@@ -1,4 +1,6 @@
 // Platzhalter-Spalte im Mail-Vorlagen-Editor (Einfügen, Spalte, Suche, Tabs, Leave-Warnung).
+import { slugify } from "../lib/slug.js";
+import { parseHeaders } from "../lib/mail-headers.js";
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
@@ -371,4 +373,28 @@ for (const n of ["subject", "body"]) {
   }) as EventListener);
   x.addEventListener("click", acClose);
   x.addEventListener("blur", acClose);
+}
+
+// Freie Vorlagen: key folgt dem Namen, bis er von Hand geändert wird; Header-Regeln wie auf dem Server (gemeinsame Funktion).
+const nameEl = f.elements.namedItem("name") as HTMLInputElement | null, keyEl = f.elements.namedItem("key") as HTMLInputElement | null;
+if (nameEl && keyEl) {
+  let manual = keyEl.value !== "" && keyEl.value !== slugify(nameEl.value);
+  keyEl.addEventListener("input", () => { manual = true; });
+  nameEl.addEventListener("input", () => { if (!manual) keyEl.value = slugify(nameEl.value); });
+}
+const hdrRows = document.getElementById("hdr-rows");
+if (hdrRows) {
+  // Zeilen (hn/hv) → Text „X-Name: Wert“ wie readCustom auf dem Server; leere Zeilen zählen nicht.
+  const check = () => {
+    const names = [...hdrRows.querySelectorAll<HTMLInputElement>("[name=hn]")];
+    const text = names.map((n) => [n.value.trim(), (n.closest("[data-hrow]")?.querySelector<HTMLInputElement>("[name=hv]")?.value ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n");
+    const errs = parseHeaders(text).errors;
+    names.forEach((n) => n.setCustomValidity(""));
+    names[0]?.setCustomValidity(errs[0] ?? "");
+    const out = document.getElementById("err-headers");
+    if (out) out.textContent = errs.join(" ");
+  };
+  hdrRows.addEventListener("input", check);
+  hdrRows.addEventListener("click", () => queueMicrotask(check)); // nach „Entfernen“
+  check();
 }

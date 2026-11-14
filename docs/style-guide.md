@@ -36,6 +36,7 @@ Zwei Font-Families, als CSS-Variablen definiert:
 
 - `--font-heading`: **Oswald** (700) — für `<h1>`
 - `--font-body`: **Inter** (400/500) — Standard-Body-Font (kein expliziter Klassenaufruf nötig, ist Browser-Default über `app.css`)
+- `font-mono` nur für technische Werte (Schlüssel, Thema, Betreff/Text mit Platzhaltern, Header); Rechte-Auswahl und übrige Felder bleiben in Body-Schrift.
 
 **Regel für Seitentitel:** Der `<h1>` entsteht ausschließlich in `PageHeader` (`src/components/page-header.tsx`), nie freistehend (Ausnahme: Fehlerseiten 403/404/500 und Login-Karten ohne `Layout`-Nav).
 

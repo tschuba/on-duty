@@ -645,6 +645,13 @@
       "when": 1794650312199,
       "tag": "0091_application_rejected_contact",
       "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1794668177880,
+      "tag": "0092_sloppy_paper_doll",
+      "breakpoints": true
     }
   ]
 }

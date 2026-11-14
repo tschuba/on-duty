@@ -5,6 +5,7 @@ const DOM = `<script data-leave="Verlassen?" data-tip-if="Nur wenn vorhanden" da
 <form id="tpl-form"><input name="subject"><textarea name="body"></textarea></form>
 <button id="ph-toggle"></button><button id="ph-close"></button><div id="ph-backdrop"></div><div id="ph-resize"></div>
 <div id="pane-edit"></div>
+<div id="hdr-rows"><div data-hrow><input name="hn"><input name="hv"></div></div><p id="err-headers"></p>
 <div id="ph-col"><input id="ph-search">
 <button data-side="ph" class="tab-active"></button><button data-side="tech"></button>
 <script id="ph-data" type="application/json">[{"name":"lst","desc":"Liste","example":"","type":"list"}]</script><div id="side-ph"><section data-g><ul>
@@ -194,5 +195,12 @@ describe("placeholder highlight mirror", () => {
       document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
       expect(menu().classList.contains("hidden")).toBe(true);
     });
+  });
+  it("validates header rows (hn/hv) live", () => {
+    const hn = document.querySelector<HTMLInputElement>("[name=hn]")!;
+    expect($("err-headers").textContent).toBe("");
+    const t = (v: string) => { hn.value = v; hn.dispatchEvent(new Event("input", { bubbles: true })); };
+    t("Foo"); expect($("err-headers").textContent).toContain("X-"); expect(hn.validationMessage).not.toBe("");
+    t("X-Foo"); expect($("err-headers").textContent).toBe("");
   });
 });
