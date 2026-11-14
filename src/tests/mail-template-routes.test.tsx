@@ -10,7 +10,8 @@ vi.mock("../middleware/auth.js", () => ({
 }));
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
 vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve({ state: "unconfigured", timestamp: null, lastSuccess: null }) }));
-vi.mock("../db/index.js", () => ({ db: {} }));
+const dbAccess = vi.fn();
+vi.mock("../db/index.js", () => ({ db: new Proxy({}, { get: (_t, k) => { dbAccess(String(k)); return () => { throw new Error("db used"); }; } }) }));
 
 const sys = (key: string, perm: string, body = "Hi {{#recipients}}{{optOutUrl}}{{/recipients}}") => ({
   key, category: "event", audience: "member", prefix: "[{{org.name}}]", editPermissions: [perm], system: { subject: "Sys {{event.title}}", body }, override: null as any,
@@ -139,6 +140,14 @@ describe("mail template routes", () => {
     const { subject } = renderMail({ prefix: "[{{org.name}}]", subject: "Hallo {{event.title}}", body: "x" }, previewVars("event-created"));
     expect(await res.text()).toContain(subject.replace(/&/g, "&amp;"));
     expect((await post("/member-settings-link/preview", { subject: "S", body: "{{settingsUrl}}" })).status).toBe(403);
+  });
+
+  it("preview reads no domain data (no db access)", async () => {
+    const { CATALOG, previewVars } = await import("../lib/mail-templates.js");
+    dbAccess.mockClear();
+    for (const [key, e] of Object.entries(CATALOG)) for (const c of e.previewCases) previewVars(key, c.id);
+    expect((await post("/event-created/preview", { subject: "S", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}", case: "multiple" })).status).toBe(200);
+    expect(dbAccess).not.toHaveBeenCalled();
   });
 
   it("back link follows ?from only for internal paths", async () => {
