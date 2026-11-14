@@ -13,8 +13,9 @@ import { parseHeaders } from "../lib/mail-headers.js";
 import { SLUG_RE } from "../lib/slug.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
 import { db } from "../db/index.js";
-import { memberRoles } from "../db/schema/index.js";
-import { asc } from "drizzle-orm";
+import { memberRoles, members, persons } from "../db/schema/index.js";
+import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { PERMISSION_LABELS } from "../components/permission-badges.js";
 import type { CustomMeta } from "../db/schema/mail.js";
 import { t } from "../i18n/index.js";
@@ -390,6 +391,19 @@ const previewCustom = async (c: any) => {
 };
 mailTemplateRoutes.post("/new/preview", async (c) => { requireCreate(c.get("user")); return previewCustom(c); });
 
+// Mitgliedersuche für die Einzelauswahl; wer freie Vorlagen versenden darf, darf suchen.
+mailTemplateRoutes.get("/search-members", async (c) => {
+  if (!(await editable(c.get("user"))).some((x) => x.custom)) return forbidden();
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+  const needle = `%${q}%`;
+  const rows = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId))
+    .where(and(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)), isNull(members.exitDate), isNull(members.deathDate)))
+    .orderBy(asc(persons.lastName), asc(persons.firstName)).limit(10);
+  return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }))} />);
+});
+
 mailTemplateRoutes.get("/:key", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
   if (tpl.custom) return renderCustom(c, tpl, null, false);
@@ -464,8 +478,9 @@ mailTemplateRoutes.post("/:key/reset", async (c) => {
 
 // ---- Manueller Versand (Backlog 156): Recht = editPermissions, alle Felder Pflicht ----------------
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ["active", "youth", "children", "passive", "supporting"] as const;
-const readSelection = (f: Record<string, unknown>) => ({ statuses: asArray(f.status).filter((x) => (STATUSES as readonly string[]).includes(x)), roleIds: asArray(f.role) });
+const readSelection = (f: Record<string, unknown>) => ({ statuses: asArray(f.status).filter((x) => (STATUSES as readonly string[]).includes(x)), roleIds: asArray(f.role), memberIds: asArray(f.member).filter((x) => UUID_RE.test(x)) });
 
 // Ein Formular: Änderung der Auswahl lädt per GET neu (Zähler, Feldwerte bleiben in der Query), „Versenden“ sendet per POST.
 async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, sel: ReturnType<typeof readSelection>, errors: string[] = [], status?: number) {
@@ -473,6 +488,9 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
   const meta = tpl.custom!.meta;
   const counts = countRecipients(await customRecipients(tpl.custom!.topic, sel));
   const roles = await db.select({ id: memberRoles.id, title: memberRoles.title }).from(memberRoles).orderBy(asc(memberRoles.sortOrder));
+  const picked = sel.memberIds.length
+    ? await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members).innerJoin(persons, eq(persons.id, members.personId)).where(inArray(members.id, sel.memberIds))
+    : [];
   const smtp = isSmtpConfigured();
   const action = `/mail/templates/${tpl.key}/send${fromQs(back)}`;
   return c.html(
@@ -491,7 +509,15 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
             {roles.length > 0 && <div class="flex flex-wrap gap-3" data-sel>
               {roles.map((r) => <label class="label cursor-pointer gap-2"><input type="checkbox" name="role" value={r.id} class="checkbox checkbox-sm" checked={sel.roleIds.includes(r.id)} />{r.title}</label>)}
             </div>}
+            <EntityPicker searchUrl="/mail/templates/search-members" placeholder={t("events.form.membersSearch")} />
+            <div id="send-members" class="flex flex-wrap gap-1">
+              {picked.map((m) => (
+                <span class="badge badge-ghost gap-1"><input type="hidden" name="member" value={m.id} />{m.firstName} {m.lastName}
+                  <button type="button" class="cursor-pointer" aria-label={t("common.remove")} data-chip-remove>×</button></span>
+              ))}
+            </div>
           </FieldGroup>
+          <script dangerouslySetInnerHTML={{ __html: SEND_SCRIPT }} />
           <p class="font-medium" role="status">{T("mailTemplates.send.counts", { send: counts.send, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
           {meta.fields.map((f) => (
             <Field label={f.label || fieldLabel(f.name)} required>
@@ -503,6 +529,12 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
       </div>
     </Layout>, status);
 }
+
+// Einzelauswahl: Treffer als Chip mit Hidden-Feld anhängen, danach neu laden (Zähler); × entfernt.
+const SEND_SCRIPT = `(function(){var f=document.currentScript.closest('form'),box=f.querySelector('#send-members');
+f.addEventListener('picker:select',function(e){var d=e.detail;if(!f.querySelector('input[name=member][value="'+d.id+'"]')){var s=document.createElement('span');s.className='badge badge-ghost gap-1';
+var i=document.createElement('input');i.type='hidden';i.name='member';i.value=d.id;s.appendChild(i);s.appendChild(document.createTextNode(d.name));box.appendChild(s);}f.submit();});
+box.addEventListener('click',function(e){var b=e.target.closest('[data-chip-remove]');if(b){b.parentNode.remove();f.submit();}});})();`;
 
 const readValues = (tpl: TemplateView, f: Record<string, unknown>) =>
   Object.fromEntries(tpl.custom!.meta.fields.map((x) => [x.name, String(asArray(f[`f_${x.name}`])[0] ?? "").replace(/\r\n/g, "\n").trim()]));

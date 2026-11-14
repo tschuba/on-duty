@@ -961,7 +961,7 @@ export const de = {
   "mailTemplates.send": "Versenden",
   "mailTemplates.send.title": "Mail versenden: {name}",
   "mailTemplates.send.selection": "Empfänger",
-  "mailTemplates.send.selection.hint": "Statusgruppen und Funktionen werden vereint; ohne Auswahl gehen alle aktiven Mitglieder an. Nur mit Adresse und ohne Abbestellung des Themas „{topic}“.",
+  "mailTemplates.send.selection.hint": "Statusgruppen, Funktionen und Einzelpersonen werden vereint; ohne Auswahl gehen alle aktiven Mitglieder an. Nur mit Adresse und ohne Abbestellung des Themas „{topic}“.",
   "mailTemplates.send.counts": "{send} Empfänger, {noEmail} ohne Adresse, {optedOut} abbestellt.",
   "mailTemplates.send.noSmtp": "Der Mailversand ist nicht eingerichtet (SMTP).",
   "mailTemplates.send.noRecipients": "Keine Empfänger.",

@@ -14,12 +14,12 @@ import { t } from "../i18n/index.js";
 const inFlight = new Set<string>();
 export const isSending = (key: string) => inFlight.has(key);
 
-// Auswahl: Vereinigung aus Statusgruppen und aktuell vergebenen Funktionen; leer = alle aktiven Mitglieder.
-export interface Selection { statuses: string[]; roleIds: string[] }
+// Auswahl: Vereinigung aus Statusgruppen, aktuell vergebenen Funktionen und Einzelpersonen; leer = alle aktiven Mitglieder.
+export interface Selection { statuses: string[]; roleIds: string[]; memberIds: string[] }
 
-export async function customRecipients(topic: string, sel: Selection = { statuses: [], roleIds: [] }): Promise<EventMailRecipient[]> {
+export async function customRecipients(topic: string, sel: Selection = { statuses: [], roleIds: [], memberIds: [] }): Promise<EventMailRecipient[]> {
   let ids: string[];
-  if (!sel.statuses.length && !sel.roleIds.length) {
+  if (!sel.statuses.length && !sel.roleIds.length && !sel.memberIds.length) {
     ids = (await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)).filter(isActiveMember).map((m) => m.id);
   } else {
     const byStatus = await findMembersByStatus(); // nur aktive Mitglieder
@@ -30,6 +30,7 @@ export async function customRecipients(topic: string, sel: Selection = { statuse
         .where(and(inArray(memberRoleAssignments.memberRoleId, sel.roleIds), isNull(memberRoleAssignments.to)));
       rows.forEach((r) => active.has(r.id) && picked.add(r.id));
     }
+    sel.memberIds.forEach((id) => active.has(id) && picked.add(id));
     ids = [...picked];
   }
   return mailRecipientsFor(ids, topic);
