@@ -97,7 +97,7 @@ const groupOf = (k: string, v: VarSpec, custom?: boolean) =>
 
 // Zusätze des Editors für freie Vorlagen (Backlog 162)
 interface CustomForm {
-  isNew: boolean; name: string; description: string; prefix: string; headers: string; fields: { name: string; label?: string; example?: string }[];
+  isNew: boolean; urgent: boolean; name: string; description: string; prefix: string; headers: string; fields: { name: string; label?: string; example?: string }[];
   key: string; topic: string; audience: string; perms: string[]; topics: string[]; grantable: Permission[];
 }
 // Header als Zeilen „X-Name | Wert“; mindestens eine leere Zeile zum Ausfüllen
@@ -175,6 +175,8 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.permissions.hint")}</p>
                 </div>
               </> : null}
+              <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="urgent" value="1" class="checkbox checkbox-sm" checked={cf.urgent} />{t("mailTemplates.custom.urgent")}</label>
+              <p class="label text-xs opacity-70 whitespace-normal -mt-3">{t("mailTemplates.custom.urgent.hint")}</p>
               <Field label={t("mailTemplates.technical.prefix")}><input id="tpl-prefix" name="prefix" class="input w-full font-mono" placeholder={t("mailTemplates.technical.prefix")} value={cf.prefix} /></Field>
             </>}
             <Field label={t("mailTemplates.field.subject")} required class={cf ? undefined : "md:group-data-[open=false]:pr-12"} after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
@@ -317,7 +319,7 @@ async function readCustom(c: any) {
   const one = (k: string) => String(asArray(f[k])[0] ?? "");
   const subject = one("subject").trim(), body = one("body").replace(/\r\n/g, "\n"), prefix = one("prefix").trim();
   const fields = customFields({ prefix, subject, body }).map((name) => ({ name, label: one(`fl_${name}`).trim() || undefined, example: one(`fe_${name}`).trim() || undefined }));
-  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
+  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), urgent: one("urgent") === "1", key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
 }
 type CustomFormData = Awaited<ReturnType<typeof readCustom>>;
 
@@ -337,7 +339,7 @@ async function customErrors(d: CustomFormData, allowed: string[] | null, newKey:
 }
 
 const toInput = (d: CustomFormData, tpl: Pick<TemplateView, "audience" | "editPermissions"> & { topic?: string }, isNew: boolean): CustomInput => ({
-  meta: { name: d.name, ...(d.description ? { description: d.description } : {}), fields: d.fields } satisfies CustomMeta,
+  meta: { name: d.name, ...(d.description ? { description: d.description } : {}), ...(d.urgent ? { urgent: true } : {}), fields: d.fields } satisfies CustomMeta,
   topic: isNew ? d.topic : tpl.topic!, audience: isNew ? d.audience : tpl.audience, editPermissions: isNew ? d.perms : tpl.editPermissions,
   prefix: d.prefix, subject: d.subject, body: d.body, extraHeaders: parseHeaders(d.headers).headers,
 });
@@ -346,7 +348,7 @@ async function renderCustom(c: any, tpl: TemplateView, d: CustomFormData | null,
   const user = c.get("user");
   const cur = tpl.custom;
   const form: CustomForm = {
-    isNew, name: d?.name ?? cur?.meta.name ?? "", description: d?.description ?? cur?.meta.description ?? "", prefix: d?.prefix ?? tpl.prefix,
+    isNew, urgent: d ? d.urgent : !!cur?.meta.urgent, name: d?.name ?? cur?.meta.name ?? "", description: d?.description ?? cur?.meta.description ?? "", prefix: d?.prefix ?? tpl.prefix,
     headers: d?.headers ?? Object.entries(cur?.extraHeaders ? JSON.parse(cur.extraHeaders) : {}).map(([k, v]) => `${k}: ${v}`).join("\n"),
     fields: d?.fields ?? cur?.meta.fields ?? [], key: d?.key ?? tpl.key, topic: d?.topic ?? cur?.topic ?? "", audience: d?.audience ?? tpl.audience,
     perms: d?.perms ?? tpl.editPermissions, topics: isNew ? await listTopics() : [], grantable: grantable(user),
@@ -486,7 +488,7 @@ const readSelection = (f: Record<string, unknown>) => ({ statuses: asArray(f.sta
 async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, sel: ReturnType<typeof readSelection>, errors: string[] = [], status?: number) {
   const back = backTo(c.req.query("from"));
   const meta = tpl.custom!.meta;
-  const counts = countRecipients(await customRecipients(tpl.custom!.topic, sel));
+  const counts = countRecipients(await customRecipients(tpl.custom!.topic, sel, !!meta.urgent));
   const roles = await db.select({ id: memberRoles.id, title: memberRoles.title }).from(memberRoles).orderBy(asc(memberRoles.sortOrder));
   const picked = sel.memberIds.length
     ? await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members).innerJoin(persons, eq(persons.id, members.personId)).where(inArray(members.id, sel.memberIds))
@@ -502,7 +504,7 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
         <form method="get" action={action} class="space-y-4" onchange="if(event.target.closest('[data-sel]'))this.submit()">
           {back !== "/mail/templates" && <input type="hidden" name="from" value={back} />}
           <FieldGroup legend={t("mailTemplates.send.selection")}>
-            <p class="text-sm opacity-70">{T("mailTemplates.send.selection.hint", { topic: tpl.custom!.topic })}</p>
+            <p class="text-sm opacity-70">{meta.urgent ? t("mailTemplates.send.urgent") : T("mailTemplates.send.selection.hint", { topic: tpl.custom!.topic })}</p>
             <div class="flex flex-wrap gap-3" data-sel>
               {STATUSES.map((st) => <label class="label cursor-pointer gap-2"><input type="checkbox" name="status" value={st} class="checkbox checkbox-sm" checked={sel.statuses.includes(st)} />{T(`status.${st}`)}</label>)}
             </div>
@@ -554,7 +556,7 @@ mailTemplateRoutes.post("/:key/send", async (c) => {
   const fail = (msg: string, status: number) => sendForm(c, tpl, values, sel, [msg], status);
   if (Object.values(values).some((v) => !v)) return fail(t("mailTemplates.send.missing"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (!isSmtpConfigured()) return fail(t("mailTemplates.send.noSmtp"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
-  const res = await startCustomMail(tpl.key, values, sel);
+  const res = await startCustomMail(tpl.key, values, sel, !!tpl.custom.meta.urgent);
   if (res === "busy") return fail(t("mailTemplates.send.busy"), HTTP_STATUS.CONFLICT);
   if (res === "invalid") return fail(t("mailTemplates.send.invalid"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (res === "none") return fail(t("mailTemplates.send.noRecipients"), HTTP_STATUS.UNPROCESSABLE_ENTITY);

@@ -5,7 +5,7 @@ import { users } from "./auth";
 import { persons } from "./persons";
 import { events } from "./events";
 
-export interface CustomMeta { name: string; description?: string; fields: { name: string; label?: string; example?: string }[] }
+export interface CustomMeta { name: string; description?: string; urgent?: boolean; fields: { name: string; label?: string; example?: string }[] }
 
 /* v8 ignore start -- table schema declarations, no branching logic to unit-test */
 export const mailTemplateVariantEnum = pgEnum("mail_template_variant", ["system", "override", "custom"]);

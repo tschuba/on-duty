@@ -17,7 +17,7 @@ export const isSending = (key: string) => inFlight.has(key);
 // Auswahl: Vereinigung aus Statusgruppen, aktuell vergebenen Funktionen und Einzelpersonen; leer = alle aktiven Mitglieder.
 export interface Selection { statuses: string[]; roleIds: string[]; memberIds: string[] }
 
-export async function customRecipients(topic: string, sel: Selection = { statuses: [], roleIds: [], memberIds: [] }): Promise<EventMailRecipient[]> {
+export async function customRecipients(topic: string, sel: Selection = { statuses: [], roleIds: [], memberIds: [] }, urgent = false): Promise<EventMailRecipient[]> {
   let ids: string[];
   if (!sel.statuses.length && !sel.roleIds.length && !sel.memberIds.length) {
     ids = (await db.select({ id: members.id, exitDate: members.exitDate, deathDate: members.deathDate }).from(members)).filter(isActiveMember).map((m) => m.id);
@@ -33,21 +33,21 @@ export async function customRecipients(topic: string, sel: Selection = { statuse
     sel.memberIds.forEach((id) => active.has(id) && picked.add(id));
     ids = [...picked];
   }
-  return mailRecipientsFor(ids, topic);
+  return mailRecipientsFor(ids, urgent ? "" : topic); // dringend: Abbestellungen gelten nicht (Thema "" wird nie abbestellt)
 }
 
 export const countSend = (rs: EventMailRecipient[]) => rs.filter((r) => r.state === "send").length;
 
 // Startet den Versand im Hintergrund (eine Mail je Adresse). Ergebnis: Empfängerzahl oder Grund des Abbruchs.
-export async function startCustomMail(key: string, values: Record<string, string>, sel?: Selection): Promise<number | "busy" | "invalid" | "none"> {
+export async function startCustomMail(key: string, values: Record<string, string>, sel: Selection | undefined, urgent: boolean): Promise<number | "busy" | "invalid" | "none"> {
   if (inFlight.has(key)) return "busy";
   inFlight.add(key);
   try {
     const tpl = await resolveTemplate(key);
     if (!tpl?.topic) { inFlight.delete(key); return "invalid"; }
-    const rs = (await customRecipients(tpl.topic, sel)).filter((r) => r.state === "send");
+    const rs = (await customRecipients(tpl.topic, sel, urgent)).filter((r) => r.state === "send");
     if (!rs.length) { inFlight.delete(key); return "none"; }
-    void run(key, tpl, rs, values).catch((err) => logger.error({ err }, "[custom-mail] failed")).finally(() => inFlight.delete(key));
+    void run(key, tpl, rs, values, urgent).catch((err) => logger.error({ err }, "[custom-mail] failed")).finally(() => inFlight.delete(key));
     return rs.length;
   } catch (err) {
     inFlight.delete(key);
@@ -55,7 +55,7 @@ export async function startCustomMail(key: string, values: Record<string, string
   }
 }
 
-async function run(key: string, tpl: NonNullable<Awaited<ReturnType<typeof resolveTemplate>>>, rs: EventMailRecipient[], values: Record<string, string>): Promise<void> {
+async function run(key: string, tpl: NonNullable<Awaited<ReturnType<typeof resolveTemplate>>>, rs: EventMailRecipient[], values: Record<string, string>, urgent: boolean): Promise<void> {
   const groups = new Map<string, EventMailRecipient[]>();
   for (const r of rs) groups.set(r.email.toLowerCase(), [...(groups.get(r.email.toLowerCase()) ?? []), r]);
   const mailTpl = { ...tpl, key: `custom-${key}` }; // X-On-Duty-Event
@@ -66,8 +66,8 @@ async function run(key: string, tpl: NonNullable<Awaited<ReturnType<typeof resol
       org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: "" }, type: t("mail.type.custom"),
       recipient: { name: `${first.firstName} ${first.lastName}`.trim(), firstName: first.firstName, lastName: first.lastName, email: first.email },
     };
-    // List-Unsubscribe nur bei genau einem Mitglied an der Adresse, sonst nicht eindeutig.
-    const headers = group.length > 1 ? undefined : { "List-Unsubscribe": `<${linkUrl({ p: "mail.optout", m: first.memberId, t: tpl.topic! })}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+    // List-Unsubscribe nur bei genau einem Mitglied und nicht bei dringenden Mails (dort gibt es kein Opt-Out).
+    const headers = urgent || group.length > 1 ? undefined : { "List-Unsubscribe": `<${linkUrl({ p: "mail.optout", m: first.memberId, t: tpl.topic! })}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
     let sent = false;
     try {
       ({ sent } = await sendMail({ key, to: first.email, vars, template: mailTpl, headers }));
