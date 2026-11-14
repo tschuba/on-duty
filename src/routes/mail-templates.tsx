@@ -17,6 +17,7 @@ import type { CustomMeta } from "../db/schema/mail.js";
 import { t } from "../i18n/index.js";
 import { Icon } from "../components/icon.js";
 import { Field, FieldGroup } from "../components/field.js";
+import { PermissionPicker } from "../components/permission-picker.js";
 
 export const mailTemplateRoutes = new Hono<{ Variables: Variables }>();
 mailTemplateRoutes.use("*", requireAuth()); // Recht je Vorlage wird im Handler geprüft
@@ -92,6 +93,18 @@ interface CustomForm {
   isNew: boolean; name: string; description: string; prefix: string; headers: string; fields: { name: string; label?: string; example?: string }[];
   key: string; topic: string; audience: string; perms: string[]; topics: string[]; grantable: Permission[];
 }
+// Header als Zeilen „X-Name | Wert“; mindestens eine leere Zeile zum Ausfüllen
+const headerRows = (text: string): [string, string][] => {
+  const rows = text.split("\n").filter((l) => l.trim()).map((l): [string, string] => { const at = l.indexOf(":"); return at < 0 ? [l.trim(), ""] : [l.slice(0, at).trim(), l.slice(at + 1).trim()]; });
+  return rows.length ? rows : [["", ""]];
+};
+const HeaderRow = ({ n, v }: { n: string; v: string }) => (
+  <div class="flex gap-2 items-center" data-hrow>
+    <input name="hn" class="input input-sm w-2/5 font-mono" value={n} placeholder="X-Name" aria-label={t("mailTemplates.custom.headers.name")} />
+    <input name="hv" class="input input-sm grow" value={v} placeholder={t("mailTemplates.custom.headers.value")} aria-label={t("mailTemplates.custom.headers.value")} />
+    <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label={t("common.remove")} onclick="this.closest('[data-hrow]').remove()">×</button>
+  </div>
+);
 const AUDIENCES = ["member", "staff", "applicant"];
 
 // Markierung (\u0001name\u0002) aus customPreviewVars → hervorgehobener Platzhalter (Hintergrund + Text, nicht nur Farbe)
@@ -134,7 +147,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
           <form id="tpl-form" method="post" action={`${base}${fromQs(back)}`} class="space-y-4 min-w-0 pt-2 md:overflow-y-auto">
             <input type="hidden" name="updatedAt" value={expected} />
             {cf && <>
-              <Field label={t("mailTemplates.custom.name")} required><input id="tpl-name" name="name" class="input w-full" placeholder={t("mailTemplates.custom.name")} value={cf.name} required /></Field>
+              <Field label={t("mailTemplates.custom.name")} required class="md:group-data-[open=false]:pr-12"><input id="tpl-name" name="name" class="input w-full" placeholder={t("mailTemplates.custom.name")} value={cf.name} required /></Field>
               <Field label={t("mailTemplates.custom.description")}><input name="description" class="input w-full" placeholder={t("mailTemplates.custom.description")} value={cf.description} /></Field>
               {cf.isNew ? <>
                 <Field label={t("mailTemplates.custom.key")} required hint={t("mailTemplates.custom.key.hint")}><input id="tpl-key" name="key" class="input w-full font-mono" placeholder={t("mailTemplates.custom.key")} value={cf.key} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength={60} required /></Field>
@@ -142,17 +155,21 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   <input name="topic" list="tpl-topics" class="input w-full font-mono" placeholder={t("mailTemplates.custom.topic")} value={cf.topic} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength={60} required />
                   <datalist id="tpl-topics">{cf.topics.map((x) => <option value={x} />)}</datalist>
                 </Field>
-                <Field label={t("mailTemplates.technical.audience")} required>
-                  <select name="audience" class="select w-full">{AUDIENCES.map((a) => <option value={a} selected={cf.audience === a}>{T(`mailTemplates.audience.${a}`)}</option>)}</select>
-                </Field>
-                <FieldGroup legend={t("mailTemplates.custom.permissions")}>
-                  <div class="grid gap-1 sm:grid-cols-2">{cf.grantable.map((p) => <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" class="checkbox checkbox-sm" name="editPermissions" value={p} checked={cf.perms.includes(p)} />{PERMISSION_LABELS[p]}</label>)}</div>
-                  <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.permissions.hint")}</p>
+                <FieldGroup legend={t("mailTemplates.technical.audience")}>
+                  <div class="join">{AUDIENCES.map((a) => <input type="radio" name="audience" value={a} class="join-item btn" aria-label={T(`mailTemplates.audience.${a}`)} checked={cf.audience === a} required />)}</div>
                 </FieldGroup>
+                <div>
+                  {/* div statt label: ein label würde Klicks an den ersten Chip-Entfernen-Button weiterreichen */}
+                  <div class="floating-label w-full">
+                    <span>{t("mailTemplates.custom.permissions")}<span class="text-error ml-1">*</span></span>
+                    <PermissionPicker name="editPermissions" options={cf.grantable} values={cf.perms} />
+                  </div>
+                  <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.permissions.hint")}</p>
+                </div>
               </> : null}
               <Field label={t("mailTemplates.technical.prefix")}><input id="tpl-prefix" name="prefix" class="input w-full font-mono" placeholder={t("mailTemplates.technical.prefix")} value={cf.prefix} /></Field>
             </>}
-            <Field label={t("mailTemplates.field.subject")} required class="md:group-data-[open=false]:pr-12" after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
+            <Field label={t("mailTemplates.field.subject")} required class={cf ? undefined : "md:group-data-[open=false]:pr-12"} after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
               <input id="tpl-subject" name="subject" class="input w-full font-mono" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} />
             </Field>
             <Field label={t("mailTemplates.field.body")} required after={bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}>
@@ -173,9 +190,13 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   </table></div>
                 </div>
               )}
-              <Field label={t("mailTemplates.custom.headers")} hint={t("mailTemplates.custom.headers.hint")} after={<p id="err-headers" class="text-error text-sm">{errors.filter((e) => e.startsWith("headers: ")).map((e) => e.replace(/^headers: /, "")).join(" ")}</p>}>
-                <textarea id="tpl-headers" name="headers" rows={3} class="textarea w-full max-w-full font-mono" placeholder="X-Name: Wert" aria-describedby="err-headers">{cf.headers}</textarea>
-              </Field>
+              <FieldGroup legend={t("mailTemplates.custom.headers")}>
+                <div id="hdr-rows" class="space-y-2">{headerRows(cf.headers).map(([n, v]) => <HeaderRow n={n} v={v} />)}</div>
+                <template id="hdr-tpl"><HeaderRow n="" v="" /></template>
+                <div><button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('hdr-rows').appendChild(document.getElementById('hdr-tpl').content.cloneNode(true))"><Icon name="plus" class="h-4 w-4" />{t("mailTemplates.custom.headers.add")}</button></div>
+                <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.headers.hint")}</p>
+                <p id="err-headers" class="text-error text-sm">{errors.filter((e) => e.startsWith("headers: ")).map((e) => e.replace(/^headers: /, "")).join(" ")}</p>
+              </FieldGroup>
             </>}
           </form>
           <aside id="ph-col" aria-label={t("mailTemplates.placeholders")} class="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-auto bg-base-100 shadow-xl transition-transform group-data-[open=false]:invisible group-data-[open=false]:translate-x-full md:static md:mt-2 md:inset-auto md:z-auto md:w-auto md:max-w-none md:group-data-[open=true]:[contain:size] md:overflow-y-auto md:rounded-box md:border md:border-base-300 md:shadow-none md:group-data-[open=false]:visible md:group-data-[open=false]:translate-x-0 md:group-data-[open=false]:absolute md:group-data-[open=false]:-top-px md:group-data-[open=false]:-right-px md:group-data-[open=false]:w-[calc(2.5rem+2px)] md:group-data-[open=false]:border-transparent md:group-data-[open=false]:overflow-visible motion-reduce:transition-none">
@@ -288,7 +309,7 @@ async function readCustom(c: any) {
   const one = (k: string) => String(asArray(f[k])[0] ?? "");
   const subject = one("subject").trim(), body = one("body").replace(/\r\n/g, "\n"), prefix = one("prefix").trim();
   const fields = customFields({ prefix, subject, body }).map((name) => ({ name, label: one(`fl_${name}`).trim() || undefined, example: one(`fe_${name}`).trim() || undefined }));
-  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: one("headers").replace(/\r\n/g, "\n"), key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
+  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
 }
 type CustomFormData = Awaited<ReturnType<typeof readCustom>>;
 

@@ -6,7 +6,8 @@ function insertChain() {
   });
 }
 
-const insert = vi.fn(() => ({ values: vi.fn(insertChain) }));
+const valuesSpy = vi.fn((_rows?: unknown) => insertChain());
+const insert = vi.fn(() => ({ values: valuesSpy }));
 let existingAccounts: unknown[] = [];
 const where = vi.fn(() => Promise.resolve(existingAccounts));
 const select = vi.fn(() => ({ from: vi.fn(() => ({ where })) }));
@@ -53,5 +54,11 @@ describe("runSeed", () => {
 
     // memberRoleTypes, memberRoles, anniversaryYears, appRoles, appRolePermissions, users, userAppRoles (no accounts insert)
     expect(insert).toHaveBeenCalledTimes(7);
+  });
+
+  it("grants mail:templates to the Administrator role", async () => {
+    await runSeed();
+    const rows = valuesSpy.mock.calls.flatMap((c) => (Array.isArray(c[0]) ? c[0] : [c[0]])) as { permission?: string }[];
+    expect(rows.some((r) => r.permission === "mail:templates")).toBe(true);
   });
 });

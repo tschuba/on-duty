@@ -382,14 +382,19 @@ if (nameEl && keyEl) {
   keyEl.addEventListener("input", () => { manual = true; });
   nameEl.addEventListener("input", () => { if (!manual) keyEl.value = slugify(nameEl.value); });
 }
-const hdr = f.elements.namedItem("headers") as HTMLTextAreaElement | null;
-if (hdr) {
+const hdrRows = document.getElementById("hdr-rows");
+if (hdrRows) {
+  // Zeilen (hn/hv) → Text „X-Name: Wert“ wie readCustom auf dem Server; leere Zeilen zählen nicht.
   const check = () => {
-    const errs = parseHeaders(hdr.value).errors;
-    hdr.setCustomValidity(errs[0] ?? "");
+    const names = [...hdrRows.querySelectorAll<HTMLInputElement>("[name=hn]")];
+    const text = names.map((n) => [n.value.trim(), (n.closest("[data-hrow]")?.querySelector<HTMLInputElement>("[name=hv]")?.value ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n");
+    const errs = parseHeaders(text).errors;
+    names.forEach((n) => n.setCustomValidity(""));
+    names[0]?.setCustomValidity(errs[0] ?? "");
     const out = document.getElementById("err-headers");
     if (out) out.textContent = errs.join(" ");
   };
-  hdr.addEventListener("input", check);
+  hdrRows.addEventListener("input", check);
+  hdrRows.addEventListener("click", () => queueMicrotask(check)); // nach „Entfernen“
   check();
 }

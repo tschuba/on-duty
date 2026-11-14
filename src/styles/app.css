@@ -261,3 +261,6 @@ form trix-toolbar .trix-button-group.trix-button-group--file-tools { display: no
 
 /* Eigenes Chevron statt Chrome-/Safari-Datalist-Pfeil (RoleCombo). */
 input[data-combo]::-webkit-calendar-picker-indicator { display: none !important; }
+
+/* Mail-Editor: der Spiegel färbt den Feldtext (color: transparent); der Platzhalter braucht eine eigene Farbe. */
+.floating-label :is(input, textarea)::placeholder { color: color-mix(in oklab, var(--color-base-content) 50%, transparent); }
