@@ -15,15 +15,18 @@ Enthält `ORG_NAME` eines dieser Zeichen, meldet der App-Start das: eine Warnung
 | `Mitgliedsantrag` | `membership` | Eingang, Zusage, Absage von Mitgliedsanträgen |
 | `Verleih` | `lend` | Verleih-Anfragen |
 | `Registrierung` | `registration` | Freigabe neuer Benutzer |
+| `Termin` | `event` | Termin-Mails (neu, geändert, abgesagt, findet statt) |
+| `Mitglied` | `member` | Einstellungslink für Mitglieder ohne Login (`/me`) |
+| `Mitteilung` | `custom` | Freie Vorlagen (vorbereitet, noch ohne Versand) |
 | `Benutzerkonto` | – (nur Zitadel) | E-Mail-Bestätigung, Passwort-Reset, Einladung |
 
-Die Typ-Labels sind Teil der Schnittstelle: Filter dürfen sich darauf verlassen, sie werden nicht ohne Ankündigung umbenannt (`mail.type.*` in `src/i18n/de.ts`).
+Bei allen on-duty-Mails (Texte stehen als Vorlagen in der DB; die Betreffs in den Tabellen sind nur der Ausgangswert) lassen sich Betreff und Text im Editor ändern; das Präfix nur bei freien Vorlagen. Betreff-Filter sind daher nur eingeschränkt stabil, verlässlich sind nur die Header `X-On-Duty-*`. Für Zitadel-Mails („Benutzerkonto“, keine eigenen Header möglich) bleibt das Label fest und ist der einzige Filteranker. Variablen der Vorlagen: [mail-variables.md](mail-variables.md).
 
 **Header** (nur on-duty-Mails; Zitadel kann keine eigenen Header setzen):
 
-- `X-On-Duty-Category`: `membership` | `lend` | `registration`
+- `X-On-Duty-Category`: `membership` | `lend` | `registration` | `event` | `member` | `custom`
 - `X-On-Duty-Event`: siehe Tabelle unten (stabil, nicht lokalisiert)
-- `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene)
+- `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene) | `member` (Mitglieder)
 
 **Sonstiges:** `From` ist überall `SMTP_FROM` (auch bei Zitadel). Reiner Text, keine Anhänge, kein `Reply-To`. Versand über nodemailer (`src/lib/mail.ts`, Port `SMTP_PORT`, Standard 587/STARTTLS). Ohne `SMTP_HOST`/`SMTP_FROM` wird nichts gesendet. Adressen auf `.invalid` werden bei Admin-Benachrichtigungen übersprungen.
 
@@ -32,8 +35,8 @@ Die Typ-Labels sind Teil der Schnittstelle: Filter dürfen sich darauf verlassen
 | Auslöser | Empfänger | Betreff | Event | Audience |
 |---|---|---|---|---|
 | Mitgliedsantrag eingegangen | Benachrichtigungsadresse¹ | `[on-duty\|Mitgliedsantrag] Neuer Antrag eingegangen: <Name>` | `application-submitted` | `staff` |
-| Mitgliedsantrag angenommen | Antragsteller | `[on-duty\|Mitgliedsantrag] Ihr Antrag wurde angenommen` | `application-approved` | `applicant` |
-| Mitgliedsantrag abgelehnt | Antragsteller | `[on-duty\|Mitgliedsantrag] Ihr Antrag wurde abgelehnt` | `application-rejected` | `applicant` |
+| Mitgliedsantrag angenommen | Antragsteller | `[on-duty\|Mitgliedsantrag] Dein Antrag wurde angenommen` | `application-approved` | `applicant` |
+| Mitgliedsantrag abgelehnt | Antragsteller | `[on-duty\|Mitgliedsantrag] Dein Antrag wurde abgelehnt` | `application-rejected` | `applicant` |
 | Verleih-Anfrage eingegangen | Benachrichtigungsadresse¹ | `[on-duty\|Verleih] Neue Verleih-Anfrage: <Gegenstand>` | `lend-notify` | `staff` |
 | Verleih-Anfrage: Eingangsbestätigung | Antragsteller (falls E-Mail) | `[on-duty\|Verleih] Deine Verleih-Anfrage ist eingegangen` | `lend-submitted` | `applicant` |
 | Verleih-Anfrage genehmigt | Antragsteller | `[on-duty\|Verleih] Deine Verleih-Anfrage wurde genehmigt` | `lend-approved` | `applicant` |
@@ -41,6 +44,28 @@ Die Typ-Labels sind Teil der Schnittstelle: Filter dürfen sich darauf verlassen
 | Neue Registrierung wartet auf Freigabe | alle Admins (Rollen mit Rechten) | `[on-duty\|Registrierung] Neue Registrierung wartet auf Freigabe` | `registration-pending` | `staff` |
 
 ¹ Org-Einstellung `notificationEmail`, sonst `orgContactEmail`; beides leer → keine Mail.
+
+Termin-Mails (Vorlagen in der DB, Standardtexte „du“):
+
+| Auslöser | Betreff (Standard) | Event | Audience |
+|---|---|---|---|
+| Neuer Termin | `[on-duty\|Termin] Neuer Termin: <Titel>, <Datum>` | `event-created` | `member` |
+| Termin geändert | `[on-duty\|Termin] Termin geändert: …` | `event-updated` | `member` |
+| Termin abgesagt | `[on-duty\|Termin] Termin abgesagt: …` | `event-cancelled` | `member` |
+| Absage zurückgenommen | `[on-duty\|Termin] Termin findet statt: …` | `event-uncancelled` | `member` |
+| Info-Mail „Künftig Termine per Mail“ (Button im Zahnrad-Dropdown auf `/events`, erreicht nur Mitglieder ohne bereits versendete Info-Mail) | `[on-duty\|Termin] Künftig Termine per Mail` | `event-mail-info` | `member` |
+
+Einstellungslink (Transaktionsmail, kein Opt-Out-Thema):
+
+| Auslöser | Betreff (Standard) | Event | Audience |
+|---|---|---|---|
+| Anfrage auf `/me` mit bekannter Adresse | `[on-duty\|Mitglied] Deine Einstellungen bei <Org>` | `member-settings-link` | `member` |
+
+Der Link (`/link/<Token>`, 30 Minuten gültig) öffnet die Einstellungsseite für alle aktiven Personen mit dieser Adresse; Versand wird in `mail_log` protokolliert, Änderungen setzen `source = settings`.
+
+Versand: nach „Mail senden“ im Modal auf der Termin-Detailseite (nach Anlegen, nach Änderung von Zeit, Ort oder Anmeldefrist, nach Absage/Wiederaufnahme; „Neuer Termin“ lässt sich über „Mitglieder benachrichtigen“ / „Fehlgeschlagene erneut senden“ nachholen; den Versandstatus je Mitglied zeigt der Abschnitt „Mail-Versand“; Opt-Out auch per Checkbox im Konto bzw. Mitgliederformular), eine Mail je Adresse (gemeinsame Adressen mit einem Block je Mitglied). Jede Mail enthält Opt-Out-Links (`/link/<Token>`, signiert, ohne Login); bei genau einem Mitglied zusätzlich `List-Unsubscribe` und `List-Unsubscribe-Post`. Abbestellungen stehen in `mail_preferences`, das Versandprotokoll in `mail_log`.
+
+Rezepte mit konkretem Betreff gelten nur für das feste Präfix, nicht für den änderbaren Betreff.
 
 ## Mails von Zitadel
 

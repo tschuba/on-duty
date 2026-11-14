@@ -4,6 +4,7 @@ import { users, userAppRoles, appRolePermissions } from "../db/schema/index.js";
 import { env } from "../env.js";
 import { getSettings } from "./settings.js";
 import { sendMail } from "./mail.js";
+import { buildVars } from "./mail-templates.js";
 import { LOCAL_ADMIN_EMAIL } from "./constants.js";
 
 export type RegistrationRejection = "registration_disabled" | "email_unverified";
@@ -38,14 +39,7 @@ export async function onUserRegistered(user: { id: string; name: string; email: 
   const recipients = admins.map((a) => a.email).filter((e) => !e.endsWith(".invalid"));
   await Promise.all(
     recipients.map((to) =>
-      sendMail({
-        to,
-        category: "registration",
-        event: "registration-pending",
-        audience: "staff",
-        subject: "Neue Registrierung wartet auf Freigabe",
-        text: `${user.name} (${user.email}) hat sich registriert und wartet auf Freigabe.\n\n${env.OIDC_APP_URL}/admin/users`,
-      }),
+      sendMail({ key: "registration-pending", to, vars: buildVars("registration-pending", { userName: user.name, userEmail: user.email }, []) }),
     ),
   );
 }
