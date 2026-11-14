@@ -10,6 +10,7 @@ import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
 import { isApplicationFormActive } from "../lib/application-forms.js";
 import { verifyCap } from "../lib/cap.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
 
@@ -258,14 +259,7 @@ async function notifySubmission(name: string) {
   const config = await loadOrgConfig();
   const to = notificationRecipient(config);
   if (!to) return;
-  await sendMail({
-    to,
-    category: "membership",
-    event: "application-submitted",
-    audience: "staff",
-    subject: t("applications.mail.submitNotifySubject", { name }),
-    text: `Neuer Antrag von ${name} ist eingegangen und wartet auf Prüfung.`,
-  });
+  await sendMail({ key: "application-submitted", to, vars: buildVars("application-submitted", { applicantName: name }, []) });
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────────

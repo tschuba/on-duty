@@ -6,6 +6,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary', 'json'],
       include: ['src/**'],
+      exclude: ['src/tests/**'],
       // ponytail: thresholds removed — enforcement is in CI via artifact comparison
     },
   },

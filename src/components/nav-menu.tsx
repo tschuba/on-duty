@@ -69,6 +69,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     { icon: "building-office", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
     ] },
+    { icon: "envelope", label: t("mailTemplates.title"), items: [{ label: t("mailTemplates.title"), href: "/mail/templates", show: true }] },
     { icon: "arrow-down-tray", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
     { icon: "cog-6-tooth", label: t("common.nav.admin"), items: [
       { label: t("admin.tabs.users"), href: "/admin/users", show: has("system:admin"), count: c.pendingUsers },

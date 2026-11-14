@@ -160,7 +160,7 @@ describe("POST /inventory/requests/:id/approve", () => {
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: formBody({ personId: "" }),
     });
-    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@example.com", category: "lend", audience: "applicant" }));
+    expect(sendMail).toHaveBeenCalledWith(expect.objectContaining({ to: "max@example.com", key: "lend-approved" }));
   });
 });
 

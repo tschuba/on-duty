@@ -95,7 +95,7 @@ EOT
 
     echo "Baue Image für die Init-Container..."
     "${COMPOSE[@]}" --profile app build app
-    SERVICES=(db zitadel zitadel-login zitadel-init caddy)
+    SERVICES=(db zitadel zitadel-login zitadel-init caddy mailpit)
     [[ $WITH_ERRORS -eq 1 ]] && SERVICES+=(bugsink bugsink-init)
     [[ $WITH_OBS -eq 1 ]] && SERVICES+=(openobserve openobserve-init)
     "${COMPOSE[@]}" up -d "${SERVICES[@]}"
@@ -147,6 +147,10 @@ ERROR_TRACKER_URL=$ERROR_TRACKER_URL
 OTEL_EXPORTER_OTLP_ENDPOINT=$OTEL_ENDPOINT
 OPENOBSERVE_USER=admin@openobserve.local
 OPENOBSERVE_PASSWORD=$(env_get SERVICE_PASSWORD_OPENOBSERVE)Aa1!
+# Mailpit (Host-Modus: veröffentlichter Port statt Compose-Hostname)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_FROM="$(env_get SMTP_FROM)"
 EOT
 
     echo "Migriere DB + lege Admin an..."
@@ -156,6 +160,8 @@ EOT
 
 Stack läuft. App starten: pnpm dev  →  https://$(env_get SERVICE_FQDN_APP)
 Admin-Login: /admin/login, Passwort: $(env_get SERVICE_PASSWORD_ADMIN)
+
+Mailpit (abgefangene Mails): http://localhost:8025
 
 Zitadel-Console: https://$(env_get SERVICE_FQDN_ZITADEL)
   Login-Name: $(zitadel_login_name)

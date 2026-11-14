@@ -9,7 +9,8 @@ import { deleteOwnAccount, normalizeName, resolveAccountUrl } from "../lib/accou
 import { auth } from "../auth.js";
 import { env } from "../env.js";
 import { db } from "../db/index.js";
-import { appRoles, userAppRoles, users } from "../db/schema/index.js";
+import { appRoles, persons, userAppRoles, users } from "../db/schema/index.js";
+import { isOptedOut, setEventMailsEnabled } from "../lib/event-mail.js";
 import { eq } from "drizzle-orm";
 import { HTTP_STATUS, LOCAL_ADMIN_ACCOUNT_ID } from "../lib/constants.js";
 
@@ -119,6 +120,8 @@ accountRoutes.get("/", guard, async (c) => {
     .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId))
     .where(eq(userAppRoles.userId, user.id));
   const isLocalAdmin = user.id === LOCAL_ADMIN_ACCOUNT_ID;
+  const [person] = await db.select({ id: persons.id }).from(persons).where(eq(persons.userId, user.id));
+  const eventMails = person ? !(await isOptedOut(person.id)) : null;
   const accountUrl = resolveAccountUrl(env.OIDC_ACCOUNT_URL, env.OIDC_PROVIDER);
   return c.html(
     <Layout title={t("account.title")} user={user}>
@@ -141,6 +144,14 @@ accountRoutes.get("/", guard, async (c) => {
         <script dangerouslySetInnerHTML={{ __html: `document.body.addEventListener('htmx:beforeSwap', function (e) {
           if (e.detail.xhr.status === 422 && e.detail.requestConfig.elt.id === 'account-name-form') { e.detail.shouldSwap = true; e.detail.isError = false; }
         });` }} />
+        {eventMails !== null && (
+          <form method="post" action="/account/mail-prefs" class="mb-6">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="events" class="checkbox" checked={eventMails} onchange="this.form.submit()" />
+              <span>{t("mail.prefs.events")}</span>
+            </label>
+          </form>
+        )}
         {accountUrl && !isLocalAdmin && (
           <section class="mb-6">
             <h2 class="text-lg font-semibold mb-1">{t("account.login.heading")}</h2>
@@ -160,6 +171,12 @@ accountRoutes.get("/", guard, async (c) => {
       </div>
     </Layout>,
   );
+});
+
+accountRoutes.post("/mail-prefs", guard, async (c) => {
+  const [person] = await db.select({ id: persons.id }).from(persons).where(eq(persons.userId, c.get("user").id));
+  if (person) await setEventMailsEnabled(person.id, (await c.req.parseBody()).events === "on", "account");
+  return c.redirect("/account");
 });
 
 accountRoutes.post("/delete", guard, async (c) => {

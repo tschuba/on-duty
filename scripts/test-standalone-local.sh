@@ -59,7 +59,7 @@ echo "Baue App-Image aus lokalem Dockerfile..."
 echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
 # On the very first Zitadel setup, zitadel-init creates project + OIDC app and writes
 # client id/secret to the bootstrap volume; app reads them from there.
-SERVICES=(db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks)
+SERVICES=(db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks mailpit)
 [[ $WITH_ERRORS -eq 1 ]] && SERVICES+=(bugsink bugsink-init)
 "${COMPOSE[@]}" up -d "${SERVICES[@]}"
 

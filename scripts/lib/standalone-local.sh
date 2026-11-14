@@ -38,11 +38,12 @@ SERVICE_PASSWORD_OPENOBSERVE=$(openssl rand -hex 16)
 EOF
 fi
 
-# Dummy-SMTP: zitadel-init trägt die Werte nur als Konfiguration in Zitadel ein, ein Mailserver ist nicht nötig.
+# Test-SMTP: Mailpit-Container (docker-compose.standalone.local.yml), Web-UI http://localhost:8025.
+# zitadel-init trägt die Werte zusätzlich in Zitadel ein (dessen Mails scheitern, Mailpit bietet kein STARTTLS).
 if ! grep -q '^SMTP_HOST=' "$ENV_FILE"; then
   cat >> "$ENV_FILE" <<EOF
-SMTP_HOST=smtp.localhost
-SMTP_PORT=587
+SMTP_HOST=mailpit
+SMTP_PORT=1025
 SMTP_USER=first-user
 SMTP_PASS=dummy-pass
 SMTP_FROM=on-duty <noreply@app.localhost>

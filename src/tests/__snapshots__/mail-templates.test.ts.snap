@@ -1,0 +1,90 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mail templates > renders existing mail application-approved 1`] = `
+{
+  "subject": "[Feuerwehr Test|Mitgliedsantrag] Dein Antrag wurde angenommen",
+  "text": "Hallo Anna,
+
+dein Antrag wurde angenommen. Du bist nun wieder Mitglied.
+
+Viele Grüße
+Feuerwehr Test",
+}
+`;
+
+exports[`mail templates > renders existing mail application-rejected 1`] = `
+{
+  "subject": "[Feuerwehr Test|Mitgliedsantrag] Dein Antrag wurde abgelehnt",
+  "text": "Hallo Anna,
+
+dein Antrag wurde leider abgelehnt.
+
+Viele Grüße
+Feuerwehr Test",
+}
+`;
+
+exports[`mail templates > renders existing mail application-submitted 1`] = `
+{
+  "subject": "[Feuerwehr Test|Mitgliedsantrag] Neuer Antrag eingegangen: Anna B",
+  "text": "Neuer Antrag von Anna B ist eingegangen und wartet auf Prüfung.",
+}
+`;
+
+exports[`mail templates > renders existing mail lend-approved 1`] = `
+{
+  "subject": "[Feuerwehr Test|Verleih] Deine Verleih-Anfrage wurde genehmigt",
+  "text": "Hallo Anna,
+
+deine Anfrage für Zelt wurde genehmigt.
+
+https://portal.test/s/1
+
+Viele Grüße
+Feuerwehr Test",
+}
+`;
+
+exports[`mail templates > renders existing mail lend-notify 1`] = `
+{
+  "subject": "[Feuerwehr Test|Verleih] Neue Verleih-Anfrage: Zelt",
+  "text": "Neue Anfrage für Zelt. Details: https://portal.test/r/1",
+}
+`;
+
+exports[`mail templates > renders existing mail lend-rejected 1`] = `
+{
+  "subject": "[Feuerwehr Test|Verleih] Deine Verleih-Anfrage wurde abgelehnt",
+  "text": "Hallo Anna,
+
+deine Anfrage für Zelt wurde leider abgelehnt.
+
+https://portal.test/s/1
+
+Viele Grüße
+Feuerwehr Test",
+}
+`;
+
+exports[`mail templates > renders existing mail lend-submitted 1`] = `
+{
+  "subject": "[Feuerwehr Test|Verleih] Deine Verleih-Anfrage ist eingegangen",
+  "text": "Hallo Anna,
+
+deine Anfrage für Zelt ist eingegangen und wird geprüft. Das ist noch keine Zusage.
+
+https://portal.test/s/1
+
+Viele Grüße
+Feuerwehr Test",
+}
+`;
+
+exports[`mail templates > renders existing mail registration-pending 1`] = `
+{
+  "subject": "[Feuerwehr Test|Registrierung] Neue Registrierung wartet auf Freigabe",
+  "text": "Anna B (a@x.de) hat sich registriert und wartet auf Freigabe.
+
+https://portal.test/admin/users",
+}
+`;
