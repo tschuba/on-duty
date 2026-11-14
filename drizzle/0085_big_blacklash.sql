@@ -1,0 +1,8 @@
+ALTER TABLE "app_role_permissions" ALTER COLUMN "permission" SET DATA TYPE text;--> statement-breakpoint
+ALTER TABLE "mail_templates" ALTER COLUMN "edit_permissions" SET DATA TYPE text;--> statement-breakpoint
+UPDATE "app_role_permissions" SET "permission" = 'applications:manage' WHERE "permission" = 'applications:manage-forms';--> statement-breakpoint
+UPDATE "mail_templates" SET "edit_permissions" = replace("edit_permissions", 'applications:manage-forms', 'applications:manage');--> statement-breakpoint
+DROP TYPE "public"."permission";--> statement-breakpoint
+CREATE TYPE "public"."permission" AS ENUM('members:read', 'members:write', 'members:delete', 'members:bank-data:read', 'members:bank-data:write', 'system:admin', 'donations:read', 'donations:record', 'donations:delete', 'donations:issue-receipts', 'applications:read', 'applications:record', 'applications:review', 'applications:manage', 'inventory:read', 'inventory:manage', 'inventory:configure', 'inventory:inspect', 'inventory:inspection:delete', 'lending:read', 'lending:manage', 'org:read', 'org:write', 'org:tax-data:read', 'org:tax-data:write', 'import:run', 'member-roles:read', 'member-roles:write', 'member-roles:delete', 'member-role-types:read', 'member-role-types:write', 'member-role-types:delete', 'anniversary-years:read', 'anniversary-years:write', 'anniversary-years:delete', 'events:manage', 'training:read', 'training:write', 'training:delete');--> statement-breakpoint
+ALTER TABLE "app_role_permissions" ALTER COLUMN "permission" SET DATA TYPE "public"."permission" USING "permission"::"public"."permission";--> statement-breakpoint
+ALTER TABLE "mail_templates" ALTER COLUMN "edit_permissions" SET DATA TYPE "public"."permission"[] USING "edit_permissions"::"public"."permission"[];
