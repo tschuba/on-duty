@@ -12,8 +12,9 @@ import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { isExpired, verifyLinkToken, type LinkPayload } from "../lib/links.js";
 import { loadSettings, saveSettings } from "../lib/member-settings.js";
 import { invitedMembers, isActiveMember, setRsvp, type SetRsvpResult } from "../lib/events.js";
-import { setOptOut } from "../lib/event-mail.js";
+import { EVENT_TOPIC, setOptOut } from "../lib/event-mail.js";
 import { members } from "../db/schema/index.js";
+import { TopicPrefs } from "../components/topic-prefs.js";
 
 // Öffentliche tokenbasierte Links (Backlog 149): GET zeigt nur eine Bestätigung, erst POST ändert etwas (Mail-Scanner rufen Links auf).
 export const linkRoutes = new Hono();
@@ -58,6 +59,7 @@ async function SettingsPage({ token, memberId, saved }: { token: string; memberI
                 <input type="checkbox" name="events" value={p.personId} class="checkbox" checked={p.events} />
                 <span>{t("mail.prefs.events")}</span>
               </label>
+              <TopicPrefs name="topics" prefs={p.topics} inputValue={(topic) => `${p.personId}|${topic}`} />
             </section>
           ))}
           <button type="submit" class="btn btn-primary">{t("link.member_settings.save")}</button>
@@ -76,9 +78,12 @@ linkRoutes.get("/:token", async (c) => {
   if ("res" in g) return g.res;
   if (g.payload.p === "member.settings") return c.html(<SettingsPage token={c.req.param("token")} memberId={g.payload.m} />);
   const key = g.payload.p.replace(".", "_");
+  const topic = g.payload.t;
+  const other = topic && topic !== EVENT_TOPIC ? { topic } : undefined; // Termin-Mails behalten ihre Texte
+  const tt = (k: string) => t(`link.${key}.${k}${other ? ".topic" : ""}` as never, other as never);
   return c.html(
-    <Page title={t(`link.${key}.title` as never)}>
-      <p class="py-2">{t(`link.${key}.body` as never)}</p>
+    <Page title={tt("title")}>
+      <p class="py-2">{tt("body")}</p>
       <form method="post" action={`/link/${c.req.param("token")}`}>
         <button type="submit" class="btn btn-primary">{t(`link.${key}.button` as never)}</button>
       </form>
@@ -93,14 +98,14 @@ linkRoutes.post("/:token", async (c) => {
 
   if (p === "member.settings") {
     const body = await c.req.parseBody({ all: true });
-    await saveSettings(m, [body.events ?? []].flat().map(String));
+    await saveSettings(m, [body.events ?? []].flat().map(String), [body.topics ?? []].flat().map(String));
     return c.html(<SettingsPage token={c.req.param("token")} memberId={m} saved />);
   }
 
   if (p === "mail.optout" || p === "mail.optout-address") {
     const ok = await setOptOut(m, topic!, true, p === "mail.optout" ? "person" : "address", p === "mail.optout" ? "link" : "address-link");
     return ok
-      ? c.html(<Page title={t("link.optedOut.title")}><p>{t("link.optedOut.body")}</p></Page>)
+      ? c.html(<Page title={t("link.optedOut.title")}><p>{topic && topic !== EVENT_TOPIC ? t("link.optedOut.body.topic", { topic }) : t("link.optedOut.body")}</p></Page>)
       : c.html(<Page title={t("link.invalid.title")}><p>{t("link.invalid.body")}</p></Page>, HTTP_STATUS.NOT_FOUND);
   }
 

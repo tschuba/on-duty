@@ -5,7 +5,7 @@ import { linkUrl, SETTINGS_LINK_MINUTES } from "./links.js";
 import { sendMail } from "./mail.js";
 import { buildVars, resolveTemplate } from "./mail-templates.js";
 import { logger } from "./logger.js";
-import { isOptedOut, setEventMailsEnabled } from "./event-mail.js";
+import { isOptedOut, saveTopicPrefs, setEventMailsEnabled, topicPrefs } from "./event-mail.js";
 
 export interface SettingsPerson { memberId: string; personId: string; firstName: string; lastName: string }
 
@@ -44,12 +44,16 @@ export async function sendSettingsLink(email: string): Promise<void> {
   }
 }
 
-export async function loadSettings(memberId: string): Promise<(SettingsPerson & { events: boolean })[]> {
+export async function loadSettings(memberId: string): Promise<(SettingsPerson & { events: boolean; topics: { topic: string; enabled: boolean }[] })[]> {
   const people = await personsForMember(memberId);
-  return Promise.all(people.map(async (p) => ({ ...p, events: !(await isOptedOut(p.personId)) })));
+  return Promise.all(people.map(async (p) => ({ ...p, events: !(await isOptedOut(p.personId)), topics: await topicPrefs(p.personId) })));
 }
 
 // Nur Personen dieser Adresse sind änderbar; fehlende Checkbox = ausgeschaltet.
-export async function saveSettings(memberId: string, enabledPersonIds: string[]): Promise<void> {
-  for (const p of await personsForMember(memberId)) await setEventMailsEnabled(p.personId, enabledPersonIds.includes(p.personId), "settings");
+// enabledTopics: "personId|thema" je angehaktem Thema.
+export async function saveSettings(memberId: string, enabledPersonIds: string[], enabledTopics: string[] = []): Promise<void> {
+  for (const p of await personsForMember(memberId)) {
+    await setEventMailsEnabled(p.personId, enabledPersonIds.includes(p.personId), "settings");
+    await saveTopicPrefs(p.personId, enabledTopics.filter((x) => x.startsWith(`${p.personId}|`)).map((x) => x.slice(p.personId.length + 1)), "settings");
+  }
 }

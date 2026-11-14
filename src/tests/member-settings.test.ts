@@ -15,7 +15,7 @@ const sendMail = vi.fn(async (_o: any) => ({ sent: true }));
 vi.mock("../lib/mail.js", () => ({ sendMail: (o: any) => sendMail(o) }));
 vi.mock("../lib/mail-templates.js", () => ({ resolveTemplate: async () => ({ key: "member-settings-link" }), buildVars: (_k: string, rec: any) => rec }));
 const setEnabled = vi.fn();
-vi.mock("../lib/event-mail.js", () => ({ isOptedOut: async (id: string) => id === "p2", setEventMailsEnabled: (...a: any[]) => setEnabled(...a) }));
+vi.mock("../lib/event-mail.js", () => ({ isOptedOut: async (id: string) => id === "p2", topicPrefs: async () => [], saveTopicPrefs: async () => {}, setEventMailsEnabled: (...a: any[]) => setEnabled(...a) }));
 
 const { sendSettingsLink, loadSettings, saveSettings } = await import("../lib/member-settings.js");
 const person = (n: number) => ({ memberId: `m${n}`, personId: `p${n}`, firstName: `F${n}`, lastName: "L" });

@@ -7,7 +7,14 @@ import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 // Das Script wird einmal pro Seite gebunden (wie ChipInput). Ereignisse auf dem Wurzelelement:
 // `picker:select` (detail = data-* der Trefferzeile), `picker:create`, `picker:clear`.
 let instanceCount = 0;
-export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, placeholder, required, suggest, include, extraParams, error }: {
+const CHIP_REMOVE_CLASS = "picker-chip-remove inline-flex items-center justify-center rounded-full h-4 w-4 ml-0.5 bg-base-300 text-xs leading-none cursor-pointer [-webkit-tap-highlight-color:transparent] hover:bg-error hover:text-error-content";
+export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, placeholder, required, suggest, include, extraParams, error, multiple, selected, label }: {
+  /** Mehrfachauswahl: Auswahl erscheint als Chips (je ein Hidden-Feld `name`) vor dem Suchfeld, das leer und aktiv bleibt. Ereignisse: `picker:select` und `picker:change` (Chip hinzugefügt/entfernt). */
+  multiple?: boolean;
+  /** Nur mit `multiple`: bereits gewählte Einträge. */
+  selected?: { id: string; name: string }[];
+  /** Nur mit `multiple`: schwebendes Label wie bei ChipInput, steht dauerhaft oben auf dem Rand. */
+  label?: string;
   /** id des Hidden-Felds; steht auch als data-picker-id am Wurzelelement (Filter für `picker:*`-Ereignisse). */
   id?: string;
   /** Feldname des Hidden-Felds; ohne Namen wird nichts abgeschickt (z. B. Mehrfachauswahl). */
@@ -26,14 +33,26 @@ export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, pl
 }) {
   const listId = `picker-list-${++instanceCount}`;
   const sel = Boolean(selectedId);
+  // Mehrfach: ein <div>, denn ein <label> würde Klicks auf den ersten Chip-×-Button umleiten.
+  const Box = multiple ? "div" : "label";
   return (
-    <div class="relative" data-picker data-picker-id={id ?? ""} data-required-msg={required ? t("picker.selectPerson") : ""} data-suggest={suggest ? "1" : ""}>
-      <label class={`input flex items-center gap-2 w-full${error ? " input-error" : ""}`}>
-        <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+    <div class="relative" data-picker data-multiple={multiple ? "1" : ""} data-name={name ?? ""} data-remove-label={t("common.remove")} data-picker-id={id ?? ""} data-required-msg={required ? t("picker.selectPerson") : ""} data-suggest={suggest ? "1" : ""}>
+      {multiple && label && (
+        <span class="pointer-events-none absolute z-[2] start-3 top-0 scale-75 -translate-x-[12.5%] -translate-y-1/2 px-1 rounded-sm bg-base-100 text-sm leading-none">{label}</span>
+      )}
+      <Box onclick={multiple ? "if(!event.target.closest('button'))this.querySelector('.picker-input').focus()" : undefined} class={`input flex items-center w-full${multiple ? " h-auto min-h-10 py-1.5 flex-wrap gap-1" : " gap-2"}${error ? " input-error" : ""}`}>
+        {multiple
+          ? <span class="contents" data-picker-chips>{(selected ?? []).map((m) => (
+              <span class="badge badge-outline gap-1 pr-1" data-chip={m.id}>
+                <input type="hidden" name={name} value={m.id} />{m.name}
+                <button type="button" class={CHIP_REMOVE_CLASS} aria-label={t("common.remove")}>×</button>
+              </span>
+            ))}</span>
+          : <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />}
         <input
           type="text"
           name="q"
-          class="picker-input grow min-w-0"
+          class={multiple ? "picker-input w-auto h-6! ms-1 grow min-w-24 outline-none bg-transparent" : "picker-input grow min-w-0"}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded="false"
@@ -48,11 +67,13 @@ export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, pl
           hx-include={include}
           hx-vals={extraParams ? JSON.stringify(extraParams) : undefined}
         />
-        <button type="button" class="picker-clear btn btn-ghost btn-xs btn-circle" aria-label={t("common.remove")} hidden={!sel}>
-          <Icon name="x-mark" class="w-4 h-4" />
-        </button>
-      </label>
-      <input type="hidden" id={id} name={name} value={selectedId ?? ""} />
+        {!multiple && (
+          <button type="button" class="picker-clear btn btn-ghost btn-xs btn-circle" aria-label={t("common.remove")} hidden={!sel}>
+            <Icon name="x-mark" class="w-4 h-4" />
+          </button>
+        )}
+      </Box>
+      {!multiple && <input type="hidden" id={id} name={name} value={selectedId ?? ""} />}
       <ul id={listId} role="listbox" hidden class="picker-list menu menu-sm absolute left-0 right-0 top-full z-50 mt-1 max-h-60 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow" />
       <script dangerouslySetInnerHTML={{ __html: PICKER_SCRIPT }} />
     </div>
@@ -107,6 +128,7 @@ const PICKER_SCRIPT = `
     }
     function pickerSync(root) {
       var p = pickerParts(root);
+      if (!p.hidden) return;
       p.input.setCustomValidity(root.dataset.requiredMsg && !p.hidden.value ? root.dataset.requiredMsg : '');
     }
     window.pickerSync = pickerSync;
@@ -134,10 +156,29 @@ const PICKER_SCRIPT = `
       opts[next].scrollIntoView({ block: 'nearest' });
     }
     function pickerEmit(root, type, detail) { root.dispatchEvent(new CustomEvent(type, { bubbles: true, detail: detail || {} })); }
+    // Mehrfachauswahl: Chip samt Hidden-Feld anhängen (false, wenn schon vorhanden).
+    function pickerAddChip(root, id, name) {
+      var box = root.querySelector('[data-picker-chips]');
+      if (box.querySelector('[data-chip="' + id + '"]')) return false;
+      var chip = document.createElement('span');
+      chip.className = 'badge badge-outline gap-1 pr-1'; chip.dataset.chip = id;
+      var h = document.createElement('input'); h.type = 'hidden'; h.name = root.dataset.name; h.value = id;
+      var x = document.createElement('button'); x.type = 'button'; x.className = ${JSON.stringify(CHIP_REMOVE_CLASS)}; x.textContent = '×'; x.setAttribute('aria-label', root.dataset.removeLabel);
+      chip.append(h, name, x); box.appendChild(chip);
+      return true;
+    }
+    window.pickerAddChip = pickerAddChip;
     function pickerSelect(root, li) {
       var p = pickerParts(root);
       pickerClose(root);
       if (li.hasAttribute('data-create')) { p.ul.textContent = ''; pickerEmit(root, 'picker:create'); return; }
+      if (root.dataset.multiple) {
+        var added = pickerAddChip(root, li.dataset.id, li.dataset.name);
+        p.input.value = ''; p.ul.textContent = ''; p.input.focus();
+        pickerEmit(root, 'picker:select', Object.assign({}, li.dataset));
+        if (added) pickerEmit(root, 'picker:change');
+        return;
+      }
       p.hidden.value = li.dataset.id; p.input.value = li.dataset.name; p.input.readOnly = true; p.clear.hidden = false;
       p.ul.textContent = '';
       pickerSync(root);
@@ -171,6 +212,8 @@ const PICKER_SCRIPT = `
     document.body.addEventListener('click', function(e) {
       var li = e.target.closest && e.target.closest('.picker-list [role=option]');
       if (li) { pickerSelect(li.closest('[data-picker]'), li); return; }
+      var rm = e.target.closest && e.target.closest('.picker-chip-remove');
+      if (rm) { var r = rm.closest('[data-picker]'); rm.closest('[data-chip]').remove(); pickerEmit(r, 'picker:change'); return; }
       var cl = e.target.closest && e.target.closest('.picker-clear');
       if (cl) pickerReset(cl.closest('[data-picker]'));
     });

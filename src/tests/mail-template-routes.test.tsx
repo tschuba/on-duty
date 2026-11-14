@@ -38,7 +38,6 @@ describe("mail template routes", () => {
     const html = await (await mailTemplateRoutes.request("/")).text();
     expect(html).toContain("Neuer Termin");
     expect(html).not.toContain("Einstellungs-Link");
-    expect(html).toContain("Auslieferungszustand");
   });
 
   it("empty list with a hint without any editable template; 403 for a foreign template", async () => {
@@ -199,7 +198,7 @@ describe("custom template routes", () => {
     const res = await mailTemplateRoutes.request("/new");
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('name="key"');
-    const ok = { name: "Plan", key: "plan", topic: "t", audience: "member", subject: "s", body: "{{ort}}" };
+    const ok = { name: "Plan", key: "plan", topic: "t", audience: "member", subject: "s", body: "{{ort}} {{unsubscribeUrl}}" };
     const bad = (o: Record<string, string>) => post("/new", { ...ok, editPermissions: "mail:templates", ...o });
     expect((await bad({ key: "taken" })).status).toBe(422);
     expect((await bad({ editPermissions: "system:admin" })).status).toBe(422); // fremdes Recht
@@ -214,14 +213,34 @@ describe("custom template routes", () => {
     key: "plan", category: "custom", audience: "member", prefix: "[Alt]", editPermissions: ["mail:templates"], system: { subject: "s", body: "{{ort}}" }, override: null,
     custom: { topic: "uebung", meta: { name: "Plan", fields: [{ name: "ort" }] }, extraHeaders: JSON.stringify({ "X-Foo": "bar" }), updatedAt: new Date("2026-01-02T03:04:05Z") }, ...o,
   });
-  const edit = { name: "Plan", subject: "s", body: "{{ort}}", updatedAt: "2026-01-02T03:04:05.000Z" };
+  const edit = { name: "Plan", subject: "s", body: "{{ort}} {{unsubscribeUrl}}", updatedAt: "2026-01-02T03:04:05.000Z" };
 
-  it("lists custom templates in their own group, after the system ones", async () => {
+  it("quick preview renders the current text with sample data; needs edit or send right", async () => {
+    perms = new Set(["events:manage"]);
+    const ok = await mailTemplateRoutes.request("/event-created/quick");
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toContain("Sys Übung Atemschutz");
+    expect((await mailTemplateRoutes.request("/member-settings-link/quick")).status).toBe(403);
+    expect((await mailTemplateRoutes.request("/nope/quick")).status).toBe(404);
+  });
+
+  it("send preview uses the entered values and marks empty fields; send right required", async () => {
+    templates = [cust({ editPermissions: ["x"] })];
+    perms = new Set(["mail:send"]);
+    const html = await (await post("/plan/send/preview", { f_ort: "Halle" })).text();
+    expect(html).toContain("Halle");
+    expect(await (await post("/plan/send/preview", { f_ort: "" })).text()).toContain("{{ort}}");
+    perms = new Set(["mail:templates"]);
+    expect((await post("/plan/send/preview", { f_ort: "x" })).status).toBe(403);
+    expect((await mailTemplateRoutes.request("/plan/quick")).status).toBe(403);
+  });
+
+  it("lists custom templates in their own group, before the system ones", async () => {
     perms = new Set(["mail:templates"]);
     templates = [cust(), sys("event-created", "mail:templates")];
     const html = await (await mailTemplateRoutes.request("/")).text();
     expect(html).toContain("Eigene Vorlagen");
-    expect(html.indexOf("Neuer Termin")).toBeLessThan(html.indexOf("Eigene Vorlagen"));
+    expect(html.indexOf("Eigene Vorlagen")).toBeLessThan(html.indexOf("Neuer Termin"));
   });
 
   it("delete: 403 without edit permission, 404 for system templates, removes custom ones", async () => {
@@ -249,11 +268,19 @@ describe("custom template routes", () => {
     expect(saveCustom).toHaveBeenCalledWith("plan", expect.objectContaining({ topic: "uebung", audience: "member", editPermissions: ["mail:templates"] }), "u1", edit.updatedAt);
   });
 
-  it("prefix and key/topic/audience/perms fields only on custom templates; prefix editable, key only when new", async () => {
+  it("saves the description in meta", async () => {
+    perms = new Set(["mail:templates"]);
+    templates = [cust()];
+    saveCustom.mockClear();
+    expect((await post("/plan", { ...edit, description: " Kurz " })).status).toBe(302);
+    expect(saveCustom.mock.calls[0][1]).toEqual(expect.objectContaining({ meta: expect.objectContaining({ description: "Kurz" }) }));
+  });
+
+  it("key/topic/audience/perms fields only on custom templates; prefix is part of the subject, key only when new", async () => {
     perms = new Set(["mail:templates"]);
     templates = [cust(), sys("event-created", "mail:templates")];
     const custom = await (await mailTemplateRoutes.request("/plan")).text();
-    expect(custom).toContain('name="prefix"');
+    expect(custom).not.toContain('name="prefix"');
     expect(custom).not.toContain('name="key"'); // nur beim Anlegen
     const system = await (await mailTemplateRoutes.request("/event-created")).text();
     expect(system).not.toContain('name="prefix"');

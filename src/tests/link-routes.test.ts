@@ -15,10 +15,10 @@ vi.mock("../components/public-form.js", () => ({ PublicFooter: () => null, clien
 const setRsvp = vi.fn();
 const setOptOut = vi.fn(async () => true);
 const saveSettings = vi.fn(async () => {});
-let settingsPeople = [{ personId: "p1", firstName: "Anna", lastName: "B", events: false }];
+let settingsPeople = [{ personId: "p1", firstName: "Anna", lastName: "B", events: false, topics: [] }];
 vi.mock("../lib/member-settings.js", () => ({ loadSettings: async () => settingsPeople, saveSettings: (...a: any[]) => (saveSettings as any)(...a) }));
 vi.mock("../lib/events.js", () => ({ invitedMembers: async () => ["m1"], isActiveMember: () => true, setRsvp: (...a: any[]) => setRsvp(...a) }));
-vi.mock("../lib/event-mail.js", () => ({ setOptOut: (...a: any[]) => (setOptOut as any)(...a) }));
+vi.mock("../lib/event-mail.js", () => ({ setOptOut: (...a: any[]) => (setOptOut as any)(...a), EVENT_TOPIC: "events" }));
 
 const { linkRoutes } = await import("../routes/links.js");
 const { signLinkToken } = await import("../lib/links.js");
@@ -32,13 +32,20 @@ describe("link routes", () => {
     expect(res.status).toBe(200);
     expect(setOptOut).not.toHaveBeenCalled();
   });
+  it("opt-out page names the topic, except for event mails", async () => {
+    const page = async (t: string) => (await linkRoutes.request(`/${signLinkToken({ p: "mail.optout", m: "m1", t })}`)).text();
+    expect(await page("vorstand")).toContain("Thema „vorstand“");
+    expect(await page("events")).toContain("Termin-Mails");
+    const done = await (await post(signLinkToken({ p: "mail.optout", m: "m1", t: "vorstand" }))).text();
+    expect(done).toContain("Thema „vorstand“");
+  });
   it("settings: GET changes nothing, POST saves checked persons, expired link is 410", async () => {
     const tok = signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() + 60_000 });
     expect((await linkRoutes.request(`/${tok}`)).status).toBe(200);
     expect(saveSettings).not.toHaveBeenCalled();
     const res = await linkRoutes.request(`/${tok}`, { method: "POST", body: new URLSearchParams({ events: "p1" }) });
     expect(res.status).toBe(200);
-    expect(saveSettings).toHaveBeenCalledWith("m1", ["p1"]);
+    expect(saveSettings).toHaveBeenCalledWith("m1", ["p1"], []);
     saveSettings.mockClear();
     const old = signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() - 1 });
     expect((await linkRoutes.request(`/${old}`, { method: "POST" })).status).toBe(410);
@@ -47,7 +54,7 @@ describe("link routes", () => {
   it("settings: name headings only when the address has several persons", async () => {
     const tok = signLinkToken({ p: "member.settings", m: "m1", exp: Date.now() + 60_000 });
     expect(await (await linkRoutes.request(`/${tok}`)).text()).not.toContain("Anna B");
-    settingsPeople = [...settingsPeople, { personId: "p2", firstName: "Ben", lastName: "B", events: true }];
+    settingsPeople = [...settingsPeople, { personId: "p2", firstName: "Ben", lastName: "B", events: true, topics: [] }];
     const html = await (await linkRoutes.request(`/${tok}`)).text();
     expect(html).toContain("Anna B");
     expect(html).toContain("Ben B");

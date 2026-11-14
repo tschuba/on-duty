@@ -39,6 +39,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "anniversary-years:delete": t("admin.permissions.key.anniversaryYearsDelete"),
   "events:manage": t("admin.permissions.key.eventsManage"),
   "mail:templates": t("admin.permissions.key.mailTemplates"),
+  "mail:send": t("admin.permissions.key.mailSend"),
   "training:read": t("admin.permissions.key.trainingRead"),
   "training:write": t("admin.permissions.key.trainingWrite"),
   "training:delete": t("admin.permissions.key.trainingDelete"),

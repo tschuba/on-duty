@@ -10,7 +10,8 @@ import { auth } from "../auth.js";
 import { env } from "../env.js";
 import { db } from "../db/index.js";
 import { appRoles, persons, userAppRoles, users } from "../db/schema/index.js";
-import { isOptedOut, setEventMailsEnabled } from "../lib/event-mail.js";
+import { isOptedOut, saveTopicPrefs, setEventMailsEnabled, topicPrefs } from "../lib/event-mail.js";
+import { TopicPrefs } from "../components/topic-prefs.js";
 import { eq } from "drizzle-orm";
 import { HTTP_STATUS, LOCAL_ADMIN_ACCOUNT_ID } from "../lib/constants.js";
 
@@ -121,6 +122,7 @@ accountRoutes.get("/", guard, async (c) => {
     .where(eq(userAppRoles.userId, user.id));
   const isLocalAdmin = user.id === LOCAL_ADMIN_ACCOUNT_ID;
   const [person] = await db.select({ id: persons.id }).from(persons).where(eq(persons.userId, user.id));
+  const prefs = person ? await topicPrefs(person.id) : [];
   const eventMails = person ? !(await isOptedOut(person.id)) : null;
   const accountUrl = resolveAccountUrl(env.OIDC_ACCOUNT_URL, env.OIDC_PROVIDER);
   return c.html(
@@ -150,6 +152,7 @@ accountRoutes.get("/", guard, async (c) => {
               <input type="checkbox" name="events" class="checkbox" checked={eventMails} onchange="this.form.submit()" />
               <span>{t("mail.prefs.events")}</span>
             </label>
+            <TopicPrefs name="topics" prefs={prefs} onchange="this.form.submit()" />
           </form>
         )}
         {accountUrl && !isLocalAdmin && (
@@ -175,7 +178,11 @@ accountRoutes.get("/", guard, async (c) => {
 
 accountRoutes.post("/mail-prefs", guard, async (c) => {
   const [person] = await db.select({ id: persons.id }).from(persons).where(eq(persons.userId, c.get("user").id));
-  if (person) await setEventMailsEnabled(person.id, (await c.req.parseBody()).events === "on", "account");
+  if (person) {
+    const body = await c.req.parseBody({ all: true });
+    await setEventMailsEnabled(person.id, body.events === "on", "account");
+    await saveTopicPrefs(person.id, [body.topics ?? []].flat().map(String), "account");
+  }
   return c.redirect("/account");
 });
 

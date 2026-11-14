@@ -40,7 +40,9 @@ Zwei Font-Families, als CSS-Variablen definiert:
 
 **Regel für Seitentitel:** Der `<h1>` entsteht ausschließlich in `PageHeader` (`src/components/page-header.tsx`), nie freistehend (Ausnahme: Fehlerseiten 403/404/500 und Login-Karten ohne `Layout`-Nav).
 
-Keine weiteren Heading-Ebenen (`h2`/`h3`) mit eigener Konvention etabliert — bei Bedarf hier ergänzen, bevor neue Varianten frei erfunden werden.
+`h2` für Listenabschnitte: `text-lg font-semibold mb-2`. Selbst angelegte Inhalte (z. B. „Eigene Vorlagen“ in `/mail/templates`) werden vor mitgelieferten gelistet, mit `border-l-4 border-primary pl-4`, `text-primary` und einem `divider` zu den mitgelieferten Abschnitten.
+
+Keine weiteren Heading-Ebenen (`h3`) mit eigener Konvention etabliert — bei Bedarf hier ergänzen, bevor neue Varianten frei erfunden werden.
 
 ## Seiten-Layout-Struktur
 

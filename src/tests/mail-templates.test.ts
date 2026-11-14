@@ -78,7 +78,9 @@ describe("mail templates", () => {
     expect(validateTemplate(k, { subject: "x", body: "{{optOutUrl}}" }).join()).toMatch(/Pflichtplatzhalter/);
     expect(validateTemplate(k, { subject: "x", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}{{> p}}" }).join()).toMatch(/Partials/);
     expect(validateTemplate(k, { subject: "{{", body: "x" }).length).toBeGreaterThan(0);
-    expect(validateTemplate("custom-x", { subject: "{{anything}}", body: "x" })).toEqual([]);
+    expect(validateTemplate("custom-x", { subject: "{{anything}}", body: "{{unsubscribeUrl}}" })).toEqual([]);
+    expect(validateTemplate("custom-x", { subject: "{{anything}}", body: "x" }).join()).toMatch(/Abmelde-Link/);
+    expect(validateTemplate("custom-x", { subject: "{{anything}}", body: "x", urgent: true })).toEqual([]);
   });
 
   it("errors carry the line and a typo suggestion", () => {

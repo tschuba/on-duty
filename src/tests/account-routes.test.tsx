@@ -26,7 +26,7 @@ vi.mock("../middleware/auth.js", () => ({
 vi.mock("../lib/account.js", async (orig) => ({ ...(await orig<typeof import("../lib/account.js")>()), deleteOwnAccount: (...a: unknown[]) => (deleteOwnAccount as any)(...a) }));
 const setEventMailsEnabled = vi.fn(async () => undefined);
 let optedOut = false;
-vi.mock("../lib/event-mail.js", () => ({ isOptedOut: async () => optedOut, setEventMailsEnabled: (...a: unknown[]) => (setEventMailsEnabled as any)(...a) }));
+vi.mock("../lib/event-mail.js", () => ({ isOptedOut: async () => optedOut, topicPrefs: async () => [], saveTopicPrefs: async () => {}, setEventMailsEnabled: (...a: unknown[]) => (setEventMailsEnabled as any)(...a) }));
 vi.mock("../lib/flash.js", () => ({ setFlash: vi.fn() }));
 vi.mock("../auth.js", () => ({ auth: { api: { signOut: (...a: unknown[]) => (signOut as any)(...a) } } }));
 vi.mock("../db/index.js", () => {

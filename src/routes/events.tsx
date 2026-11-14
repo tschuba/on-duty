@@ -569,7 +569,7 @@ async function TagSuggestions(user: AuthedUser) {
 function MembersPanel({ invitees }: { invitees: { id: string; name: string }[] }) {
   return (
     <div id="event-members" class="hidden group-has-[:checked]:flex flex-col gap-3 mt-3 pl-8">
-      <EntityPicker searchUrl="/events/search-members" placeholder={t("events.form.membersSearch")} />
+      <EntityPicker multiple name="memberIds" searchUrl="/events/search-members" label={t("events.form.members")} placeholder={t("events.form.membersSearch")} selected={invitees} />
       <div class="flex flex-wrap items-center gap-1" id="event-member-groups">
         {(["active", "youth", "children", "passive", "supporting"] as const).map((st) => (
           <button type="button" class="btn btn-sm btn-outline" data-status={st} data-label={t(`status.${st}`)} disabled>{t(`status.${st}`)}</button>
@@ -578,14 +578,6 @@ function MembersPanel({ invitees }: { invitees: { id: string; name: string }[] }
       <div class="flex items-center justify-between text-sm">
         <span class="opacity-70" id="event-member-count" data-one={t("events.form.membersCountOne")} data-many={t("events.form.membersCountMany")} data-none={t("events.form.membersNone")}></span>
         <button type="button" class="btn btn-ghost btn-xs" id="event-member-clear" data-confirm={t("events.form.membersClearConfirm")}>{t("events.form.membersClear")}</button>
-      </div>
-      <div id="event-member-chips" class="flex flex-wrap gap-1" data-remove={t("common.remove")}>
-        {invitees.map((m) => (
-          <span class="badge badge-ghost gap-1" data-member-chip={m.id}>
-            <input type="hidden" name="memberIds" value={m.id} />{m.name}
-            <button type="button" class="cursor-pointer" aria-label={t("common.remove")} data-chip-remove>×</button>
-          </span>
-        ))}
       </div>
     </div>
   );
@@ -715,48 +707,26 @@ async function EventForm({ values, errors, invitees, tz }: {
             });
           });
           // Mitgliederauswahl: Chips mit Hidden-Feld memberIds; Kategorie-Buttons fügen ihre Treffer mit einem Klick hinzu.
-          const chips = document.getElementById('event-member-chips');
           const box = document.getElementById('event-members');
+          const picker = box.querySelector('[data-picker]');
+          const chips = picker.querySelector('[data-picker-chips]');
           const countEl = document.getElementById('event-member-count');
           const radio = document.getElementById('event-visibility-members');
           let groups = null;
-          function has(id) { return !!chips.querySelector('[data-member-chip="' + id + '"]'); }
+          function has(id) { return !!chips.querySelector('[data-chip="' + id + '"]'); }
           function refresh() {
             const n = chips.children.length;
             countEl.textContent = n === 0 ? countEl.dataset.none : (n === 1 ? countEl.dataset.one : countEl.dataset.many.replace('{n}', n));
-            document.getElementById('event-member-clear').hidden = n === 0;
-            box.querySelectorAll('[data-status]').forEach(function(b) {
-              const all = groups ? groups[b.dataset.status] : [];
-              const open = all.filter(function(m) { return !has(m.id); }).length;
-              const full = all.length > 0 && open === 0;
-              b.dataset.remove = full ? '1' : '';
-              b.disabled = all.length === 0;
-              b.classList.toggle('btn-primary', full); b.classList.toggle('btn-outline', !full);
-              b.textContent = (full ? '× ' : '+ ') + b.dataset.label + (groups ? ' (' + (full ? all.length : open) + ')' : '');
-            });
-          }
-          function addChip(id, name) {
-            if (has(id)) return;
-            const span = document.createElement('span');
-            span.className = 'badge badge-ghost gap-1'; span.dataset.memberChip = id;
-            const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = 'memberIds'; inp.value = id;
-            const x = document.createElement('button'); x.type = 'button'; x.className = 'cursor-pointer'; x.dataset.chipRemove = ''; x.setAttribute('aria-label', chips.dataset.remove); x.textContent = '×';
-            span.append(inp, name, x); chips.appendChild(span);
-          }
-          chips.addEventListener('click', function(e) { const x = e.target.closest('[data-chip-remove]'); if (x) { x.parentElement.remove(); refresh(); } });
-          document.getElementById('event-member-clear').addEventListener('click', function() {
+            document.getElementById('event-member-clear').addEventListener('click', function() {
             if (confirm(this.dataset.confirm)) { chips.textContent = ''; refresh(); }
           });
-          box.addEventListener('picker:select', function(e) {
-            addChip(e.detail.id, e.detail.name); refresh();
-            const root = e.target.closest('[data-picker]'); const clr = root && root.querySelector('.picker-clear'); if (clr) clr.click();
-          });
+          picker.addEventListener('picker:change', refresh);
           box.querySelectorAll('[data-status]').forEach(function(b) {
             b.addEventListener('click', function() {
               const remove = b.dataset.remove === '1';
               groups[b.dataset.status].forEach(function(m) {
                 if (!remove) addChip(m.id, m.name);
-                else { const c = chips.querySelector('[data-member-chip="' + m.id + '"]'); if (c) c.remove(); }
+                else { const c = chips.querySelector('[data-chip="' + m.id + '"]'); if (c) c.remove(); }
               });
               refresh();
             });
