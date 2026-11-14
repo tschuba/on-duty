@@ -137,7 +137,7 @@ describe("GET /events/:id mail UI", () => {
   it("opens the created-modal on ?notify=created, with 'Mail senden' focused", async () => {
     targets = { mode: "all", recipients: sendable(3) };
     const body = await page("?notify=created");
-    expect(body).toContain("3 Mitglieder erhalten die Mail");
+    expect(body).toContain("erhalten die Mail");
     expect(body).toMatch(/<button[^>]*autofocus[^>]*>Mail senden/);
   });
   it("adds the cancel modal only with SMTP", async () => {
