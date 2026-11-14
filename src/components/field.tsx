@@ -29,7 +29,7 @@ export function Field({ label, required, hint, floating = true, after, class: cl
 // Gruppe zusammengehöriger Felder (Radio-Liste, Von/Bis).
 export function FieldGroup({ legend, children }: { legend: string; children: unknown }) {
   return (
-    <fieldset class="fieldset p-0">
+    <fieldset class="fieldset p-0 gap-3">
       <legend class="fieldset-legend">{legend}</legend>
       {children as never}
     </fieldset>

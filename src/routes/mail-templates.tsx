@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { ChipInput } from "../components/chip-input.js";
+import { tagSuggestionsJson } from "../lib/tags.js";
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -34,11 +36,11 @@ const forbidden = () => { throw new HTTPException(HTTP_STATUS.FORBIDDEN); };
 const notFound = () => { throw new HTTPException(HTTP_STATUS.NOT_FOUND); };
 
 async function editable(user: Variables["user"]): Promise<TemplateView[]> {
-  // Reihenfolge = Katalog (die DB liefert ohne ORDER BY keine stabile Reihenfolge), freie Vorlagen danach nach Name
+  // Reihenfolge = Katalog (die DB liefert ohne ORDER BY keine stabile Reihenfolge), freie Vorlagen zuerst, nach Name
   const order = Object.keys(CATALOG);
   const nameOf = (x: TemplateView) => x.custom?.meta.name ?? "";
   return (await listTemplates()).filter((x) => (CATALOG[x.key] || x.custom) && (mayEdit(user, x.editPermissions) || (x.custom && maySend(user))))
-    .sort((a, b) => (a.custom ? 1 : 0) - (b.custom ? 1 : 0) || order.indexOf(a.key) - order.indexOf(b.key) || nameOf(a).localeCompare(nameOf(b), "de"));
+    .sort((a, b) => (b.custom ? 1 : 0) - (a.custom ? 1 : 0) || order.indexOf(a.key) - order.indexOf(b.key) || nameOf(a).localeCompare(nameOf(b), "de"));
 }
 const maySend = (user: Variables["user"]) => user.permissions.has("system:admin") || user.permissions.has("mail:send");
 const mayCreate = (user: Variables["user"]) => user.permissions.has("system:admin") || user.permissions.has("mail:templates");
@@ -58,7 +60,11 @@ const stamp = (u: { updatedAt: Date; updatedBy: string | null }) => ({
 
 mailTemplateRoutes.get("/", async (c) => {
   const user = c.get("user");
-  const list = await editable(user);
+  const q = (c.req.query("q") ?? "").trim();
+  const all = await editable(user);
+  // Suche in Name, Beschreibung, Betreff und aktuellem Text (Override vor System)
+  const hay = (x: TemplateView) => [x.custom?.meta.name ?? CATALOG[x.key].name, x.custom?.meta.description ?? CATALOG[x.key].description, (x.override ?? x.system).subject, (x.override ?? x.system).body].join("\n").toLowerCase();
+  const list = q ? all.filter((x) => hay(x).includes(q.toLowerCase())) : all;
   const href = (x: TemplateView) => `/mail/templates/${x.key}${x.custom && !mayEdit(user, x.editPermissions) ? "/send" : ""}`;
   const catOf = (x: TemplateView) => (x.custom ? "custom" : CATALOG[x.key].category);
   const groups = [...new Set(list.map(catOf))];
@@ -66,13 +72,20 @@ mailTemplateRoutes.get("/", async (c) => {
     <Layout title={t("mailTemplates.title")} user={user}>
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("mailTemplates.title")} actions={mayCreate(user) && <HeaderAction variant="primary" icon="plus" label={t("mailTemplates.new")} href="/mail/templates/new" class="btn-primary" />} />
-        {!list.length && <p class="opacity-70">{t("mailTemplates.empty")}</p>}
-        {groups.map((g) => (
-          <section class="mb-6">
-            <h2 class="text-lg font-semibold mb-2">{g === "custom" ? t("mailTemplates.group.custom") : T(`mail.type.${g}`)}</h2>
+        {all.length > 0 && (
+          <form method="get" role="search" class="mb-4">
+            <input type="search" name="q" value={q} class="input w-full" placeholder={t("mailTemplates.searchTemplates")} aria-label={t("mailTemplates.searchTemplates")} autocomplete="off" />
+          </form>
+        )}
+        {!list.length && <p class="opacity-70">{t(all.length ? "mailTemplates.searchTemplates.empty" : "mailTemplates.empty")}</p>}
+        {groups.map((g, i) => (
+          <>
+          {i === 1 && groups[0] === "custom" && <div class="divider text-sm opacity-70">{t("mailTemplates.group.system")}</div>}
+          <section class={`mb-6 ${g === "custom" ? "border-l-4 border-primary pl-4" : ""}`}>
+            <h2 class={`text-lg font-semibold ${g === "custom" ? "text-primary mb-0" : "mb-2"}`}>{g === "custom" ? t("mailTemplates.group.custom") : T(`mail.type.${g}`)}</h2>
+            {g === "custom" && <p class="text-sm opacity-70 mb-2">{t("mailTemplates.group.custom.hint")}</p>}
             <div class="overflow-x-auto">
               <table class="table table-zebra w-full">
-                <thead><tr><th>{t("mailTemplates.col.name")}</th><th>{t("mailTemplates.col.state")}</th><th><span class="sr-only">{t("mailTemplates.quick")}</span></th></tr></thead>
                 <tbody>
                   {list.filter((x) => catOf(x) === g).map((x) => (
                     <tr class="cursor-pointer hover" onclick={`location.href='${href(x)}'`}>
@@ -80,8 +93,12 @@ mailTemplateRoutes.get("/", async (c) => {
                         <a href={href(x)} class="font-medium link link-hover">{x.custom ? x.custom.meta.name : CATALOG[x.key].name}</a>
                         <div class="text-sm opacity-60">{x.custom ? x.custom.meta.description : CATALOG[x.key].description}</div>
                       </td>
-                      <td>{x.custom ? t("mailTemplates.state.own", stamp(x.custom)) : x.override ? t("mailTemplates.state.custom", stamp(x.override)) : t("mailTemplates.state.system")}</td>
-                      <td class="text-right">
+                      <td class="text-right whitespace-nowrap">
+                        {x.custom && maySend(user) && (
+                          <a href={`/mail/templates/${x.key}/send`} class="btn btn-ghost btn-sm btn-square" title={t("mailTemplates.send")} aria-label={`${x.custom.meta.name}: ${t("mailTemplates.send")}`} onclick="event.stopPropagation()">
+                            <Icon name="envelope" class="h-5 w-5" />
+                          </a>
+                        )}
                         <button type="button" class="btn btn-ghost btn-sm btn-square" title={t("mailTemplates.quick")} aria-label={`${x.custom ? x.custom.meta.name : CATALOG[x.key].name}: ${t("mailTemplates.quick")}`}
                           hx-get={`/mail/templates/${x.key}/quick`} hx-target="#quick-body" {...{ "hx-on::after-request": "if(event.detail.successful)document.getElementById('quick-dialog').showModal()" }} onclick="event.stopPropagation()">
                           <Icon name="magnifying-glass" class="h-5 w-5" />
@@ -93,6 +110,7 @@ mailTemplateRoutes.get("/", async (c) => {
               </table>
             </div>
           </section>
+          </>
         ))}
         <dialog id="quick-dialog" class="modal">
           <div class="modal-box max-w-3xl">
@@ -151,7 +169,6 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
   const base = cf?.isNew ? "/mail/templates/new" : `/mail/templates/${key}`;
   const requiredNames = new Set(entry.required.map((r) => (r.list ? `${r.list}[].${r.name}` : r.name)));
   const phData = Object.entries(entry.vars).map(([name, v]) => ({ name, desc: v.desc, example: v.example, optional: !!v.optional, type: v.type, group: groupOf(name, v, !!cf), list: name.includes("[]") || v.type === "list", required: requiredNames.has(name) }));
-  const formErr = errors.filter((e) => e.startsWith("form: "));
   const bodyErr = errors.filter((e) => !e.startsWith("subject:") && !e.startsWith("form: ") && !e.startsWith("headers: "));
   return (
     <Layout title={entry.name} user={user}>
@@ -167,7 +184,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
         />
         {cf ? (!cf.isNew && tpl.custom && <p class="mb-4">{t("mailTemplates.state.own", stamp(tpl.custom))}</p>)
           : tpl.override ? <p class="mb-4">{t("mailTemplates.status.custom", stamp(tpl.override))}</p> : <div role="status" class="alert alert-info alert-soft mb-4">{t("mailTemplates.status.system")}</div>}
-        {formErr.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{formErr.map((e) => <li>{e.replace(/^form: /, "")}</li>)}</ul></div>}
+        {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e.replace(/^(form|subject|body|prefix|headers): /, "")}</li>)}</ul></div>}
         {conflict && <div role="alert" class="alert alert-error mb-4"><span>{t("mailTemplates.conflict")} <a class="link" href={`/mail/templates/${key}`}>{t("mailTemplates.conflict.reload")}</a></span></div>}
         <div class="flex justify-end mb-2 md:hidden">
           <button type="button" id="ph-toggle" class="btn btn-ghost btn-square" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")}><Icon name="sidebar-expand" class="h-5 w-5 text-gold" /></button>
@@ -203,10 +220,9 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
               </> : null}
               <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="urgent" value="1" class="checkbox checkbox-sm" checked={cf.urgent} disabled={!user.permissions.has("system:admin")} />{t("mailTemplates.custom.urgent")}</label>
               <p class="label text-xs opacity-70 whitespace-normal -mt-3">{t("mailTemplates.custom.urgent.hint")}</p>
-              <Field label={t("mailTemplates.technical.prefix")}><input id="tpl-prefix" name="prefix" class="input w-full font-mono" placeholder={t("mailTemplates.technical.prefix")} value={cf.prefix} /></Field>
             </>}
             <Field label={t("mailTemplates.field.subject")} required class={cf ? undefined : "md:group-data-[open=false]:pr-12"} after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
-              <input id="tpl-subject" name="subject" class="input w-full font-mono" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} />
+              <label class="input w-full font-mono gap-1">{!cf && tpl.prefix ? <span class="text-base-content/60 shrink-0">{tpl.prefix}</span> : null}<input id="tpl-subject" name="subject" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} /></label>
             </Field>
             <Field label={t("mailTemplates.field.body")} required after={bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}>
               <textarea id="tpl-body" name="body" rows={18} class="textarea w-full max-w-full resize-y font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
@@ -217,7 +233,6 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   <h2 class="font-semibold mb-1">{t("mailTemplates.custom.fields")}</h2>
                   <p class="text-sm opacity-70 mb-2">{t("mailTemplates.custom.fields.hint")}</p>
                   <div class="overflow-x-auto"><table class="table table-sm">
-                    <thead><tr><th>{t("mailTemplates.custom.fields.placeholder")}</th><th>{t("mailTemplates.custom.fields.label")}</th><th>{t("mailTemplates.custom.fields.example")}</th></tr></thead>
                     <tbody>{cf.fields.map((f) => (
                       <tr><td><code>{`{{${f.name}}}`}</code></td>
                         <td><input name={`fl_${f.name}`} class="input input-sm w-full" value={f.label ?? ""} placeholder={fieldLabel(f.name)} aria-label={`${f.name}: ${t("mailTemplates.custom.fields.label")}`} /></td>
@@ -343,7 +358,7 @@ const asArray = (v: unknown) => (Array.isArray(v) ? v : v == null ? [] : [v]).ma
 async function readCustom(c: any, current?: boolean) {
   const f = await c.req.parseBody({ all: true });
   const one = (k: string) => String(asArray(f[k])[0] ?? "");
-  const subject = one("subject").trim(), body = one("body").replace(/\r\n/g, "\n"), prefix = one("prefix").trim();
+  const subject = one("subject").trim(), body = one("body").replace(/\r\n/g, "\n"), prefix = "";
   const fields = customFields({ prefix, subject, body }).map((name) => ({ name, label: one(`fl_${name}`).trim() || undefined, example: one(`fe_${name}`).trim() || undefined }));
   return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), urgent: c.get("user").permissions.has("system:admin") ? one("urgent") === "1" : !!current, key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
 }
@@ -379,7 +394,7 @@ async function renderCustom(c: any, tpl: TemplateView, d: CustomFormData | null,
     fields: d?.fields ?? cur?.meta.fields ?? [], key: d?.key ?? tpl.key, topic: d?.topic ?? cur?.topic ?? "", audience: d?.audience ?? tpl.audience,
     perms: d?.perms ?? tpl.editPermissions, topics: isNew ? await listTopics() : [], grantable: grantable(user),
   };
-  const values = d ?? tpl.system;
+  const values = d ?? (isNew ? { ...tpl.system, subject: "[{{org.name}}] " } : { ...tpl.system, subject: `${tpl.prefix ? `${tpl.prefix} ` : ""}${tpl.system.subject}` });
   return c.html(<Editor user={user} back={backTo(c.req.query("from"))} tpl={tpl} values={values} errors={errors} expected={d?.expected ?? cur?.updatedAt.toISOString() ?? ""} conflict={status === HTTP_STATUS.CONFLICT} cf={form} />, status);
 }
 
@@ -504,7 +519,8 @@ mailTemplateRoutes.post("/:key/reset", async (c) => {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ["active", "youth", "children", "passive", "supporting"] as const;
-const readSelection = (f: Record<string, unknown>) => ({ statuses: asArray(f.status).filter((x) => (STATUSES as readonly string[]).includes(x)), roleIds: asArray(f.role), memberIds: asArray(f.member).filter((x) => UUID_RE.test(x)) });
+// „Alle“ (status=all) ist exklusiv und entspricht der leeren Auswahl.
+const readSelection = (f: Record<string, unknown>) => asArray(f.status).includes("all") ? { statuses: [], roleIds: [], memberIds: [] } : ({ statuses: asArray(f.status).filter((x) => (STATUSES as readonly string[]).includes(x)), roleIds: asArray(f.role).filter((x) => UUID_RE.test(x)), memberIds: asArray(f.member).filter((x) => UUID_RE.test(x)) });
 
 // Ein Formular: Änderung der Auswahl lädt per GET neu (Zähler, Feldwerte bleiben in der Query), „Versenden“ sendet per POST.
 async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, sel: ReturnType<typeof readSelection>, errors: string[] = [], status?: number) {
@@ -522,49 +538,61 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
     <Layout title={meta.name} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
         <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`}
-          actions={<HeaderAction icon="clipboard-list" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />} />
+          actions={<>
+            <HeaderAction icon="clipboard-list" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />
+            <HeaderAction variant="primary" class="btn-primary" icon="envelope" label={t("mailTemplates.send")} form="send-form" attrs={{ formmethod: "post", ...(!smtp || !counts.send ? { disabled: "" } : {}) }} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send, mails: counts.mails }))})`} />
+          </>} />
         {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e}</li>)}</ul></div>}
         {!smtp && <div role="alert" class="alert alert-warning mb-4">{t("mailTemplates.send.noSmtp")}</div>}
-        <form method="get" action={action} class="space-y-4" onchange="if(event.target.closest('[data-sel]'))this.submit()">
+        <form id="send-form" method="get" action={action} class="space-y-4" onchange="if(event.target.closest('[data-sel]'))this.submit()">
           {back !== "/mail/templates" && <input type="hidden" name="from" value={back} />}
           <FieldGroup legend={t("mailTemplates.send.selection")}>
-            <p class="text-sm opacity-70">{meta.urgent ? t("mailTemplates.send.urgent") : T("mailTemplates.send.selection.hint", { topic: tpl.custom!.topic })}</p>
-            <div class="flex flex-wrap gap-3" data-sel>
-              {STATUSES.map((st) => <label class="label cursor-pointer gap-2"><input type="checkbox" name="status" value={st} class="checkbox checkbox-sm" checked={sel.statuses.includes(st)} />{T(`status.${st}`)}</label>)}
+            <p class="text-sm opacity-70">{meta.urgent ? t("mailTemplates.send.urgent") : t("mailTemplates.send.selection.hint")}</p>
+            <div class="join flex-wrap" data-sel>
+              <input type="checkbox" name="status" value="all" class="join-item btn btn-sm" aria-label={t("mailTemplates.send.all")} checked={!sel.statuses.length && !sel.roleIds.length && !sel.memberIds.length} />
+              {STATUSES.map((st) => <input type="checkbox" name="status" value={st} class="join-item btn btn-sm" aria-label={T(`status.${st}`)} checked={sel.statuses.includes(st)} />)}
             </div>
-            {roles.length > 0 && <div class="flex flex-wrap gap-3" data-sel>
-              {roles.map((r) => <label class="label cursor-pointer gap-2"><input type="checkbox" name="role" value={r.id} class="checkbox checkbox-sm" checked={sel.roleIds.includes(r.id)} />{r.title}</label>)}
-            </div>}
-            <EntityPicker searchUrl="/mail/templates/search-members" placeholder={t("events.form.membersSearch")} />
-            <div id="send-members" class="flex flex-wrap gap-1">
-              {picked.map((m) => (
-                <span class="badge badge-ghost gap-1"><input type="hidden" name="member" value={m.id} />{m.firstName} {m.lastName}
-                  <button type="button" class="cursor-pointer" aria-label={t("common.remove")} data-chip-remove>×</button></span>
-              ))}
-            </div>
+            {roles.length > 0 && <ChipInput name="role" label={t("mailTemplates.send.roles")} placeholder={t("mailTemplates.send.rolesPlaceholder")} values={sel.roleIds} presets={roles.map((r) => ({ key: r.id, label: r.title, badge: "badge-outline" }))} presetButtons={false} suggestionsFrom="#role-suggestions" caseSensitive={false} />}
+            <script type="application/json" id="role-suggestions" dangerouslySetInnerHTML={{ __html: tagSuggestionsJson(roles.map((r) => r.title)) }} />
+            <EntityPicker multiple name="member" searchUrl="/mail/templates/search-members" label={t("mailTemplates.send.members")} placeholder={t("events.form.membersSearch")} selected={picked.map((m) => ({ id: m.id, name: `${m.firstName} ${m.lastName}` }))} />
           </FieldGroup>
           <script dangerouslySetInnerHTML={{ __html: SEND_SCRIPT }} />
-          <p class="font-medium" role="status">{T("mailTemplates.send.counts", { send: counts.send, mails: counts.mails, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
+          <div class="stats stats-vertical sm:stats-horizontal bg-base-200 w-full" role="status">
+            {(["send", "mails", "noEmail", "optedOut"] as const).map((k) => (
+              <div class="stat px-4 py-2">
+                <div class="stat-title text-xs whitespace-normal">{t(`mailTemplates.send.stats.${k}`)}</div>
+                <div class="stat-value text-2xl">{counts[k]}</div>
+              </div>
+            ))}
+          </div>
           {meta.fields.map((f) => (
             <Field label={f.label || fieldLabel(f.name)} required>
               <textarea name={`f_${f.name}`} rows={3} class="textarea w-full" required placeholder={f.label || fieldLabel(f.name)}>{values[f.name] ?? f.example ?? ""}</textarea>
             </Field>
           ))}
-          <div class="flex flex-wrap gap-2 items-center">
-            <button type="button" class="btn btn-outline" hx-post={`/mail/templates/${tpl.key}/send/preview`} hx-include="closest form" hx-target="#send-preview">{t("mailTemplates.send.preview")}</button>
+          <div role="tablist" class="tabs tabs-lift">
+            {(["default", "multiple"] as const).map((id) => (
+              <>
+                <input type="radio" name="case" value={id} class="tab text-secondary checked:font-semibold [--tab-bg:var(--color-base-200)] [--tab-border-color:var(--color-secondary)]" aria-label={t(`mailTemplates.case.${id}`)} checked={(c.req.query("case") ?? "default") === id} />
+                <div class="tab-content bg-base-100 border-secondary p-4">
+                  <div id={`send-preview-${id}`} hx-post={`/mail/templates/${tpl.key}/send/preview`} hx-include="closest form" hx-vals={JSON.stringify({ case: id })} hx-trigger="load, input delay:300ms from:closest form" />
+                </div>
+              </>
+            ))}
           </div>
-          <div id="send-preview" />
-          <button type="submit" formmethod="post" class="btn btn-primary" disabled={!smtp || !counts.send} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send, mails: counts.mails }))})`}>{t("mailTemplates.send")}</button>
         </form>
       </div>
     </Layout>, status);
 }
 
-// Einzelauswahl: Treffer als Chip mit Hidden-Feld anhängen, danach neu laden (Zähler); × entfernt.
-const SEND_SCRIPT = `(function(){var f=document.currentScript.closest('form'),box=f.querySelector('#send-members');
-f.addEventListener('picker:select',function(e){var d=e.detail;if(!f.querySelector('input[name=member][value="'+d.id+'"]')){var s=document.createElement('span');s.className='badge badge-ghost gap-1';
-var i=document.createElement('input');i.type='hidden';i.name='member';i.value=d.id;s.appendChild(i);s.appendChild(document.createTextNode(d.name));box.appendChild(s);}f.submit();});
-box.addEventListener('click',function(e){var b=e.target.closest('[data-chip-remove]');if(b){b.parentNode.remove();f.submit();}});})();`;
+// Änderung der Chips (Funktionen oder Mitglieder) lädt neu (Zähler).
+// „Alle“ ist exklusiv: wer etwas anderes wählt, nimmt „Alle“ heraus; „Alle“ wählen leert die Statusgruppen (Funktionen/Personen verwirft der Server).
+const SEND_SCRIPT = `(function(){var f=document.currentScript.closest('form');
+var all=f.querySelector('input[name=status][value=all]');
+function other(){all.checked=false;f.submit();}
+f.addEventListener('chip:change',other);f.addEventListener('picker:change',other);
+f.addEventListener('change',function(e){var t=e.target;if(t.name!=='status')return;
+if(t===all){all.checked=true;f.querySelectorAll('input[name=status]:not([value=all])').forEach(function(i){i.checked=false;});}else all.checked=false;},true);})();`; // Capture: muss vor dem onchange-Submit des Formulars laufen
 
 const readValues = (tpl: TemplateView, f: Record<string, unknown>) =>
   Object.fromEntries(tpl.custom!.meta.fields.map((x) => [x.name, String(asArray(f[`f_${x.name}`])[0] ?? "").replace(/\r\n/g, "\n").trim()]));
@@ -581,6 +609,7 @@ mailTemplateRoutes.post("/:key/send/preview", async (c) => {
   const f = await c.req.parseBody({ all: true });
   const values = readValues(tpl, f);
   const vars = customPreviewVars([]);
+  if (f.case === "multiple") { vars.multiple = true; vars.you = t("mail.event.you.many"); }
   for (const x of tpl.custom!.meta.fields) vars[x.name] = values[x.name] || `\u0001${x.name}\u0002`; // leer: hervorgehoben
   if (tpl.custom!.meta.urgent) vars.unsubscribeUrl = "";
   const out = renderMail({ prefix: tpl.prefix, ...tpl.system }, vars);
@@ -618,10 +647,12 @@ mailTemplateRoutes.get("/:key/log", async (c) => {
     <Layout title={tpl.custom!.meta.name} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
         <PageHeader title={T("mailTemplates.log.title", { name: tpl.custom!.meta.name })} backHref={`/mail/templates/${tpl.key}/send${fromQs(back)}`} />
-        <p class="mb-4">{T("mailTemplates.log.counts", { sent: n("sent"), failed: n("failed") })}</p>
+        <div class="stats stats-vertical sm:stats-horizontal border border-base-300 mb-4">
+          <div class="stat"><div class="stat-title">{t("mailTemplates.log.sent")}</div><div class="stat-value text-success">{n("sent")}</div></div>
+          <div class="stat"><div class="stat-title">{t("mailTemplates.log.failed")}</div><div class="stat-value text-error">{n("failed")}</div></div>
+        </div>
         {!rows.length ? <p class="opacity-70">{t("mailTemplates.log.empty")}</p> : (
           <div class="overflow-x-auto"><table class="table table-zebra w-full">
-            <thead><tr><th>{t("mailTemplates.log.col.when")}</th><th>{t("mailTemplates.log.col.person")}</th><th>{t("mailTemplates.log.col.status")}</th></tr></thead>
             <tbody>{rows.map((r) => (
               <tr><td>{formatDateTime(r.at, tz, locale)}</td><td>{r.firstName} {r.lastName}</td>
                 <td><span class={`badge badge-sm ${r.status === "sent" ? "badge-success" : "badge-error"}`}>{T(`mailTemplates.log.${r.status}`)}</span></td></tr>

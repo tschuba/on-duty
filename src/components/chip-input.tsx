@@ -4,7 +4,7 @@ import { t } from "../i18n/index.js";
 // values may contain commas. Script is bound once per page and works per instance
 // via [data-chip-input] (no fixed ids → several instances per page are fine).
 let instanceCount = 0;
-export function ChipInput({ name, label, placeholder, values, max, maxFrom, splitOnComma = false, caseSensitive = true, hint, suggestionsFrom, presets }: {
+export function ChipInput({ name, label, placeholder, values, max, maxFrom, splitOnComma = false, caseSensitive = true, hint, suggestionsFrom, presets, presetButtons = true }: {
   name: string;
   label: string;
   placeholder?: string;
@@ -20,6 +20,8 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
   suggestionsFrom?: string;
   /** Fixed tags: stored by key, shown by label/colour, offered as one-click buttons inside the box. */
   presets?: { key: string; label: string; badge: string }[];
+  /** false: presets only map key→label, no one-click buttons. */
+  presetButtons?: boolean;
 }) {
   const list = values ?? [];
   const listId = `chip-list-${++instanceCount}`;
@@ -38,9 +40,9 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
           </span>
           );
         })}
-        <input type="text" class={`chip-text grow min-w-24 outline-none bg-transparent ${placeholder ? "" : "placeholder:opacity-0 focus:placeholder:opacity-100"}`} placeholder={placeholder}
+        <input type="text" class={`chip-text w-auto h-6! ms-1 grow min-w-24 outline-none bg-transparent ${placeholder ? "" : "placeholder:opacity-0 focus:placeholder:opacity-100"}`} placeholder={placeholder}
           {...(suggestionsFrom ? { role: "combobox", "aria-autocomplete": "list", "aria-expanded": "false", "aria-controls": listId, autocomplete: "off" } : {})} />
-        {presets && (
+        {presets && presetButtons && (
           <div class="chip-presets basis-full flex flex-wrap items-center gap-1 border-t border-base-300 mt-1 pt-2">
             {presets.map((p) => (
               <button type="button" class={`chip-preset badge badge-outline cursor-pointer ${p.badge}`} data-preset={p.key} hidden={list.includes(p.key)}>+ {p.label}</button>
@@ -148,6 +150,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
             h.type = 'hidden'; h.name = root.dataset.name; h.value = value;
             chip.appendChild(h);
             root.querySelector('.chip-box').insertBefore(chip, root.querySelector('.chip-text'));
+            root.dispatchEvent(new CustomEvent('chip:change', { bubbles: true }));
           }
           function chipCommit(input) {
             var root = input.closest('[data-chip-input]');
@@ -202,6 +205,7 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
             var root = rm.closest('[data-chip-input]');
             rm.closest('[data-chip]').remove();
             chipRefresh(root);
+            root.dispatchEvent(new CustomEvent('chip:change', { bubbles: true }));
           });
           document.body.addEventListener('submit', function(e) {
             e.target.querySelectorAll('[data-chip-input] .chip-text').forEach(function(i){ if (i.value.trim()) chipCommit(i); });
