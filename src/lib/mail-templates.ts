@@ -20,15 +20,16 @@ export interface EventMailRecord {
   optOutAllUrl?: string; // nur bei mehreren Mitgliedern
   orgContactEmail?: string;
 }
-export interface MailRecipient { firstName: string; lastName: string; email: string; optOutUrl: string; rsvpYesUrl?: string; rsvpNoUrl?: string }
+export interface MailRecipient { firstName: string; lastName: string; email: string; optOutUrl?: string; rsvpYesUrl?: string; rsvpNoUrl?: string }
 
 export interface InfoMailRecord { optOutAllUrl?: string; orgContactEmail?: string }
+export interface SimpleMailRecord { applicantName?: string; rejoin?: boolean; itemName?: string; requestUrl?: string; statusUrl?: string; userName?: string; userEmail?: string; orgContactEmail?: string }
 export interface SettingsMailRecord { settingsUrl: string; validMinutes: number; orgContactEmail?: string }
 
 interface CatalogEntry {
   name: string; description: string; // Klartext für die Oberfläche
-  category: "event" | "member";
-  audience: "member";
+  category: "event" | "member" | "membership" | "lend" | "registration";
+  audience: "member" | "staff" | "applicant";
   vars: Record<string, VarSpec>;
   required: { name: string; list?: string; label: string }[]; // label: Klartextname für Fehlermeldungen/Checkliste
   // ohne list: Variable auf oberster Ebene
@@ -132,36 +133,62 @@ const settingsEntry: CatalogEntry = {
 };
 
 // Info-Mail zu Termin-Mails: nur Anrede, Mitgliederblöcke und Opt-Out-Links, kein Termin.
-const INFO_KEYS = ["addressee", "multiple", "recipients", "recipients[].name", "recipients[].optOutUrl", "optOutAllUrl"];
+const INFO_KEYS = ["addressee", "you", "multiple", "recipients", "recipients[].name", "recipients[].optOutUrl", "optOutAllUrl"];
 const infoEntry: CatalogEntry = {
   ...eventEntry,
   vars: { ...GLOBAL_VARS, ...Object.fromEntries(INFO_KEYS.map((k) => [k, EVENT_VARS[k]])) },
   build: (r: InfoMailRecord, recipients: MailRecipient[]) => ({
     addressee: recipients.map((p) => p.firstName).join(", "),
     multiple: recipients.length > 1,
+    you: t(recipients.length > 1 ? "mail.event.you.many" : "mail.event.you.one"),
     recipients: recipients.map((p) => ({ name: fullName(p), optOutUrl: p.optOutUrl })),
     optOutAllUrl: recipients.length > 1 ? (r.optOutAllUrl ?? "") : "",
   }),
 };
 
+// Mails an bestehende Abläufe (Antrag, Verleih, Registrierung): ein Empfänger, Verwalter-Mails ohne Personenvariablen.
+const STAFF_GLOBAL = Object.fromEntries(Object.entries(GLOBAL_VARS).filter(([k]) => !k.startsWith("recipient.")));
+const V = (desc: string, example: string, source: VarSource): VarSpec => ({ type: "text", desc, example, source });
+const simple = (category: CatalogEntry["category"], audience: CatalogEntry["audience"], vars: Record<string, VarSpec>, build: (r: SimpleMailRecord) => MailVars): CatalogEntry =>
+  ({ name: "", description: "", category, audience, vars: { ...(audience === "staff" ? STAFF_GLOBAL : GLOBAL_VARS), ...vars }, required: [], build });
+const lendApplicant = simple("lend", "applicant", {
+  "item.name": V("Name des Gegenstands", "Zelt", "data"),
+  "request.statusUrl": V("Statusseite der Anfrage", "https://portal.example.org/lend/status/abc", "link"),
+}, (r) => ({ item: { name: r.itemName }, request: { statusUrl: r.statusUrl } }));
+
 const named = (key: string, e: CatalogEntry): CatalogEntry => ({ ...e, name: t(`mailTemplates.name.${key}` as never), description: t(`mailTemplates.desc.${key}` as never) });
 export const CATALOG: Record<string, CatalogEntry> = Object.fromEntries(Object.entries({
-  "member-settings-link": settingsEntry,
   "event-created": eventEntry,
   "event-updated": eventEntry,
   "event-cancelled": eventEntry,
   "event-uncancelled": eventEntry,
   "event-mail-info": infoEntry,
+  "member-settings-link": settingsEntry,
+  "application-submitted": simple("membership", "staff", { "applicant.name": V("Name des Antragstellers", "Anna Beispiel", "person") }, (r) => ({ applicant: { name: r.applicantName } })),
+  "application-approved": simple("membership", "applicant", { rejoin: { type: "boolean", desc: "Wieder Mitglied nach Austritt", example: "ja", source: "data" } }, (r) => ({ rejoin: !!r.rejoin })),
+  "application-rejected": simple("membership", "applicant", {}, () => ({})),
+  "lend-notify": simple("lend", "staff", {
+    "item.name": V("Name des Gegenstands", "Zelt", "data"),
+    "request.url": V("Anfrage in der Verwaltung", "https://portal.example.org/inventory/requests/1", "link"),
+  }, (r) => ({ item: { name: r.itemName }, request: { url: r.requestUrl } })),
+  "lend-submitted": lendApplicant,
+  "lend-approved": lendApplicant,
+  "lend-rejected": lendApplicant,
+  "registration-pending": simple("registration", "staff", {
+    "user.name": V("Name des Benutzers", "Anna Beispiel", "person"),
+    "user.email": V("Adresse des Benutzers", "anna@example.org", "person"),
+    "admin.url": V("Benutzerverwaltung", "https://portal.example.org/admin/users", "link"),
+  }, (r) => ({ user: { name: r.userName, email: r.userEmail }, admin: { url: `${env.OIDC_APP_URL}/admin/users` } })),
 }).map(([k, e]) => [k, named(k, e)]));
 
 // Einziger Einstieg für Versand und Editor-Vorschau: ergänzt die globalen Variablen.
-export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord | InfoMailRecord, recipients: MailRecipient[]): MailVars {
+export function buildVars(key: string, record: EventMailRecord | SettingsMailRecord | InfoMailRecord | SimpleMailRecord, recipients: MailRecipient[]): MailVars {
   const entry = CATALOG[key];
   if (!entry) throw new Error(`unknown mail template key: ${key}`);
   const first = recipients[0];
   return {
     ...entry.build(record, recipients),
-    org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: record.orgContactEmail ?? "" },
+    org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: (record as SimpleMailRecord).orgContactEmail ?? "" },
     type: t(`mail.type.${entry.category}`),
     recipient: first ? { name: fullName(first), firstName: first.firstName, lastName: first.lastName, email: first.email } : {},
   };

@@ -11,7 +11,7 @@ vi.mock("../db/index.js", () => ({ db: { select } }));
 const { CATALOG, buildVars, validateTemplate, renderMail, resolveTemplate, catalogDocs } = await import("../lib/mail-templates.js");
 
 // Standardtexte direkt aus der Seed-Migration.
-const sql = ["0081_mail_templates_seed", "0083_member_settings_link_template", "0084_event_info_mail_template"].map((f) => readFileSync(`drizzle/${f}.sql`, "utf8")).join("\n");
+const sql = ["0081_mail_templates_seed", "0083_member_settings_link_template", "0084_event_info_mail_template", "0086_existing_mail_templates"].map((f) => readFileSync(`drizzle/${f}.sql`, "utf8")).join("\n");
 const seeded = [...sql.matchAll(/\('([\w-]+)', 'de', 'system'.*?\$s\$(.*?)\$s\$, \$b\$(.*?)\$b\$/gs)].map((m) => ({ key: m[1], subject: m[2], body: m[3] }));
 
 const record = { event: { id: "e1", title: "Übung", startsAt: new Date("2026-04-12T16:00:00Z"), endsAt: new Date("2026-04-12T18:00:00Z"), allDay: false, location: "Gerätehaus", rsvpEnabled: true, rsvpDeadline: null, maxParticipants: 20 } };
@@ -23,7 +23,31 @@ describe("mail templates", () => {
     expect(seeded.map((s) => s.key).sort()).toEqual(Object.keys(CATALOG).sort());
   });
 
-  it.each(seeded)("renders $key from its seeded text", ({ key, subject, body }) => {
+  const EXISTING = ["application-submitted", "application-approved", "application-rejected", "lend-notify", "lend-submitted", "lend-approved", "lend-rejected", "registration-pending"];
+  const simple = { applicantName: "Anna B", rejoin: true, itemName: "Zelt", requestUrl: "https://portal.test/r/1", statusUrl: "https://portal.test/s/1", userName: "Anna B", userEmail: "a@x.de" };
+  it.each(seeded.filter((s) => EXISTING.includes(s.key)))("renders existing mail $key", ({ key, subject, body }) => {
+    expect(validateTemplate(key, { prefix: "[{{org.name}}|{{type}}]", subject, body })).toEqual([]);
+    const vars = buildVars(key, simple, [anna]);
+    const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, vars);
+    expect(out.subject).toMatch(/^\[Feuerwehr Test\|(Mitgliedsantrag|Verleih|Registrierung)\] \S/);
+    expect(out.text).not.toMatch(/\{\{|undefined/);
+    expect(out).toMatchSnapshot();
+    if (CATALOG[key].audience === "applicant") expect(out.text).toContain("Hallo Anna,");
+    else expect(out.text).not.toContain("Hallo");
+    // jede Variable aus dem Builder steht mit source im Katalog
+    const flat = (o: any, pre = ""): string[] => Object.entries(o).flatMap(([k, v]) => v && typeof v === "object" ? flat(v, `${pre}${k}.`) : [`${pre}${k}`]);
+    for (const v of flat(CATALOG[key].build(simple, [anna]))) expect(CATALOG[key].vars[v]?.source).toBeTruthy();
+  });
+
+  it("application-approved rejoin variant", () => {
+    const subject = "";
+    const body = readFileSync("drizzle/0089_application_approved_wording.sql", "utf8").match(/\$b\$(.*?)\$b\$/s)![1];
+    const text = (rejoin: boolean) => renderMail({ prefix: "", subject, body }, buildVars("application-approved", { rejoin }, [anna])).text;
+    expect(text(true)).toContain("wieder dabei");
+    expect(text(false)).not.toContain("wieder dabei");
+  });
+
+  it.each(seeded.filter((s) => !EXISTING.includes(s.key)))("renders $key from its seeded text", ({ key, subject, body }) => {
     expect(validateTemplate(key, { prefix: "[{{org.name}}|{{type}}]", subject, body })).toEqual([]);
     const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, buildVars(key, { ...record, changes: "Ort: A → B" }, [anna, ben]));
     if (key === "member-settings-link") return;

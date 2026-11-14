@@ -62,7 +62,7 @@ describe("sendMail logging", () => {
 
   it("warns without logging the recipient when SMTP is not configured", async () => {
     const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
-    expect(await sendMail({ to: "a@b.de", category: "lend", event: "x", audience: "staff", subject: "Betreff", text: "x" })).toEqual({ sent: false });
+    expect(await sendMail({ key: "x", to: "a@b.de", vars: {}, template: { key: "x", locale: "de", category: "lend", audience: "staff", topic: null, prefix: "", subject: "Betreff", body: "x", headersMode: "fixed", extraHeaders: null } })).toEqual({ sent: false });
     expect(JSON.stringify(warn.mock.calls)).not.toContain("a@b.de");
   });
 });

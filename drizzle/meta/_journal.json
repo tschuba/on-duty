@@ -603,6 +603,48 @@
       "when": 1794646966454,
       "tag": "0085_big_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1794647420448,
+      "tag": "0086_existing_mail_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1794648713819,
+      "tag": "0087_optout_link_wording",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794649381638,
+      "tag": "0088_mail_tone",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1794649900341,
+      "tag": "0089_application_approved_wording",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1794650152440,
+      "tag": "0090_lend_status_link_context",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1794650312199,
+      "tag": "0091_application_rejected_contact",
+      "breakpoints": true
     }
   ]
 }

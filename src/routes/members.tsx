@@ -27,6 +27,7 @@ import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import { TrainingSection, sortRecords } from "./training.js";
 import { trainingRecords } from "../db/schema/index.js";
 
@@ -1592,8 +1593,8 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   });
 
   if (applicationId && notifyApplicant && personFields.email) {
-    const bodyKey = linkMemberId && linkedWasArchived ? "applications.mail.approvedBodyRejoin" : "applications.mail.approvedBody";
-    await sendMail({ to: personFields.email, category: "membership", event: "application-approved", audience: "applicant", subject: t("applications.mail.approvedSubject"), text: t(bodyKey) });
+    const rejoin = !!(linkMemberId && linkedWasArchived);
+    await sendMail({ key: "application-approved", to: personFields.email, vars: buildVars("application-approved", { rejoin }, [{ firstName: personFields.firstName, lastName: personFields.lastName, email: personFields.email }]) });
   }
 
   setFlash(c, t("members.flash.created"), "success");

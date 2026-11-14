@@ -1,3 +1,4 @@
+import { loadOrgConfig } from "../lib/org-config.js";
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
 import { EmailField, Field } from "../components/field.js";
@@ -17,6 +18,7 @@ import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-ra
 import { env } from "../env.js";
 import { ageInYears } from "../lib/status.js";
 import { sendMail } from "../lib/mail.js";
+import { buildVars } from "../lib/mail-templates.js";
 import {
   isFormCurrentlyActive,
   loadApplicationForms,
@@ -623,7 +625,7 @@ applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
     .where(eq(applications.id, id));
 
   if (notifyApplicant && app.person.email) {
-    await sendMail({ to: app.person.email, category: "membership", event: "application-rejected", audience: "applicant", subject: t("applications.mail.rejectedSubject"), text: t("applications.mail.rejectedBody") });
+    await sendMail({ key: "application-rejected", to: app.person.email, vars: buildVars("application-rejected", { orgContactEmail: (await loadOrgConfig()).orgContactEmail }, [{ firstName: app.person.firstName, lastName: app.person.lastName, email: app.person.email }]) });
   }
 
   setFlash(c, t("applications.flash.rejected"), "success");
