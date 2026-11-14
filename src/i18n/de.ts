@@ -973,6 +973,8 @@ export const de = {
   "mailTemplates.log.sent": "Gesendet",
   "mailTemplates.log.failed": "Fehlgeschlagen",
   "mailTemplates.send": "Versenden",
+  "mailTemplates.send.preview": "Vorschau",
+  "mailTemplates.quick": "Schnellvorschau",
   "mailTemplates.send.title": "Mail versenden: {name}",
   "mailTemplates.send.selection": "Empfänger",
   "mailTemplates.send.selection.hint": "Statusgruppen, Funktionen und Einzelpersonen werden vereint; ohne Auswahl gehen alle aktiven Mitglieder an. Nur mit Adresse und ohne Abbestellung des Themas „{topic}“.",

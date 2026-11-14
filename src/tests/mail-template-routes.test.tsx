@@ -216,6 +216,26 @@ describe("custom template routes", () => {
   });
   const edit = { name: "Plan", subject: "s", body: "{{ort}} {{unsubscribeUrl}}", updatedAt: "2026-01-02T03:04:05.000Z" };
 
+  it("quick preview renders the current text with sample data; needs edit or send right", async () => {
+    perms = new Set(["events:manage"]);
+    const ok = await mailTemplateRoutes.request("/event-created/quick");
+    expect(ok.status).toBe(200);
+    expect(await ok.text()).toContain("Sys Übung Atemschutz");
+    expect((await mailTemplateRoutes.request("/member-settings-link/quick")).status).toBe(403);
+    expect((await mailTemplateRoutes.request("/nope/quick")).status).toBe(404);
+  });
+
+  it("send preview uses the entered values and marks empty fields; send right required", async () => {
+    templates = [cust({ editPermissions: ["x"] })];
+    perms = new Set(["mail:send"]);
+    const html = await (await post("/plan/send/preview", { f_ort: "Halle" })).text();
+    expect(html).toContain("Halle");
+    expect(await (await post("/plan/send/preview", { f_ort: "" })).text()).toContain("{{ort}}");
+    perms = new Set(["mail:templates"]);
+    expect((await post("/plan/send/preview", { f_ort: "x" })).status).toBe(403);
+    expect((await mailTemplateRoutes.request("/plan/quick")).status).toBe(403);
+  });
+
   it("lists custom templates in their own group, after the system ones", async () => {
     perms = new Set(["mail:templates"]);
     templates = [cust(), sys("event-created", "mail:templates")];

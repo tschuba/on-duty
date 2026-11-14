@@ -72,7 +72,7 @@ mailTemplateRoutes.get("/", async (c) => {
             <h2 class="text-lg font-semibold mb-2">{g === "custom" ? t("mailTemplates.group.custom") : T(`mail.type.${g}`)}</h2>
             <div class="overflow-x-auto">
               <table class="table table-zebra w-full">
-                <thead><tr><th>{t("mailTemplates.col.name")}</th><th>{t("mailTemplates.col.state")}</th></tr></thead>
+                <thead><tr><th>{t("mailTemplates.col.name")}</th><th>{t("mailTemplates.col.state")}</th><th><span class="sr-only">{t("mailTemplates.quick")}</span></th></tr></thead>
                 <tbody>
                   {list.filter((x) => catOf(x) === g).map((x) => (
                     <tr class="cursor-pointer hover" onclick={`location.href='${href(x)}'`}>
@@ -81,6 +81,12 @@ mailTemplateRoutes.get("/", async (c) => {
                         <div class="text-sm opacity-60">{x.custom ? x.custom.meta.description : CATALOG[x.key].description}</div>
                       </td>
                       <td>{x.custom ? t("mailTemplates.state.own", stamp(x.custom)) : x.override ? t("mailTemplates.state.custom", stamp(x.override)) : t("mailTemplates.state.system")}</td>
+                      <td class="text-right">
+                        <button type="button" class="btn btn-ghost btn-sm btn-square" title={t("mailTemplates.quick")} aria-label={`${x.custom ? x.custom.meta.name : CATALOG[x.key].name}: ${t("mailTemplates.quick")}`}
+                          hx-get={`/mail/templates/${x.key}/quick`} hx-target="#quick-body" {...{ "hx-on::after-request": "if(event.detail.successful)document.getElementById('quick-dialog').showModal()" }} onclick="event.stopPropagation()">
+                          <Icon name="magnifying-glass" class="h-5 w-5" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -88,10 +94,28 @@ mailTemplateRoutes.get("/", async (c) => {
             </div>
           </section>
         ))}
+        <dialog id="quick-dialog" class="modal">
+          <div class="modal-box max-w-3xl">
+            <div id="quick-body" />
+            <form method="dialog" class="modal-action"><button class="btn">{t("common.close")}</button></form>
+          </div>
+          <form method="dialog" class="modal-backdrop"><button aria-label={t("common.close")}>{t("common.close")}</button></form>
+        </dialog>
       </div>
     </Layout>,
   );
 });
+
+// Gerenderte Mail (Betreff + Text); Markierungen leerer Felder werden hervorgehoben.
+const MailPreview = ({ subject, text }: { subject: string; text: string }) => (
+  <div class="border border-base-300 rounded-box overflow-hidden" aria-live="polite">
+    <div class="bg-base-200 border-b border-base-300 px-4 py-3">
+      <p class="text-xs uppercase tracking-wide text-secondary mb-1">{t("mailTemplates.preview.head")} · {t("mailTemplates.preview.sample")}</p>
+      <p class="font-semibold">{highlight(subject)}</p>
+    </div>
+    <div class="whitespace-pre-wrap text-sm p-4 bg-base-100">{highlight(text)}</div>
+  </div>
+);
 
 const GROUPS = ["event", "recipient", "details", "org", "link", "fields"] as const;
 const groupOf = (k: string, v: VarSpec, custom?: boolean) =>
@@ -382,15 +406,7 @@ const previewCustom = async (c: any, current?: boolean) => {
   if (errors.length) return c.html(<div role="alert" class="alert alert-error"><ul>{errors.map((e) => <li>{e.replace(/^\w+: /, "")}</li>)}</ul><a class="link" href="#" onclick="document.querySelector('[data-tab=edit]').click();return false">{t("mailTemplates.preview.toEditor")}</a></div>);
   const out = renderMail(d, customPreviewVars(d.fields));
   return c.html(
-    <div>
-      <div class="border border-base-300 rounded-box overflow-hidden" aria-live="polite">
-        <div class="bg-base-200 border-b border-base-300 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-secondary mb-1">{t("mailTemplates.preview.head")} · {t("mailTemplates.preview.sample")}</p>
-          <p class="font-semibold">{highlight(out.subject)}</p>
-        </div>
-        <div class="whitespace-pre-wrap text-sm p-4 bg-base-100">{highlight(out.text)}</div>
-      </div>
-    </div>,
+    <MailPreview subject={out.subject} text={out.text} />,
   );
 };
 mailTemplateRoutes.post("/new/preview", async (c) => { requireCreate(c.get("user")); return previewCustom(c); });
@@ -406,6 +422,18 @@ mailTemplateRoutes.get("/search-members", async (c) => {
     .where(and(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)), isNull(members.exitDate), isNull(members.deathDate)))
     .orderBy(asc(persons.lastName), asc(persons.firstName)).limit(10);
   return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }))} />);
+});
+
+// Schnellvorschau aus der Liste: aktueller Text mit Beispieldaten (nur lesen, Recht wie beim Anzeigen/Versenden).
+mailTemplateRoutes.get("/:key/quick", async (c) => {
+  const user = c.get("user");
+  const key = c.req.param("key");
+  const tpl = (await listTemplates()).find((x) => x.key === key && (CATALOG[x.key] || x.custom));
+  if (!tpl) return notFound();
+  if (!(mayEdit(user, tpl.editPermissions) || (tpl.custom && maySend(user)))) return forbidden();
+  const cur = tpl.override ?? tpl.system;
+  const out = tpl.custom ? renderMail({ prefix: tpl.prefix, ...cur }, customPreviewVars(tpl.custom.meta.fields)) : renderMail({ prefix: tpl.prefix, ...cur }, previewVars(key));
+  return c.html(<><h2 class="text-lg font-semibold mb-3">{tpl.custom ? tpl.custom.meta.name : CATALOG[key].name}</h2><MailPreview subject={out.subject} text={out.text} /></>);
 });
 
 mailTemplateRoutes.get("/:key", async (c) => {
@@ -451,15 +479,7 @@ mailTemplateRoutes.post("/:key/preview", async (c) => {
   if (errors.length) return c.html(<div role="alert" class="alert alert-error" data-missing={missing.join(",")}><ul>{issues.map((i) => <li data-line={i.line}>{i.text}</li>)}</ul><a class="link" href="#" onclick="document.querySelector('[data-tab=edit]').click();return false">{t("mailTemplates.preview.toEditor")}</a></div>);
   const out = renderMail({ prefix: tpl.prefix, subject, body }, previewVars(tpl.key, caseId));
   return c.html(
-    <div>
-      <div class="border border-base-300 rounded-box overflow-hidden" aria-live="polite">
-        <div class="bg-base-200 border-b border-base-300 px-4 py-3">
-          <p class="text-xs uppercase tracking-wide text-secondary mb-1">{t("mailTemplates.preview.head")} · {t("mailTemplates.preview.sample")}</p>
-          <p class="font-semibold">{out.subject}</p>
-        </div>
-        <div class="whitespace-pre-wrap text-sm p-4 bg-base-100">{out.text}</div>
-      </div>
-    </div>,
+    <MailPreview subject={out.subject} text={out.text} />,
   );
 });
 
@@ -529,6 +549,10 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
               <textarea name={`f_${f.name}`} rows={3} class="textarea w-full" required placeholder={f.label || fieldLabel(f.name)}>{values[f.name] ?? f.example ?? ""}</textarea>
             </Field>
           ))}
+          <div class="flex flex-wrap gap-2 items-center">
+            <button type="button" class="btn btn-outline" hx-post={`/mail/templates/${tpl.key}/send/preview`} hx-include="closest form" hx-target="#send-preview">{t("mailTemplates.send.preview")}</button>
+          </div>
+          <div id="send-preview" />
           <button type="submit" formmethod="post" class="btn btn-primary" disabled={!smtp || !counts.send} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send }))})`}>{t("mailTemplates.send")}</button>
         </form>
       </div>
@@ -548,6 +572,18 @@ mailTemplateRoutes.get("/:key/send", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"), true);
   const q = c.req.queries();
   return sendForm(c, tpl, readValues(tpl, q), readSelection(q));
+});
+
+// Vorschau mit den eingetragenen Werten (echte Eingaben, Beispieldaten für den Empfänger).
+mailTemplateRoutes.post("/:key/send/preview", async (c) => {
+  const tpl = await load(c.get("user"), c.req.param("key"), true);
+  const f = await c.req.parseBody({ all: true });
+  const values = readValues(tpl, f);
+  const vars = customPreviewVars([]);
+  for (const x of tpl.custom!.meta.fields) vars[x.name] = values[x.name] || `\u0001${x.name}\u0002`; // leer: hervorgehoben
+  if (tpl.custom!.meta.urgent) vars.unsubscribeUrl = "";
+  const out = renderMail({ prefix: tpl.prefix, ...tpl.system }, vars);
+  return c.html(<MailPreview subject={out.subject} text={out.text} />);
 });
 
 mailTemplateRoutes.post("/:key/send", async (c) => {
