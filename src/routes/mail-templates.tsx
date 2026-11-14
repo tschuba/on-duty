@@ -188,7 +188,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
           </dialog>
         )}
         <script id="ph-data" type="application/json" dangerouslySetInnerHTML={{ __html: JSON.stringify(phData).replace(/</g, "\\u003c") }} />
-        <script src="/js/mail-placeholders.min.js" data-leave={t("mailTemplates.leaveWarning")} data-tip-if={t("mailTemplates.tip.onlyIf")} data-tip-end={t("mailTemplates.tip.end")} defer></script>
+        <script src="/js/mail-placeholders.min.js" data-leave={t("mailTemplates.leaveWarning")} data-tip-if={t("mailTemplates.tip.onlyIf")} data-tip-end={t("mailTemplates.tip.end")} data-ac-count={t("mailTemplates.ac.count")} data-ac-none={t("mailTemplates.ac.none")} defer></script>
       </div>
     </Layout>
   );
