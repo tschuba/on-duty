@@ -61,13 +61,15 @@ async function run(key: string, tpl: NonNullable<Awaited<ReturnType<typeof resol
   const mailTpl = { ...tpl, key: `custom-${key}` }; // X-On-Duty-Event
   for (const group of groups.values()) {
     const first = group[0];
+    const single = group.length === 1;
+    const unsubscribeUrl = urgent ? "" : linkUrl({ p: single ? "mail.optout" : "mail.optout-address", m: first.memberId, t: tpl.topic! });
     const vars: MailVars = {
-      ...values,
+      ...values, unsubscribeUrl,
       org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: "" }, type: t("mail.type.custom"),
       recipient: { name: `${first.firstName} ${first.lastName}`.trim(), firstName: first.firstName, lastName: first.lastName, email: first.email },
     };
     // List-Unsubscribe nur bei genau einem Mitglied und nicht bei dringenden Mails (dort gibt es kein Opt-Out).
-    const headers = urgent || group.length > 1 ? undefined : { "List-Unsubscribe": `<${linkUrl({ p: "mail.optout", m: first.memberId, t: tpl.topic! })}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
+    const headers = urgent || !single ? undefined : { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
     let sent = false;
     try {
       ({ sent } = await sendMail({ key, to: first.email, vars, template: mailTpl, headers }));

@@ -240,7 +240,7 @@ export function previewVars(key: string, caseId?: string): MailVars {
 // ---- Validierung ----------------------------------------------------------
 
 type Token = [string, string, number, number, Token[]?];
-export interface TemplateInput { prefix?: string | null; subject: string; body: string }
+export interface TemplateInput { prefix?: string | null; subject: string; body: string; urgent?: boolean }
 
 const lineOf = (text: string, idx: number) => text.slice(0, idx).split("\n").length;
 const distance = (a: string, b: string) => {
@@ -260,10 +260,14 @@ function suggest(names: string[], name: string): string | undefined {
 
 // Freie Vorlagen: Globale Variablen sind erlaubt, alles andere muss ein Feldname sein (flach, ohne Punkt, nicht reserviert).
 const FIELD_RE = /^[a-z][a-z0-9_]*$/;
-const RESERVED = new Set(["you", "addressee", "multiple", "recipients", "optOutAllUrl"]);
+const RESERVED = new Set(["you", "addressee", "multiple", "recipients", "optOutAllUrl", "unsubscribeUrl"]);
+// Nur in freien Vorlagen: Abmelde-Link der Mitteilung (bei dringenden leer, dort gibt es kein Opt-Out).
+const CUSTOM_ONLY_VARS: Record<string, VarSpec> = {
+  unsubscribeUrl: { type: "text", desc: "Abmelde-Link für dieses Thema (Pflicht, außer bei dringenden Mitteilungen)", example: "https://portal.example.org/link/VORSCHAU", source: "link" },
+};
 const isField = (n: string) => FIELD_RE.test(n) && !RESERVED.has(n);
 function customNameError(name: string): string | undefined {
-  if (GLOBAL_VARS[name] || isField(name)) return undefined;
+  if (GLOBAL_VARS[name] || CUSTOM_ONLY_VARS[name] || isField(name)) return undefined;
   if (RESERVED.has(name)) return `„${name}“ ist reserviert und kann nicht als Feld verwendet werden`;
   const hint = name.includes(".") ? suggest(Object.keys(GLOBAL_VARS), name) : undefined;
   return `unbekannte Variable „${name}“${hint ? `. Meintest du „${hint}“?` : ". Feldnamen: Kleinbuchstaben, Ziffern und Unterstrich, ohne Punkt"}`;
@@ -289,6 +293,7 @@ export function customPreviewVars(fields: { name: string; example?: string }[]):
   const vars: MailVars = {
     org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: "" }, type: t("mail.type.custom"),
     recipient: { name: "Anna Beispiel", firstName: "Anna", lastName: "Beispiel", email: "anna@example.org" },
+    unsubscribeUrl: CUSTOM_ONLY_VARS.unsubscribeUrl.example,
   };
   for (const f of fields) vars[f.name] = f.example || `\u0001${f.name}\u0002`;
   return vars;
@@ -296,7 +301,7 @@ export function customPreviewVars(fields: { name: string; example?: string }[]):
 
 // Sidebar-Einträge freier Vorlagen: globale Variablen plus Felder.
 export const customVars = (fields: { name: string; label?: string; example?: string }[]): Record<string, VarSpec> => ({
-  ...GLOBAL_VARS,
+  ...GLOBAL_VARS, ...CUSTOM_ONLY_VARS,
   ...Object.fromEntries(fields.map((f) => [f.name, { type: "text", desc: f.label || fieldLabel(f.name), example: f.example ?? "", source: "data" } as VarSpec])),
 });
 // treffpunkt_uhrzeit → „Treffpunkt uhrzeit“
@@ -330,6 +335,7 @@ export function validateTemplate(key: string, input: TemplateInput): string[] {
       errors.push(`${field}: ${m ? `Zeile ${lineOf(text, Number(m[2]))}: ${unclosed ? `Block „${unclosed[1]}“ ist nicht geschlossen` : m[1]}` : (err as Error).message}`);
     }
   }
+  if (!entry && !input.urgent && !seen.has("unsubscribeUrl")) errors.push("Pflichtplatzhalter „Abmelde-Link“ fehlt (außer bei dringenden Mitteilungen)");
   for (const r of entry?.required ?? []) {
     if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.label}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
   }
@@ -358,7 +364,7 @@ export async function resolveTemplate(key: string, locale = resolveLocale()): Pr
       if (!errors.length) return { ...base, subject: ov.subject, body: ov.body };
       logger.warn({ key, locale: loc, errors }, "[mail] invalid override template, falling back to system row");
     }
-    const errors = validateTemplate(key, { prefix: base.prefix, subject: sys.subject, body: sys.body });
+    const errors = validateTemplate(key, { prefix: base.prefix, subject: sys.subject, body: sys.body, urgent: !!sys.meta?.urgent });
     if (errors.length) {
       logger.error({ key, locale: loc, errors }, "[mail] invalid system template, mail not sent");
       return null;

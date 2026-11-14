@@ -199,7 +199,7 @@ describe("custom template routes", () => {
     const res = await mailTemplateRoutes.request("/new");
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('name="key"');
-    const ok = { name: "Plan", key: "plan", topic: "t", audience: "member", subject: "s", body: "{{ort}}" };
+    const ok = { name: "Plan", key: "plan", topic: "t", audience: "member", subject: "s", body: "{{ort}} {{unsubscribeUrl}}" };
     const bad = (o: Record<string, string>) => post("/new", { ...ok, editPermissions: "mail:templates", ...o });
     expect((await bad({ key: "taken" })).status).toBe(422);
     expect((await bad({ editPermissions: "system:admin" })).status).toBe(422); // fremdes Recht
@@ -214,7 +214,7 @@ describe("custom template routes", () => {
     key: "plan", category: "custom", audience: "member", prefix: "[Alt]", editPermissions: ["mail:templates"], system: { subject: "s", body: "{{ort}}" }, override: null,
     custom: { topic: "uebung", meta: { name: "Plan", fields: [{ name: "ort" }] }, extraHeaders: JSON.stringify({ "X-Foo": "bar" }), updatedAt: new Date("2026-01-02T03:04:05Z") }, ...o,
   });
-  const edit = { name: "Plan", subject: "s", body: "{{ort}}", updatedAt: "2026-01-02T03:04:05.000Z" };
+  const edit = { name: "Plan", subject: "s", body: "{{ort}} {{unsubscribeUrl}}", updatedAt: "2026-01-02T03:04:05.000Z" };
 
   it("lists custom templates in their own group, after the system ones", async () => {
     perms = new Set(["mail:templates"]);

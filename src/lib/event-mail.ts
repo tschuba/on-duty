@@ -231,3 +231,15 @@ export async function setEventMailsEnabled(personId: string, enabled: boolean, s
   if ((await isOptedOut(personId)) === !enabled) return;
   await savePreference([personId], EVENT_TOPIC, !enabled, source);
 }
+
+// Weitere Themen (freie Mitteilungen), zu denen die Person eine Präferenz hat; enabled = nicht abbestellt.
+export async function topicPrefs(personId: string): Promise<{ topic: string; enabled: boolean }[]> {
+  const rows = await db.select({ topic: mailPreferences.topic, o: mailPreferences.optedOut }).from(mailPreferences)
+    .where(and(eq(mailPreferences.personId, personId), sql`${mailPreferences.topic} <> ${EVENT_TOPIC}`)).orderBy(asc(mailPreferences.topic));
+  return rows.map((r) => ({ topic: r.topic, enabled: !r.o }));
+}
+
+// `enabled` = Themen, die angehakt abgeschickt wurden; alle bekannten Themen der Person werden daran abgeglichen (nur Änderungen schreiben).
+export async function saveTopicPrefs(personId: string, enabled: string[], source: "account" | "admin" | "settings"): Promise<void> {
+  for (const p of await topicPrefs(personId)) if (p.enabled !== enabled.includes(p.topic)) await savePreference([personId], p.topic, p.enabled, source);
+}

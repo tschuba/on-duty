@@ -316,12 +316,12 @@ const readForm = async (c: any) => {
 const blankTpl = (): TemplateView => ({ key: "", category: "custom", audience: "member", prefix: "", editPermissions: [], system: { subject: "", body: "" }, override: null });
 const asArray = (v: unknown) => (Array.isArray(v) ? v : v == null ? [] : [v]).map(String);
 
-async function readCustom(c: any) {
+async function readCustom(c: any, current?: boolean) {
   const f = await c.req.parseBody({ all: true });
   const one = (k: string) => String(asArray(f[k])[0] ?? "");
   const subject = one("subject").trim(), body = one("body").replace(/\r\n/g, "\n"), prefix = one("prefix").trim();
   const fields = customFields({ prefix, subject, body }).map((name) => ({ name, label: one(`fl_${name}`).trim() || undefined, example: one(`fe_${name}`).trim() || undefined }));
-  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), urgent: one("urgent") === "1", key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
+  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), urgent: c.get("user").permissions.has("system:admin") ? one("urgent") === "1" : !!current, key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
 }
 type CustomFormData = Awaited<ReturnType<typeof readCustom>>;
 
@@ -370,14 +370,14 @@ mailTemplateRoutes.post("/new", async (c) => {
   const errors = await customErrors(d, grantable(user), true);
   const tpl = blankTpl();
   if (errors.length) return renderCustom(c, tpl, d, true, errors, HTTP_STATUS.UNPROCESSABLE_ENTITY);
-  if ((await createCustom(d.key, toInput(d, tpl, true, user.permissions.has("system:admin") && d.urgent), user.id)) === "conflict") return renderCustom(c, tpl, d, true, [`form: ${t("mailTemplates.custom.err.keyTaken")}`], HTTP_STATUS.CONFLICT);
+  if ((await createCustom(d.key, toInput(d, tpl, true, d.urgent), user.id)) === "conflict") return renderCustom(c, tpl, d, true, [`form: ${t("mailTemplates.custom.err.keyTaken")}`], HTTP_STATUS.CONFLICT);
   setFlash(c, t("mailTemplates.flash.saved"), "success");
   return c.redirect(`/mail/templates/${d.key}${fromQs(backTo(c.req.query("from")))}`);
 });
 
 // Nur Beispieldaten: Felder mit Beispieltext, sonst hervorgehobener Platzhalter.
-const previewCustom = async (c: any) => {
-  const d = await readCustom(c);
+const previewCustom = async (c: any, current?: boolean) => {
+  const d = await readCustom(c, current);
   const errors = [...parseHeaders(d.headers).errors, ...validateTemplate("", d)];
   if (errors.length) return c.html(<div role="alert" class="alert alert-error"><ul>{errors.map((e) => <li>{e.replace(/^\w+: /, "")}</li>)}</ul><a class="link" href="#" onclick="document.querySelector('[data-tab=edit]').click();return false">{t("mailTemplates.preview.toEditor")}</a></div>);
   const out = renderMail(d, customPreviewVars(d.fields));
@@ -419,10 +419,10 @@ mailTemplateRoutes.post("/:key", async (c) => {
   const user = c.get("user");
   const tpl = await load(user, c.req.param("key"));
   if (tpl.custom) {
-    const d = await readCustom(c);
+    const d = await readCustom(c, !!tpl.custom.meta.urgent);
     const errors = await customErrors({ ...d, key: tpl.key }, null, false);
     if (errors.length) return renderCustom(c, tpl, d, false, errors, HTTP_STATUS.UNPROCESSABLE_ENTITY);
-    if ((await saveCustom(tpl.key, toInput(d, { ...tpl, topic: tpl.custom.topic }, false, user.permissions.has("system:admin") ? d.urgent : !!tpl.custom.meta.urgent), user.id, d.expected)) === "conflict") return renderCustom(c, tpl, d, false, [], HTTP_STATUS.CONFLICT);
+    if ((await saveCustom(tpl.key, toInput(d, { ...tpl, topic: tpl.custom.topic }, false, d.urgent), user.id, d.expected)) === "conflict") return renderCustom(c, tpl, d, false, [], HTTP_STATUS.CONFLICT);
     setFlash(c, t("mailTemplates.flash.saved"), "success");
     return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
   }
@@ -439,7 +439,7 @@ mailTemplateRoutes.post("/:key", async (c) => {
 // Nur Beispieldaten: kein Versand, keine Speicherung, keine Fachdaten.
 mailTemplateRoutes.post("/:key/preview", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
-  if (tpl.custom) return previewCustom(c);
+  if (tpl.custom) return previewCustom(c, !!tpl.custom.meta.urgent);
   const f = await c.req.parseBody();
   const { subject, body } = await readForm(c);
   const cases = CATALOG[tpl.key].previewCases;

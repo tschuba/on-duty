@@ -20,15 +20,15 @@ describe("mail headers", () => {
 
 describe("custom template validation", () => {
   it("turns unknown placeholders into fields", () => {
-    expect(customFields({ prefix: "{{org.name}}", subject: "{{ort}}", body: "{{#zeit}}{{treffpunkt_uhrzeit}}{{/zeit}} {{recipient.name}}" })).toEqual(["ort", "zeit", "treffpunkt_uhrzeit"]);
-    expect(validateTemplate("", { subject: "{{ort}}", body: "{{recipient.name}} {{org.url}}" })).toEqual([]);
+    expect(customFields({ prefix: "{{org.name}}", subject: "{{ort}}", body: "{{#zeit}}{{treffpunkt_uhrzeit}}{{/zeit}} {{recipient.name}} {{unsubscribeUrl}}" })).toEqual(["ort", "zeit", "treffpunkt_uhrzeit"]);
+    expect(validateTemplate("", { subject: "{{ort}}", body: "{{recipient.name}} {{org.url}} {{unsubscribeUrl}}" })).toEqual([]);
   });
   it("rejects dotted and reserved names, suggests globals", () => {
-    const e = validateTemplate("", { subject: "x", body: "{{org.nam}} {{you}} {{a.b}}" });
+    const e = validateTemplate("", { subject: "x", body: "{{org.nam}} {{you}} {{a.b}} {{unsubscribeUrl}}" });
     expect(e.join("\n")).toContain("Meintest du „org.name“");
     expect(e.some((x) => x.includes("„you“ ist reserviert"))).toBe(true);
     expect(e.some((x) => x.includes("„a.b“"))).toBe(true);
-    expect(validateTemplate("", { subject: "x", body: "{{> p}}" })).toHaveLength(1);
+    expect(validateTemplate("", { subject: "x", body: "{{> p}} {{unsubscribeUrl}}" })).toHaveLength(1);
   });
   it("highlights empty fields in preview, not fields with example", () => {
     const out = renderMail({ prefix: "", subject: "{{ort}}", body: "{{#ort}}{{ort}}{{/ort}} {{wann}}" }, customPreviewVars([{ name: "ort" }, { name: "wann", example: "heute" }]));

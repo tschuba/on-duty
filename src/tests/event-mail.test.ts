@@ -17,7 +17,7 @@ vi.mock("../lib/mail.js", () => ({ sendMail: (o: any) => sendMail(o) }));
 vi.mock("../lib/mail-templates.js", () => ({ resolveTemplate: async () => ({ key: "event-created" }), whenText: () => "W", buildVars: (_k: string, rec: any, r: any[]) => ({ n: r.length, all: rec.optOutAllUrl }) }));
 vi.mock("../lib/events.js", () => ({ invitedMembers: async () => ["m1", "m2", "m3", "m4"], isActiveMember: (m: any) => !m.exitDate && !m.deathDate }));
 
-const { eventMailRecipients, sendEventMails, startEventMails, eventChanges, createdTargets, eventDelivery, sendChangeMails, setEventMailsEnabled, infoMailRecipients, sendEventInfoMail } = await import("../lib/event-mail.js");
+const { eventMailRecipients, sendEventMails, startEventMails, eventChanges, createdTargets, eventDelivery, sendChangeMails, setEventMailsEnabled, infoMailRecipients, sendEventInfoMail, topicPrefs, saveTopicPrefs } = await import("../lib/event-mail.js");
 const future = new Date(Date.now() + 86400000);
 const ev: any = { id: "e1", visibility: "loggedIn", endsAt: future };
 const row = (n: number, email: string | null) => ({ memberId: `m${n}`, personId: `p${n}`, firstName: `F${n}`, lastName: "L", email });
@@ -142,6 +142,18 @@ describe("setEventMailsEnabled", () => {
     queue = [[{ o: true }]];
     await setEventMailsEnabled("p1", false, "admin");
     expect(logged).toHaveLength(0);
+  });
+});
+
+describe("topic preferences", () => {
+  it("lists other topics with enabled = not opted out", async () => {
+    queue = [[{ topic: "info", o: true }, { topic: "vorstand", o: false }]];
+    expect(await topicPrefs("p1")).toEqual([{ topic: "info", enabled: false }, { topic: "vorstand", enabled: true }]);
+  });
+  it("re-enables a checked topic, opts out an unchecked one, ignores unknown and unchanged", async () => {
+    queue = [[{ topic: "info", o: true }, { topic: "vorstand", o: false }, { topic: "x", o: false }]];
+    await saveTopicPrefs("p1", ["info", "x", "fremd"], "settings");
+    expect(logged.flat().map((r: any) => [r.topic, r.optedOut])).toEqual([["info", false], ["vorstand", true]]);
   });
 });
 
