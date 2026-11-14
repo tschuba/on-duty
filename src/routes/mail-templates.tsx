@@ -37,16 +37,17 @@ async function editable(user: Variables["user"]): Promise<TemplateView[]> {
   // Reihenfolge = Katalog (die DB liefert ohne ORDER BY keine stabile Reihenfolge), freie Vorlagen danach nach Name
   const order = Object.keys(CATALOG);
   const nameOf = (x: TemplateView) => x.custom?.meta.name ?? "";
-  return (await listTemplates()).filter((x) => (CATALOG[x.key] || x.custom) && mayEdit(user, x.editPermissions))
+  return (await listTemplates()).filter((x) => (CATALOG[x.key] || x.custom) && (mayEdit(user, x.editPermissions) || (x.custom && maySend(user))))
     .sort((a, b) => (a.custom ? 1 : 0) - (b.custom ? 1 : 0) || order.indexOf(a.key) - order.indexOf(b.key) || nameOf(a).localeCompare(nameOf(b), "de"));
 }
+const maySend = (user: Variables["user"]) => user.permissions.has("system:admin") || user.permissions.has("mail:send");
 const mayCreate = (user: Variables["user"]) => user.permissions.has("system:admin") || user.permissions.has("mail:templates");
 // Rechte, die der Ersteller vergeben darf: nur eigene (system:admin: alle)
 const grantable = (user: Variables["user"]): Permission[] => PERMISSIONS.filter((p) => user.permissions.has("system:admin") || user.permissions.has(p));
-async function load(user: Variables["user"], key: string): Promise<TemplateView> {
+async function load(user: Variables["user"], key: string, forSend = false): Promise<TemplateView> {
   const tpl = (await listTemplates()).find((x) => x.key === key && (CATALOG[x.key] || x.custom));
   if (!tpl) return notFound();
-  if (!mayEdit(user, tpl.editPermissions)) return forbidden();
+  if (forSend ? !tpl.custom || !maySend(user) : !mayEdit(user, tpl.editPermissions)) return forbidden();
   return tpl;
 }
 // ?from nur als interner Pfad ("/x", nicht "//x" oder "/\\x"), sonst Liste.
@@ -58,6 +59,7 @@ const stamp = (u: { updatedAt: Date; updatedBy: string | null }) => ({
 mailTemplateRoutes.get("/", async (c) => {
   const user = c.get("user");
   const list = await editable(user);
+  const href = (x: TemplateView) => `/mail/templates/${x.key}${x.custom && !mayEdit(user, x.editPermissions) ? "/send" : ""}`;
   const catOf = (x: TemplateView) => (x.custom ? "custom" : CATALOG[x.key].category);
   const groups = [...new Set(list.map(catOf))];
   return c.html(
@@ -73,9 +75,9 @@ mailTemplateRoutes.get("/", async (c) => {
                 <thead><tr><th>{t("mailTemplates.col.name")}</th><th>{t("mailTemplates.col.state")}</th></tr></thead>
                 <tbody>
                   {list.filter((x) => catOf(x) === g).map((x) => (
-                    <tr class="cursor-pointer hover" onclick={`location.href='/mail/templates/${x.key}'`}>
+                    <tr class="cursor-pointer hover" onclick={`location.href='${href(x)}'`}>
                       <td>
-                        <a href={`/mail/templates/${x.key}`} class="font-medium link link-hover">{x.custom ? x.custom.meta.name : CATALOG[x.key].name}</a>
+                        <a href={href(x)} class="font-medium link link-hover">{x.custom ? x.custom.meta.name : CATALOG[x.key].name}</a>
                         <div class="text-sm opacity-60">{x.custom ? x.custom.meta.description : CATALOG[x.key].description}</div>
                       </td>
                       <td>{x.custom ? t("mailTemplates.state.own", stamp(x.custom)) : x.override ? t("mailTemplates.state.custom", stamp(x.override)) : t("mailTemplates.state.system")}</td>
@@ -134,7 +136,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
           title={cf?.isNew ? t("mailTemplates.new") : entry.name} backHref={back} backLabel={back === "/mail/templates" ? undefined : t("mailTemplates.back")} subtitle={entry.description}
           actions={<>
             {tpl.override && <HeaderAction icon="arrow-uturn-left" label={t("mailTemplates.reset")} class="btn-outline" onclick="document.getElementById('reset-dialog').showModal()" />}
-            {cf && !cf.isNew && <HeaderAction icon="envelope" label={t("mailTemplates.send")} href={`/mail/templates/${key}/send${fromQs(back)}`} />}
+            {cf && !cf.isNew && maySend(user) && <HeaderAction icon="envelope" label={t("mailTemplates.send")} href={`/mail/templates/${key}/send${fromQs(back)}`} />}
             {cf && !cf.isNew && <HeaderAction icon="trash" label={t("mailTemplates.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-dialog').showModal()" />}
             <FormActions formId="tpl-form" />
           </>}
@@ -175,7 +177,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.permissions.hint")}</p>
                 </div>
               </> : null}
-              <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="urgent" value="1" class="checkbox checkbox-sm" checked={cf.urgent} />{t("mailTemplates.custom.urgent")}</label>
+              <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="urgent" value="1" class="checkbox checkbox-sm" checked={cf.urgent} disabled={!user.permissions.has("system:admin")} />{t("mailTemplates.custom.urgent")}</label>
               <p class="label text-xs opacity-70 whitespace-normal -mt-3">{t("mailTemplates.custom.urgent.hint")}</p>
               <Field label={t("mailTemplates.technical.prefix")}><input id="tpl-prefix" name="prefix" class="input w-full font-mono" placeholder={t("mailTemplates.technical.prefix")} value={cf.prefix} /></Field>
             </>}
@@ -338,8 +340,8 @@ async function customErrors(d: CustomFormData, allowed: string[] | null, newKey:
   return e;
 }
 
-const toInput = (d: CustomFormData, tpl: Pick<TemplateView, "audience" | "editPermissions"> & { topic?: string }, isNew: boolean): CustomInput => ({
-  meta: { name: d.name, ...(d.description ? { description: d.description } : {}), ...(d.urgent ? { urgent: true } : {}), fields: d.fields } satisfies CustomMeta,
+const toInput = (d: CustomFormData, tpl: Pick<TemplateView, "audience" | "editPermissions"> & { topic?: string }, isNew: boolean, urgent: boolean): CustomInput => ({
+  meta: { name: d.name, ...(d.description ? { description: d.description } : {}), ...(urgent ? { urgent: true } : {}), fields: d.fields } satisfies CustomMeta,
   topic: isNew ? d.topic : tpl.topic!, audience: isNew ? d.audience : tpl.audience, editPermissions: isNew ? d.perms : tpl.editPermissions,
   prefix: d.prefix, subject: d.subject, body: d.body, extraHeaders: parseHeaders(d.headers).headers,
 });
@@ -368,7 +370,7 @@ mailTemplateRoutes.post("/new", async (c) => {
   const errors = await customErrors(d, grantable(user), true);
   const tpl = blankTpl();
   if (errors.length) return renderCustom(c, tpl, d, true, errors, HTTP_STATUS.UNPROCESSABLE_ENTITY);
-  if ((await createCustom(d.key, toInput(d, tpl, true), user.id)) === "conflict") return renderCustom(c, tpl, d, true, [`form: ${t("mailTemplates.custom.err.keyTaken")}`], HTTP_STATUS.CONFLICT);
+  if ((await createCustom(d.key, toInput(d, tpl, true, user.permissions.has("system:admin") && d.urgent), user.id)) === "conflict") return renderCustom(c, tpl, d, true, [`form: ${t("mailTemplates.custom.err.keyTaken")}`], HTTP_STATUS.CONFLICT);
   setFlash(c, t("mailTemplates.flash.saved"), "success");
   return c.redirect(`/mail/templates/${d.key}${fromQs(backTo(c.req.query("from")))}`);
 });
@@ -395,7 +397,7 @@ mailTemplateRoutes.post("/new/preview", async (c) => { requireCreate(c.get("user
 
 // Mitgliedersuche für die Einzelauswahl; wer freie Vorlagen versenden darf, darf suchen.
 mailTemplateRoutes.get("/search-members", async (c) => {
-  if (!(await editable(c.get("user"))).some((x) => x.custom)) return forbidden();
+  if (!maySend(c.get("user"))) return forbidden();
   const q = (c.req.query("q") ?? "").trim();
   if (q.length < 2) return c.html("");
   const needle = `%${q}%`;
@@ -420,7 +422,7 @@ mailTemplateRoutes.post("/:key", async (c) => {
     const d = await readCustom(c);
     const errors = await customErrors({ ...d, key: tpl.key }, null, false);
     if (errors.length) return renderCustom(c, tpl, d, false, errors, HTTP_STATUS.UNPROCESSABLE_ENTITY);
-    if ((await saveCustom(tpl.key, toInput(d, { ...tpl, topic: tpl.custom.topic }, false), user.id, d.expected)) === "conflict") return renderCustom(c, tpl, d, false, [], HTTP_STATUS.CONFLICT);
+    if ((await saveCustom(tpl.key, toInput(d, { ...tpl, topic: tpl.custom.topic }, false, user.permissions.has("system:admin") ? d.urgent : !!tpl.custom.meta.urgent), user.id, d.expected)) === "conflict") return renderCustom(c, tpl, d, false, [], HTTP_STATUS.CONFLICT);
     setFlash(c, t("mailTemplates.flash.saved"), "success");
     return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
   }
@@ -542,15 +544,13 @@ const readValues = (tpl: TemplateView, f: Record<string, unknown>) =>
   Object.fromEntries(tpl.custom!.meta.fields.map((x) => [x.name, String(asArray(f[`f_${x.name}`])[0] ?? "").replace(/\r\n/g, "\n").trim()]));
 
 mailTemplateRoutes.get("/:key/send", async (c) => {
-  const tpl = await load(c.get("user"), c.req.param("key"));
-  if (!tpl.custom) return notFound();
+  const tpl = await load(c.get("user"), c.req.param("key"), true);
   const q = c.req.queries();
   return sendForm(c, tpl, readValues(tpl, q), readSelection(q));
 });
 
 mailTemplateRoutes.post("/:key/send", async (c) => {
-  const tpl = await load(c.get("user"), c.req.param("key"));
-  if (!tpl.custom) return notFound();
+  const tpl = await load(c.get("user"), c.req.param("key"), true);
   const f = await c.req.parseBody({ all: true });
   const values = readValues(tpl, f), sel = readSelection(f);
   const fail = (msg: string, status: number) => sendForm(c, tpl, values, sel, [msg], status);

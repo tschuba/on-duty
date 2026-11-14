@@ -39,6 +39,7 @@ export const PERMISSIONS = [
   "anniversary-years:delete",
   "events:manage",
   "mail:templates",
+  "mail:send",
   "training:read",
   "training:write",
   "training:delete",
