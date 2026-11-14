@@ -227,7 +227,7 @@ export function formatPeriod(r: Pick<RequestWithItem, "plannedFrom" | "plannedTo
 const STATUS_BADGE = { open: "badge-info", approved: "badge-success", rejected: "badge-error" } as const;
 
 function StatusPage({ request, justSubmitted }: { request: RequestWithItem; justSubmitted: boolean }) {
-  const statusUrl = `${process.env.OIDC_APP_URL ?? ""}/lend/status/${request.statusToken}`;
+  const statusUrl = `${env.OIDC_APP_URL}/lend/status/${request.statusToken}`;
   const date = (d: Date) => d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
   return (
     <Layout title={t("lend.status.title")}>

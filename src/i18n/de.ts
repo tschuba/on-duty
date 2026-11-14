@@ -893,6 +893,7 @@ export const de = {
   "mailTemplates.optional": "optional",
   "mailTemplates.group.event": "Termin",
   "mailTemplates.group.recipient": "Empfänger",
+  "mailTemplates.group.details": "Angaben",
   "mailTemplates.group.org": "Organisation",
   "mailTemplates.group.link": "Links",
   "mailTemplates.sidebar": "Platzhalter und technische Angaben",

@@ -107,11 +107,13 @@ const SAMPLE_RECORD = {
   event: { id: "beispiel", title: "Übung Atemschutz", startsAt: new Date("2026-04-12T16:00:00Z"), endsAt: new Date("2026-04-12T18:00:00Z"), allDay: false, location: "Gerätehaus", rsvpEnabled: true, rsvpDeadline: null, maxParticipants: 20 },
   changes: "Ort: Halle → Gerätehaus", optOutAllUrl: "https://portal.example.org/o/all", orgContactEmail: "info@example.org",
   settingsUrl: "https://portal.example.org/link/abc", validMinutes: 30,
+  applicantName: "Anna Beispiel", rejoin: false, itemName: "Zelt", requestUrl: "https://portal.example.org/inventory/requests/1",
+  statusUrl: "https://portal.example.org/lend/status/abc", userName: "Anna Beispiel", userEmail: "anna@example.org",
 };
 
-const GROUPS = ["event", "recipient", "org", "link"] as const;
+const GROUPS = ["event", "recipient", "details", "org", "link"] as const;
 const groupOf = (k: string, v: VarSpec) =>
-  v.source === "link" ? "link" : k.startsWith("event.") ? "event" : k.startsWith("org.") || k === "type" ? "org" : "recipient";
+  v.source === "link" ? "link" : k.startsWith("event.") ? "event" : /^(item|applicant|user)\.|^(rejoin)$/.test(k) ? "details" : k.startsWith("org.") || k === "type" ? "org" : "recipient";
 
 function Editor({ user, back, tpl, values, errors, expected, conflict }: { user: Variables["user"]; back: string; tpl: TemplateView; values: { subject: string; body: string }; errors: string[]; expected: string; conflict?: boolean }) {
   const key = tpl.key, entry = CATALOG[key];
