@@ -10,7 +10,8 @@ vi.mock("../middleware/auth.js", () => ({
 }));
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
 vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve({ state: "unconfigured", timestamp: null, lastSuccess: null }) }));
-vi.mock("../db/index.js", () => ({ db: {} }));
+const dbAccess = vi.fn();
+vi.mock("../db/index.js", () => ({ db: new Proxy({}, { get: (_t, k) => { dbAccess(String(k)); return () => { throw new Error("db used"); }; } }) }));
 
 const sys = (key: string, perm: string, body = "Hi {{#recipients}}{{optOutUrl}}{{/recipients}}") => ({
   key, category: "event", audience: "member", prefix: "[{{org.name}}]", editPermissions: [perm], system: { subject: "Sys {{event.title}}", body }, override: null as any,
@@ -85,6 +86,68 @@ describe("mail template routes", () => {
     expect(ok).toContain("Übung Atemschutz");
     const bad = await (await post("/event-created/preview", { subject: "{{x}}", body: "y" })).text();
     expect(bad).toContain("alert-error");
+  });
+
+  it("preview cases: tabs, condition holds, no real data", async () => {
+    const body = "{{#event.location}}ORT{{/event.location}}|{{#multiple}}MEHR{{/multiple}}|{{#event.rsvpEnabled}}RSVP{{/event.rsvpEnabled}}{{#recipients}}{{optOutUrl}}{{/recipients}}";
+    const html = async (c: string) => (await (await post("/event-created/preview", { subject: "S", body, case: c })).text());
+    const std = await html("default");
+    expect(std).not.toContain("tablist"); // Fälle stehen in der Tab-Zeile des Editors, nicht in der Vorschau
+    const page = await (await mailTemplateRoutes.request("/event-created")).text();
+    for (const l of ["Standard", "Ohne Ort", "Ohne Anmeldung", "Mehrere Mitglieder an der Adresse"]) expect(page).toContain(l);
+    expect(page).toContain('data-case="multiple"');
+    expect(page).toContain('data-tab="entry"'); // Fall-Tabs erst nach Klick auf „Vorschau“ sichtbar (hidden)
+    expect(page).toMatch(/class="btn [^"]*hidden[^"]*"[^>]*data-tab="preview" data-case="default"/);
+    expect(std).toContain("ORT|");
+    expect(std).toContain("VORSCHAU");
+    expect(await html("noLocation")).not.toContain("ORT");
+    expect(await html("noRsvp")).not.toContain("RSVP");
+    expect(await html("multiple")).toContain("MEHR");
+    perms = new Set(["system:admin"]);
+    expect(await (await mailTemplateRoutes.request("/member-settings-link")).text()).toContain(">Vorschau<");
+  });
+
+  it("preview renders every case of every template without errors", async () => {
+    const { CATALOG, previewVars, renderMail } = await import("../lib/mail-templates.js");
+    for (const [key, e] of Object.entries(CATALOG)) for (const c of e.previewCases) {
+      expect(() => renderMail({ prefix: "[{{org.name}}]", subject: "x", body: "y" }, previewVars(key, c.id))).not.toThrow();
+    }
+    const cancelled = previewVars("event-cancelled", "default") as any;
+    expect(cancelled.event.rsvpEnabled).toBe(false);
+  });
+
+  it("preview errors carry line and missing required placeholders", async () => {
+    const html = await (await post("/event-created/preview", { subject: "S", body: "a\n{{x}}" })).text();
+    expect(html).toContain('data-line="2"');
+    expect(html).toContain('data-missing="optOutUrl"');
+  });
+
+  it("preview never touches the db and subject equals the send subject", async () => {
+    const { CATALOG, previewVars, renderMail } = await import("../lib/mail-templates.js");
+    const row = { prefix: "[{{org.name}}]", subject: "{{event.title}}", body: "x" };
+    const res = await post("/event-created/preview", { subject: row.subject, body: "{{#recipients}}{{optOutUrl}}{{/recipients}}" });
+    expect(res.status).toBe(200); // db ist {}: jeder Zugriff würfe
+    expect(await res.text()).toContain(renderMail(row, previewVars("event-created", "default")).subject);
+    for (const e of Object.values(CATALOG)) for (const r of e.required) expect(r.label.length).toBeGreaterThan(0);
+  });
+
+  it("preview saves nothing, needs edit permission, subject equals send subject", async () => {
+    const res = await post("/event-created/preview", { subject: "Hallo {{event.title}}", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}" });
+    expect(res.status).toBe(200);
+    expect(saveOverride).not.toHaveBeenCalled();
+    expect(resetOverride).not.toHaveBeenCalled();
+    const { renderMail, previewVars } = await import("../lib/mail-templates.js");
+    const { subject } = renderMail({ prefix: "[{{org.name}}]", subject: "Hallo {{event.title}}", body: "x" }, previewVars("event-created"));
+    expect(await res.text()).toContain(subject.replace(/&/g, "&amp;"));
+    expect((await post("/member-settings-link/preview", { subject: "S", body: "{{settingsUrl}}" })).status).toBe(403);
+  });
+
+  it("preview reads no domain data (no db access)", async () => {
+    const { CATALOG, previewVars } = await import("../lib/mail-templates.js");
+    dbAccess.mockClear();
+    for (const [key, e] of Object.entries(CATALOG)) for (const c of e.previewCases) previewVars(key, c.id);
+    expect((await post("/event-created/preview", { subject: "S", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}", case: "multiple" })).status).toBe(200);
+    expect(dbAccess).not.toHaveBeenCalled();
   });
 
   it("back link follows ?from only for internal paths", async () => {

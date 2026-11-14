@@ -7,7 +7,7 @@ import { HTTP_STATUS } from "../lib/constants.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDay } from "../lib/datetime.js";
 import { env } from "../env.js";
-import { CATALOG, buildVars, mayEdit, renderMail, validateTemplate, type MailRecipient, type VarSpec } from "../lib/mail-templates.js";
+import { CATALOG, mayEdit, previewVars, renderMail, validateTemplate, type VarSpec } from "../lib/mail-templates.js";
 import { listTemplates, resetOverride, saveOverride, type TemplateView } from "../lib/mail-template-store.js";
 import { t } from "../i18n/index.js";
 import { Icon } from "../components/icon.js";
@@ -96,22 +96,12 @@ d.hidden=n===0;if(n)any=true});
 document.getElementById('ph-empty').classList.toggle('hidden',any)});
 se.addEventListener('keydown',function(e){if(e.key==='Escape'&&se.value){e.stopPropagation();se.value='';se.dispatchEvent(new Event('input'))}
 if(e.key==='Enter'){e.preventDefault();var v=document.querySelectorAll('#side-ph li[data-s]:not([hidden]) [data-ph]');if(v.length===1)v[0].click()}});
-document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){var p=b.dataset.tab==='preview';
+var cs=document.querySelectorAll('[data-case]'),en=document.querySelector('[data-tab=entry]'),lc=cs[0];
+document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){var k=b.dataset.tab;if(k==='entry'){lc.click();return}
+var p=k==='preview';if(p)lc=b;
 document.getElementById('pane-edit').classList.toggle('hidden',p);document.getElementById('pane-preview').classList.toggle('hidden',!p);pg.disabled=cl.disabled=p;
+if(en){en.classList.toggle('hidden',p);cs.forEach(function(o){o.classList.toggle('hidden',!p)})}
 document.querySelectorAll('[data-tab]').forEach(function(o){o.classList.toggle('tab-active',o===b)})})})})();`;
-
-const SAMPLE_PEOPLE: MailRecipient[] = [
-  { firstName: "Anna", lastName: "Beispiel", email: "anna@example.org", optOutUrl: "https://portal.example.org/o/1", rsvpYesUrl: "https://portal.example.org/r/yes", rsvpNoUrl: "https://portal.example.org/r/no" },
-  { firstName: "Ben", lastName: "Beispiel", email: "ben@example.org", optOutUrl: "https://portal.example.org/o/2", rsvpYesUrl: "https://portal.example.org/r/yes", rsvpNoUrl: "https://portal.example.org/r/no" },
-];
-// Nur Beispieldaten, nie Echtdaten.
-const SAMPLE_RECORD = {
-  event: { id: "beispiel", title: "Übung Atemschutz", startsAt: new Date("2026-04-12T16:00:00Z"), endsAt: new Date("2026-04-12T18:00:00Z"), allDay: false, location: "Gerätehaus", rsvpEnabled: true, rsvpDeadline: null, maxParticipants: 20 },
-  changes: "Ort: Halle → Gerätehaus", optOutAllUrl: "https://portal.example.org/o/all", orgContactEmail: "info@example.org",
-  settingsUrl: "https://portal.example.org/link/abc", validMinutes: 30,
-  applicantName: "Anna Beispiel", rejoin: false, itemName: "Zelt", requestUrl: "https://portal.example.org/inventory/requests/1",
-  statusUrl: "https://portal.example.org/lend/status/abc", userName: "Anna Beispiel", userEmail: "anna@example.org",
-};
 
 const GROUPS = ["event", "recipient", "details", "org", "link"] as const;
 const groupOf = (k: string, v: VarSpec) =>
@@ -133,9 +123,18 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
         {tpl.override ? <p class="mb-4">{t("mailTemplates.status.custom", stamp(tpl.override))}</p> : <div role="status" class="alert alert-info alert-soft mb-4">{t("mailTemplates.status.system")}</div>}
         {conflict && <div role="alert" class="alert alert-error mb-4"><span>{t("mailTemplates.conflict")} <a class="link" href={`/mail/templates/${key}`}>{t("mailTemplates.conflict.reload")}</a></span></div>}
         <div class="flex items-center justify-between gap-2 mb-4">
-        <div role="tablist" class="tabs tabs-border">
+        <div role="tablist" class="tabs tabs-border flex-wrap items-center gap-y-1">
           <button type="button" role="tab" class="tab tab-active" data-tab="edit">{t("common.edit")}</button>
-          <button type="button" role="tab" class="tab" data-tab="preview" hx-post={`/mail/templates/${key}/preview`} hx-include="#tpl-form" hx-target="#preview">{t("mailTemplates.preview")}</button>
+          {entry.previewCases.length > 1 && <button type="button" role="tab" class="tab" data-tab="entry">{t("mailTemplates.preview")}</button>}
+          {(() => {
+            const multi = entry.previewCases.length > 1;
+            const btns = entry.previewCases.map((x) => (
+              <button type="button" role="tab" aria-label={x.label} class={multi ? "btn btn-sm join-item hidden [&.tab-active]:btn-primary" : "tab"} data-tab="preview" data-case={x.id} hx-post={`/mail/templates/${key}/preview`} hx-include="#tpl-form" hx-vals={JSON.stringify({ case: x.id })} hx-target="#preview">
+                {multi ? x.label : t("mailTemplates.preview")}
+              </button>
+            ));
+            return multi ? <div class="join ml-2" role="presentation">{btns}</div> : btns;
+          })()}
         </div>
         <button type="button" id="ph-toggle" class="btn btn-ghost btn-square md:hidden" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")}><Icon name="sidebar-expand" class="h-5 w-5 text-gold" /></button>
         </div>
@@ -236,13 +235,30 @@ mailTemplateRoutes.post("/:key", async (c) => {
   return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
 });
 
+// Nur Beispieldaten: kein Versand, keine Speicherung, keine Fachdaten.
 mailTemplateRoutes.post("/:key/preview", async (c) => {
   const tpl = await load(c.get("user"), c.req.param("key"));
+  const f = await c.req.parseBody();
   const { subject, body } = await readForm(c);
+  const cases = CATALOG[tpl.key].previewCases;
+  const caseId = cases.find((x) => x.id === String(f.case ?? ""))?.id ?? cases[0].id;
   const errors = validateTemplate(tpl.key, { prefix: tpl.prefix, subject, body });
-  if (errors.length) return c.html(<div role="alert" class="alert alert-error"><ul>{errors.map((e) => <li>{e.replace(/^\w+: /, "")}</li>)}</ul></div>);
-  const out = renderMail({ prefix: tpl.prefix, subject, body }, buildVars(tpl.key, SAMPLE_RECORD as never, SAMPLE_PEOPLE));
-  return c.html(<div class="border border-base-300 rounded-box p-4"><p class="font-semibold mb-3">{out.subject}</p><pre class="whitespace-pre-wrap font-sans text-sm">{out.text}</pre></div>);
+  // strukturiert: Zeile aus der Meldung, Pflichtplatzhalter-Status für die Checkliste des Editors
+  const issues = errors.map((e) => ({ line: /Zeile (\d+)/.exec(e)?.[1], missing: e.startsWith("Pflichtplatzhalter"), text: e.replace(/^\w+: /, "") }));
+  const missing = CATALOG[tpl.key].required.filter((r) => issues.some((i) => i.missing && i.text.includes(`„${r.label}“`))).map((r) => r.name);
+  if (errors.length) return c.html(<div role="alert" class="alert alert-error" data-missing={missing.join(",")}><ul>{issues.map((i) => <li data-line={i.line}>{i.text}</li>)}</ul><a class="link" href="#" onclick="document.querySelector('[data-tab=edit]').click();return false">{t("mailTemplates.preview.toEditor")}</a></div>);
+  const out = renderMail({ prefix: tpl.prefix, subject, body }, previewVars(tpl.key, caseId));
+  return c.html(
+    <div>
+      <div class="border border-base-300 rounded-box overflow-hidden" aria-live="polite">
+        <div class="bg-base-200 border-b border-base-300 px-4 py-3">
+          <p class="text-xs uppercase tracking-wide text-base-content/60 mb-1">{t("mailTemplates.preview.head")} · {t("mailTemplates.preview.sample")}</p>
+          <p class="font-semibold">{out.subject}</p>
+        </div>
+        <div class="whitespace-pre-wrap text-sm p-4 bg-base-100">{out.text}</div>
+      </div>
+    </div>,
+  );
 });
 
 mailTemplateRoutes.post("/:key/reset", async (c) => {
