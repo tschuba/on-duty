@@ -21,7 +21,9 @@ const forbidden = () => { throw new HTTPException(HTTP_STATUS.FORBIDDEN); };
 const notFound = () => { throw new HTTPException(HTTP_STATUS.NOT_FOUND); };
 
 async function editable(user: Variables["user"]): Promise<TemplateView[]> {
-  return (await listTemplates()).filter((x) => CATALOG[x.key] && mayEdit(user, x.editPermissions));
+  // Reihenfolge = Katalog (die DB liefert ohne ORDER BY keine stabile Reihenfolge)
+  const order = Object.keys(CATALOG);
+  return (await listTemplates()).filter((x) => CATALOG[x.key] && mayEdit(user, x.editPermissions)).sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
 }
 async function load(user: Variables["user"], key: string): Promise<TemplateView> {
   const tpl = (await listTemplates()).find((x) => x.key === key && CATALOG[x.key]);

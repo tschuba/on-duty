@@ -157,12 +157,12 @@ const lendApplicant = simple("lend", "applicant", {
 
 const named = (key: string, e: CatalogEntry): CatalogEntry => ({ ...e, name: t(`mailTemplates.name.${key}` as never), description: t(`mailTemplates.desc.${key}` as never) });
 export const CATALOG: Record<string, CatalogEntry> = Object.fromEntries(Object.entries({
-  "member-settings-link": settingsEntry,
   "event-created": eventEntry,
   "event-updated": eventEntry,
   "event-cancelled": eventEntry,
   "event-uncancelled": eventEntry,
   "event-mail-info": infoEntry,
+  "member-settings-link": settingsEntry,
   "application-submitted": simple("membership", "staff", { "applicant.name": V("Name des Antragstellers", "Anna Beispiel", "person") }, (r) => ({ applicant: { name: r.applicantName } })),
   "application-approved": simple("membership", "applicant", { rejoin: { type: "boolean", desc: "Wieder Mitglied nach Austritt", example: "ja", source: "data" } }, (r) => ({ rejoin: !!r.rejoin })),
   "application-rejected": simple("membership", "applicant", {}, () => ({})),
