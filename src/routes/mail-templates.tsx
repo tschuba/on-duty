@@ -5,7 +5,7 @@ import { FormActions, HeaderAction, PageHeader } from "../components/page-header
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { setFlash } from "../lib/flash.js";
-import { formatDay } from "../lib/datetime.js";
+import { formatDateTime, formatDay, resolveLocale, resolveTimezone } from "../lib/datetime.js";
 import { env } from "../env.js";
 import { CATALOG, customFields, customPreviewVars, customVars, fieldLabel, mayEdit, previewVars, renderMail, validateTemplate, type VarSpec } from "../lib/mail-templates.js";
 import { createCustom, deleteCustom, keyTaken, listTemplates, listTopics, resetOverride, saveCustom, saveOverride, type CustomInput, type TemplateView } from "../lib/mail-template-store.js";
@@ -13,8 +13,8 @@ import { parseHeaders } from "../lib/mail-headers.js";
 import { SLUG_RE } from "../lib/slug.js";
 import { PERMISSIONS, type Permission } from "../lib/roles.js";
 import { db } from "../db/index.js";
-import { memberRoles, members, persons } from "../db/schema/index.js";
-import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import { mailLog, memberRoles, members, persons } from "../db/schema/index.js";
+import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { PERMISSION_LABELS } from "../components/permission-badges.js";
 import type { CustomMeta } from "../db/schema/mail.js";
@@ -500,7 +500,8 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
   return c.html(
     <Layout title={meta.name} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
-        <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`} />
+        <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`}
+          actions={<HeaderAction icon="clipboard-list" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />} />
         {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e}</li>)}</ul></div>}
         {!smtp && <div role="alert" class="alert alert-warning mb-4">{t("mailTemplates.send.noSmtp")}</div>}
         <form method="get" action={action} class="space-y-4" onchange="if(event.target.closest('[data-sel]'))this.submit()">
@@ -562,4 +563,36 @@ mailTemplateRoutes.post("/:key/send", async (c) => {
   if (res === "none") return fail(t("mailTemplates.send.noRecipients"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   setFlash(c, T("mailTemplates.send.started", { count: res }), "success");
   return c.redirect(`/mail/templates/${tpl.key}${fromQs(backTo(c.req.query("from")))}`);
+});
+
+// Versandprotokoll der Vorlage: Zähler und die letzten Einträge je Person (mail_log trägt nur den key).
+mailTemplateRoutes.get("/:key/log", async (c) => {
+  const tpl = await load(c.get("user"), c.req.param("key"), true);
+  const back = backTo(c.req.query("from"));
+  const where = eq(mailLog.template, tpl.key);
+  const [rows, totals] = await Promise.all([
+    db.select({ status: mailLog.status, at: mailLog.sentAt, firstName: persons.firstName, lastName: persons.lastName }).from(mailLog)
+      .innerJoin(persons, eq(persons.id, mailLog.personId)).where(where).orderBy(desc(mailLog.sentAt)).limit(200),
+    db.select({ status: mailLog.status, n: sql<number>`count(*)::int` }).from(mailLog).where(where).groupBy(mailLog.status),
+  ]);
+  const n = (s: string) => totals.find((x) => x.status === s)?.n ?? 0;
+  const tz = resolveTimezone(c), locale = resolveLocale();
+  return c.html(
+    <Layout title={tpl.custom!.meta.name} user={c.get("user")}>
+      <div class="max-w-2xl mx-auto">
+        <PageHeader title={T("mailTemplates.log.title", { name: tpl.custom!.meta.name })} backHref={`/mail/templates/${tpl.key}/send${fromQs(back)}`} />
+        <p class="mb-4">{T("mailTemplates.log.counts", { sent: n("sent"), failed: n("failed") })}</p>
+        {!rows.length ? <p class="opacity-70">{t("mailTemplates.log.empty")}</p> : (
+          <div class="overflow-x-auto"><table class="table table-zebra w-full">
+            <thead><tr><th>{t("mailTemplates.log.col.when")}</th><th>{t("mailTemplates.log.col.person")}</th><th>{t("mailTemplates.log.col.status")}</th></tr></thead>
+            <tbody>{rows.map((r) => (
+              <tr><td>{formatDateTime(r.at, tz, locale)}</td><td>{r.firstName} {r.lastName}</td>
+                <td><span class={`badge badge-sm ${r.status === "sent" ? "badge-success" : "badge-error"}`}>{T(`mailTemplates.log.${r.status}`)}</span></td></tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        {rows.length === 200 && <p class="text-sm opacity-60 mt-2">{t("mailTemplates.log.limit")}</p>}
+      </div>
+    </Layout>,
+  );
 });
