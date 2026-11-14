@@ -25,3 +25,4 @@ tile-cache/
 
 # Mock-Hilfsdatei
 public/js/location-view.min.js
+public/js/mail-placeholders.min.js

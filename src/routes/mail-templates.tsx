@@ -72,43 +72,14 @@ mailTemplateRoutes.get("/", async (c) => {
   );
 });
 
-const LEAVE_SCRIPT = (msg: string) => `(function(){var f=document.getElementById('tpl-form'),dirty=false,last=f.elements.subject;
-f.addEventListener('input',function(){dirty=true});f.addEventListener('submit',function(){dirty=false});
-window.addEventListener('beforeunload',function(e){if(dirty){e.preventDefault();e.returnValue=${JSON.stringify(msg)}}});
-f.querySelectorAll('input,textarea').forEach(function(el){el.addEventListener('focus',function(){last=el})});
-document.querySelectorAll('[data-ph]').forEach(function(b){b.addEventListener('click',function(){var v='{{'+b.dataset.ph+'}}',s=last.selectionStart||0,e=last.selectionEnd||0;
-last.setRangeText(v,s,e,'end');if(!md.matches)setPh(false);last.focus();dirty=true})});
-var pg=document.getElementById('ph-toggle'),cl=document.getElementById('ph-close'),pane=document.getElementById('pane-edit'),md=matchMedia('(min-width: 768px)');
-function setPh(o,save){pane.dataset.open=o;pg.setAttribute('aria-expanded',o);cl.setAttribute('aria-expanded',o);if(!o)side('ph');if(save&&md.matches)try{localStorage.setItem('mailPlaceholders',o)}catch(e){}}
-function shut(){setPh(false,true);(md.matches?cl:pg).focus()}
-var sv=null;try{sv=localStorage.getItem('mailPlaceholders')}catch(e){}
-setPh(md.matches&&sv!=='false');pg.addEventListener('click',function(){setPh(pane.dataset.open!=='true',true)});
-document.getElementById('ph-backdrop').addEventListener('click',shut);cl.addEventListener('click',function(){if(md.matches){setPh(pane.dataset.open!=='true',true)}else shut()});
-document.getElementById('ph-col').addEventListener('keydown',function(e){if(e.key==='Escape'){e.stopPropagation();shut()}});
-function side(n){var t=n==='tech';document.getElementById('side-ph').classList.toggle('hidden',t);document.getElementById('side-tech').classList.toggle('hidden',!t);
-document.querySelectorAll('[data-side]').forEach(function(o){o.classList.toggle('tab-active',o.dataset.side===n)})}
-document.querySelectorAll('[data-side]').forEach(function(b){b.addEventListener('click',function(){side(b.dataset.side)})});
-var se=document.getElementById('ph-search'),nf=function(x){return x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')};
-se.addEventListener('input',function(){var q=nf(se.value.trim()),any=false;
-document.querySelectorAll('#side-ph section[data-g]').forEach(function(d){var n=0;
-d.querySelectorAll('li[data-s]').forEach(function(li){var m=!q||nf(li.dataset.s).indexOf(q)>-1;li.hidden=!m;if(m)n++});
-d.hidden=n===0;if(n)any=true});
-document.getElementById('ph-empty').classList.toggle('hidden',any)});
-se.addEventListener('keydown',function(e){if(e.key==='Escape'&&se.value){e.stopPropagation();se.value='';se.dispatchEvent(new Event('input'))}
-if(e.key==='Enter'){e.preventDefault();var v=document.querySelectorAll('#side-ph li[data-s]:not([hidden]) [data-ph]');if(v.length===1)v[0].click()}});
-var cs=document.querySelectorAll('[data-case]'),en=document.querySelector('[data-tab=entry]'),lc=cs[0];
-document.querySelectorAll('[data-tab]').forEach(function(b){b.addEventListener('click',function(){var k=b.dataset.tab;if(k==='entry'){lc.click();return}
-var p=k==='preview';if(p)lc=b;
-document.getElementById('pane-edit').classList.toggle('hidden',p);document.getElementById('pane-preview').classList.toggle('hidden',!p);pg.disabled=cl.disabled=p;
-if(en){en.classList.toggle('hidden',p);cs.forEach(function(o){o.classList.toggle('hidden',!p)})}
-document.querySelectorAll('[data-tab]').forEach(function(o){o.classList.toggle('tab-active',o===b)})})})})();`;
-
 const GROUPS = ["event", "recipient", "details", "org", "link"] as const;
 const groupOf = (k: string, v: VarSpec) =>
   v.source === "link" ? "link" : k.startsWith("event.") ? "event" : /^(item|applicant|user)\.|^(rejoin)$/.test(k) ? "details" : k.startsWith("org.") || k === "type" ? "org" : "recipient";
 
 function Editor({ user, back, tpl, values, errors, expected, conflict }: { user: Variables["user"]; back: string; tpl: TemplateView; values: { subject: string; body: string }; errors: string[]; expected: string; conflict?: boolean }) {
   const key = tpl.key, entry = CATALOG[key];
+  const requiredNames = new Set(entry.required.map((r) => (r.list ? `${r.list}[].${r.name}` : r.name)));
+  const phData = Object.entries(entry.vars).map(([name, v]) => ({ name, desc: v.desc, example: v.example, optional: !!v.optional, type: v.type, group: groupOf(name, v), list: name.includes("[]") || v.type === "list", required: requiredNames.has(name) }));
   const bodyErr = errors.filter((e) => !e.startsWith("subject:"));
   return (
     <Layout title={entry.name} user={user}>
@@ -165,17 +136,30 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
               <input id="ph-search" type="search" class="input input-sm w-full" placeholder={t("mailTemplates.search")} aria-label={t("mailTemplates.search")} autocomplete="off" />
               <p id="ph-empty" class="hidden text-base-content/60 p-1" role="status">{t("mailTemplates.search.empty")}</p>
               {GROUPS.map((g) => {
-                const items = Object.entries(entry.vars).filter(([k, v]) => !k.includes("[]") && v.type !== "list" && groupOf(k, v) === g);
+                const cond = (k: string, v: { optional?: boolean; type: string }) => v.optional && v.type !== "boolean" && !requiredNames.has(k);
+                const items = Object.entries(entry.vars).filter(([k, v]) => v.type !== "list" && groupOf(k, v) === g);
                 return items.length > 0 && (
                   <section data-g>
                     <h3 class="px-1 pt-1 text-xs font-bold uppercase tracking-wide text-base-content/60">{t(`mailTemplates.group.${g}`)}</h3>
                     <ul class="space-y-1 p-1">
                       {items.map(([k, v]) => (
-                        <li data-s={`${k} ${v.desc} ${v.example}`}>
-                          <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal flex-col items-start gap-0" data-ph={k} title={k}>
-                            <span>+ {v.desc}{v.optional && <span class="text-base-content/60"> ({t("mailTemplates.optional")})</span>}</span>
-                            {v.example && <span class="font-normal text-xs text-base-content/60 break-all">{v.example}</span>}
-                          </button>
+                        <li data-s={`${k} ${v.desc} ${v.example}`} class={cond(k, v) ? "rounded-box bg-base-200 p-1 space-y-1" : undefined}>
+                          {cond(k, v) ? (
+                            <>
+                              <p class="px-1 text-xs">{v.desc}{v.optional && <span class="text-base-content/60"> ({t("mailTemplates.optional")})</span>}{v.example && <span class="block text-base-content/60 break-all">{v.example}</span>}</p>
+                              <div class="flex flex-wrap gap-1">
+                                {v.type !== "boolean" && <button type="button" class="btn btn-ghost btn-xs" data-ph={k} title={k}>+ {t("mailTemplates.insertDirect")}</button>}
+                                <button type="button" class="btn btn-ghost btn-xs" data-cond={k} data-bool={v.type === "boolean" ? "1" : undefined} title={v.type === "boolean" ? t("mailTemplates.onlyIfTrue.tip") : t("mailTemplates.onlyIfPresent.tip")}>+ {v.type === "boolean" ? t("mailTemplates.onlyIfTrue") : t("mailTemplates.onlyIfPresent")}</button>
+                              </div>
+                            </>
+                          ) : v.type === "boolean" && !requiredNames.has(k) ? (
+                            <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-cond={k} data-bool="1" title={t("mailTemplates.onlyIfTrue.tip")}>+ {t("mailTemplates.onlyIfBool")}: {v.desc}</button>
+                          ) : (
+                            <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal flex-col items-start gap-0" data-ph={k} title={k}>
+                              <span>+ {v.desc}</span>
+                              {v.example && <span class="font-normal text-xs text-base-content/60 break-all">{v.example}</span>}
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -204,7 +188,8 @@ function Editor({ user, back, tpl, values, errors, expected, conflict }: { user:
             </div>
           </dialog>
         )}
-        <script dangerouslySetInnerHTML={{ __html: LEAVE_SCRIPT(t("mailTemplates.leaveWarning")) }} />
+        <script id="ph-data" type="application/json" dangerouslySetInnerHTML={{ __html: JSON.stringify(phData).replace(/</g, "\\u003c") }} />
+        <script src="/js/mail-placeholders.min.js" data-leave={t("mailTemplates.leaveWarning")} defer></script>
       </div>
     </Layout>
   );

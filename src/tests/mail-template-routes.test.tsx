@@ -116,6 +116,30 @@ describe("mail template routes", () => {
     expect(cancelled.event.rsvpEnabled).toBe(false);
   });
 
+  it("conditional placeholder buttons and #ph-data", async () => {
+    const { CATALOG, renderMail, validateTemplate, previewVars } = await import("../lib/mail-templates.js");
+    const page = await (await mailTemplateRoutes.request("/event-created")).text();
+    expect(page).toContain('data-cond="event.location"');
+    expect(page).toContain('data-cond="event.rsvpEnabled" data-bool="1"');
+    expect(page).not.toContain('data-cond="event.title"');
+    const data = JSON.parse(page.match(/<script id="ph-data"[^>]*>(.*?)<\/script>/s)![1]);
+    expect(data.map((d: any) => d.name)).toEqual(Object.keys(CATALOG["event-created"].vars));
+    expect(data.find((d: any) => d.name === "recipients[].optOutUrl").required).toBe(true);
+    for (const e of Object.values(CATALOG)) for (const v of Object.values(e.vars)) expect(v.desc.length).toBeGreaterThan(0);
+    const body = "a\n{{#event.location}}\nOrt {{event.location}}\n{{/event.location}}\nb {{#recipients}}{{optOutUrl}}{{/recipients}}";
+    expect(validateTemplate("event-created", { subject: "s", body })).toEqual([]);
+    const row = { prefix: "", subject: "s", body };
+    expect(renderMail(row, previewVars("event-created", "default")).text).toMatch(/a\nOrt .+\nb /);
+    expect(renderMail(row, previewVars("event-created", "noLocation")).text).toMatch(/^a\nb /);
+  });
+
+  it("staff templates offer no recipient.* or you", async () => {
+    const { CATALOG } = await import("../lib/mail-templates.js");
+    const staff = Object.values(CATALOG).filter((e) => e.audience === "staff");
+    expect(staff.length).toBeGreaterThan(0);
+    for (const e of staff) for (const k of Object.keys(e.vars)) expect(k.startsWith("recipient.") || k === "you").toBe(false);
+  });
+
   it("preview errors carry line and missing required placeholders", async () => {
     const html = await (await post("/event-created/preview", { subject: "S", body: "a\n{{x}}" })).text();
     expect(html).toContain('data-line="2"');
