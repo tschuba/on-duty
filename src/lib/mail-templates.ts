@@ -261,8 +261,11 @@ function suggest(names: string[], name: string): string | undefined {
 // Freie Vorlagen: Globale Variablen sind erlaubt, alles andere muss ein Feldname sein (flach, ohne Punkt, nicht reserviert).
 const FIELD_RE = /^[a-z][a-z0-9_]*$/;
 const RESERVED = new Set(["you", "addressee", "multiple", "recipients", "optOutAllUrl", "unsubscribeUrl"]);
-// Nur in freien Vorlagen: Abmelde-Link der Mitteilung (bei dringenden leer, dort gibt es kein Opt-Out).
+// Nur in freien Vorlagen: Anrede wie bei Termin-Mails (Vornamen aller Mitglieder einer Adresse) und Abmelde-Link der Mitteilung (bei dringenden leer, dort gibt es kein Opt-Out).
 const CUSTOM_ONLY_VARS: Record<string, VarSpec> = {
+  addressee: EVENT_VARS.addressee,
+  multiple: { ...EVENT_VARS.multiple, desc: "Mehr als ein Mitglied an der Adresse (nur dann „euch“, Namen aller)" },
+  you: EVENT_VARS.you,
   unsubscribeUrl: { type: "text", desc: "Abmelde-Link für dieses Thema (Pflicht, außer bei dringenden Mitteilungen)", example: "https://portal.example.org/link/VORSCHAU", source: "link" },
 };
 const isField = (n: string) => FIELD_RE.test(n) && !RESERVED.has(n);
@@ -293,6 +296,7 @@ export function customPreviewVars(fields: { name: string; example?: string }[]):
   const vars: MailVars = {
     org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: "" }, type: t("mail.type.custom"),
     recipient: { name: "Anna Beispiel", firstName: "Anna", lastName: "Beispiel", email: "anna@example.org" },
+    addressee: "Anna", multiple: false, you: t("mail.event.you.one"),
     unsubscribeUrl: CUSTOM_ONLY_VARS.unsubscribeUrl.example,
   };
   for (const f of fields) vars[f.name] = f.example || `\u0001${f.name}\u0002`;

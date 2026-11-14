@@ -20,7 +20,7 @@ import { PERMISSION_LABELS } from "../components/permission-badges.js";
 import type { CustomMeta } from "../db/schema/mail.js";
 import { t } from "../i18n/index.js";
 import { Icon } from "../components/icon.js";
-import { countSend, customRecipients, isSending, startCustomMail } from "../lib/custom-mail.js";
+import { countMails, customRecipients, isSending, startCustomMail } from "../lib/custom-mail.js";
 import { isSmtpConfigured } from "../lib/mail.js";
 import { countRecipients } from "../lib/event-mail.js";
 import { Field, FieldGroup } from "../components/field.js";
@@ -119,7 +119,7 @@ const MailPreview = ({ subject, text }: { subject: string; text: string }) => (
 
 const GROUPS = ["event", "recipient", "details", "org", "link", "fields"] as const;
 const groupOf = (k: string, v: VarSpec, custom?: boolean) =>
-  custom ? (k.startsWith("org.") || k === "type" ? "org" : k.startsWith("recipient.") ? "recipient" : "fields") : v.source === "link" ? "link" : k.startsWith("event.") ? "event" : /^(item|applicant|user)\.|^(rejoin)$/.test(k) ? "details" : k.startsWith("org.") || k === "type" ? "org" : "recipient";
+  custom ? (k.startsWith("org.") || k === "type" ? "org" : k.startsWith("recipient.") || ["addressee", "you", "multiple"].includes(k) ? "recipient" : k === "unsubscribeUrl" ? "link" : "fields") : v.source === "link" ? "link" : k.startsWith("event.") ? "event" : /^(item|applicant|user)\.|^(rejoin)$/.test(k) ? "details" : k.startsWith("org.") || k === "type" ? "org" : "recipient";
 
 // Zusätze des Editors für freie Vorlagen (Backlog 162)
 interface CustomForm {
@@ -510,7 +510,8 @@ const readSelection = (f: Record<string, unknown>) => ({ statuses: asArray(f.sta
 async function sendForm(c: any, tpl: TemplateView, values: Record<string, string>, sel: ReturnType<typeof readSelection>, errors: string[] = [], status?: number) {
   const back = backTo(c.req.query("from"));
   const meta = tpl.custom!.meta;
-  const counts = countRecipients(await customRecipients(tpl.custom!.topic, sel, !!meta.urgent));
+  const recipients = await customRecipients(tpl.custom!.topic, sel, !!meta.urgent);
+  const counts = { ...countRecipients(recipients), ...countMails(recipients) };
   const roles = await db.select({ id: memberRoles.id, title: memberRoles.title }).from(memberRoles).orderBy(asc(memberRoles.sortOrder));
   const picked = sel.memberIds.length
     ? await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members).innerJoin(persons, eq(persons.id, members.personId)).where(inArray(members.id, sel.memberIds))
@@ -543,7 +544,7 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
             </div>
           </FieldGroup>
           <script dangerouslySetInnerHTML={{ __html: SEND_SCRIPT }} />
-          <p class="font-medium" role="status">{T("mailTemplates.send.counts", { send: counts.send, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
+          <p class="font-medium" role="status">{T("mailTemplates.send.counts", { send: counts.send, mails: counts.mails, noEmail: counts.noEmail, optedOut: counts.optedOut })}</p>
           {meta.fields.map((f) => (
             <Field label={f.label || fieldLabel(f.name)} required>
               <textarea name={`f_${f.name}`} rows={3} class="textarea w-full" required placeholder={f.label || fieldLabel(f.name)}>{values[f.name] ?? f.example ?? ""}</textarea>
@@ -553,7 +554,7 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
             <button type="button" class="btn btn-outline" hx-post={`/mail/templates/${tpl.key}/send/preview`} hx-include="closest form" hx-target="#send-preview">{t("mailTemplates.send.preview")}</button>
           </div>
           <div id="send-preview" />
-          <button type="submit" formmethod="post" class="btn btn-primary" disabled={!smtp || !counts.send} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send }))})`}>{t("mailTemplates.send")}</button>
+          <button type="submit" formmethod="post" class="btn btn-primary" disabled={!smtp || !counts.send} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send, mails: counts.mails }))})`}>{t("mailTemplates.send")}</button>
         </form>
       </div>
     </Layout>, status);

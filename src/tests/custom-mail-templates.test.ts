@@ -24,11 +24,16 @@ describe("custom template validation", () => {
     expect(validateTemplate("", { subject: "{{ort}}", body: "{{recipient.name}} {{org.url}} {{unsubscribeUrl}}" })).toEqual([]);
   });
   it("rejects dotted and reserved names, suggests globals", () => {
-    const e = validateTemplate("", { subject: "x", body: "{{org.nam}} {{you}} {{a.b}} {{unsubscribeUrl}}" });
+    const e = validateTemplate("", { subject: "x", body: "{{org.nam}} {{recipients}} {{a.b}} {{unsubscribeUrl}}" });
     expect(e.join("\n")).toContain("Meintest du „org.name“");
-    expect(e.some((x) => x.includes("„you“ ist reserviert"))).toBe(true);
+    expect(e.some((x) => x.includes("„recipients“ ist reserviert"))).toBe(true);
     expect(e.some((x) => x.includes("„a.b“"))).toBe(true);
     expect(validateTemplate("", { subject: "x", body: "{{> p}} {{unsubscribeUrl}}" })).toHaveLength(1);
+  });
+  it("accepts the salutation variables without turning them into fields", () => {
+    const input = { subject: "x", body: "Hallo {{addressee}}, {{#multiple}}seid{{/multiple}} {{you}} {{unsubscribeUrl}}" };
+    expect(validateTemplate("", input)).toEqual([]);
+    expect(customFields(input)).toEqual([]);
   });
   it("highlights empty fields in preview, not fields with example", () => {
     const out = renderMail({ prefix: "", subject: "{{ort}}", body: "{{#ort}}{{ort}}{{/ort}} {{wann}}" }, customPreviewVars([{ name: "ort" }, { name: "wann", example: "heute" }]));

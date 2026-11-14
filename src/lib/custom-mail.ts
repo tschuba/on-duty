@@ -36,7 +36,16 @@ export async function customRecipients(topic: string, sel: Selection = { statuse
   return mailRecipientsFor(ids, urgent ? "" : topic); // dringend: Abbestellungen gelten nicht (Thema "" wird nie abbestellt)
 }
 
-export const countSend = (rs: EventMailRecipient[]) => rs.filter((r) => r.state === "send").length;
+// Anrede wie bei Termin-Mails: Vornamen aller Mitglieder der Adresse, "dich"/"euch".
+export const salutation = (group: { firstName: string }[]) => ({
+  addressee: group.map((r) => r.firstName).join(", "), multiple: group.length > 1, you: t(group.length > 1 ? "mail.event.you.many" : "mail.event.you.one"),
+});
+
+// Personen und Mails (eine Mail je Adresse, getrimmt und kleingeschrieben).
+export const countMails = (rs: EventMailRecipient[]) => {
+  const send = rs.filter((r) => r.state === "send");
+  return { people: send.length, mails: new Set(send.map((r) => r.email.toLowerCase())).size };
+};
 
 // Startet den Versand im Hintergrund (eine Mail je Adresse). Ergebnis: Empfängerzahl oder Grund des Abbruchs.
 export async function startCustomMail(key: string, values: Record<string, string>, sel: Selection | undefined, urgent: boolean): Promise<number | "busy" | "invalid" | "none"> {
@@ -64,7 +73,7 @@ async function run(key: string, tpl: NonNullable<Awaited<ReturnType<typeof resol
     const single = group.length === 1;
     const unsubscribeUrl = urgent ? "" : linkUrl({ p: single ? "mail.optout" : "mail.optout-address", m: first.memberId, t: tpl.topic! });
     const vars: MailVars = {
-      ...values, unsubscribeUrl,
+      ...values, ...salutation(group), unsubscribeUrl,
       org: { name: env.ORG_NAME, url: env.OIDC_APP_URL, contactEmail: "" }, type: t("mail.type.custom"),
       recipient: { name: `${first.firstName} ${first.lastName}`.trim(), firstName: first.firstName, lastName: first.lastName, email: first.email },
     };

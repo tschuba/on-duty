@@ -12,7 +12,7 @@ vi.mock("../lib/mail.js", () => ({ sendMail: (o: any) => sendMail(o) }));
 vi.mock("../lib/mail-templates.js", () => ({ resolveTemplate: async () => ({ key: "plan", topic: "info" }) }));
 vi.mock("../lib/events.js", () => ({ isActiveMember: () => true, findMembersByStatus: async () => ({}) }));
 
-const { startCustomMail, isSending } = await import("../lib/custom-mail.js");
+const { startCustomMail, isSending, countMails, salutation } = await import("../lib/custom-mail.js");
 const { verifyLinkToken } = await import("../lib/links.js");
 const row = (n: number, email: string) => ({ memberId: `m${n}`, personId: `p${n}`, firstName: `F${n}`, lastName: "L", email });
 const sel = { statuses: [], roleIds: [], memberIds: [] };
@@ -37,6 +37,8 @@ describe("startCustomMail", () => {
     expect(tokenOf(shared.vars.unsubscribeUrl)).toMatchObject({ p: "mail.optout-address", t: "info" });
     expect(shared.headers).toBeUndefined();
     expect(single.vars.ort).toBe("Halle");
+    expect(single.vars).toMatchObject({ addressee: "F1", multiple: false, you: "dich" });
+    expect(shared.vars).toMatchObject({ addressee: "F2, F3", multiple: true, you: "euch" });
   });
 
   it("urgent: no link, no header", async () => {
@@ -53,5 +55,15 @@ describe("startCustomMail", () => {
     const first = startCustomMail("plan", {}, sel, false);
     expect(await startCustomMail("plan", {}, sel, false)).toBe("busy");
     await first; await settle();
+  });
+});
+
+describe("countMails", () => {
+  it("counts people and one mail per address", () => {
+    const r = (n: number, email: string, state = "send") => ({ ...row(n, email), state }) as any;
+    expect(countMails([r(1, "a@x.de"), r(2, "b@x.de"), r(3, " B@x.de".trim()), r(4, "c@x.de", "opted-out")])).toEqual({ people: 3, mails: 2 });
+  });
+  it("builds the salutation", () => {
+    expect(salutation([{ firstName: "Anna" }, { firstName: "Ben" }])).toEqual({ addressee: "Anna, Ben", multiple: true, you: "euch" });
   });
 });
