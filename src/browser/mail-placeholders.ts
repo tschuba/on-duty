@@ -4,10 +4,14 @@ type Field = HTMLInputElement | HTMLTextAreaElement;
 
 const f = $("tpl-form") as HTMLFormElement;
 const msg = document.querySelector<HTMLScriptElement>("script[data-leave]")?.dataset.leave ?? "";
+// Geändert = Formularinhalt weicht vom Ausgangsstand ab (manuelles Zurückändern gilt als unverändert).
+const snap = () => JSON.stringify([...new FormData(f)]);
+const base = snap();
 let dirty = false;
 // Fallback ohne Fokus: Text (Hauptarbeitsfläche)
 let last = f.elements.namedItem("body") as Field;
-f.addEventListener("input", () => { dirty = true; });
+f.addEventListener("input", () => { dirty = snap() !== base; });
+f.addEventListener("reset", () => { dirty = false; });
 f.addEventListener("submit", () => { dirty = false; });
 window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = msg; } });
 f.querySelectorAll<Field>("input,textarea").forEach((el) => el.addEventListener("focus", () => { last = el; }));
@@ -251,3 +255,120 @@ export function mirror(field: Field) {
   return draw;
 }
 ["subject", "body"].forEach((n) => mirror(f.elements.namedItem(n) as Field));
+
+// Autovervollständigung bei „{{“ (nur bei getipptem Zeichen; Quelle: Seitenleiste + Listen aus #ph-data).
+type Ent = { n: string; s: string; d: string; v: boolean; blk: boolean };
+const catalog = (): Ent[] => {
+  const m = new Map<string, Ent>();
+  document.querySelectorAll<HTMLElement>("#side-ph [data-ph],#side-ph [data-cond]").forEach((b) => {
+    const n = (b.dataset.ph ?? b.dataset.cond)!, li = b.closest<HTMLElement>("li");
+    const e = m.get(n) ?? { n, s: li?.dataset.s ?? n, d: li?.dataset.d ?? "", v: false, blk: false };
+    if (b.dataset.cond) e.blk = true; else e.v = true;
+    m.set(n, e);
+  });
+  info.forEach((i, n) => { if (i.l) m.set(n, { n, s: `${n} ${i.d}`, d: i.d, v: false, blk: true }); });
+  return [...m.values()];
+};
+const menu = document.createElement("ul");
+menu.id = "ac-menu"; menu.setAttribute("role", "listbox");
+menu.className = "fixed z-50 hidden max-h-60 overflow-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-lg text-sm";
+const live = document.createElement("div");
+live.className = "sr-only"; live.setAttribute("aria-live", "polite");
+document.body.append(menu, live);
+menu.addEventListener("mousedown", (e) => e.preventDefault()); // Fokus bleibt im Feld
+let acField: Field | null = null, acIdx = 0, acHits: Ent[] = [];
+const TOKEN = /\{\{([#^]?)([^{}\s]*)$/;
+const tokenAt = (x: Field) => TOKEN.exec(x.value.slice(0, x.selectionStart ?? 0));
+
+function acClose() {
+  if (!acField) return;
+  menu.classList.add("hidden");
+  for (const a of ["aria-activedescendant", "aria-controls"]) acField.removeAttribute(a);
+  acField.setAttribute("aria-expanded", "false");
+  acField = null;
+}
+function acPlace(x: Field) {
+  const fr = x.getBoundingClientRect(), wide = x instanceof HTMLTextAreaElement && md.matches;
+  let r: DOMRect = fr;
+  if (x instanceof HTMLTextAreaElement) {
+    // Cursorposition über den Spiegel (liegt direkt vor dem Feld).
+    const mi = x.previousElementSibling as HTMLElement, w = document.createTreeWalker(mi, NodeFilter.SHOW_TEXT);
+    let left = x.selectionStart ?? 0;
+    for (let n = w.nextNode() as Text | null; n; n = w.nextNode() as Text | null) {
+      if (left <= n.length) {
+        const g = document.createRange(); g.setStart(n, left); g.collapse(true);
+        const q = g.getClientRects()[0];
+        if (q && (q.width || q.height) && q.bottom > fr.top && q.top < fr.bottom) r = q; // sonst (aus dem Feld gescrollt): Feldrand
+        break;
+      }
+      left -= n.length;
+    }
+  }
+  menu.style.width = wide ? "18rem" : `${fr.width}px`;
+  menu.style.left = `${Math.max(8, Math.min(wide ? r.left : fr.left, innerWidth - (wide ? 288 : fr.width) - 8))}px`;
+  // Zu wenig Platz unter dem Feld: darüber öffnen, Höhe auf den verfügbaren Platz begrenzen.
+  menu.style.maxHeight = "";
+  const h = menu.offsetHeight, below = innerHeight - r.bottom - 12, above = r.top - 12;
+  if (h > below && above > below) {
+    const mh = Math.min(h, above);
+    menu.style.maxHeight = `${mh}px`;
+    menu.style.top = `${r.top - mh - 4}px`;
+  } else {
+    menu.style.maxHeight = `${Math.min(h, Math.max(below, 96))}px`;
+    menu.style.top = `${r.bottom + 4}px`;
+  }
+}
+function acRender(x: Field, q: string, blk: boolean) {
+  const nq = nf(q);
+  acHits = catalog().filter((e) => (blk ? e.blk : e.v) && nf(`${e.n} ${e.s}`).includes(nq));
+  acIdx = Math.min(acIdx, Math.max(acHits.length - 1, 0));
+  menu.replaceChildren(...(acHits.length ? acHits.map((e, i) => {
+    const li = document.createElement("li");
+    li.id = `ac-o${i}`; li.setAttribute("role", "option"); li.setAttribute("aria-selected", String(i === acIdx));
+    li.className = `cursor-pointer rounded-field px-2 py-1 ${i === acIdx ? "bg-primary text-primary-content" : ""}`;
+    const d = document.createElement("div"); d.textContent = e.d || e.n;
+    const c = document.createElement("div"); c.className = "font-mono text-xs opacity-70 break-all"; c.textContent = e.n;
+    li.append(d, c);
+    li.addEventListener("click", () => acAccept(x, e));
+    return li;
+  }) : [Object.assign(document.createElement("li"), { textContent: ds.acNone, className: "px-2 py-1 opacity-70" })]));
+  menu.querySelector(`#ac-o${acIdx}`)?.scrollIntoView?.({ block: "nearest" });
+  acField = x;
+  x.setAttribute("aria-expanded", "true"); x.setAttribute("aria-controls", "ac-menu");
+  if (acHits.length) x.setAttribute("aria-activedescendant", `ac-o${acIdx}`); else x.removeAttribute("aria-activedescendant");
+  menu.classList.remove("hidden");
+  acPlace(x);
+  live.textContent = acHits.length ? (ds.acCount ?? "").replace("{n}", String(acHits.length)) : ds.acNone ?? "";
+}
+function acAccept(x: Field, e: Ent) {
+  const tk = tokenAt(x);
+  if (!tk) return acClose();
+  const c = x.selectionStart ?? 0, end = x.value.startsWith("}}", c) ? c + 2 : c;
+  acClose();
+  x.setRangeText(`{{${tk[1]}${e.n}}}`, c - tk[0].length, end, "end");
+  x.focus();
+  x.dispatchEvent(new Event("input", { bubbles: true })); // kein InputEvent: löst das Menü nicht erneut aus
+}
+for (const n of ["subject", "body"]) {
+  const x = f.elements.namedItem(n) as Field;
+  x.setAttribute("role", "combobox"); x.setAttribute("aria-expanded", "false"); x.setAttribute("aria-autocomplete", "list");
+  x.addEventListener("input", (e) => {
+    const tk = tokenAt(x);
+    const typed = e instanceof InputEvent && e.inputType === "insertText";
+    if (!tk || (acField !== x && !typed)) { if (acField === x) acClose(); return; }
+    if (acField !== x) { acIdx = 0; acClose(); }
+    acRender(x, tk[2], tk[1] !== "");
+  });
+  x.addEventListener("keydown", ((e: KeyboardEvent) => {
+    if (acField !== x) return;
+    const k = e.key;
+    if (k === "Escape") { e.preventDefault(); e.stopPropagation(); acClose(); }
+    else if ((k === "ArrowDown" || k === "ArrowUp") && acHits.length) {
+      e.preventDefault();
+      acIdx = (acIdx + (k === "ArrowDown" ? 1 : acHits.length - 1)) % acHits.length;
+      const t = tokenAt(x)!; acRender(x, t[2], t[1] !== "");
+    } else if ((k === "Enter" || k === "Tab") && acHits.length) { e.preventDefault(); acAccept(x, acHits[acIdx]); }
+  }) as EventListener);
+  x.addEventListener("click", acClose);
+  x.addEventListener("blur", acClose);
+}

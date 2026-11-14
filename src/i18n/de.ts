@@ -897,6 +897,8 @@ export const de = {
   "mailTemplates.placeholders": "Platzhalter",
   "mailTemplates.search": "Platzhalter suchen",
   "mailTemplates.search.empty": "Keine Platzhalter gefunden.",
+  "mailTemplates.ac.count": "{n} Platzhalter verfügbar",
+  "mailTemplates.ac.none": "Keine Platzhalter gefunden",
   "mailTemplates.optional": "optional",
   "mailTemplates.tip.onlyIf": "Nur wenn vorhanden",
   "mailTemplates.tip.end": "Ende des Blocks",

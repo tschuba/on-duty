@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const DOM = `<script data-leave="Verlassen?" data-tip-if="Nur wenn vorhanden" data-tip-end="Ende des Blocks"></script>
+const DOM = `<script data-leave="Verlassen?" data-tip-if="Nur wenn vorhanden" data-tip-end="Ende des Blocks" data-ac-count="{n} Treffer" data-ac-none="Keine"></script>
 <form id="tpl-form"><input name="subject"><textarea name="body"></textarea></form>
 <button id="ph-toggle"></button><button id="ph-close"></button><div id="ph-backdrop"></div><div id="ph-resize"></div>
 <div id="pane-edit"></div>
@@ -113,8 +113,15 @@ describe("mail placeholders editor", () => {
   it("warns on leave only when dirty", () => {
     const ev = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e; };
     expect(ev().defaultPrevented).toBe(false);
+    const body = document.querySelector<HTMLTextAreaElement>("[name=body]")!, orig = body.value;
+    body.value = orig + "x";
     $("tpl-form").dispatchEvent(new Event("input"));
     expect(ev().defaultPrevented).toBe(true);
+    body.value = orig; // manuell zurück zum Original
+    $("tpl-form").dispatchEvent(new Event("input"));
+    expect(ev().defaultPrevented).toBe(false);
+    body.value = orig + "x";
+    $("tpl-form").dispatchEvent(new Event("input"));
     $("tpl-form").dispatchEvent(new Event("submit"));
     expect(ev().defaultPrevented).toBe(false);
   });
@@ -147,5 +154,45 @@ describe("placeholder highlight mirror", () => {
     a.dispatchEvent(new Event("input"));
     expect(mir().style.height).toBe("321px");
     expect(mir().style.width).toBe("402px"); // clientWidth + Border
+  });
+  describe("autocomplete", () => {
+    const menu = () => document.getElementById("ac-menu")!;
+    const opts = () => [...menu().querySelectorAll("[role=option]")].map((o) => o.querySelector(".font-mono")!.textContent);
+    const typeCh = (a: HTMLTextAreaElement, ch: string) => {
+      const p = a.selectionStart!; a.value = a.value.slice(0, p) + ch + a.value.slice(a.selectionEnd!); a.setSelectionRange(p + 1, p + 1);
+      a.dispatchEvent(new InputEvent("input", { inputType: "insertText", data: ch }));
+    };
+    const key = (a: HTMLElement, k: string) => { const e = new KeyboardEvent("keydown", { key: k, cancelable: true }); a.dispatchEvent(e); return e; };
+    it("opens on typed {{, filters, block mode, ARIA, live region", () => {
+      const a = area(); a.focus();
+      typeCh(a, "{"); expect(menu().classList.contains("hidden")).toBe(true);
+      typeCh(a, "{");
+      expect(menu().classList.contains("hidden")).toBe(false);
+      expect(opts()).toEqual(["a.cafe", "l[].nm", "a.name"]);
+      expect(a.getAttribute("role")).toBe("combobox"); expect(a.getAttribute("aria-expanded")).toBe("true");
+      expect(a.getAttribute("aria-controls")).toBe("ac-menu"); expect(a.getAttribute("aria-activedescendant")).toBe("ac-o0");
+      expect(menu().getAttribute("role")).toBe("listbox");
+      expect(document.querySelector("[aria-live=polite]")!.textContent).toBe("3 Treffer");
+      typeCh(a, "n"); expect(opts()).toEqual(["l[].nm", "a.name"]);
+      a.value = ""; typeCh(a, "{"); typeCh(a, "{"); typeCh(a, "#");
+      expect(opts()).toEqual(["a.name", "lst"]); // nur Blockfähiges
+    });
+    it("keys: arrows + Enter accept, no doubled }}, Esc closes, Enter without menu is untouched", () => {
+      const a = area(); a.focus();
+      a.value = "x}}"; a.setSelectionRange(1, 1); typeCh(a, "{"); typeCh(a, "{");
+      key(a, "ArrowDown"); expect(a.getAttribute("aria-activedescendant")).toBe("ac-o1");
+      expect(key(a, "Enter").defaultPrevented).toBe(true);
+      expect(a.value).toBe("x{{l[].nm}}"); expect(menu().classList.contains("hidden")).toBe(true);
+      expect(key(a, "Enter").defaultPrevented).toBe(false);
+      a.value = ""; typeCh(a, "{"); typeCh(a, "{"); typeCh(a, "a"); key(a, "Tab"); expect(a.value).toBe("{{a.cafe}}");
+      a.value = ""; typeCh(a, "{"); typeCh(a, "{"); key(a, "Escape"); expect(a.value).toBe("{{"); expect(menu().classList.contains("hidden")).toBe(true);
+      typeCh(a, "a"); expect(menu().classList.contains("hidden")).toBe(false); // weiter tippen öffnet erneut
+    });
+    it("does not open on programmatic input or insert click", () => {
+      const a = area(); a.value = "{{"; a.setSelectionRange(2, 2); a.dispatchEvent(new Event("input"));
+      expect(menu().classList.contains("hidden")).toBe(true);
+      document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
+      expect(menu().classList.contains("hidden")).toBe(true);
+    });
   });
 });
