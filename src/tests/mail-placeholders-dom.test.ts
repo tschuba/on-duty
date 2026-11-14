@@ -113,8 +113,15 @@ describe("mail placeholders editor", () => {
   it("warns on leave only when dirty", () => {
     const ev = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e; };
     expect(ev().defaultPrevented).toBe(false);
+    const body = document.querySelector<HTMLTextAreaElement>("[name=body]")!, orig = body.value;
+    body.value = orig + "x";
     $("tpl-form").dispatchEvent(new Event("input"));
     expect(ev().defaultPrevented).toBe(true);
+    body.value = orig; // manuell zurück zum Original
+    $("tpl-form").dispatchEvent(new Event("input"));
+    expect(ev().defaultPrevented).toBe(false);
+    body.value = orig + "x";
+    $("tpl-form").dispatchEvent(new Event("input"));
     $("tpl-form").dispatchEvent(new Event("submit"));
     expect(ev().defaultPrevented).toBe(false);
   });
@@ -179,6 +186,7 @@ describe("placeholder highlight mirror", () => {
       expect(key(a, "Enter").defaultPrevented).toBe(false);
       a.value = ""; typeCh(a, "{"); typeCh(a, "{"); typeCh(a, "a"); key(a, "Tab"); expect(a.value).toBe("{{a.cafe}}");
       a.value = ""; typeCh(a, "{"); typeCh(a, "{"); key(a, "Escape"); expect(a.value).toBe("{{"); expect(menu().classList.contains("hidden")).toBe(true);
+      typeCh(a, "a"); expect(menu().classList.contains("hidden")).toBe(false); // weiter tippen öffnet erneut
     });
     it("does not open on programmatic input or insert click", () => {
       const a = area(); a.value = "{{"; a.setSelectionRange(2, 2); a.dispatchEvent(new Event("input"));

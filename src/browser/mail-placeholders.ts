@@ -4,10 +4,14 @@ type Field = HTMLInputElement | HTMLTextAreaElement;
 
 const f = $("tpl-form") as HTMLFormElement;
 const msg = document.querySelector<HTMLScriptElement>("script[data-leave]")?.dataset.leave ?? "";
+// Geändert = Formularinhalt weicht vom Ausgangsstand ab (manuelles Zurückändern gilt als unverändert).
+const snap = () => JSON.stringify([...new FormData(f)]);
+const base = snap();
 let dirty = false;
 // Fallback ohne Fokus: Text (Hauptarbeitsfläche)
 let last = f.elements.namedItem("body") as Field;
-f.addEventListener("input", () => { dirty = true; });
+f.addEventListener("input", () => { dirty = snap() !== base; });
+f.addEventListener("reset", () => { dirty = false; });
 f.addEventListener("submit", () => { dirty = false; });
 window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = msg; } });
 f.querySelectorAll<Field>("input,textarea").forEach((el) => el.addEventListener("focus", () => { last = el; }));
@@ -286,7 +290,7 @@ function acClose() {
 function acPlace(x: Field) {
   const fr = x.getBoundingClientRect(), wide = x instanceof HTMLTextAreaElement && md.matches;
   let r: DOMRect = fr;
-  if (wide) {
+  if (x instanceof HTMLTextAreaElement) {
     // Cursorposition über den Spiegel (liegt direkt vor dem Feld).
     const mi = x.previousElementSibling as HTMLElement, w = document.createTreeWalker(mi, NodeFilter.SHOW_TEXT);
     let left = x.selectionStart ?? 0;
@@ -294,7 +298,7 @@ function acPlace(x: Field) {
       if (left <= n.length) {
         const g = document.createRange(); g.setStart(n, left); g.collapse(true);
         const q = g.getClientRects()[0];
-        if (q && (q.width || q.height)) r = q;
+        if (q && (q.width || q.height) && q.bottom > fr.top && q.top < fr.bottom) r = q; // sonst (aus dem Feld gescrollt): Feldrand
         break;
       }
       left -= n.length;
@@ -302,7 +306,17 @@ function acPlace(x: Field) {
   }
   menu.style.width = wide ? "18rem" : `${fr.width}px`;
   menu.style.left = `${Math.max(8, Math.min(wide ? r.left : fr.left, innerWidth - (wide ? 288 : fr.width) - 8))}px`;
-  menu.style.top = `${(wide ? r.bottom : fr.bottom) + 4}px`;
+  // Zu wenig Platz unter dem Feld: darüber öffnen, Höhe auf den verfügbaren Platz begrenzen.
+  menu.style.maxHeight = "";
+  const h = menu.offsetHeight, below = innerHeight - r.bottom - 12, above = r.top - 12;
+  if (h > below && above > below) {
+    const mh = Math.min(h, above);
+    menu.style.maxHeight = `${mh}px`;
+    menu.style.top = `${r.top - mh - 4}px`;
+  } else {
+    menu.style.maxHeight = `${Math.min(h, Math.max(below, 96))}px`;
+    menu.style.top = `${r.bottom + 4}px`;
+  }
 }
 function acRender(x: Field, q: string, blk: boolean) {
   const nq = nf(q);
@@ -341,7 +355,7 @@ for (const n of ["subject", "body"]) {
   x.addEventListener("input", (e) => {
     const tk = tokenAt(x);
     const typed = e instanceof InputEvent && e.inputType === "insertText";
-    if (!tk || (acField !== x && !(typed && !tk[2]))) { if (acField === x) acClose(); return; }
+    if (!tk || (acField !== x && !typed)) { if (acField === x) acClose(); return; }
     if (acField !== x) { acIdx = 0; acClose(); }
     acRender(x, tk[2], tk[1] !== "");
   });

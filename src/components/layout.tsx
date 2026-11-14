@@ -176,8 +176,14 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         }
         // Verwerfen-Button nur bei ungespeicherten Änderungen zeigen
         const toggleDiscard = (f, show) => f && f.id && document.querySelectorAll('[data-discard="' + f.id + '"]').forEach(b => b.classList.toggle("hidden", !show));
-        document.addEventListener("input", (e) => toggleDiscard(e.target.form, true));
-        document.addEventListener("change", (e) => toggleDiscard(e.target.form, true));
+        // Geändert = ein Feld weicht vom Ausgangswert (defaultValue/defaultChecked) ab; manuelles Zurücksetzen gilt als unverändert
+        const isDirty = (f) => [...f.elements].some(el =>
+          el.type === "checkbox" || el.type === "radio" ? el.checked !== el.defaultChecked
+          : el.tagName === "SELECT" ? [...el.options].some(o => o.selected !== o.defaultSelected)
+          : el.type !== "file" && "defaultValue" in el && el.value !== el.defaultValue);
+        const syncDiscard = (e) => { const f = e.target.form; if (f) toggleDiscard(f, isDirty(f)); };
+        document.addEventListener("input", syncDiscard);
+        document.addEventListener("change", syncDiscard);
         document.addEventListener("reset", (e) => toggleDiscard(e.target, false));
         // Höhe der Filterleiste als --filter-h (Monatszeile klebt darunter); sie bricht je nach Breite/Inhalt um
         const filterRO = new ResizeObserver(([en]) => document.documentElement.style.setProperty("--filter-h", en.target.offsetHeight + "px"));
