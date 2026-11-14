@@ -556,7 +556,7 @@ mailTemplateRoutes.post("/:key/send", async (c) => {
   const fail = (msg: string, status: number) => sendForm(c, tpl, values, sel, [msg], status);
   if (Object.values(values).some((v) => !v)) return fail(t("mailTemplates.send.missing"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (!isSmtpConfigured()) return fail(t("mailTemplates.send.noSmtp"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
-  const res = await startCustomMail(tpl.key, values, sel, !!tpl.custom.meta.urgent);
+  const res = await startCustomMail(tpl.key, values, sel, !!tpl.custom!.meta.urgent);
   if (res === "busy") return fail(t("mailTemplates.send.busy"), HTTP_STATUS.CONFLICT);
   if (res === "invalid") return fail(t("mailTemplates.send.invalid"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
   if (res === "none") return fail(t("mailTemplates.send.noRecipients"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
