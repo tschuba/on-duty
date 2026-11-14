@@ -596,6 +596,13 @@
       "when": 1794607813240,
       "tag": "0084_event_info_mail_template",
       "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1794646966454,
+      "tag": "0085_big_blacklash",
+      "breakpoints": true
     }
   ]
 }

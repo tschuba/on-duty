@@ -24,14 +24,14 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Administrator",
     description: "Benutzerverwaltung, Systemkonfiguration und Antragsformulare",
     isProtected: true,
-    permissions: ["system:admin", "applications:manage-forms", "import:run", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete", "events:manage"],
+    permissions: ["system:admin", "applications:manage", "import:run", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete", "events:manage"],
   },
   {
     id: "2f8e1d4c-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
     name: "Bearbeiter",
     description: "Kann Mitglieder, Spenden und Anträge bearbeiten sowie Stammdaten pflegen",
     isProtected: true,
-    permissions: ["members:read", "members:write", "donations:read", "donations:record", "applications:read", "applications:record", "applications:manage-forms", "org:write", "member-roles:read", "member-roles:write", "member-role-types:read", "anniversary-years:read", "anniversary-years:write"],
+    permissions: ["members:read", "members:write", "donations:read", "donations:record", "applications:read", "applications:record", "applications:manage", "org:write", "member-roles:read", "member-roles:write", "member-role-types:read", "anniversary-years:read", "anniversary-years:write"],
   },
   {
     id: "7c3d5e6f-8a9b-4c1d-8e2f-3a4b5c6d7e8f",
@@ -45,7 +45,7 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Vorstand",
     description: "Kann Spenden erfassen, Zuwendungsbestätigungen ausstellen und Anträge prüfen",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage-forms", "inventory:read", "inventory:manage", "inventory:configure", "inventory:inspect", "inventory:inspection:delete", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "member-roles:read", "member-role-types:read", "anniversary-years:read"],
+    permissions: ["members:read", "members:write", "members:delete", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage", "inventory:read", "inventory:manage", "inventory:configure", "inventory:inspect", "inventory:inspection:delete", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "member-roles:read", "member-role-types:read", "anniversary-years:read"],
   },
   {
     id: "5d3e7f90-1b2c-4d5e-8f60-7a8b9c0d1e2f",

@@ -161,7 +161,7 @@ applicationRoutes.get("/", guard, async (c) => {
   const rows = sortApplications((await fetchApplications()).filter((a) => statusFilter.includes(a.status) && inRange(a)), sort, dir);
   const presets = rangePresets(todayStr(), "past");
   const forms = await loadApplicationForms();
-  const canManageForms = user.permissions.has("applications:manage-forms");
+  const canManageForms = user.permissions.has("applications:manage");
 
   function filterUrl(next: ApplicationStatus[]) {
     return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, ...rp }, { status: next });
@@ -632,7 +632,7 @@ applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
 
 // POST /applications/forms/:type — de-/activate a public application form,
 // gated by its own permission (separate from applications:review).
-applicationRoutes.post("/forms/:type", requireAuth("applications:manage-forms"), async (c) => {
+applicationRoutes.post("/forms/:type", requireAuth("applications:manage"), async (c) => {
   const type = c.req.param("type");
   if (type !== "membership" && type !== "youth") return c.notFound();
 

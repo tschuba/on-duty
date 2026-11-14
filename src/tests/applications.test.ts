@@ -147,7 +147,7 @@ describe("GET /", () => {
     expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
   });
 
-  it("shows each form's status but hides the settings gear without applications:manage-forms", async () => {
+  it("shows each form's status but hides the settings gear without applications:manage", async () => {
     applicationFormsFixture.membership = { type: "membership", isActive: false, startDate: null, endDate: "2026-09-01" };
     const res = await applicationRoutes.request("/");
     const html = await res.text();
@@ -162,8 +162,8 @@ describe("GET /", () => {
     expect(html).toContain('class="flex items-center gap-1 text-success"');
   });
 
-  it("shows the settings gear and modal for a user with applications:manage-forms", async () => {
-    currentUser.permissions = new Set(["applications:read", "applications:record", "applications:review", "applications:manage-forms"]);
+  it("shows the settings gear and modal for a user with applications:manage", async () => {
+    currentUser.permissions = new Set(["applications:read", "applications:record", "applications:review", "applications:manage"]);
     const res = await applicationRoutes.request("/");
     const html = await res.text();
     expect(html).toContain('id="form-settings-membership"');

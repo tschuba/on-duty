@@ -15,7 +15,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "applications:read": t("admin.permissions.key.applicationsRead"),
   "applications:record": t("admin.permissions.key.applicationsRecord"),
   "applications:review": t("admin.permissions.key.applicationsReview"),
-  "applications:manage-forms": t("admin.permissions.key.applicationsManageForms"),
+  "applications:manage": t("admin.permissions.key.applicationsManage"),
   "inventory:read": t("admin.permissions.key.inventoryRead"),
   "inventory:manage": t("admin.permissions.key.inventoryManage"),
   "inventory:configure": t("admin.permissions.key.inventoryConfigure"),

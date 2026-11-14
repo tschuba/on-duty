@@ -407,7 +407,7 @@ export const de = {
   "admin.permissions.key.applicationsRead": "Anträge einsehen",
   "admin.permissions.key.applicationsRecord": "Anträge bearbeiten",
   "admin.permissions.key.applicationsReview": "Anträge prüfen",
-  "admin.permissions.key.applicationsManageForms": "Formulare de-/aktivieren",
+  "admin.permissions.key.applicationsManage": "Antragswesen konfigurieren",
   "admin.permissions.key.inventoryRead": "Inventar ansehen",
   "admin.permissions.key.inventoryManage": "Inventar verwalten",
   "admin.permissions.key.inventoryConfigure": "Inventarfelder konfigurieren",
