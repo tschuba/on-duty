@@ -898,6 +898,8 @@ export const de = {
   "mailTemplates.search": "Platzhalter suchen",
   "mailTemplates.search.empty": "Keine Platzhalter gefunden.",
   "mailTemplates.optional": "optional",
+  "mailTemplates.tip.onlyIf": "Nur wenn vorhanden",
+  "mailTemplates.tip.end": "Ende des Blocks",
   "mailTemplates.insertDirect": "Direkt einfügen",
   "mailTemplates.onlyIfPresent": "Text nur wenn vorhanden",
   "mailTemplates.onlyIfPresent.tip": "Der Text erscheint nur, wenn der Wert angegeben ist. Markierter Text wird dafür verwendet.",

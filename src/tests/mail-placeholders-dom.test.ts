@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const DOM = `<script data-leave="Verlassen?"></script>
+const DOM = `<script data-leave="Verlassen?" data-tip-if="Nur wenn vorhanden" data-tip-end="Ende des Blocks"></script>
 <form id="tpl-form"><input name="subject"><textarea name="body"></textarea></form>
 <button id="ph-toggle"></button><button id="ph-close"></button><div id="ph-backdrop"></div><div id="ph-resize"></div>
 <div id="pane-edit"></div>
 <div id="ph-col"><input id="ph-search">
 <button data-side="ph" class="tab-active"></button><button data-side="tech"></button>
-<div id="side-ph"><section data-g><ul>
-<li data-s="Café"><button data-ph="a.cafe"></button></li><li data-s="Name"><button data-ph="a.name"></button></li></ul></section>
+<script id="ph-data" type="application/json">[{"name":"lst","desc":"Liste","example":"","type":"list"}]</script><div id="side-ph"><section data-g><ul>
+<li data-s="Café"><button data-ph="a.cafe"></button></li><li data-k="l[].nm" data-d="Listenname" data-e="Anna"><button data-ph="l[].nm"></button></li><li data-s="Name" data-k="a.name" data-d="Name" data-e="Max"><button data-ph="a.name"></button></li></ul></section>
 <button data-cond="a.name"></button></div><div id="side-tech" class="hidden"></div><p id="ph-empty" class="hidden"></p></div>
 <input type="radio" name="t" data-tab="edit" checked><input type="radio" name="t" data-tab="entry" class="tab"><input type="radio" name="t" data-tab="preview" data-case class="hidden">`;
 
@@ -29,6 +29,22 @@ beforeEach(async () => {
 });
 
 describe("mail placeholders editor", () => {
+  it("shows tooltip for caret in token; none for unknown, closes on Esc", () => {
+    vi.useFakeTimers();
+    const a = area(), tip = () => document.getElementById("ph-tip")!;
+    a.focus(); a.value = "x{{a.name}}{{#a.name}}{{/a.name}}{{zz}}";
+    a.dispatchEvent(new Event("input"));
+    const at = (p: number) => { a.setSelectionRange(p, p); a.dispatchEvent(new Event("keyup")); vi.advanceTimersByTime(500); };
+    at(4); expect(tip().textContent).toBe("NameMax"); expect(tip().getAttribute("role")).toBe("tooltip"); expect(a.getAttribute("aria-describedby")).toBe("ph-tip");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); expect(tip().classList.contains("hidden")).toBe(true);
+    at(14); expect(tip().textContent).toBe("Nur wenn vorhanden: Name");
+    at(24); expect(tip().textContent).toBe("Ende des Blocks");
+    at(38); expect(tip().classList.contains("hidden")).toBe(true);
+    a.value = "{{nm}}"; a.dispatchEvent(new Event("input")); at(3); expect(tip().textContent).toBe("ListennameAnna"); // Platzhalter innerhalb einer Liste
+    a.value = "{{#lst}}"; a.dispatchEvent(new Event("input")); at(4); expect(tip().textContent).toBe("Liste"); // Listen-Block: nur Erklärung
+    a.value = "{{& a.name }}"; a.dispatchEvent(new Event("input")); at(5); expect(tip().textContent).toBe("NameMax"); // unescaped + Leerzeichen
+    vi.useRealTimers();
+  });
   it("inserts placeholders and conditional blocks", () => {
     document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
     expect(area().value).toBe("{{a.name}}");
