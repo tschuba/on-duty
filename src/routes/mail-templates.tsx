@@ -61,7 +61,8 @@ const stamp = (u: { updatedAt: Date; updatedBy: string | null }) => ({
 mailTemplateRoutes.get("/", async (c) => {
   const user = c.get("user");
   const q = (c.req.query("q") ?? "").trim();
-  const all = await editable(user);
+  const cat = c.req.query("category") ?? "";
+  const all = (await editable(user)).filter((x) => !cat || (x.custom ? "custom" : CATALOG[x.key].category) === cat);
   // Suche in Name, Beschreibung, Betreff und aktuellem Text (Override vor System)
   const hay = (x: TemplateView) => [x.custom?.meta.name ?? CATALOG[x.key].name, x.custom?.meta.description ?? CATALOG[x.key].description, (x.override ?? x.system).subject, (x.override ?? x.system).body].join("\n").toLowerCase();
   const list = q ? all.filter((x) => hay(x).includes(q.toLowerCase())) : all;
@@ -74,6 +75,7 @@ mailTemplateRoutes.get("/", async (c) => {
         <PageHeader title={t("mailTemplates.title")} actions={mayCreate(user) && <HeaderAction variant="primary" icon="plus" label={t("mailTemplates.new")} href="/mail/templates/new" class="btn-primary" />} />
         {all.length > 0 && (
           <form method="get" role="search" class="mb-4">
+            {cat && <input type="hidden" name="category" value={cat} />}
             <input type="search" name="q" value={q} class="input w-full" placeholder={t("mailTemplates.searchTemplates")} aria-label={t("mailTemplates.searchTemplates")} autocomplete="off" />
           </form>
         )}
