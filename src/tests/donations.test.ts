@@ -161,6 +161,19 @@ describe("GET /", () => {
     expect(html).not.toContain("50,50");
   });
 
+  it("stats follow the search and receipt filters", async () => {
+    donationsFindManyResult = [
+      makeDonation({ amount: "111.00" }),
+      makeDonation({ id: "don2", amount: "222.00", receiptStatus: "issued", donor: { id: "d2", person: { id: "p2", firstName: "Karl", lastName: "Meier" } } }),
+    ];
+    const bySearch = await (await donationRoutes.request("/?search=Meier")).text();
+    expect(bySearch).toContain("222,00");
+    expect(bySearch).not.toContain("111,00");
+    const byReceipt = await (await donationRoutes.request("/?receipt=open")).text();
+    expect(byReceipt).toContain("111,00");
+    expect(byReceipt).not.toContain("222,00");
+  });
+
   it("never shows a receipt link or actions column in the list", async () => {
     completeOrgConfig();
     donationsFindManyResult = [makeDonation()];
