@@ -152,6 +152,15 @@ describe("GET /", () => {
     expect(html).toContain("100,00");
   });
 
+  it("renders stats over the filtered set, with toggle and open-receipts link", async () => {
+    donationsFindManyResult = [makeDonation({ date: "2026-03-01" }), makeDonation({ id: "don2", amount: "50.50", date: "2025-03-01" })];
+    const html = await (await donationRoutes.request("/?from=2026-01-01&to=2026-12-31")).text();
+    expect(html).toContain('id="donations-stats"');
+    expect(html).toContain('id="donations-stats-toggle"');
+    expect(html).toContain("receipt=open");
+    expect(html).not.toContain("50,50");
+  });
+
   it("never shows a receipt link or actions column in the list", async () => {
     completeOrgConfig();
     donationsFindManyResult = [makeDonation()];

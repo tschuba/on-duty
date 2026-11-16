@@ -1,6 +1,6 @@
 import { sortDonations } from "../routes/donations.js";
 import { describe, it, expect } from "vitest";
-import { nextReceiptStatus, recipientName } from "../lib/donations.js";
+import { nextReceiptStatus, recipientName, summarizeDonations } from "../lib/donations.js";
 
 describe("nextReceiptStatus", () => {
   it("allows the specified transitions only", () => {
@@ -34,4 +34,20 @@ describe("sortDonations", () => {
     expect(ids(sortDonations(list, "amount", "asc"))).toBe("3,2,1");
   });
   it("sorts by donor", () => expect(ids(sortDonations(list, "donor", "asc"))).toBe("3,2,1"));
+});
+
+describe("summarizeDonations", () => {
+  const mk = (amount: string, date: string, donorId: string, type: string | null = "cash", receiptStatus = "open") => ({ amount, date, donorId, type, receiptStatus });
+  it("handles an empty list", () => {
+    const s = summarizeDonations([]);
+    expect(s).toMatchObject({ count: 0, cents: 0, averageCents: 0, donors: 0, years: [] });
+  });
+  it("sums in cents without float drift", () => expect(summarizeDonations([mk("0.10", "2026-01-01", "a"), mk("0.20", "2026-01-02", "a")]).cents).toBe(30));
+  it("counts distinct donors, averages, and groups by year", () => {
+    const s = summarizeDonations([mk("10", "2025-05-01", "a"), mk("20", "2026-01-01", "a", "transfer", "issued"), mk("30", "2026-02-01", "b", null)]);
+    expect(s.donors).toBe(2);
+    expect(s.averageCents).toBe(2000);
+    expect(s.open).toEqual({ count: 2, cents: 4000 });
+    expect(s.years.map((y) => [y.year, y.count, y.cents, y.cashCents, y.transferCents])).toEqual([["2026", 2, 5000, 0, 2000], ["2025", 1, 1000, 1000, 0]]);
+  });
 });
