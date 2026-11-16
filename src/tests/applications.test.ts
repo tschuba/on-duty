@@ -131,6 +131,12 @@ describe("GET /", () => {
     for (const h of hrefs) expect(h).toContain("range=rel&rel=P3M&dir=past");
   });
 
+  it("offers the all-time preset and shows it as the default range", async () => {
+    const html = await (await applicationRoutes.request("/")).text();
+    expect(html).toContain("range=all");
+    expect(html).toContain("Gesamter Zeitraum");
+  });
+
   it("renders status toggles; the last active one is disabled", async () => {
     const html = await (await applicationRoutes.request("/")).text();
     const inputs = html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g)!;
