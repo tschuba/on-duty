@@ -148,6 +148,26 @@ describe("mail template routes", () => {
     expect(html).toContain('data-missing="optOutUrl"');
   });
 
+  it("editor GET and 422 render the checklist; free templates include opt-out unless urgent", async () => {
+    const page = await (await mailTemplateRoutes.request("/event-created")).text();
+    expect(page).not.toContain('id="req-btn"'); // Fixture vollständig: kein Button
+    const bad = await post("/event-created", { subject: "x", body: "hi", updatedAt: "" });
+    expect(bad.status).toBe(422);
+    const badHtml = await bad.text();
+    expect(badHtml).toContain('id="req-btn"');
+    expect(badHtml).toContain('data-missing="1"');
+  });
+
+  it("part=checklist returns only the checklist fragment", async () => {
+    let html = await (await post("/event-created/preview", { subject: "S", body: "x", part: "checklist" })).text();
+    expect(html).toContain('id="req-wrap"');
+    expect(html).toContain("fehlt");
+    expect(html).not.toContain("alert-error");
+    html = await (await post("/event-created/preview", { subject: "S", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}", part: "checklist" })).text();
+    expect(html).toContain("vollständig");
+    expect(html).not.toContain("req-btn");
+  });
+
   it("preview never touches the db and subject equals the send subject", async () => {
     const { CATALOG, previewVars, renderMail } = await import("../lib/mail-templates.js");
     const row = { prefix: "[{{org.name}}]", subject: "{{event.title}}", body: "x" };
@@ -192,6 +212,12 @@ describe("mail template routes", () => {
 });
 
 describe("custom template routes", () => {
+  it("checklist for free templates: opt-out unless urgent", async () => {
+    perms = new Set(["mail:templates", "system:admin"]);
+    const chk = async (o: Record<string, string>) => (await post("/new/preview", { subject: "S", body: "x", part: "checklist", ...o })).text();
+    expect(await chk({})).toContain("Abmelde-Link");
+    expect(await chk({ urgent: "1" })).not.toContain("req-btn");
+  });
   it("/new is not swallowed by /:key; 403 without mail:templates", async () => {
     expect((await mailTemplateRoutes.request("/new")).status).toBe(403);
     perms = new Set(["mail:templates"]);

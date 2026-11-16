@@ -311,10 +311,11 @@ export const customVars = (fields: { name: string; label?: string; example?: str
 // treffpunkt_uhrzeit → „Treffpunkt uhrzeit“
 export const fieldLabel = (n: string) => { const s = n.replace(/_/g, " "); return s[0].toUpperCase() + s.slice(1); };
 
-export function validateTemplate(key: string, input: TemplateInput): string[] {
+function analyze(key: string, input: TemplateInput) {
   const entry = CATALOG[key]; // kein Eintrag = freie Vorlage: unbekannte Variablen erlaubt (werden Felder)
   const errors: string[] = [];
   const seen = new Set<string>();
+  let parseFailed = false;
   const isRoot = (n: string) => !!entry?.vars[n] && !n.includes("[]");
   const walk = (tokens: Token[], list: string | null, field: string, text: string) => {
     for (const tok of tokens) {
@@ -334,16 +335,13 @@ export function validateTemplate(key: string, input: TemplateInput): string[] {
   };
   for (const [field, text] of [["prefix", input.prefix ?? ""], ["subject", input.subject], ["body", input.body]] as const) {
     try { walk(Mustache.parse(text) as Token[], null, field, text); } catch (err) {
+      parseFailed = true;
       const m = /^(.*) at (\d+)$/.exec((err as Error).message);
       const unclosed = m && /^Unclosed section "(.*)"$/.exec(m[1]);
       errors.push(`${field}: ${m ? `Zeile ${lineOf(text, Number(m[2]))}: ${unclosed ? `Block „${unclosed[1]}“ ist nicht geschlossen` : m[1]}` : (err as Error).message}`);
     }
   }
-  if (!entry && !input.urgent && !seen.has("unsubscribeUrl")) errors.push("Pflichtplatzhalter „Abmelde-Link“ fehlt (außer bei dringenden Mitteilungen)");
-  for (const r of entry?.required ?? []) {
-    if (!seen.has(r.list ? `${r.list}[].${r.name}` : r.name)) errors.push(`Pflichtplatzhalter „${r.label}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}`);
-  }
-  return errors;
+  return { errors, seen, incomplete: parseFailed };
 }
 
 // ---- Auflösen und Rendern -------------------------------------------------
@@ -418,3 +416,23 @@ export const exampleVars = (key: string) => {
   for (const [k, v] of Object.entries(CATALOG[key].vars)) flat[k] = v.example;
   return flat;
 };
+
+export interface RequiredItem { name: string; label: string; ok: boolean; list?: string; custom?: boolean }
+// Einzige Quelle für den Pflichtplatzhalter-Status (Meldungen, Checkliste, data-missing).
+// incomplete: Parserfehler, seen ist unvollständig.
+export function requiredStatus(key: string, input: TemplateInput): { items: RequiredItem[]; incomplete: boolean } {
+  const { seen, incomplete } = analyze(key, input);
+  const entry = CATALOG[key];
+  const items: RequiredItem[] = entry
+    ? entry.required.map((r) => ({ name: r.name, label: r.label, list: r.list, ok: seen.has(r.list ? `${r.list}[].${r.name}` : r.name) }))
+    : input.urgent ? [] : [{ name: "unsubscribeUrl", label: t("mailTemplates.required.optOutUrl"), custom: true, ok: seen.has("unsubscribeUrl") }];
+  return { items, incomplete };
+}
+
+export function validateTemplate(key: string, input: TemplateInput): string[] {
+  const { errors } = analyze(key, input);
+  for (const r of requiredStatus(key, input).items) {
+    if (!r.ok) errors.push(`Pflichtplatzhalter „${r.label}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}${r.custom ? " (außer bei dringenden Mitteilungen)" : ""}`);
+  }
+  return errors;
+}

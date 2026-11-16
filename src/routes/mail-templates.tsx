@@ -9,7 +9,7 @@ import { HTTP_STATUS } from "../lib/constants.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDateTime, formatDay, resolveLocale, resolveTimezone } from "../lib/datetime.js";
 import { env } from "../env.js";
-import { CATALOG, customFields, customPreviewVars, customVars, fieldLabel, mayEdit, previewVars, renderMail, validateTemplate, type VarSpec } from "../lib/mail-templates.js";
+import { CATALOG, customFields, customPreviewVars, customVars, fieldLabel, mayEdit, previewVars, renderMail, requiredStatus, validateTemplate, type VarSpec } from "../lib/mail-templates.js";
 import { createCustom, deleteCustom, keyTaken, listTemplates, listTopics, resetOverride, saveCustom, saveOverride, type CustomInput, type TemplateView } from "../lib/mail-template-store.js";
 import { parseHeaders } from "../lib/mail-headers.js";
 import { SLUG_RE } from "../lib/slug.js";
@@ -162,6 +162,33 @@ const HeaderRow = ({ n, v }: { n: string; v: string }) => (
 );
 const AUDIENCES = ["member", "staff", "applicant"];
 
+// Pflichtplatzhalter-Checkliste der Editorleiste; #req-wrap wird per HTMX (outerHTML) ersetzt, der Live-Text per OOB in #req-live.
+const liveText = (n: number, incomplete: boolean) => incomplete ? t("mailTemplates.req.syntax") : n ? t("mailTemplates.req.missingCount", { count: n }) : t("mailTemplates.req.complete");
+function RequiredChecklist({ status, oob }: { status: ReturnType<typeof requiredStatus>; oob?: boolean }) {
+  const { items, incomplete } = status;
+  const missing = incomplete ? 0 : items.filter((i) => !i.ok).length;
+  const live = <span id="req-live" class="sr-only" aria-live="polite" {...(oob ? { "hx-swap-oob": "innerHTML" } : {})}>{items.length ? liveText(missing, incomplete) : ""}</span>;
+  if (!items.length || (!incomplete && !missing)) return <><span id="req-wrap" />{live}</>; // alles vorhanden: kein Button, nur Live-Text
+  const icon = incomplete ? <Icon name="checkup-list" class="h-4 w-4 text-base-content/60" /> : <Icon name="exclamation-triangle" class="h-4 w-4 text-warning" />;
+  return (
+    <>
+      <span id="req-wrap">
+        <button type="button" id="req-btn" class="btn btn-ghost btn-sm btn-square" popovertarget="req-check" style="anchor-name:--req-btn" aria-expanded="false" aria-controls="req-check" aria-label={t("mailTemplates.req.title")} title={t("mailTemplates.req.title")} data-missing={missing}>
+          <span class="indicator">{missing ? <span class="indicator-item badge badge-warning badge-xs">{missing}</span> : null}{icon}</span>
+        </button>
+        <div id="req-check" popover="auto" style="position-anchor:--req-btn" aria-label={t("mailTemplates.req.title")} class="dropdown w-72 max-w-[calc(100vw-1rem)] rounded-box border border-base-300 bg-base-100 p-3 space-y-2 text-sm shadow-xl">
+          <h3 class="font-semibold">{t("mailTemplates.req.title")}</h3>
+          {incomplete ? <p class="text-base-content/60">{t("mailTemplates.req.syntax")}</p> : (
+            <ul class="space-y-1">{items.map((i) => <li class="flex items-center gap-2"><Icon name={i.ok ? "check" : "exclamation-triangle"} class={`h-4 w-4 shrink-0 ${i.ok ? "text-success" : "text-warning"}`} /><span class="grow">{i.label}</span><span class="text-base-content/60">{i.ok ? t("mailTemplates.req.ok") : t("mailTemplates.req.missing")}</span></li>)}</ul>
+          )}
+        </div>
+      </span>
+      {live}
+    </>
+  );
+}
+const checklistAttrs = (base: string) => ({ "hx-post": `${base}/preview`, "hx-include": "#tpl-form", "hx-vals": JSON.stringify({ part: "checklist" }), "hx-target": "#req-wrap", "hx-swap": "outerHTML" });
+
 // Markierung (\u0001name\u0002) aus customPreviewVars → hervorgehobener Platzhalter (Hintergrund + Text, nicht nur Farbe)
 const highlight = (s: string) => s.split(/\u0001([^\u0002]*)\u0002/).map((part, i) => (i % 2 ? <mark class="bg-warning text-warning-content px-1 rounded font-semibold">{`{{${part}}}`}</mark> : part));
 
@@ -172,6 +199,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
     : CATALOG[key];
   const base = cf?.isNew ? "/mail/templates/new" : `/mail/templates/${key}`;
   const requiredNames = new Set(entry.required.map((r) => (r.list ? `${r.list}[].${r.name}` : r.name)));
+  const reqStatus = requiredStatus(cf ? "" : key, { prefix: tpl.prefix, subject: values.subject, body: values.body, urgent: cf?.urgent });
   const phData = Object.entries(entry.vars).map(([name, v]) => ({ name, desc: v.desc, example: v.example, optional: !!v.optional, type: v.type, group: groupOf(name, v, !!cf), list: name.includes("[]") || v.type === "list", required: requiredNames.has(name) }));
   const bodyErr = errors.filter((e) => !e.startsWith("subject:") && !e.startsWith("form: ") && !e.startsWith("headers: "));
   return (
@@ -257,11 +285,12 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                 </div>
               </details>
         <div role="tablist" class="tabs tabs-lift">
-          <input form="none" type="radio" name="tpl-tabs" class="tab" aria-label={t("common.edit")} data-tab="edit" checked />
+          <input form="none" type="radio" name="tpl-tabs" class="tab" aria-label={t("common.edit")} data-tab="edit" checked {...checklistAttrs(base)} />
           <div class="tab-content bg-base-100 border-base-300 p-4">
             <div id="tpl-bar" role="toolbar" aria-label={t("mailTemplates.bar")} class="sticky top-0 z-10 -mx-4 -mt-4 mb-4">
               <div class="flex items-center gap-1 rounded-t-box rounded-tl-none border-b border-base-300 bg-base-200 px-4 py-2">
                 <button type="button" id="ph-btn" class="btn btn-ghost btn-sm" popovertarget="side-ph" style="anchor-name:--ph-btn" aria-expanded="false" aria-controls="side-ph" title={t("mailTemplates.placeholders")}><Icon name="plus" class="h-4 w-4" /><span class="max-sm:hidden">{t("mailTemplates.placeholders")}</span></button>
+                <RequiredChecklist status={reqStatus} />
                 <span class="ml-auto text-xs text-base-content/60 max-sm:hidden">{t("mailTemplates.bar.hint")} <kbd class="kbd kbd-xs">{"{{"}</kbd></span>
               </div>
               <div id="side-ph" popover="auto" style="position-anchor:--ph-btn" aria-label={t("mailTemplates.placeholders")} class="dropdown w-96 max-w-[calc(100vw-1rem)] max-h-96 overflow-auto rounded-box border border-base-300 bg-base-100 p-2 space-y-2 text-sm shadow-xl">
@@ -306,7 +335,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
               <label class="input w-full font-mono gap-1">{!cf && tpl.prefix ? <span class="text-base-content/60 shrink-0">{tpl.prefix}</span> : null}<input id="tpl-subject" name="subject" autocomplete="off" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} /></label>
             </Field>
             <Field label={t("mailTemplates.field.body")} required after={bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}>
-              <textarea id="tpl-body" name="body" autocomplete="off" rows={18} class="textarea w-full max-w-full resize-y font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
+              <textarea id="tpl-body" name="body" hx-trigger="change" {...checklistAttrs(base)} autocomplete="off" rows={18} class="textarea w-full max-w-full resize-y font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
             </Field>
         </div>
         </div>
@@ -366,7 +395,7 @@ async function readCustom(c: any, current?: boolean) {
   const one = (k: string) => String(asArray(f[k])[0] ?? "");
   const subject = one("subject").trim(), body = one("body").replace(/\r\n/g, "\n"), prefix = "";
   const fields = customFields({ prefix, subject, body }).map((name) => ({ name, label: one(`fl_${name}`).trim() || undefined, example: one(`fe_${name}`).trim() || undefined }));
-  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), urgent: c.get("user").permissions.has("system:admin") ? one("urgent") === "1" : !!current, key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case") };
+  return { subject, body, prefix, fields, name: one("name").trim(), description: one("description").trim(), headers: asArray(f.hn).map((n, i) => [n.trim(), String(asArray(f.hv)[i] ?? "").trim()]).filter(([n, v]) => n || v).map(([n, v]) => `${n}: ${v}`).join("\n"), urgent: c.get("user").permissions.has("system:admin") ? one("urgent") === "1" : !!current, key: one("key").trim(), topic: one("topic").trim(), audience: one("audience"), perms: asArray(f.editPermissions), expected: one("updatedAt"), case: one("case"), part: one("part") };
 }
 type CustomFormData = Awaited<ReturnType<typeof readCustom>>;
 
@@ -423,6 +452,7 @@ mailTemplateRoutes.post("/new", async (c) => {
 // Nur Beispieldaten: Felder mit Beispieltext, sonst hervorgehobener Platzhalter.
 const previewCustom = async (c: any, current?: boolean) => {
   const d = await readCustom(c, current);
+  if (d.part === "checklist") return c.html(<RequiredChecklist status={requiredStatus("", d)} oob />);
   const errors = [...parseHeaders(d.headers).errors, ...validateTemplate("", d)];
   if (errors.length) return c.html(<div role="alert" class="alert alert-error"><ul>{errors.map((e) => <li>{e.replace(/^\w+: /, "")}</li>)}</ul><a class="link" href="#" onclick="document.querySelector('[data-tab=edit]').click();return false">{t("mailTemplates.preview.toEditor")}</a></div>);
   const out = renderMail(d, customPreviewVars(d.fields));
@@ -493,10 +523,11 @@ mailTemplateRoutes.post("/:key/preview", async (c) => {
   const { subject, body } = await readForm(c);
   const cases = CATALOG[tpl.key].previewCases;
   const caseId = cases.find((x) => x.id === String(f.case ?? ""))?.id ?? cases[0].id;
+  if (f.part === "checklist") return c.html(<RequiredChecklist status={requiredStatus(tpl.key, { prefix: tpl.prefix, subject, body })} oob />);
   const errors = validateTemplate(tpl.key, { prefix: tpl.prefix, subject, body });
-  // strukturiert: Zeile aus der Meldung, Pflichtplatzhalter-Status für die Checkliste des Editors
+  // strukturiert: Zeile aus der Meldung
   const issues = errors.map((e) => ({ line: /Zeile (\d+)/.exec(e)?.[1], missing: e.startsWith("Pflichtplatzhalter"), text: e.replace(/^\w+: /, "") }));
-  const missing = CATALOG[tpl.key].required.filter((r) => issues.some((i) => i.missing && i.text.includes(`„${r.label}“`))).map((r) => r.name);
+  const missing = requiredStatus(tpl.key, { prefix: tpl.prefix, subject, body }).items.filter((r) => !r.ok).map((r) => r.name);
   if (errors.length) return c.html(<div role="alert" class="alert alert-error" data-missing={missing.join(",")}><ul>{issues.map((i) => <li data-line={i.line}>{i.text}</li>)}</ul><a class="link" href="#" onclick="document.querySelector('[data-tab=edit]').click();return false">{t("mailTemplates.preview.toEditor")}</a></div>);
   const out = renderMail({ prefix: tpl.prefix, subject, body }, previewVars(tpl.key, caseId));
   return c.html(
