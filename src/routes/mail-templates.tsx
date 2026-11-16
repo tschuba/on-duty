@@ -179,7 +179,7 @@ function RequiredChecklist({ status, oob }: { status: ReturnType<typeof required
         <div id="req-check" popover="auto" style="position-anchor:--req-btn" aria-label={t("mailTemplates.req.title")} class="dropdown w-72 max-w-[calc(100vw-1rem)] rounded-box border border-base-300 bg-base-100 p-3 space-y-2 text-sm shadow-xl">
           <h3 class="font-semibold">{t("mailTemplates.req.title")}</h3>
           {incomplete ? <p class="text-base-content/60">{t("mailTemplates.req.syntax")}</p> : (
-            <ul class="space-y-1">{items.map((i) => <li class="flex items-center gap-2"><Icon name={i.ok ? "check" : "exclamation-triangle"} class={`h-4 w-4 shrink-0 ${i.ok ? "text-success" : "text-warning"}`} /><span class="grow">{i.label}</span><span class="text-base-content/60">{i.ok ? t("mailTemplates.req.ok") : t("mailTemplates.req.missing")}</span></li>)}</ul>
+            <ul class="space-y-1">{items.map((i) => <li class="flex items-center gap-2"><Icon name={i.ok ? "check" : "exclamation-triangle"} class={`h-4 w-4 shrink-0 ${i.ok ? "text-success" : "text-warning"}`} /><span class="grow">{i.label} <code class="text-xs text-base-content/60">{i.list ? `{{#${i.list}}}{{${i.name}}}{{/${i.list}}}` : `{{${i.name}}}`}</code></span><span class="text-base-content/60">{i.ok ? t("mailTemplates.req.ok") : t("mailTemplates.req.missing")}</span></li>)}</ul>
           )}
         </div>
       </span>

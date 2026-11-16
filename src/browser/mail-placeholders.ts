@@ -34,6 +34,7 @@ export function insert(text: string, wrap?: { open: string; close: string; inner
   if (!md.matches) setPh(false);
   last.focus();
   last.dispatchEvent(new Event("input", { bubbles: true })); // zeichnet den Spiegel neu, setzt dirty
+  last.dispatchEvent(new Event("change", { bubbles: true })); // aktualisiert die Pflichtplatzhalter-Leiste (hx-trigger=change)
 }
 
 document.querySelectorAll<HTMLElement>("[data-ph]").forEach((b) => b.addEventListener("click", () => insert(`{{${b.dataset.ph}}}`)));
@@ -321,6 +322,7 @@ function acAccept(x: Field, e: Ent) {
   x.setRangeText(`{{${tk[1]}${e.n}}}`, c - tk[0].length, end, "end");
   x.focus();
   x.dispatchEvent(new Event("input", { bubbles: true })); // kein InputEvent: löst das Menü nicht erneut aus
+  x.dispatchEvent(new Event("change", { bubbles: true }));
 }
 for (const n of ["subject", "body"]) {
   const x = f.elements.namedItem(n) as Field;

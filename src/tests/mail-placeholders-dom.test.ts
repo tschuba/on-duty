@@ -53,6 +53,13 @@ describe("mail placeholders editor", () => {
     document.querySelector<HTMLElement>("[data-cond]")!.click();
     expect(area().value).toBe("x{{#a.name}}y{{/a.name}}z");
   });
+  it("insert fires change (refreshes the required-placeholder bar)", () => {
+    const onChange = vi.fn();
+    area().addEventListener("change", onChange);
+    document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
+    document.querySelector<HTMLElement>("[data-cond]")!.click();
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
   it("inserts into last focused field", () => {
     const s = document.querySelector<HTMLInputElement>("[name=subject]")!;
     s.dispatchEvent(new Event("focus"));
