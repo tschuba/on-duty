@@ -998,7 +998,7 @@ export const de = {
   "mailTemplates.field.subject": "Betreff",
   "mailTemplates.field.body": "Text",
   "mailTemplates.technical": "Technische Angaben",
-  "mailTemplates.section.meta": "Metadaten",
+  "mailTemplates.section.meta": "Einstellungen",
   "mailTemplates.section.meta.missing": "Angaben fehlen oder fehlerhaft",
   "mailTemplates.bar": "Werkzeuge für den Text",
   "mailTemplates.bar.hint": "Autovervollständigung mit",

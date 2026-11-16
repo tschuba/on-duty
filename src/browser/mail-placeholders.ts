@@ -370,7 +370,7 @@ if (hdrRows) {
   check();
 }
 
-// Metadaten (eingeklappt): fehlende/fehlerhafte Angaben bleiben als Badge sichtbar; beim Absenden-Versuch klappt der Bereich auf.
+// Einstellungen (eingeklappt): fehlende/fehlerhafte Angaben bleiben als Badge sichtbar; beim Absenden-Versuch klappt der Bereich auf.
 const meta = document.getElementById("tpl-meta") as HTMLDetailsElement | null;
 if (meta) {
   let srv = meta.dataset.err === "1"; // Serverfehler gelten bis zur nächsten Eingabe
