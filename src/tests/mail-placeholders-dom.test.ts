@@ -8,7 +8,7 @@ const DOM = `<script data-leave="Verlassen?" data-tip-if="Nur wenn vorhanden" da
 <div id="tpl-bar" data-x><button id="ph-btn" aria-expanded="false"></button>
 <script id="ph-data" type="application/json">[{"name":"lst","desc":"Liste","example":"","type":"list"}]</script><div id="side-ph"><input id="ph-search"><section data-g><ul>
 <li data-s="Café"><button data-ph="a.cafe"></button></li><li data-k="l[].nm" data-d="Listenname" data-e="Anna"><button data-ph="l[].nm"></button></li><li data-s="Name" data-k="a.name" data-d="Name" data-e="Max"><button data-ph="a.name"></button></li></ul></section>
-<button data-cond="a.name"></button></div><p id="ph-empty" class="hidden"></p></div>
+<button data-cond="a.name"></button><ul><li data-sub><ul><li data-s="Name"><button data-li="lst" data-inner="nm"></button></li></ul></li></ul></div><p id="ph-empty" class="hidden"></p></div>
 <input type="radio" name="t" data-tab="edit" checked><input type="radio" name="t" data-tab="entry" class="tab"><input type="radio" name="t" data-tab="preview" data-case class="hidden">`;
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -136,6 +136,17 @@ describe("placeholder highlight mirror", () => {
     a.dispatchEvent(new Event("input"));
     expect(mir().style.height).toBe("321px");
     expect(mir().style.width).toBe("402px"); // clientWidth + Border
+  });
+  describe("list entries", () => {
+    const click = () => document.querySelector<HTMLElement>("[data-li]")!.click();
+    it("wraps outside a block, inserts only the name inside", () => {
+      const a = area(); a.focus(); a.value = ""; click();
+      expect(a.value).toBe("{{#lst}}{{nm}}{{/lst}}");
+      a.value = "{{#lst}}x"; a.setSelectionRange(9, 9); click();
+      expect(a.value).toBe("{{#lst}}x{{nm}}");
+      a.value = "{{#lst}}x{{/lst}}"; a.setSelectionRange(17, 17); click();
+      expect(a.value).toBe("{{#lst}}x{{/lst}}{{#lst}}{{nm}}{{/lst}}");
+    });
   });
   describe("autocomplete", () => {
     const menu = () => document.getElementById("ac-menu")!;

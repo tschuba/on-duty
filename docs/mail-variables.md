@@ -17,7 +17,7 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
 | `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
 | `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
-| `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
+| `multiple` | boolean | data | Mehr als ein Mitglied mit dieser E-Mail-Adresse | ja |
 | `you` | text | data | „dich“ / „euch“ | dich |
 | `event.title` | text | data | Titel des Termins | Übung Atemschutz |
 | `event.date` | text | data | Kurzes Datum, für den Betreff | Sa., 12.04.2026 |
@@ -28,12 +28,12 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `event.maxParticipants` | text, optional | data | Maximale Teilnehmerzahl | 20 |
 | `event.changes` | text, optional | data | Änderungen, alt → neu (nur event-updated) | Ort: Halle → Gerätehaus |
 | `event.url` | text | link | Detailseite im Portal | https://portal.example.org/events/1 |
-| `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
+| `recipients` | list | data | Ein Eintrag je Mitglied mit dieser E-Mail-Adresse |  |
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
 | `recipients[].rsvpYesUrl` | text, optional | link | Zusage-Link (nur bei Anmeldung) | https://portal.example.org/r/yes |
 | `recipients[].rsvpNoUrl` | text, optional | link | Absage-Link (nur bei Anmeldung) | https://portal.example.org/r/no |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
-| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder mit dieser E-Mail-Adresse (nur bei mehreren) | https://portal.example.org/o/all |
 
 ## `event-updated`
 
@@ -50,7 +50,7 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
 | `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
 | `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
-| `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
+| `multiple` | boolean | data | Mehr als ein Mitglied mit dieser E-Mail-Adresse | ja |
 | `you` | text | data | „dich“ / „euch“ | dich |
 | `event.title` | text | data | Titel des Termins | Übung Atemschutz |
 | `event.date` | text | data | Kurzes Datum, für den Betreff | Sa., 12.04.2026 |
@@ -61,12 +61,12 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `event.maxParticipants` | text, optional | data | Maximale Teilnehmerzahl | 20 |
 | `event.changes` | text, optional | data | Änderungen, alt → neu (nur event-updated) | Ort: Halle → Gerätehaus |
 | `event.url` | text | link | Detailseite im Portal | https://portal.example.org/events/1 |
-| `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
+| `recipients` | list | data | Ein Eintrag je Mitglied mit dieser E-Mail-Adresse |  |
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
 | `recipients[].rsvpYesUrl` | text, optional | link | Zusage-Link (nur bei Anmeldung) | https://portal.example.org/r/yes |
 | `recipients[].rsvpNoUrl` | text, optional | link | Absage-Link (nur bei Anmeldung) | https://portal.example.org/r/no |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
-| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder mit dieser E-Mail-Adresse (nur bei mehreren) | https://portal.example.org/o/all |
 
 ## `event-cancelled`
 
@@ -83,7 +83,7 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
 | `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
 | `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
-| `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
+| `multiple` | boolean | data | Mehr als ein Mitglied mit dieser E-Mail-Adresse | ja |
 | `you` | text | data | „dich“ / „euch“ | dich |
 | `event.title` | text | data | Titel des Termins | Übung Atemschutz |
 | `event.date` | text | data | Kurzes Datum, für den Betreff | Sa., 12.04.2026 |
@@ -94,12 +94,12 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `event.maxParticipants` | text, optional | data | Maximale Teilnehmerzahl | 20 |
 | `event.changes` | text, optional | data | Änderungen, alt → neu (nur event-updated) | Ort: Halle → Gerätehaus |
 | `event.url` | text | link | Detailseite im Portal | https://portal.example.org/events/1 |
-| `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
+| `recipients` | list | data | Ein Eintrag je Mitglied mit dieser E-Mail-Adresse |  |
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
 | `recipients[].rsvpYesUrl` | text, optional | link | Zusage-Link (nur bei Anmeldung) | https://portal.example.org/r/yes |
 | `recipients[].rsvpNoUrl` | text, optional | link | Absage-Link (nur bei Anmeldung) | https://portal.example.org/r/no |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
-| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder mit dieser E-Mail-Adresse (nur bei mehreren) | https://portal.example.org/o/all |
 
 ## `event-uncancelled`
 
@@ -116,7 +116,7 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipient.lastName` | text | person | Nachname des Empfängers | Beispiel |
 | `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
 | `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
-| `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
+| `multiple` | boolean | data | Mehr als ein Mitglied mit dieser E-Mail-Adresse | ja |
 | `you` | text | data | „dich“ / „euch“ | dich |
 | `event.title` | text | data | Titel des Termins | Übung Atemschutz |
 | `event.date` | text | data | Kurzes Datum, für den Betreff | Sa., 12.04.2026 |
@@ -127,12 +127,12 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `event.maxParticipants` | text, optional | data | Maximale Teilnehmerzahl | 20 |
 | `event.changes` | text, optional | data | Änderungen, alt → neu (nur event-updated) | Ort: Halle → Gerätehaus |
 | `event.url` | text | link | Detailseite im Portal | https://portal.example.org/events/1 |
-| `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
+| `recipients` | list | data | Ein Eintrag je Mitglied mit dieser E-Mail-Adresse |  |
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
 | `recipients[].rsvpYesUrl` | text, optional | link | Zusage-Link (nur bei Anmeldung) | https://portal.example.org/r/yes |
 | `recipients[].rsvpNoUrl` | text, optional | link | Absage-Link (nur bei Anmeldung) | https://portal.example.org/r/no |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
-| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder mit dieser E-Mail-Adresse (nur bei mehreren) | https://portal.example.org/o/all |
 
 ## `event-mail-info`
 
@@ -150,11 +150,11 @@ Kategorie `event`, Audience `member`. Pflichtplatzhalter: `optOutUrl` in `recipi
 | `recipient.email` | text | person | Adresse des Empfängers | anna@example.org |
 | `addressee` | text | person | Anrede-Namen, kommagetrennt | Anna, Ben |
 | `you` | text | data | „dich“ / „euch“ | dich |
-| `multiple` | boolean | data | Mehr als ein Mitglied an der Adresse | ja |
-| `recipients` | list | data | Ein Eintrag je Mitglied der Adresse |  |
+| `multiple` | boolean | data | Mehr als ein Mitglied mit dieser E-Mail-Adresse | ja |
+| `recipients` | list | data | Ein Eintrag je Mitglied mit dieser E-Mail-Adresse |  |
 | `recipients[].name` | text | person | Name des Mitglieds | Anna Beispiel |
 | `recipients[].optOutUrl` | text | link | Abmelde-Link für Termin-Mails (Pflicht) | https://portal.example.org/o/1 |
-| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren) | https://portal.example.org/o/all |
+| `optOutAllUrl` | text, optional | link | Abmelde-Link für alle Mitglieder mit dieser E-Mail-Adresse (nur bei mehreren) | https://portal.example.org/o/all |
 
 ## `member-settings-link`
 

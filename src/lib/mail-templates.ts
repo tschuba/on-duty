@@ -52,7 +52,7 @@ const GLOBAL_VARS: Record<string, VarSpec> = {
 
 const EVENT_VARS: Record<string, VarSpec> = {
   addressee: { type: "text", desc: "Anrede-Namen, kommagetrennt", example: "Anna, Ben", source: "person" },
-  multiple: { type: "boolean", desc: "Mehr als ein Mitglied an der Adresse", example: "ja", source: "data" },
+  multiple: { type: "boolean", desc: "Mehr als ein Mitglied mit dieser E-Mail-Adresse", example: "ja", source: "data" },
   you: { type: "text", desc: "„dich“ / „euch“", example: "dich", source: "data" },
   "event.title": { type: "text", desc: "Titel des Termins", example: "Übung Atemschutz", source: "data" },
   "event.date": { type: "text", desc: "Kurzes Datum, für den Betreff", example: "Sa., 12.04.2026", source: "data" },
@@ -63,12 +63,12 @@ const EVENT_VARS: Record<string, VarSpec> = {
   "event.maxParticipants": { type: "text", desc: "Maximale Teilnehmerzahl", example: "20", source: "data", optional: true },
   "event.changes": { type: "text", desc: "Änderungen, alt → neu (nur event-updated)", example: "Ort: Halle → Gerätehaus", source: "data", optional: true },
   "event.url": { type: "text", desc: "Detailseite im Portal", example: "https://portal.example.org/events/1", source: "link" },
-  recipients: { type: "list", desc: "Ein Eintrag je Mitglied der Adresse", example: "", source: "data" },
+  recipients: { type: "list", desc: "Ein Eintrag je Mitglied mit dieser E-Mail-Adresse", example: "", source: "data" },
   "recipients[].name": { type: "text", desc: "Name des Mitglieds", example: "Anna Beispiel", source: "person" },
   "recipients[].rsvpYesUrl": { type: "text", desc: "Zusage-Link (nur bei Anmeldung)", example: "https://portal.example.org/r/yes", source: "link", optional: true },
   "recipients[].rsvpNoUrl": { type: "text", desc: "Absage-Link (nur bei Anmeldung)", example: "https://portal.example.org/r/no", source: "link", optional: true },
   "recipients[].optOutUrl": { type: "text", desc: "Abmelde-Link für Termin-Mails (Pflicht)", example: "https://portal.example.org/o/1", source: "link" },
-  optOutAllUrl: { type: "text", desc: "Abmelde-Link für alle Mitglieder der Adresse (nur bei mehreren)", example: "https://portal.example.org/o/all", source: "link", optional: true },
+  optOutAllUrl: { type: "text", desc: "Abmelde-Link für alle Mitglieder mit dieser E-Mail-Adresse (nur bei mehreren)", example: "https://portal.example.org/o/all", source: "link", optional: true },
 };
 
 const fullName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName}`.trim();
@@ -264,7 +264,7 @@ const RESERVED = new Set(["you", "addressee", "multiple", "recipients", "optOutA
 // Nur in freien Vorlagen: Anrede wie bei Termin-Mails (Vornamen aller Mitglieder einer Adresse) und Abmelde-Link der Mitteilung (bei dringenden leer, dort gibt es kein Opt-Out).
 const CUSTOM_ONLY_VARS: Record<string, VarSpec> = {
   addressee: EVENT_VARS.addressee,
-  multiple: { ...EVENT_VARS.multiple, desc: "Mehr als ein Mitglied an der Adresse (nur dann „euch“, Namen aller)" },
+  multiple: { ...EVENT_VARS.multiple, desc: "Mehr als ein Mitglied mit dieser E-Mail-Adresse (nur dann „euch“, Namen aller)" },
   you: EVENT_VARS.you,
   unsubscribeUrl: { type: "text", desc: "Abmelde-Link für dieses Thema (Pflicht, außer bei dringenden Mitteilungen)", example: "https://portal.example.org/link/VORSCHAU", source: "link" },
 };
