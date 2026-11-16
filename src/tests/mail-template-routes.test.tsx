@@ -126,6 +126,7 @@ describe("mail template routes", () => {
     expect(page).not.toContain('data-cond="event.title"');
     expect(page).toContain('data-li="recipients" data-inner="name"');
     expect(page).toContain('data-cond="recipients"');
+    for (const n of ["rsvpYesUrl", "rsvpNoUrl", "optOutUrl"]) expect(page).toContain(`data-li="recipients" data-inner="${n}"`);
     expect(page).toContain("Alle Mitglieder mit gleicher E-Mail-Adresse");
     expect(page).not.toContain('data-ph="recipient.');
     expect(page).not.toContain('data-ph="recipients[]');

@@ -293,55 +293,46 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                 <RequiredChecklist status={reqStatus} />
                 <span class="ml-auto text-xs text-base-content/60 max-sm:hidden">{t("mailTemplates.bar.hint")} <kbd class="kbd kbd-xs">{"{{"}</kbd></span>
               </div>
-              <div id="side-ph" popover="auto" style="position-anchor:--ph-btn" aria-label={t("mailTemplates.placeholders")} class="dropdown w-96 max-w-[calc(100vw-1rem)] max-h-96 overflow-auto rounded-box border border-base-300 bg-base-100 p-2 space-y-2 text-sm shadow-xl">
-              <input id="ph-search" type="search" class="input input-sm w-full sticky top-0 z-10" placeholder={t("mailTemplates.search")} aria-label={t("mailTemplates.search")} autocomplete="off" />
+              <div id="side-ph" popover="auto" style="position-anchor:--ph-btn" aria-label={t("mailTemplates.placeholders")} class="dropdown w-96 max-w-[calc(100vw-1rem)] max-h-[70vh] overflow-auto rounded-box border border-base-300 bg-base-100 px-2 pb-2 pt-0 space-y-2 text-sm shadow-xl">
+              <div class="sticky top-0 z-10 -mx-2 bg-base-100 px-2 py-2"><input id="ph-search" type="search" class="input input-sm w-full" placeholder={t("mailTemplates.search")} aria-label={t("mailTemplates.search")} autocomplete="off" /></div>
               <p id="ph-empty" class="hidden text-base-content/60 p-1" role="status">{t("mailTemplates.search.empty")}</p>
               {GROUPS.map((g) => {
-                const cond = (k: string, v: { optional?: boolean; type: string }) => v.optional && v.type !== "boolean" && !requiredNames.has(k);
                 const listName = Object.entries(entry.vars).find(([, v]) => v.type === "list")?.[0];
-                const all = Object.entries(entry.vars).filter(([k, v]) => v.type !== "list" && groupOf(k, v, !!cf) === g && !(listName && k.startsWith("recipient.")));
-                const listItems = listName ? all.filter(([k]) => k.startsWith(`${listName}[].`)) : [];
-                const items = listName ? all.filter(([k]) => !k.startsWith(`${listName}[].`)) : all;
-                return all.length > 0 && (
+                const inList = (k: string) => !!listName && k.startsWith(`${listName}[].`);
+                const entries = Object.entries(entry.vars).filter(([, v]) => v.type !== "list");
+                const items = entries.filter(([k, v]) => !inList(k) && !(listName && k.startsWith("recipient.")) && groupOf(k, v, !!cf) === g);
+                const listItems = g === "recipient" && listName ? entries.filter(([k]) => inList(k)) : [];
+                // Eine Zeile je Platzhalter: Beschriftung links, Token rechts (bei Hover/Fokus), optional ein kleiner „nur wenn“-Button.
+                const row = (k: string, v: { desc: string; example?: string; optional?: boolean; type: string }, label: string, attrs: Record<string, string | undefined>) => {
+                  const bool = v.type === "boolean", cond = (v.optional || bool) && !requiredNames.has(k);
+                  const star = requiredNames.has(k) ? " *" : "";
+                  return (
+                    <li data-s={`${k} ${v.desc} ${v.example}`} data-k={k} data-d={v.desc} data-e={v.example || undefined} class="group flex items-center gap-1 rounded-field hover:bg-base-200 focus-within:bg-base-200">
+                      {bool && cond ? (
+                        <button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 min-w-0 flex-1 justify-start text-left whitespace-normal py-1 font-normal" data-cond={k} data-bool="1" title={t("mailTemplates.onlyIfTrue.tip")}><span>+ {t("mailTemplates.onlyIfBool")}: {label}</span></button>
+                      ) : (
+                        <button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 min-w-0 flex-1 justify-start text-left whitespace-normal py-1 font-normal" {...attrs} title={v.example ? `${k}: ${v.example}` : k}><span>+ {label}{star}{v.optional && <span class="text-base-content/60"> ({t("mailTemplates.optional")})</span>}</span></button>
+                      )}
+                      <code class="shrink-0 max-w-44 truncate font-mono text-xs text-base-content/60 hidden group-hover:inline group-focus-within:inline">{`{{${attrs["data-inner"] ?? k}}}`}</code>
+                      {!bool && cond && v.optional && <button type="button" class="btn btn-ghost btn-xs shrink-0" data-cond={k} title={t("mailTemplates.onlyIfPresent.tip")}>{t("mailTemplates.onlyIfShort")}</button>}
+                    </li>
+                  );
+                };
+                return (items.length > 0 || listItems.length > 0) && (
                   <section data-g>
-                    <h3 class="px-1 pt-1 text-xs font-bold uppercase tracking-wide text-base-content/60">{t(`mailTemplates.group.${g}`)}</h3>
-                    <ul class="space-y-1 p-1">
-                      {items.map(([k, v]) => (
-                        <li data-s={`${k} ${v.desc} ${v.example}`} data-k={k} data-d={v.desc} data-e={v.example || undefined} class={cond(k, v) ? "rounded-box bg-base-200 p-1 space-y-1" : undefined}>
-                          {cond(k, v) ? (
-                            <>
-                              <p class="px-1 text-xs">{v.desc}{v.optional && <span class="text-base-content/60"> ({t("mailTemplates.optional")})</span>}{v.example && <span class="block text-base-content/60 break-all">{v.example}</span>}</p>
-                              <div class="flex flex-wrap gap-1">
-                                {v.type !== "boolean" && <button type="button" class="btn btn-ghost btn-xs" data-ph={k} title={k}>+ {t("mailTemplates.insertDirect")}</button>}
-                                <button type="button" class="btn btn-ghost btn-xs" data-cond={k} data-bool={v.type === "boolean" ? "1" : undefined} title={v.type === "boolean" ? t("mailTemplates.onlyIfTrue.tip") : t("mailTemplates.onlyIfPresent.tip")}>+ {v.type === "boolean" ? t("mailTemplates.onlyIfTrue") : t("mailTemplates.onlyIfPresent")}</button>
-                              </div>
-                            </>
-                          ) : v.type === "boolean" && !requiredNames.has(k) ? (
-                            <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-cond={k} data-bool="1" title={t("mailTemplates.onlyIfTrue.tip")}>+ {t("mailTemplates.onlyIfBool")}: {v.desc}</button>
-                          ) : (
-                            <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal flex-col items-start gap-0" data-ph={k} title={k}>
-                              <span>+ {v.desc}</span>
-                              {v.example && <span class="font-normal text-xs text-base-content/60 break-all">{v.example}</span>}
-                            </button>
-                          )}
-                        </li>
-                      ))}
+                    <h3 class="sticky top-12 z-[5] bg-base-100 px-1 pb-1 pt-1 text-xs font-bold uppercase tracking-wide text-base-content/60">{t(`mailTemplates.group.${g}`)}</h3>
+                    <ul class="space-y-0.5 p-1">
+                      {items.map(([k, v]) => row(k, v, v.desc, { "data-ph": k }))}
                       {listName && listItems.length > 0 && (
-                        <li data-sub class="rounded-box bg-base-200 p-1 space-y-1">
+                        <li data-sub class="mt-2 rounded-box bg-base-200 p-1 space-y-1">
                           <h4 class="px-1 text-xs font-semibold">{t("mailTemplates.listHeading")}</h4>
                           <p class="px-1 text-xs text-base-content/60">{t("mailTemplates.listHint")}</p>
-                          <ul class="space-y-1">
-                            <li data-s={`${listName} ${t("mailTemplates.repeat")}`}>
-                              <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-cond={listName} title={listName}>+ {t("mailTemplates.repeat")}</button>
+                          <ul class="space-y-0.5">
+                            <li data-s={`${listName} ${t("mailTemplates.repeat")}`} class="group flex items-center gap-1 rounded-field hover:bg-base-100 focus-within:bg-base-100">
+                              <button type="button" class="btn btn-ghost btn-xs h-auto min-h-0 min-w-0 flex-1 justify-start text-left whitespace-normal py-1 font-normal" data-cond={listName} title={listName}><span>+ {t("mailTemplates.repeat")}</span></button>
+                              <code class="shrink-0 font-mono text-xs text-base-content/60 hidden group-hover:inline group-focus-within:inline">{`{{#${listName}}}`}</code>
                             </li>
-                            {listItems.map(([k, v]) => {
-                              const inner = k.slice(listName.length + 3);
-                              return (
-                                <li data-s={`${k} ${v.desc} ${v.example}`} data-k={k} data-d={v.desc} data-e={v.example || undefined}>
-                                  <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-li={listName} data-inner={inner} title={k}>+ {t(`mailTemplates.listItem.${inner}` as "mailTemplates.listItem.name")}{requiredNames.has(k) ? " *" : ""}</button>
-                                </li>
-                              );
-                            })}
+                            {listItems.map(([k, v]) => { const inner = k.slice(listName.length + 3); return row(k, { ...v, optional: false }, t(`mailTemplates.listItem.${inner}` as "mailTemplates.listItem.name"), { "data-li": listName, "data-inner": inner }); })}
                           </ul>
                         </li>
                       )}

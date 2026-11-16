@@ -908,6 +908,7 @@ export const de = {
   "mailTemplates.tip.end": "Ende des Blocks",
   "mailTemplates.listHeading": "Alle Mitglieder mit gleicher E-Mail-Adresse",
   "mailTemplates.listHint": "Eine Zeile je Mitglied, auch wenn nur eines diese Adresse hat. Für Namen im Betreff „Anrede-Namen“ verwenden.",
+  "mailTemplates.onlyIfShort": "nur wenn",
   "mailTemplates.repeat": "Für jedes Mitglied wiederholen",
   "mailTemplates.listItem.name": "Name",
   "mailTemplates.listItem.rsvpYesUrl": "Zusage-Link",
