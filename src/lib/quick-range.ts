@@ -23,7 +23,13 @@ export function addMonths(dateStr: string, months: number): string {
 
 // "future": ab heute nach vorn (Prüfungen, Jubiläen, Verleih); "past": bis heute zurück (Spenden, Anträge).
 // yearStart ("MM-DD", anniversary cutoff) adds ceremony-year presets next to the calendar-year ones.
-export function rangePresets(today: string, dir: "future" | "past", yearStart?: string): RangePreset[] {
+// withAll: opt-in "Gesamter Zeitraum" preset (open range) for pages whose default is unbounded.
+export function rangePresets(today: string, dir: "future" | "past", yearStart?: string, withAll = false): RangePreset[] {
+  const list = basePresets(today, dir, yearStart);
+  return withAll ? [...list, { id: "all", key: "filter.quick.all", start: "", end: "" }] : list;
+}
+
+function basePresets(today: string, dir: "future" | "past", yearStart?: string): RangePreset[] {
   const y = Number(today.slice(0, 4));
   const year = (n: number) => ({ start: `${n}-01-01`, end: `${n}-12-31` });
   if (dir === "future") {
@@ -101,11 +107,11 @@ type RangeQuery = { range?: string; rel?: string; dir?: string; ref?: string; yr
 
 // Löst die URL-Parameter gegen heute auf. Ungültiges fällt still auf den Seiten-Standard zurück.
 // `start`/`end` sind hier die Werte der Seite (je nach Route aus start/end bzw. from/to gelesen).
-export function parseRange(q: RangeQuery, today: string, dir: "future" | "past", defaults: { start: string; end: string }, cutoff?: string): ParsedRange {
+export function parseRange(q: RangeQuery, today: string, dir: "future" | "past", defaults: { start: string; end: string }, cutoff?: string, withAll = false): ParsedRange {
   const fallback: ParsedRange = { mode: "default", ...defaults };
   const hasDates = q.start !== undefined || q.end !== undefined;
   const custom: ParsedRange = { mode: "custom", start: q.start ?? defaults.start, end: q.end ?? defaults.end };
-  const presets = rangePresets(today, dir, cutoff);
+  const presets = rangePresets(today, dir, cutoff, withAll);
   if (q.range === "custom") return custom;
   if (q.range === "rel") {
     const m = REL_RE.exec(q.rel ?? "");
@@ -119,7 +125,7 @@ export function parseRange(q: RangeQuery, today: string, dir: "future" | "past",
   }
   const p = presets.find((x) => x.id === q.range);
   if (p) return { mode: "preset", start: p.start, end: p.end, id: p.id };
-  if (!hasDates) return fallback;
+  if (!hasDates) return withAll && !defaults.start && !defaults.end ? { mode: "preset", start: "", end: "", id: "all" } : fallback;
   // Alte Links nur mit Daten: exakter Preset-Treffer → Preset, sonst benutzerdefiniert.
   const hit = presets.find((x) => x.start === custom.start && x.end === custom.end);
   return hit ? { mode: "preset", start: hit.start, end: hit.end, id: hit.id } : custom;

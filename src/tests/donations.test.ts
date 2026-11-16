@@ -478,3 +478,16 @@ testDetailPageContract({
   writePermissions: ["donations:read", "donations:record"],
   ensureRecord: () => { donationsFindFirstResult = makeDonation({ id: "don1" }); },
 });
+
+describe("GET / all-time preset", () => {
+  it("offers 'Gesamter Zeitraum' and marks it as the default", async () => {
+    donationsFindManyResult = [makeDonation()];
+    const html = await (await donationRoutes.request("/")).text();
+    expect(html).toContain("range=all");
+    expect(html).toContain("Gesamter Zeitraum");
+  });
+  it("keeps range=all open-ended", async () => {
+    donationsFindManyResult = [makeDonation({ date: "2001-01-01" })];
+    expect(await (await donationRoutes.request("/?range=all")).text()).toContain("Bauer");
+  });
+});

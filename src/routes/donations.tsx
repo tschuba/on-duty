@@ -396,7 +396,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const user = c.get("user");
   const q = c.req.query();
   const search = q.search ?? "";
-  const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" });
+  const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" }, undefined, true);
   const { start: from, end: to } = range;
   const sort: SortKey = (SORT_KEYS as readonly string[]).includes(q.sort) ? (q.sort as SortKey) : "date";
   const dir = q.sort_dir === "asc" || q.sort_dir === "desc" ? q.sort_dir : sort === "donor" ? "asc" : "desc";
@@ -416,7 +416,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const sortUrl = (col: SortKey) => buildListUrl("/donations", state, { sort: col, sort_dir: sort === col ? (dir === "asc" ? "desc" : "asc") : col === "donor" ? "asc" : "desc" });
   const th = (col: SortKey, label: string, cls = "") => <th class={cls}><a href={sortUrl(col)} class="link link-hover">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>;
 
-  const presets = rangePresets(todayStr(), "past");
+  const presets = rangePresets(todayStr(), "past", undefined, true);
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
 
