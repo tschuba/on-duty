@@ -84,7 +84,9 @@ vi.mock("../db/index.js", () => ({
 let currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:delete", "donations:issue-receipts"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
-  requireAuth: () => async (c: any, next: any) => {
+  requireAuth: (required?: string | string[]) => async (c: any, next: any) => {
+    const need = ([] as string[]).concat(required ?? []);
+    if (need.length > 0 && !need.some((p) => currentUser.permissions.has(p))) return c.text("forbidden", 403);
     c.set("user", currentUser);
     await next();
   },
@@ -172,6 +174,16 @@ describe("GET /", () => {
     const byReceipt = await (await donationRoutes.request("/?receipt=open")).text();
     expect(byReceipt).toContain("111,00");
     expect(byReceipt).not.toContain("222,00");
+  });
+
+  it("denies the list (and stats) without any donation permission, allows donations:read", async () => {
+    donationsFindManyResult = [makeDonation()];
+    currentUser = { ...currentUser, permissions: new Set(["members:read"]) };
+    expect((await donationRoutes.request("/")).status).toBe(403);
+    currentUser = { ...currentUser, permissions: new Set(["donations:read"]) };
+    const res = await donationRoutes.request("/");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('id="donations-stats"');
   });
 
   it("never shows a receipt link or actions column in the list", async () => {
