@@ -683,6 +683,7 @@ export const de = {
   "anniversaries.label.gte.short": " ab {n} J.",
   "anniversaries.label.gte.long": " ab {n} Jahren",
   "filter.quick.label": "Zeitraum",
+  "filter.quick.all": "Gesamter Zeitraum",
   "filter.quick.relative": "Relativ",
   "filter.quick.custom": "Benutzerdefiniert",
   "filter.quick.amount": "Dauer",
