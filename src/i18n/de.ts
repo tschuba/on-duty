@@ -906,6 +906,7 @@ export const de = {
   "mailTemplates.optional": "optional",
   "mailTemplates.tip.onlyIf": "Nur wenn vorhanden",
   "mailTemplates.tip.end": "Ende des Blocks",
+  "mailTemplates.insertHint": "Antippen fügt an der Cursorposition ein. „nur wenn“ umschließt markierten Text.",
   "mailTemplates.listHeading": "Alle Mitglieder mit gleicher E-Mail-Adresse",
   "mailTemplates.listHint": "Eine Zeile je Mitglied, auch wenn nur eines diese Adresse hat. Für Namen im Betreff „Anrede-Namen“ verwenden.",
   "mailTemplates.onlyIfShort": "nur wenn",
