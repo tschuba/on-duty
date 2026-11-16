@@ -432,7 +432,7 @@ export function requiredStatus(key: string, input: TemplateInput): { items: Requ
 export function validateTemplate(key: string, input: TemplateInput): string[] {
   const { errors } = analyze(key, input);
   for (const r of requiredStatus(key, input).items) {
-    if (!r.ok) errors.push(`Pflichtplatzhalter „${r.label}“ fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}${r.custom ? " (außer bei dringenden Mitteilungen)" : ""}`);
+    if (!r.ok) errors.push(`Pflichtplatzhalter „${r.label}“ ({{${r.name}}}) fehlt${r.list ? ` (innerhalb von „${r.list}“)` : ""}${r.custom ? " (außer bei dringenden Mitteilungen)" : ""}`);
   }
   return errors;
 }
