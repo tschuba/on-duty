@@ -96,7 +96,7 @@ describe("mail template routes", () => {
     const std = await html("default");
     expect(std).not.toContain("tablist"); // Fälle stehen in der Tab-Zeile des Editors, nicht in der Vorschau
     const page = await (await mailTemplateRoutes.request("/event-created")).text();
-    for (const l of ["Standard", "Ohne Ort", "Ohne Anmeldung", "Mehrere Mitglieder an der Adresse"]) expect(page).toContain(l);
+    for (const l of ["Standard", "Ohne Ort", "Ohne Anmeldung", "Mehrere Mitglieder mit gleicher E-Mail-Adresse"]) expect(page).toContain(l);
     expect(page).toContain('data-case="multiple"');
     expect(page).toContain('data-tab="entry"'); // Fall-Tabs erst nach Klick auf „Vorschau“ sichtbar (hidden)
     expect(page).toMatch(/class="tab hidden [^"]*"[^>]*data-tab="preview" data-case="default"/);
@@ -124,6 +124,11 @@ describe("mail template routes", () => {
     expect(page).toContain('data-cond="event.location"');
     expect(page).toContain('data-cond="event.rsvpEnabled" data-bool="1"');
     expect(page).not.toContain('data-cond="event.title"');
+    expect(page).toContain('data-li="recipients" data-inner="name"');
+    expect(page).toContain('data-cond="recipients"');
+    expect(page).toContain("Alle Mitglieder mit gleicher E-Mail-Adresse");
+    expect(page).not.toContain('data-ph="recipient.');
+    expect(page).not.toContain('data-ph="recipients[]');
     const data = JSON.parse(page.match(/<script id="ph-data"[^>]*>(.*?)<\/script>/s)![1]);
     expect(data.map((d: any) => d.name)).toEqual(Object.keys(CATALOG["event-created"].vars));
     expect(data.find((d: any) => d.name === "recipients[].optOutUrl").required).toBe(true);

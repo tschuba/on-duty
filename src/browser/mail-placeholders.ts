@@ -43,6 +43,13 @@ document.querySelectorAll<HTMLElement>("[data-cond]").forEach((b) => b.addEventL
   insert("", { open: `{{#${k}}}`, close: `{{/${k}}}`, inner: "" });
 }));
 
+// Listeneintrag: im Block nur {{name}}, sonst umschlossen. shortcut: Zählen offener Tags statt Parser, bei zweitem Listentyp/Randfällen ersetzen; der Server-Check bleibt maßgeblich.
+document.querySelectorAll<HTMLElement>("[data-li]").forEach((b) => b.addEventListener("click", () => {
+  const l = b.dataset.li!, n = `{{${b.dataset.inner}}}`, before = last.value.slice(0, last.selectionStart ?? 0);
+  const open = before.split(`{{#${l}}}`).length - before.split(`{{/${l}}}`).length > 0;
+  insert(open ? n : `{{#${l}}}${n}{{/${l}}}`);
+}));
+
 // Platzhalterliste: Popover (Esc, Klick daneben und Fokus-Rückgabe macht der Browser).
 const pb = $("ph-btn") as HTMLButtonElement, pp = $("side-ph");
 const setPh = (o: boolean) => { if (!o) pp.hidePopover?.(); };
@@ -64,6 +71,7 @@ se.addEventListener("input", () => {
       li.hidden = !m;
       if (m) n++;
     });
+    d.querySelectorAll<HTMLElement>("li[data-sub]").forEach((x) => { x.hidden = !x.querySelector("li[data-s]:not([hidden])"); });
     d.hidden = n === 0;
     if (n) any = true;
   });

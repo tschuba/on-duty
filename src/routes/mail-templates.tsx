@@ -298,8 +298,11 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
               <p id="ph-empty" class="hidden text-base-content/60 p-1" role="status">{t("mailTemplates.search.empty")}</p>
               {GROUPS.map((g) => {
                 const cond = (k: string, v: { optional?: boolean; type: string }) => v.optional && v.type !== "boolean" && !requiredNames.has(k);
-                const items = Object.entries(entry.vars).filter(([k, v]) => v.type !== "list" && groupOf(k, v, !!cf) === g);
-                return items.length > 0 && (
+                const listName = Object.entries(entry.vars).find(([, v]) => v.type === "list")?.[0];
+                const all = Object.entries(entry.vars).filter(([k, v]) => v.type !== "list" && groupOf(k, v, !!cf) === g && !(listName && k.startsWith("recipient.")));
+                const listItems = listName ? all.filter(([k]) => k.startsWith(`${listName}[].`)) : [];
+                const items = listName ? all.filter(([k]) => !k.startsWith(`${listName}[].`)) : all;
+                return all.length > 0 && (
                   <section data-g>
                     <h3 class="px-1 pt-1 text-xs font-bold uppercase tracking-wide text-base-content/60">{t(`mailTemplates.group.${g}`)}</h3>
                     <ul class="space-y-1 p-1">
@@ -323,6 +326,25 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                           )}
                         </li>
                       ))}
+                      {listName && listItems.length > 0 && (
+                        <li data-sub class="rounded-box bg-base-200 p-1 space-y-1">
+                          <h4 class="px-1 text-xs font-semibold">{t("mailTemplates.listHeading")}</h4>
+                          <p class="px-1 text-xs text-base-content/60">{t("mailTemplates.listHint")}</p>
+                          <ul class="space-y-1">
+                            <li data-s={`${listName} ${t("mailTemplates.repeat")}`}>
+                              <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-cond={listName} title={listName}>+ {t("mailTemplates.repeat")}</button>
+                            </li>
+                            {listItems.map(([k, v]) => {
+                              const inner = k.slice(listName.length + 3);
+                              return (
+                                <li data-s={`${k} ${v.desc} ${v.example}`} data-k={k} data-d={v.desc} data-e={v.example || undefined}>
+                                  <button type="button" class="btn btn-ghost btn-xs h-auto w-full justify-start text-left whitespace-normal" data-li={listName} data-inner={inner} title={k}>+ {t(`mailTemplates.listItem.${inner}` as "mailTemplates.listItem.name")}{requiredNames.has(k) ? " *" : ""}</button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </li>
+                      )}
                     </ul>
                   </section>
                 );
