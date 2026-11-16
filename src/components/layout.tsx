@@ -204,6 +204,8 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));
       ` }} />
     {user && <script dangerouslySetInnerHTML={{ __html: NAV_SCRIPT }} />}
+    {/* Pflichtfelder mit Floating Label: der Placeholder ist das einzige sichtbare Label; ein Overlay (unsichtbarer Placeholder-Text + roter Stern) markiert sie auch im leeren Zustand (auch nach htmx-Swaps). */}
+    <script dangerouslySetInnerHTML={{ __html: `(function(){function f(r){r.querySelectorAll(".floating-label :is(input,textarea)[required][placeholder]:not([data-star])").forEach(function(e){e.dataset.star="1";var s=document.createElement("b"),i=document.createElement("i");s.className="req-star";s.setAttribute("aria-hidden","true");i.textContent=e.placeholder;s.append(i,"*");e.after(s);function u(){var c=getComputedStyle(e),t=e.tagName==="TEXTAREA";s.style.font=c.font;s.style.left=e.offsetLeft+parseFloat(c.borderLeftWidth)+parseFloat(c.paddingLeft)+"px";s.style.top=e.offsetTop+(t?parseFloat(c.borderTopWidth)+parseFloat(c.paddingTop):0)+"px";s.style.height=t?"auto":e.offsetHeight+"px";s.style.alignItems=t?"flex-start":"center"}u();new ResizeObserver(u).observe(e)})}f(document);document.addEventListener("htmx:load",function(e){f(e.target)})})();` }} />
     <script dangerouslySetInnerHTML={{ __html: `(function(){var m=document.cookie.match(/(?:^|; )draft-clear=([^;]*)/);if(m){localStorage.removeItem('member-draft:'+decodeURIComponent(m[1]));document.cookie='draft-clear=; Max-Age=0; path=/';}})();` }} />
     </body>
   </html>
