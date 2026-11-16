@@ -84,7 +84,9 @@ vi.mock("../db/index.js", () => ({
 let currentUser = { id: "u1", permissions: new Set(["donations:record", "donations:delete", "donations:issue-receipts"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
-  requireAuth: () => async (c: any, next: any) => {
+  requireAuth: (required?: string | string[]) => async (c: any, next: any) => {
+    const need = ([] as string[]).concat(required ?? []);
+    if (need.length > 0 && !need.some((p) => currentUser.permissions.has(p))) return c.text("forbidden", 403);
     c.set("user", currentUser);
     await next();
   },
@@ -150,6 +152,38 @@ describe("GET /", () => {
     const html = await res.text();
     expect(html).toContain("Bauer");
     expect(html).toContain("100,00");
+  });
+
+  it("renders stats over the filtered set, with toggle and open-receipts link", async () => {
+    donationsFindManyResult = [makeDonation({ date: "2026-03-01" }), makeDonation({ id: "don2", amount: "50.50", date: "2025-03-01" })];
+    const html = await (await donationRoutes.request("/?from=2026-01-01&to=2026-12-31")).text();
+    expect(html).toContain('id="donations-stats"');
+    expect(html).toContain('id="donations-stats-toggle"');
+    expect(html).toContain("receipt=open");
+    expect(html).not.toContain("50,50");
+  });
+
+  it("stats follow the search and receipt filters", async () => {
+    donationsFindManyResult = [
+      makeDonation({ amount: "111.00" }),
+      makeDonation({ id: "don2", amount: "222.00", receiptStatus: "issued", donor: { id: "d2", person: { id: "p2", firstName: "Karl", lastName: "Meier" } } }),
+    ];
+    const bySearch = await (await donationRoutes.request("/?search=Meier")).text();
+    expect(bySearch).toContain("222,00");
+    expect(bySearch).not.toContain("111,00");
+    const byReceipt = await (await donationRoutes.request("/?receipt=open")).text();
+    expect(byReceipt).toContain("111,00");
+    expect(byReceipt).not.toContain("222,00");
+  });
+
+  it("denies the list (and stats) without any donation permission, allows donations:read", async () => {
+    donationsFindManyResult = [makeDonation()];
+    currentUser = { ...currentUser, permissions: new Set(["members:read"]) };
+    expect((await donationRoutes.request("/")).status).toBe(403);
+    currentUser = { ...currentUser, permissions: new Set(["donations:read"]) };
+    const res = await donationRoutes.request("/");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain('id="donations-stats"');
   });
 
   it("never shows a receipt link or actions column in the list", async () => {
@@ -455,4 +489,17 @@ testDetailPageContract({
   readPermissions: ["donations:read"],
   writePermissions: ["donations:read", "donations:record"],
   ensureRecord: () => { donationsFindFirstResult = makeDonation({ id: "don1" }); },
+});
+
+describe("GET / all-time preset", () => {
+  it("offers 'Gesamter Zeitraum' and marks it as the default", async () => {
+    donationsFindManyResult = [makeDonation()];
+    const html = await (await donationRoutes.request("/")).text();
+    expect(html).toContain("range=all");
+    expect(html).toContain("Gesamter Zeitraum");
+  });
+  it("keeps range=all open-ended", async () => {
+    donationsFindManyResult = [makeDonation({ date: "2001-01-01" })];
+    expect(await (await donationRoutes.request("/?range=all")).text()).toContain("Bauer");
+  });
 });

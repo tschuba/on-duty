@@ -19,7 +19,7 @@ import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { SortIcon } from "./members.js";
-import { nextReceiptStatus, recipientName, type ReceiptAction } from "../lib/donations.js";
+import { nextReceiptStatus, recipientName, summarizeDonations, type DonationSummary, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, duplicatePersonError, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
@@ -340,6 +340,29 @@ export function sortDonations<T extends Sortable>(list: T[], sort: SortKey = "da
   return [...list].sort((a, b) => sign * cmp(a, b) || base(a, b));
 }
 
+const eur = (cents: number) => formatAmount(cents / 100);
+
+function DonationStats({ s, openHref }: { s: DonationSummary; openHref: string }) {
+  const card = "stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4";
+  const value = "stat-value text-2xl @4xl:text-3xl";
+  const dash = (n: number, text: string) => (s.count === 0 ? "–" : n === 0 ? "0" : text);
+  return (
+    <div id="donations-stats" class="hidden sm:block @container mb-6">
+      <div class="grid grid-cols-2 @4xl:grid-cols-5 gap-2 @4xl:gap-4">
+        <div class={card}><div class="stat-title text-xs">{t("donations.stats.total")}</div><div class={value}>{eur(s.cents)}</div></div>
+        <div class={card}><div class="stat-title text-xs">{t("donations.stats.count")}</div><div class={value}>{s.count}</div></div>
+        <div class={card}><div class="stat-title text-xs">{t("donations.stats.average")}</div><div class={value}>{s.count === 0 ? "–" : eur(s.averageCents)}</div></div>
+        <div class={card}><div class="stat-title text-xs">{t("donations.stats.donors")}</div><div class={value}>{s.donors}</div></div>
+        <a href={openHref} class={`${card} hover:bg-base-300`}>
+          <div class="stat-title text-xs">{t("donations.stats.open")}</div>
+          <div class={`${value} text-warning`}>{s.open.count}</div>
+          <div class="stat-desc text-sm">{dash(s.open.count, eur(s.open.cents))}</div>
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // GET /donations — list with donor-name search and date range (filtered in JS,
 // same reasoning as members.tsx: the full set is small and already needs to be
 // loaded for the filter to run over joined donor/person fields).
@@ -347,7 +370,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const user = c.get("user");
   const q = c.req.query();
   const search = q.search ?? "";
-  const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" });
+  const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" }, undefined, true);
   const { start: from, end: to } = range;
   const sort: SortKey = (SORT_KEYS as readonly string[]).includes(q.sort) ? (q.sort as SortKey) : "date";
   const dir = q.sort_dir === "asc" || q.sort_dir === "desc" ? q.sort_dir : sort === "donor" ? "asc" : "desc";
@@ -367,13 +390,34 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const sortUrl = (col: SortKey) => buildListUrl("/donations", state, { sort: col, sort_dir: sort === col ? (dir === "asc" ? "desc" : "asc") : col === "donor" ? "asc" : "desc" });
   const th = (col: SortKey, label: string, cls = "") => <th class={cls}><a href={sortUrl(col)} class="link link-hover">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>;
 
-  const presets = rangePresets(todayStr(), "past");
+  const presets = rangePresets(todayStr(), "past", undefined, true);
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
-      <PageHeader title={t("donations.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />} />
+      <PageHeader title={t("donations.title")} actions={<>
+        <label class="flex items-center gap-2 cursor-pointer" title={t("donations.stats.toggle")}>
+          <Icon name="chart-bar" class="w-5 h-5" />
+          <span class="@max-xl:hidden">{t("donations.stats.toggle")}</span>
+          <input type="checkbox" id="donations-stats-toggle" class="toggle" aria-label={t("donations.stats.toggle")} onchange="toggleDonationsStats(this.checked)" />
+        </label>
+        {canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />}
+      </>} />
+
+      <DonationStats s={summarizeDonations(filtered)} openHref={buildListUrl("/donations", { ...state, receipt: ["open"] })} />
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function() {
+          const stats = document.getElementById('donations-stats');
+          const saved = localStorage.getItem('donations_statsVisible');
+          if (saved) stats.style.display = saved === '1' ? 'block' : 'none';
+          document.getElementById('donations-stats-toggle').checked = getComputedStyle(stats).display !== 'none';
+          window.toggleDonationsStats = function(show) {
+            stats.style.display = show ? 'block' : 'none';
+            localStorage.setItem('donations_statsVisible', show ? '1' : '0');
+          };
+        })();
+      ` }} />
 
       <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
         <div class="flex flex-col w-full md:w-auto">

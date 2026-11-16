@@ -1,6 +1,6 @@
 import { sortDonations } from "../routes/donations.js";
 import { describe, it, expect } from "vitest";
-import { nextReceiptStatus, recipientName } from "../lib/donations.js";
+import { nextReceiptStatus, recipientName, summarizeDonations } from "../lib/donations.js";
 
 describe("nextReceiptStatus", () => {
   it("allows the specified transitions only", () => {
@@ -34,4 +34,16 @@ describe("sortDonations", () => {
     expect(ids(sortDonations(list, "amount", "asc"))).toBe("3,2,1");
   });
   it("sorts by donor", () => expect(ids(sortDonations(list, "donor", "asc"))).toBe("3,2,1"));
+});
+
+describe("summarizeDonations", () => {
+  const mk = (amount: string, donorId: string, receiptStatus = "open") => ({ amount, donorId, receiptStatus });
+  it("handles an empty list", () => {
+    expect(summarizeDonations([])).toMatchObject({ count: 0, cents: 0, averageCents: 0, donors: 0, open: { count: 0, cents: 0 } });
+  });
+  it("sums in cents without float drift", () => expect(summarizeDonations([mk("0.10", "a"), mk("0.20", "a")]).cents).toBe(30));
+  it("counts distinct donors, averages, and open receipts", () => {
+    const s = summarizeDonations([mk("10", "a"), mk("20", "a", "issued"), mk("30", "b")]);
+    expect(s).toMatchObject({ count: 3, cents: 6000, averageCents: 2000, donors: 2, open: { count: 2, cents: 4000 } });
+  });
 });

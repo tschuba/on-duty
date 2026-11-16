@@ -40,7 +40,8 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
     : range.mode === "rel" ? relLabel(rel.n, rel.unit, rel.dir, rel.ceremony) + (rel.ref ? ` ${t("filter.quick.ref").toLowerCase()} ${refLabel(rel.ref, todayStr())}` : "")
     : range.mode === "custom" ? t("filter.quick.custom")
     : t("filter.quick.label");
-  const dateText = range.mode === "default" ? "" : formatRange(range.start, range.end, todayStr());
+  // The default range is shown too; an unbounded one (no start/end) reads "Alle".
+  const dateText = formatRange(range.start, range.end, todayStr()) || (range.id === "all" ? "" : t("filter.quick.all"));
   const showRel = range.mode === "rel", showCustom = range.mode === "custom";
   const item = "flex w-full items-center gap-2 px-2 py-1 min-h-11 rounded hover:bg-base-200 text-left";
   const mark = (on: boolean) => <span class="w-4 shrink-0">{on ? "✓" : ""}</span>;

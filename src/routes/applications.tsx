@@ -152,7 +152,7 @@ applicationRoutes.get("/", guard, async (c) => {
   const sort = ((c.req.query("sort") as SortKey) || "submittedAt");
   const dir = ((c.req.query("sort_dir") as "asc" | "desc") || "desc");
 
-  const range = parseRange({ ...c.req.query(), start: c.req.query("from"), end: c.req.query("to") }, todayStr(), "past", { start: "", end: "" });
+  const range = parseRange({ ...c.req.query(), start: c.req.query("from"), end: c.req.query("to") }, todayStr(), "past", { start: "", end: "" }, undefined, true);
   const { start: from, end: to } = range;
   const rp = rangeParams(range, { start: "from", end: "to" });
   const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -161,7 +161,7 @@ applicationRoutes.get("/", guard, async (c) => {
     return (!from || day >= from) && (!to || day <= to);
   };
   const rows = sortApplications((await fetchApplications()).filter((a) => statusFilter.includes(a.status) && inRange(a)), sort, dir);
-  const presets = rangePresets(todayStr(), "past");
+  const presets = rangePresets(todayStr(), "past", undefined, true);
   const forms = await loadApplicationForms();
   const canManageForms = user.permissions.has("applications:manage");
 

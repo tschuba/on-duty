@@ -25,3 +25,26 @@ export async function countOpenReceipts(): Promise<number> {
   const rows = await db.select({ id: donations.id }).from(donations).where(eq(donations.receiptStatus, "open"));
   return rows.length;
 }
+
+type SummaryInput = { amount: string | number; donorId: string; receiptStatus: string };
+export type DonationSummary = {
+  count: number;
+  cents: number;
+  averageCents: number;
+  donors: number;
+  open: { count: number; cents: number };
+};
+
+// Sums in integer cents (no float drift).
+export function summarizeDonations(list: SummaryInput[]): DonationSummary {
+  let cents = 0;
+  const open = { count: 0, cents: 0 };
+  const donors = new Set<string>();
+  for (const d of list) {
+    const c = Math.round(Number(d.amount) * 100);
+    cents += c;
+    donors.add(d.donorId);
+    if (d.receiptStatus === "open") { open.count++; open.cents += c; }
+  }
+  return { count: list.length, cents, averageCents: list.length ? Math.round(cents / list.length) : 0, donors: donors.size, open };
+}
