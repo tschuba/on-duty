@@ -119,6 +119,8 @@ const PH = `${MARK}background:${BG_PH};border-radius:3px;color:color-mix(in okla
 const BLOCK = `${MARK}background:${BG_BLOCK};border-radius:3px;color:color-mix(in oklab, #8b5cf6 65%, var(--color-base-content));`;
 
 // Wechselseitige Hervorhebung: Platzhalter-Name im Text <-> Eintrag in der Platzhalterliste.
+// Schlüssel eines Listeneintrags: Im Text steht sein innerer Name (data-inner).
+const keyOf = (b?: HTMLElement | null) => b?.dataset.ph ?? b?.dataset.cond ?? b?.dataset.inner ?? "";
 const nameOf = (tok: string) => tok.replace(/^\{\{[#/^&]?\s*|\s*\}\}$/g, "");
 function setHot(n: string) {
   document.querySelectorAll<HTMLElement>("[data-n]").forEach((o) => {
@@ -127,8 +129,8 @@ function setHot(n: string) {
     o.style.background = on ? (o.dataset.hl === "block" ? "color-mix(in oklab, #8b5cf6 55%, transparent)" : "rgba(59,130,246,.6)") : o.dataset.hl === "block" ? BG_BLOCK : BG_PH;
   });
   document.querySelectorAll<HTMLElement>("#side-ph li[data-s]").forEach((li) => {
-    const b = li.querySelector<HTMLElement>("[data-ph],[data-cond]");
-    const on = !!n && (b?.dataset.ph ?? b?.dataset.cond) === n;
+    const b = li.querySelector<HTMLElement>("[data-ph],[data-cond],[data-inner]");
+    const on = !!n && keyOf(b) === n;
     li.style.outline = on ? "2px solid var(--color-primary)" : "";
     li.style.background = on ? "color-mix(in oklab, var(--color-primary) 25%, transparent)" : "";
     li.style.borderRadius = on ? "var(--radius-field, 0.25rem)" : "";
@@ -167,9 +169,9 @@ addEventListener("scroll", hideTip, true);
 addEventListener("keydown", (e) => { if (e.key === "Escape") hideTip(); }, true);
 
 const side0 = $("side-ph");
-side0.addEventListener("mouseover", (e) => { const li = (e.target as HTMLElement).closest<HTMLElement>("li[data-s]"); const b = li?.querySelector<HTMLElement>("[data-ph],[data-cond]"); setHot(b?.dataset.ph ?? b?.dataset.cond ?? ""); });
+side0.addEventListener("mouseover", (e) => { const li = (e.target as HTMLElement).closest<HTMLElement>("li[data-s]"); const b = li?.querySelector<HTMLElement>("[data-ph],[data-cond],[data-inner]"); setHot(keyOf(b)); });
 side0.addEventListener("mouseleave", () => setHot(""));
-side0.addEventListener("focusin", (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ph],[data-cond]"); setHot(b?.dataset.ph ?? b?.dataset.cond ?? ""); });
+side0.addEventListener("focusin", (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ph],[data-cond],[data-inner]"); setHot(keyOf(b)); });
 side0.addEventListener("focusout", () => setHot(""));
 
 export function mirror(field: Field) {
