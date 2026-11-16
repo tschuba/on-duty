@@ -1,4 +1,4 @@
-// Platzhalter-Spalte im Mail-Vorlagen-Editor (Einfügen, Spalte, Suche, Tabs, Leave-Warnung).
+// Editorleiste im Mail-Vorlagen-Editor (Einfügen, Platzhalterliste, Suche, Tabs, Leave-Warnung).
 import { slugify } from "../lib/slug.js";
 import { parseHeaders } from "../lib/mail-headers.js";
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -18,7 +18,7 @@ f.addEventListener("submit", () => { dirty = false; });
 window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = msg; } });
 f.querySelectorAll<Field>("input,textarea").forEach((el) => el.addEventListener("focus", () => { last = el; }));
 
-const pg = $("ph-toggle") as HTMLButtonElement, cl = $("ph-close") as HTMLButtonElement, pane = $("pane-edit");
+const pane = $("pane-edit");
 const md = matchMedia("(min-width: 768px)");
 
 // Gemeinsamer Einfüger. wrap: umschließt die Markierung; ohne Markierung steht `inner` zwischen den Tags, der Cursor dahinter.
@@ -42,29 +42,14 @@ document.querySelectorAll<HTMLElement>("[data-cond]").forEach((b) => b.addEventL
   insert("", { open: `{{#${k}}}`, close: `{{/${k}}}`, inner: "" });
 }));
 
-function setPh(o: boolean, save?: boolean) {
-  pane.dataset.open = String(o);
-  pg.setAttribute("aria-expanded", String(o));
-  cl.setAttribute("aria-expanded", String(o));
-  if (!o) side("ph");
-  if (save && md.matches) try { localStorage.setItem("mailPlaceholders", String(o)); } catch { /* privater Modus */ }
-}
-function shut() { setPh(false, true); (md.matches ? cl : pg).focus(); }
-let sv: string | null = null;
-try { sv = localStorage.getItem("mailPlaceholders"); } catch { /* privater Modus */ }
-setPh(md.matches && sv !== "false");
-pg.addEventListener("click", () => setPh(pane.dataset.open !== "true", true));
-$("ph-backdrop").addEventListener("click", shut);
-cl.addEventListener("click", () => { if (md.matches) setPh(pane.dataset.open !== "true", true); else shut(); });
-$("ph-col").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); shut(); } });
-
-function side(n: string) {
-  const t = n === "tech";
-  $("side-ph").classList.toggle("hidden", t);
-  $("side-tech").classList.toggle("hidden", !t);
-  document.querySelectorAll<HTMLElement>("[data-side]").forEach((o) => o.classList.toggle("tab-active", o.dataset.side === n));
-}
-document.querySelectorAll<HTMLElement>("[data-side]").forEach((b) => b.addEventListener("click", () => side(b.dataset.side!)));
+// Platzhalterliste: Popover (Esc, Klick daneben und Fokus-Rückgabe macht der Browser).
+const pb = $("ph-btn") as HTMLButtonElement, pp = $("side-ph");
+const setPh = (o: boolean) => { if (!o) pp.hidePopover?.(); };
+pp.addEventListener("toggle", (e) => {
+  const o = (e as ToggleEvent).newState === "open";
+  pb.setAttribute("aria-expanded", String(o));
+  if (o) $("ph-search").focus();
+});
 
 const se = $("ph-search") as HTMLInputElement;
 const nf = (x: string) => x.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -100,23 +85,9 @@ document.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => b.addEventLi
   if (k === "entry") { lc.click(); return; }
   const p = k === "preview";
   if (p) lc = b;
-  pg.disabled = cl.disabled = p;
+  pb.disabled = p;
   if (en) { en.classList.toggle("hidden", p); cs.forEach((o) => o.classList.toggle("hidden", !p)); }
 }));
-
-// Breite der Platzhalter-Spalte per Ziehgriff (Desktop), gemerkt in localStorage.
-const rz = $("ph-resize");
-const setW = (w: number) => pane.style.setProperty("--ph-w", `${Math.min(Math.max(w, 256), pane.clientWidth * 0.6)}px`);
-try { const w = localStorage.getItem("mailPlaceholdersWidth"); if (w) setW(+w); } catch { /* privater Modus */ }
-rz.addEventListener("pointerdown", (e) => {
-  rz.setPointerCapture(e.pointerId);
-  const move = (m: PointerEvent) => setW(pane.getBoundingClientRect().right - m.clientX);
-  const up = () => {
-    rz.removeEventListener("pointermove", move); rz.removeEventListener("pointerup", up);
-    try { localStorage.setItem("mailPlaceholdersWidth", String(parseFloat(pane.style.getPropertyValue("--ph-w")))); } catch { /* privater Modus */ }
-  };
-  rz.addEventListener("pointermove", move); rz.addEventListener("pointerup", up);
-});
 
 // Höhe des Editor-Bereichs: füllt von seiner Oberkante bis zur Oberkante des Footers (nur Desktop).
 function fit() {
@@ -138,7 +109,7 @@ const BG_PH = "rgba(59,130,246,.28)", BG_BLOCK = `${tok("secondary")}24%, transp
 const PH = `${MARK}background:${BG_PH};border-radius:3px;color:color-mix(in oklab, #3b82f6 65%, var(--color-base-content));`;
 const BLOCK = `${MARK}background:${BG_BLOCK};border-radius:3px;color:color-mix(in oklab, #8b5cf6 65%, var(--color-base-content));`;
 
-// Wechselseitige Hervorhebung: Platzhalter-Name im Text <-> Eintrag in der Seitenleiste.
+// Wechselseitige Hervorhebung: Platzhalter-Name im Text <-> Eintrag in der Platzhalterliste.
 const nameOf = (tok: string) => tok.replace(/^\{\{[#/^&]?\s*|\s*\}\}$/g, "");
 function setHot(n: string) {
   document.querySelectorAll<HTMLElement>("[data-n]").forEach((o) => {
@@ -157,8 +128,8 @@ function setHot(n: string) {
 // Tooltip (Klartextname + Beispielwert) für Platzhalter im Text; Texte stammen aus dem Script-Tag (i18n).
 const ds = document.querySelector<HTMLScriptElement>("script[data-leave]")!.dataset;
 const info = new Map<string, { d: string; e: string; l?: boolean }>();
-// Listen (z. B. recipients) haben keinen Eintrag in der Seitenleiste, stehen aber in #ph-data.
-try { for (const v of JSON.parse($("ph-data")?.textContent ?? "[]")) info.set(v.name, { d: v.desc, e: v.example ?? "", l: v.type === "list" }); } catch { /* ohne Daten nur Seitenleiste */ }
+// Listen (z. B. recipients) haben keinen Eintrag in der Platzhalterliste, stehen aber in #ph-data.
+try { for (const v of JSON.parse($("ph-data")?.textContent ?? "[]")) info.set(v.name, { d: v.desc, e: v.example ?? "", l: v.type === "list" }); } catch { /* ohne Daten nur Platzhalterliste */ }
 document.querySelectorAll<HTMLElement>("#side-ph li[data-k]").forEach((li) => info.set(li.dataset.k!, { d: li.dataset.d ?? "", e: li.dataset.e ?? "" }));
 const tip = document.createElement("div");
 tip.id = "ph-tip"; tip.setAttribute("role", "tooltip");
@@ -258,7 +229,7 @@ export function mirror(field: Field) {
 }
 ["subject", "body"].forEach((n) => mirror(f.elements.namedItem(n) as Field));
 
-// Autovervollständigung bei „{{“ (nur bei getipptem Zeichen; Quelle: Seitenleiste + Listen aus #ph-data).
+// Autovervollständigung bei „{{“ (nur bei getipptem Zeichen; Quelle: Platzhalterliste + Listen aus #ph-data).
 type Ent = { n: string; s: string; d: string; v: boolean; blk: boolean };
 const catalog = (): Ent[] => {
   const m = new Map<string, Ent>();
@@ -397,4 +368,16 @@ if (hdrRows) {
   hdrRows.addEventListener("input", check);
   hdrRows.addEventListener("click", () => queueMicrotask(check)); // nach „Entfernen“
   check();
+}
+
+// Metadaten (eingeklappt): fehlende/fehlerhafte Angaben bleiben als Badge sichtbar; beim Absenden-Versuch klappt der Bereich auf.
+const meta = document.getElementById("tpl-meta") as HTMLDetailsElement | null;
+if (meta) {
+  let srv = meta.dataset.err === "1"; // Serverfehler gelten bis zur nächsten Eingabe
+  const warn = $("tpl-meta-warn");
+  const show = () => { warn.hidden = !(srv || meta.querySelector(":invalid")); };
+  meta.addEventListener("input", () => { srv = false; show(); });
+  meta.addEventListener("click", () => queueMicrotask(show)); // nach „Entfernen“ einer Header-Zeile
+  meta.addEventListener("invalid", () => { meta.open = true; show(); }, true);
+  show();
 }

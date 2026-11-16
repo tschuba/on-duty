@@ -264,3 +264,12 @@ input[data-combo]::-webkit-calendar-picker-indicator { display: none !important;
 
 /* Mail-Editor: der Spiegel färbt den Feldtext (color: transparent); der Platzhalter braucht eine eigene Farbe. */
 .floating-label :is(input, textarea)::placeholder { color: color-mix(in oklab, var(--color-base-content) 50%, transparent); }
+
+/* Roter Stern hinter dem (unsichtbar gespiegelten) Placeholder leerer Pflichtfelder; Position setzt das Script im Layout. */
+.req-star { position: absolute; display: flex; pointer-events: none; z-index: 1; white-space: pre; gap: 0.25rem; color: var(--color-error); font-weight: 700; }
+.req-star i { visibility: hidden; font-style: normal; font-weight: 400; }
+:is(input, textarea):is(:focus, :not(:placeholder-shown)) ~ .req-star { display: none; }
+
+/* daisyUI-Tooltip nur bei Fokus im Feld, nicht bei Hover */
+.tooltip-focus-only:not(:has(:focus-visible)):is(:hover)::before,
+.tooltip-focus-only:not(:has(:focus-visible)):is(:hover)::after { opacity: 0; }

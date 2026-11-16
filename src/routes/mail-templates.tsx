@@ -146,15 +146,17 @@ interface CustomForm {
   isNew: boolean; urgent: boolean; name: string; description: string; prefix: string; headers: string; fields: { name: string; label?: string; example?: string }[];
   key: string; topic: string; audience: string; perms: string[]; topics: string[]; grantable: Permission[];
 }
-// Header als Zeilen „X-Name | Wert“; mindestens eine leere Zeile zum Ausfüllen
+// Header als Zeilen „X-Name | Wert“; leere Zeilen kommen erst per „+“
 const headerRows = (text: string): [string, string][] => {
   const rows = text.split("\n").filter((l) => l.trim()).map((l): [string, string] => { const at = l.indexOf(":"); return at < 0 ? [l.trim(), ""] : [l.slice(0, at).trim(), l.slice(at + 1).trim()]; });
-  return rows.length ? rows : [["", ""]];
+  return rows;
 };
 const HeaderRow = ({ n, v }: { n: string; v: string }) => (
   <div class="flex gap-2 items-center" data-hrow>
-    <input name="hn" class="input input-sm w-2/5 font-mono" value={n} placeholder="X-Name" aria-label={t("mailTemplates.custom.headers.name")} />
-    <input name="hv" class="input input-sm grow" value={v} placeholder={t("mailTemplates.custom.headers.value")} aria-label={t("mailTemplates.custom.headers.value")} />
+    <div class="tooltip tooltip-focus-only tooltip-start w-2/5" data-tip={t("mailTemplates.custom.headers.hint")}>
+      <input name="hn" class="input w-full font-mono" value={n} placeholder="X-Name" aria-label={t("mailTemplates.custom.headers.name")} />
+    </div>
+    <input name="hv" class="input grow font-mono" value={v} placeholder={t("mailTemplates.custom.headers.value")} aria-label={t("mailTemplates.custom.headers.value")} />
     <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label={t("common.remove")} onclick="this.closest('[data-hrow]').remove()">×</button>
   </div>
 );
@@ -188,19 +190,13 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
           : tpl.override ? <p class="mb-4">{t("mailTemplates.status.custom", stamp(tpl.override))}</p> : <div role="status" class="alert alert-info alert-soft mb-4">{t("mailTemplates.status.system")}</div>}
         {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e.replace(/^(form|subject|body|prefix|headers): /, "")}</li>)}</ul></div>}
         {conflict && <div role="alert" class="alert alert-error mb-4"><span>{t("mailTemplates.conflict")} <a class="link" href={`/mail/templates/${key}`}>{t("mailTemplates.conflict.reload")}</a></span></div>}
-        <div class="flex justify-end mb-2 md:hidden">
-          <button type="button" id="ph-toggle" class="btn btn-ghost btn-square" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")}><Icon name="sidebar-expand" class="h-5 w-5 text-gold" /></button>
-        </div>
-        <div role="tablist" class="tabs tabs-lift">
-          <input type="radio" name="tpl-tabs" class="tab" aria-label={t("common.edit")} data-tab="edit" checked />
-          <div class="tab-content bg-base-100 border-base-300 p-4">
-        <div id="pane-edit" data-open="false" class="group grid gap-4 md:grid-rows-[minmax(0,1fr)] md:grid-cols-[1fr_3.25rem] md:relative md:data-[open=true]:grid-cols-[1fr_var(--ph-w,22rem)] md:data-[open=false]:grid-cols-1">
-          <div id="ph-resize" role="separator" aria-orientation="vertical" class="hidden md:group-data-[open=true]:block absolute inset-y-0 z-10 w-2 cursor-col-resize rounded hover:bg-base-300 touch-none" style="right:calc(var(--ph-w,22rem) + 0.25rem)" />
-          <div id="ph-backdrop" class="fixed inset-0 z-40 bg-black/40 md:hidden group-data-[open=false]:hidden" aria-hidden="true" />
-          <form id="tpl-form" method="post" action={`${base}${fromQs(back)}`} class="space-y-4 min-w-0 pt-2 md:overflow-y-auto">
+          <form id="tpl-form" method="post" action={`${base}${fromQs(back)}`} class="space-y-4 min-w-0">
             <input type="hidden" name="updatedAt" value={expected} />
-            {cf && <>
-              <Field label={t("mailTemplates.custom.name")} required class="md:group-data-[open=false]:pr-12"><input id="tpl-name" name="name" class="input w-full" placeholder={t("mailTemplates.custom.name")} value={cf.name} required /></Field>
+              <details id="tpl-meta" open={!!cf?.isNew || errors.some((e) => e.startsWith("form: ") || e.startsWith("headers: "))} data-err={errors.some((e) => e.startsWith("form: ") || e.startsWith("headers: ")) ? "1" : undefined} class="collapse collapse-arrow bg-base-200 border border-base-300 rounded-box">
+                <summary class="collapse-title font-semibold"><span class="flex items-center gap-2">{t("mailTemplates.section.meta")}<span id="tpl-meta-warn" hidden class="badge badge-error badge-soft"><Icon name="exclamation-triangle" class="h-4 w-4" />{t("mailTemplates.section.meta.missing")}</span></span></summary>
+                <div class={`collapse-content grid gap-6 ${cf ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]" : ""}`}>
+                  {cf && <div class="space-y-4 min-w-0">
+              <Field label={t("mailTemplates.custom.name")} required><input id="tpl-name" name="name" class="input w-full" placeholder={t("mailTemplates.custom.name")} value={cf.name} required /></Field>
               <Field label={t("mailTemplates.custom.description")}><input name="description" class="input w-full" placeholder={t("mailTemplates.custom.description")} value={cf.description} /></Field>
               {cf.isNew ? <>
                 <Field label={t("mailTemplates.custom.key")} required hint={t("mailTemplates.custom.key.hint")}><input id="tpl-key" name="key" class="input w-full font-mono" placeholder={t("mailTemplates.custom.key")} value={cf.key} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength={60} required /></Field>
@@ -215,21 +211,13 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   {/* div statt label: ein label würde Klicks an den ersten Chip-Entfernen-Button weiterreichen */}
                   <div class="floating-label w-full">
                     <span>{t("mailTemplates.custom.permissions")}<span class="text-error ml-1">*</span></span>
-                    <PermissionPicker name="editPermissions" options={cf.grantable} values={cf.perms} />
+                    <PermissionPicker name="editPermissions" options={cf.grantable} values={cf.perms} required />
                   </div>
                   <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.permissions.hint")}</p>
                 </div>
               </> : null}
-              <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="urgent" value="1" class="checkbox checkbox-sm" checked={cf.urgent} disabled={!user.permissions.has("system:admin")} />{t("mailTemplates.custom.urgent")}</label>
+              <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="urgent" value="1" class="toggle toggle-primary" checked={cf.urgent} disabled={!user.permissions.has("system:admin")} />{t("mailTemplates.custom.urgent")}</label>
               <p class="label text-xs opacity-70 whitespace-normal -mt-3">{t("mailTemplates.custom.urgent.hint")}</p>
-            </>}
-            <Field label={t("mailTemplates.field.subject")} required class={cf ? undefined : "md:group-data-[open=false]:pr-12"} after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
-              <label class="input w-full font-mono gap-1">{!cf && tpl.prefix ? <span class="text-base-content/60 shrink-0">{tpl.prefix}</span> : null}<input id="tpl-subject" name="subject" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} /></label>
-            </Field>
-            <Field label={t("mailTemplates.field.body")} required after={bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}>
-              <textarea id="tpl-body" name="body" rows={18} class="textarea w-full max-w-full resize-y font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
-            </Field>
-            {cf && <>
               {cf.fields.length > 0 && (
                 <div>
                   <h2 class="font-semibold mb-1">{t("mailTemplates.custom.fields")}</h2>
@@ -237,34 +225,47 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                   <div class="overflow-x-auto"><table class="table table-sm">
                     <tbody>{cf.fields.map((f) => (
                       <tr><td><code>{`{{${f.name}}}`}</code></td>
-                        <td><input name={`fl_${f.name}`} class="input input-sm w-full" value={f.label ?? ""} placeholder={fieldLabel(f.name)} aria-label={`${f.name}: ${t("mailTemplates.custom.fields.label")}`} /></td>
-                        <td><input name={`fe_${f.name}`} class="input input-sm w-full" value={f.example ?? ""} aria-label={`${f.name}: ${t("mailTemplates.custom.fields.example")}`} /></td></tr>
+                        <td><input name={`fl_${f.name}`} class="input w-full" value={f.label ?? ""} placeholder={fieldLabel(f.name)} aria-label={`${f.name}: ${t("mailTemplates.custom.fields.label")}`} /></td>
+                        <td><input name={`fe_${f.name}`} class="input w-full font-mono" value={f.example ?? ""} aria-label={`${f.name}: ${t("mailTemplates.custom.fields.example")}`} /></td></tr>
                     ))}</tbody>
                   </table></div>
                 </div>
               )}
-              <FieldGroup legend={t("mailTemplates.custom.headers")}>
-                <div id="hdr-rows" class="space-y-2">{headerRows(cf.headers).map(([n, v]) => <HeaderRow n={n} v={v} />)}</div>
-                <template id="hdr-tpl"><HeaderRow n="" v="" /></template>
-                <div><button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('hdr-rows').appendChild(document.getElementById('hdr-tpl').content.cloneNode(true))"><Icon name="plus" class="h-4 w-4" />{t("mailTemplates.custom.headers.add")}</button></div>
-                <p class="label text-xs opacity-70 whitespace-normal">{t("mailTemplates.custom.headers.hint")}</p>
-                <p id="err-headers" class="text-error text-sm">{errors.filter((e) => e.startsWith("headers: ")).map((e) => e.replace(/^headers: /, "")).join(" ")}</p>
-              </FieldGroup>
-            </>}
-          </form>
-          <aside id="ph-col" aria-label={t("mailTemplates.placeholders")} class="fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-auto bg-base-100 shadow-xl transition-transform group-data-[open=false]:invisible group-data-[open=false]:translate-x-full md:static md:mt-2 md:inset-auto md:z-auto md:w-auto md:max-w-none md:group-data-[open=true]:[contain:size] md:overflow-y-auto md:rounded-box md:border md:border-base-300 md:shadow-none md:group-data-[open=false]:visible md:group-data-[open=false]:translate-x-0 md:group-data-[open=false]:absolute md:group-data-[open=false]:-top-px md:group-data-[open=false]:-right-px md:group-data-[open=false]:w-[calc(2.5rem+2px)] md:group-data-[open=false]:border-transparent md:group-data-[open=false]:overflow-visible motion-reduce:transition-none">
-            <div class="bg-base-300 md:sticky md:top-0 md:z-10 flex items-center justify-between gap-1 p-0 md:group-data-[open=false]:justify-center md:group-data-[open=false]:bg-transparent">
-              <div role="tablist" class="tabs tabs-sm md:group-data-[open=false]:hidden">
-                <button type="button" role="tab" class="tab tab-active font-bold" data-side="ph">{t("mailTemplates.placeholders")}</button>
-                <button type="button" role="tab" class="tab font-bold" data-side="tech">{t("mailTemplates.technical")}</button>
+                  </div>}
+                  <div class="space-y-4 min-w-0 lg:border-l lg:border-base-300 lg:pl-6">
+                    <h3 class="font-semibold">{t("mailTemplates.technical")}</h3>
+              <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+                <dt class="opacity-60">{t("mailTemplates.technical.category")}</dt><dd>{T(`mail.type.${entry.category}`)}</dd>
+                <dt class="opacity-60">{t("mailTemplates.technical.audience")}</dt><dd>{T(`mailTemplates.audience.${tpl.audience}`)}</dd>
+                <dt class="opacity-60">{t("mailTemplates.technical.prefix")}</dt><dd>{cf || !tpl.prefix ? "–" : <code class="font-mono">{tpl.prefix}</code>}</dd>
+              </dl>
+              <div class="space-y-2">
+                <div class="@container flex items-center justify-between gap-2">
+                  <h4 class="text-sm opacity-60">{t("mailTemplates.technical.headers")}</h4>
+                  {cf && <button type="button" class="btn btn-outline btn-xs" aria-label={t("mailTemplates.custom.headers.add")} title={t("mailTemplates.custom.headers.add")} onclick="document.getElementById('hdr-rows').appendChild(document.getElementById('hdr-tpl').content.cloneNode(true))"><Icon name="plus" class="h-3 w-3" /><span class="hidden @xs:inline">{t("mailTemplates.custom.headers.add")}</span></button>}
+                </div>
+                {[["Category", tpl.category], ["Event", cf ? `custom-${cf.key || tpl.key}` : tpl.key], ["Audience", tpl.audience]].map(([n, v]) => (
+                  <code class="block font-mono text-xs bg-base-200 rounded-field px-2 py-1 break-all">X-On-Duty-{n}: {v}</code>
+                ))}
+                {cf && <>
+                  <div id="hdr-rows" class="space-y-2">{headerRows(cf.headers).map(([n, v]) => <HeaderRow n={n} v={v} />)}</div>
+                  <template id="hdr-tpl"><HeaderRow n="" v="" /></template>
+                  <p id="err-headers" class="text-error text-sm">{errors.filter((e) => e.startsWith("headers: ")).map((e) => e.replace(/^headers: /, "")).join(" ")}</p>
+                </>}
               </div>
-              <button type="button" id="ph-close" class="btn btn-ghost btn-square btn-md md:inline-flex md:tooltip md:tooltip-left" aria-expanded="false" aria-controls="ph-col" aria-label={t("mailTemplates.sidebar")} data-tip={t("mailTemplates.sidebar")}>
-                <Icon name="sidebar-expand" class="h-5 w-5 text-gold md:group-data-[open=false]:hidden" />
-                <Icon name="sidebar-collapse" class="h-5 w-5 text-gold hidden md:group-data-[open=false]:block" />
-              </button>
-            </div>
-            <div id="side-ph" class="md:group-data-[open=false]:hidden p-2 space-y-2 text-sm">
-              <input id="ph-search" type="search" class="input input-sm w-full" placeholder={t("mailTemplates.search")} aria-label={t("mailTemplates.search")} autocomplete="off" />
+                  </div>
+                </div>
+              </details>
+        <div role="tablist" class="tabs tabs-lift">
+          <input form="none" type="radio" name="tpl-tabs" class="tab" aria-label={t("common.edit")} data-tab="edit" checked />
+          <div class="tab-content bg-base-100 border-base-300 p-4">
+            <div id="tpl-bar" role="toolbar" aria-label={t("mailTemplates.bar")} class="sticky top-0 z-10 -mx-4 -mt-4 mb-4">
+              <div class="flex items-center gap-1 rounded-t-box rounded-tl-none border-b border-base-300 bg-base-200 px-4 py-2">
+                <button type="button" id="ph-btn" class="btn btn-ghost btn-sm" popovertarget="side-ph" style="anchor-name:--ph-btn" aria-expanded="false" aria-controls="side-ph" title={t("mailTemplates.placeholders")}><Icon name="plus" class="h-4 w-4" /><span class="max-sm:hidden">{t("mailTemplates.placeholders")}</span></button>
+                <span class="ml-auto text-xs text-base-content/60 max-sm:hidden">{t("mailTemplates.bar.hint")} <kbd class="kbd kbd-xs">{"{{"}</kbd></span>
+              </div>
+              <div id="side-ph" popover="auto" style="position-anchor:--ph-btn" aria-label={t("mailTemplates.placeholders")} class="dropdown w-96 max-w-[calc(100vw-1rem)] max-h-96 overflow-auto rounded-box border border-base-300 bg-base-100 p-2 space-y-2 text-sm shadow-xl">
+              <input id="ph-search" type="search" class="input input-sm w-full sticky top-0 z-10" placeholder={t("mailTemplates.search")} aria-label={t("mailTemplates.search")} autocomplete="off" />
               <p id="ph-empty" class="hidden text-base-content/60 p-1" role="status">{t("mailTemplates.search.empty")}</p>
               {GROUPS.map((g) => {
                 const cond = (k: string, v: { optional?: boolean; type: string }) => v.optional && v.type !== "boolean" && !requiredNames.has(k);
@@ -298,24 +299,27 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                 );
               })}
             </div>
-            <dl id="side-tech" class="hidden text-sm p-3 space-y-3">
-              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.category")}</dt><dd>{T(`mail.type.${entry.category}`)}</dd></div>
-              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.audience")}</dt><dd>{T(`mailTemplates.audience.${tpl.audience}`)}</dd></div>
-              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.prefix")}</dt><dd><code>{cf ? "" : tpl.prefix}</code></dd></div>
-              <div><dt class="text-xs uppercase tracking-wide text-base-content/60">{t("mailTemplates.technical.headers")}</dt>
-                <dd class="break-all"><code class="block">X-On-Duty-Category: {tpl.category}</code><code class="block">X-On-Duty-Event: {cf ? `custom-${cf.key || tpl.key}` : tpl.key}</code><code class="block">X-On-Duty-Audience: {tpl.audience}</code></dd></div>
-            </dl>
-          </aside>
+            </div>
+        <div id="pane-edit" class="grid gap-4 md:grid-rows-[minmax(0,1fr)]">
+        <div class="space-y-4 min-w-0 pt-2 md:overflow-y-auto">
+            <Field label={t("mailTemplates.field.subject")} required after={errors.filter((e) => e.startsWith("subject:")).map((e) => <p id="err-subject" class="text-error text-sm">{e.replace(/^subject: /, "")}</p>)}>
+              <label class="input w-full font-mono gap-1">{!cf && tpl.prefix ? <span class="text-base-content/60 shrink-0">{tpl.prefix}</span> : null}<input id="tpl-subject" name="subject" autocomplete="off" placeholder={t("mailTemplates.field.subject")} value={values.subject} required aria-describedby={errors.some((e) => e.startsWith("subject:")) ? "err-subject" : undefined} /></label>
+            </Field>
+            <Field label={t("mailTemplates.field.body")} required after={bodyErr.map((e) => <p id="err-body" class="text-error text-sm">{e.replace(/^(body|prefix): /, "")}</p>)}>
+              <textarea id="tpl-body" name="body" autocomplete="off" rows={18} class="textarea w-full max-w-full resize-y font-mono" placeholder={t("mailTemplates.field.body")} required aria-describedby={bodyErr.length ? "err-body" : undefined}>{values.body}</textarea>
+            </Field>
+        </div>
         </div>
           </div>
-          {entry.previewCases.length > 1 && <input type="radio" name="tpl-tabs" class="tab" aria-label={t("mailTemplates.preview")} data-tab="entry" />}
+          {entry.previewCases.length > 1 && <input form="none" type="radio" name="tpl-tabs" class="tab" aria-label={t("mailTemplates.preview")} data-tab="entry" />}
           {entry.previewCases.map((x) => (
             <>
-              <input type="radio" name="tpl-tabs" class={entry.previewCases.length > 1 ? "tab hidden text-secondary checked:font-semibold [--tab-bg:var(--color-base-200)] [--tab-border-color:var(--color-secondary)]" : "tab"} aria-label={entry.previewCases.length > 1 ? x.label : t("mailTemplates.preview")} data-tab="preview" data-case={x.id} hx-post={`${base}/preview`} hx-include="#tpl-form" hx-vals={JSON.stringify({ case: x.id })} hx-target={`#preview-${x.id}`} />
+              <input form="none" type="radio" name="tpl-tabs" class={entry.previewCases.length > 1 ? "tab hidden text-secondary checked:font-semibold [--tab-bg:var(--color-base-200)] [--tab-border-color:var(--color-secondary)]" : "tab"} aria-label={entry.previewCases.length > 1 ? x.label : t("mailTemplates.preview")} data-tab="preview" data-case={x.id} hx-post={`${base}/preview`} hx-include="#tpl-form" hx-vals={JSON.stringify({ case: x.id })} hx-target={`#preview-${x.id}`} />
               <div class="tab-content bg-base-100 border-secondary p-4"><div id={`preview-${x.id}`} /></div>
             </>
           ))}
         </div>
+        </form>
         {cf && !cf.isNew && (
           <dialog id="delete-dialog" class="modal">
             <div class="modal-box">

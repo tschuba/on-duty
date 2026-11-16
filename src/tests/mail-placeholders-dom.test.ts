@@ -2,15 +2,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const DOM = `<script data-leave="Verlassen?" data-tip-if="Nur wenn vorhanden" data-tip-end="Ende des Blocks" data-ac-count="{n} Treffer" data-ac-none="Keine"></script>
-<form id="tpl-form"><input name="subject"><textarea name="body"></textarea></form>
-<button id="ph-toggle"></button><button id="ph-close"></button><div id="ph-backdrop"></div><div id="ph-resize"></div>
+<form id="tpl-form"><div id="s"><label class="floating-label"><input name="subject"></label></div><div id="tpl-bar-slot"></div><div id="b"><label class="floating-label"><textarea name="body"></textarea></label></div></form>
 <div id="pane-edit"></div>
 <div id="hdr-rows"><div data-hrow><input name="hn"><input name="hv"></div></div><p id="err-headers"></p>
-<div id="ph-col"><input id="ph-search">
-<button data-side="ph" class="tab-active"></button><button data-side="tech"></button>
-<script id="ph-data" type="application/json">[{"name":"lst","desc":"Liste","example":"","type":"list"}]</script><div id="side-ph"><section data-g><ul>
+<div id="tpl-bar" data-x><button id="ph-btn" aria-expanded="false"></button>
+<script id="ph-data" type="application/json">[{"name":"lst","desc":"Liste","example":"","type":"list"}]</script><div id="side-ph"><input id="ph-search"><section data-g><ul>
 <li data-s="Café"><button data-ph="a.cafe"></button></li><li data-k="l[].nm" data-d="Listenname" data-e="Anna"><button data-ph="l[].nm"></button></li><li data-s="Name" data-k="a.name" data-d="Name" data-e="Max"><button data-ph="a.name"></button></li></ul></section>
-<button data-cond="a.name"></button></div><div id="side-tech" class="hidden"></div><p id="ph-empty" class="hidden"></p></div>
+<button data-cond="a.name"></button></div><p id="ph-empty" class="hidden"></p></div>
 <input type="radio" name="t" data-tab="edit" checked><input type="radio" name="t" data-tab="entry" class="tab"><input type="radio" name="t" data-tab="preview" data-case class="hidden">`;
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -61,34 +59,10 @@ describe("mail placeholders editor", () => {
     document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
     expect(s.value).toBe("{{a.name}}");
   });
-  it("toggles/closes pane and remembers it", () => {
-    expect($("pane-edit").dataset.open).toBe("true");
-    $("ph-toggle").click();
-    expect($("pane-edit").dataset.open).toBe("false");
-    expect(localStorage.getItem("mailPlaceholders")).toBe("false");
-    $("ph-toggle").click();
-    expect($("pane-edit").dataset.open).toBe("true");
-    $("ph-col").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    expect($("pane-edit").dataset.open).toBe("false");
-  });
-  it("mobile: starts closed, insert closes pane, close button shuts", () => {
-    vi.resetModules();
-    document.body.innerHTML = DOM;
-    vi.stubGlobal("matchMedia", () => ({ matches: false }));
-    return import("../browser/mail-placeholders.js").then(() => {
-      expect($("pane-edit").dataset.open).toBe("false");
-      $("ph-toggle").click();
-      expect($("pane-edit").dataset.open).toBe("true");
-      document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
-      expect($("pane-edit").dataset.open).toBe("false");
-      $("ph-toggle").click(); $("ph-close").click();
-      expect($("pane-edit").dataset.open).toBe("false");
-    });
-  });
-  it("switches side tabs", () => {
-    document.querySelector<HTMLElement>("[data-side=tech]")!.click();
-    expect($("side-tech").classList.contains("hidden")).toBe(false);
-    expect($("side-ph").classList.contains("hidden")).toBe(true);
+  it("insert closes the popover on mobile only", () => {
+    const hide = vi.fn(); ($("side-ph") as any).hidePopover = hide;
+    document.querySelector<HTMLElement>("[data-ph='a.name']")!.click();
+    expect(hide).not.toHaveBeenCalled();
   });
   it("searches accent-insensitively, Enter inserts single hit, Escape clears", () => {
     const se = $("ph-search") as HTMLInputElement;
@@ -105,11 +79,11 @@ describe("mail placeholders editor", () => {
   it("preview/entry tabs", () => {
     // Der Eintrags-Tab springt zur zuletzt gewählten Vorschau-Variante.
     document.querySelector<HTMLElement>("[data-tab=entry]")!.click();
-    expect(($("ph-toggle") as HTMLButtonElement).disabled).toBe(true);
+    expect(($("ph-btn") as HTMLButtonElement).disabled).toBe(true);
     expect(document.querySelector("[data-tab=entry]")!.classList.contains("hidden")).toBe(true);
     expect(document.querySelector("[data-case]")!.classList.contains("hidden")).toBe(false);
     document.querySelector<HTMLElement>("[data-tab=edit]")!.click();
-    expect(($("ph-toggle") as HTMLButtonElement).disabled).toBe(false);
+    expect(($("ph-btn") as HTMLButtonElement).disabled).toBe(false);
   });
   it("warns on leave only when dirty", () => {
     const ev = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e; };

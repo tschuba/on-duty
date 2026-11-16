@@ -4,7 +4,7 @@ import type { Permission } from "../lib/roles.js";
 
 // Durchsuchbare, nach Ressource gruppierte Rechte-Auswahl als Chips (Hidden-Input je Chip).
 // Panel öffnet beim Fokus; Tippen filtert, Enter übernimmt den ersten Treffer. Skript einmal je Seite.
-export function PermissionPicker({ name, options, values }: { name: string; options: Permission[]; values: string[] }) {
+export function PermissionPicker({ name, options, values, required }: { name: string; options: Permission[]; values: string[]; required?: boolean }) {
   const groups = new Map<string, Permission[]>();
   for (const p of options) groups.set(p.split(":")[0], [...(groups.get(p.split(":")[0]) ?? []), p]);
   const chip = (p: string) => (
@@ -16,9 +16,10 @@ export function PermissionPicker({ name, options, values }: { name: string; opti
   );
   return (
     <div class="relative w-full" data-perm-picker data-name={name} data-remove={t("common.remove")}>
-      <div class="pp-box input w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1 cursor-text">
+      <div class="pp-box group relative input w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1 cursor-text">
         {values.filter((p) => options.includes(p as Permission)).map(chip)}
-        <input type="text" class="pp-text grow min-w-32 outline-none bg-transparent font-[inherit] text-base" placeholder={t("mailTemplates.custom.permissions.search")} aria-label={t("mailTemplates.custom.permissions")} autocomplete="off" />
+        <input type="text" class="pp-text grow min-w-32 outline-none bg-transparent font-[inherit] text-sm" placeholder={t("mailTemplates.custom.permissions.search")} aria-label={t("mailTemplates.custom.permissions")} autocomplete="off" />
+        {required && <b class="pointer-events-none absolute inset-y-0 left-[calc(0.75rem+1px)] flex items-center gap-1 text-sm font-bold text-error group-focus-within:hidden group-has-[[data-chip]]:hidden" aria-hidden="true"><i class="invisible not-italic font-normal">{t("mailTemplates.custom.permissions.search")}</i>*</b>}
       </div>
       <div hidden class="pp-panel absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-box border border-base-300 bg-base-100 shadow p-2 space-y-2">
         {[...groups].map(([res, perms]) => (
