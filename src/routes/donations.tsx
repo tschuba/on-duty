@@ -359,32 +359,6 @@ function DonationStats({ s, openHref }: { s: DonationSummary; openHref: string }
           <div class="stat-desc text-sm">{dash(s.open.count, eur(s.open.cents))}</div>
         </a>
       </div>
-      {s.years.length > 0 && (
-        <div class="overflow-x-auto mt-4">
-          <table class="table table-zebra w-full">
-            <thead>
-              <tr>
-                <th>{t("donations.stats.year")}</th>
-                <th class="text-right">{t("donations.stats.count")}</th>
-                <th class="text-right">{t("donations.stats.total")}</th>
-                <th class="text-right">{t("donations.stats.cash")}</th>
-                <th class="text-right">{t("donations.stats.transfer")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {s.years.map((y) => (
-                <tr>
-                  <td>{y.year}</td>
-                  <td class="text-right">{y.count}</td>
-                  <td class="text-right whitespace-nowrap">{eur(y.cents)}</td>
-                  <td class="text-right whitespace-nowrap">{eur(y.cashCents)}</td>
-                  <td class="text-right whitespace-nowrap">{eur(y.transferCents)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }

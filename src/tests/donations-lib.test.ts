@@ -37,17 +37,13 @@ describe("sortDonations", () => {
 });
 
 describe("summarizeDonations", () => {
-  const mk = (amount: string, date: string, donorId: string, type: string | null = "cash", receiptStatus = "open") => ({ amount, date, donorId, type, receiptStatus });
+  const mk = (amount: string, donorId: string, receiptStatus = "open") => ({ amount, donorId, receiptStatus });
   it("handles an empty list", () => {
-    const s = summarizeDonations([]);
-    expect(s).toMatchObject({ count: 0, cents: 0, averageCents: 0, donors: 0, years: [] });
+    expect(summarizeDonations([])).toMatchObject({ count: 0, cents: 0, averageCents: 0, donors: 0, open: { count: 0, cents: 0 } });
   });
-  it("sums in cents without float drift", () => expect(summarizeDonations([mk("0.10", "2026-01-01", "a"), mk("0.20", "2026-01-02", "a")]).cents).toBe(30));
-  it("counts distinct donors, averages, and groups by year", () => {
-    const s = summarizeDonations([mk("10", "2025-05-01", "a"), mk("20", "2026-01-01", "a", "transfer", "issued"), mk("30", "2026-02-01", "b", null)]);
-    expect(s.donors).toBe(2);
-    expect(s.averageCents).toBe(2000);
-    expect(s.open).toEqual({ count: 2, cents: 4000 });
-    expect(s.years.map((y) => [y.year, y.count, y.cents, y.cashCents, y.transferCents])).toEqual([["2026", 2, 5000, 0, 2000], ["2025", 1, 1000, 1000, 0]]);
+  it("sums in cents without float drift", () => expect(summarizeDonations([mk("0.10", "a"), mk("0.20", "a")]).cents).toBe(30));
+  it("counts distinct donors, averages, and open receipts", () => {
+    const s = summarizeDonations([mk("10", "a"), mk("20", "a", "issued"), mk("30", "b")]);
+    expect(s).toMatchObject({ count: 3, cents: 6000, averageCents: 2000, donors: 2, open: { count: 2, cents: 4000 } });
   });
 });
