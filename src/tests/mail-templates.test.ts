@@ -129,3 +129,20 @@ describe("mail templates", () => {
     expect(readFileSync("docs/mail-variables.md", "utf8")).toBe(catalogDocs());
   });
 });
+
+describe("requiredStatus", () => {
+  it("tracks ok, missing, incomplete, custom and urgent", async () => {
+    const { requiredStatus } = await import("../lib/mail-templates.js");
+    const st = (body: string, key = "event-created", urgent = false) => requiredStatus(key, { subject: "S", body, urgent });
+    expect(st("x").items.map((i) => i.ok)).toEqual([false]);
+    expect(st("{{#recipients}}{{optOutUrl}}{{/recipients}}").items.every((i) => i.ok)).toBe(true);
+    expect(st("{{optOutUrl}}").items[0].ok).toBe(false);
+    expect(st("{{#recipients}}").incomplete).toBe(true);
+    expect(st("x", "").items[0].label).toBe("Abmelde-Link");
+    expect(st("x", "", true).items).toEqual([]);
+    for (const k of Object.keys(CATALOG)) {
+      const s = st("x", k);
+      expect(s.items.every((i) => i.ok)).toBe(!validateTemplate(k, { subject: "S", body: "x" }).some((e) => e.startsWith("Pflichtplatzhalter")));
+    }
+  });
+});
