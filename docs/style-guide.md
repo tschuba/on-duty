@@ -98,7 +98,7 @@ Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
 - Kein Vorfahr darf `overflow` ≠ `visible` haben, sonst bricht Sticky. Deshalb stehen Pager und Leiste **außerhalb** von `overflow-x-auto`-Wrappern.
 - Sticky gilt nur innerhalb des Eltern-Elements: Leiste und Liste/Tabelle müssen im selben Container liegen, ohne Zwischen-Wrapper mit kurzer Höhe. Fehlerbild: Leiste scrollt nach kurzer Strecke weg (so zuvor in `/anniversaries`).
 - `display: contents` am Sticky-Element selbst ist wirkungslos; Klasse an das umgebende `<div>` setzen.
-- `--header-h` ist geschätzt (4rem); `--filter-h` wird im Layout gemessen. Ändert sich die Höhe des `PageHeader`, muss der Wert mit; ändert sich die Höhe des `PageHeader`, muss der Wert mit.
+- `--header-h` ist geschätzt (4rem); `--filter-h` wird im Layout gemessen. Ändert sich die Höhe des `PageHeader`, muss der Wert mit.
 
 ## Ansichten-Umschalter
 
