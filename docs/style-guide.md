@@ -108,6 +108,13 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - Unter `sm`: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
 - Nicht für Unterseiten mit eigenen Rechten/Zählern (dort Sidebar) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
 
+## Tabs
+
+Tabs (`role="tablist"`, daisyUI `tabs`) schalten Inhalte **innerhalb eines Formulars oder Panels** um. Seitenweite Ansichten sind Sache von `TitleSwitch`, Filter von `filter`/`ToggleFilter`.
+
+- **Panel mit Inhalt** (z. B. Bearbeiten/Vorschau im Vorlagen-Editor): `tabs tabs-lift`, Inhalt in `tab-content bg-base-100 border-base-300 p-4`. Umschaltung per Radio-`input.tab` (kein JS), `aria-label` trägt den Namen.
+- **Auswahlleiste ohne eigenes Panel** (z. B. Rollen-Typ-Auswahl): `tabs tabs-border`, `button.tab` mit `tab-active`.
+
 ## Buttons
 
 Die Bedeutung hängt an der Farb-/Outline-Kombination:
