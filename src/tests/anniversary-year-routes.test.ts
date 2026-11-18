@@ -134,6 +134,9 @@ vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof impor
 vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve(backupStatus) }));
 
 const { yearRoutes: yearRoutes } = await import("../routes/anniversary-years.js");
+const { anniversaryRoutes } = await import("../routes/anniversaries.js");
+// Die Liste lebt auf /anniversaries?view=years; /anniversary-years leitet nur um.
+const yearsList = (qs = "") => anniversaryRoutes.request(`/?view=years${qs ? `&${qs}` : ""}`);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -195,20 +198,20 @@ function makeYear(overrides: Record<string, unknown> = {}) {
 describe("GET /anniversaries", () => {
   it("shows the empty state", async () => {
     yearsFixture = [];
-    const html = await (await yearRoutes.request("/")).text();
+    const html = await (await yearsList()).text();
     expect(html).toContain(t("admin.anniversaries.empty"));
   });
 
   it("renders a titled year with its delete confirmation", async () => {
     yearsFixture = [makeYear({ year: 25, title: "Silber" })];
-    const html = await (await yearRoutes.request("/")).text();
+    const html = await (await yearsList()).text();
     expect(html).toContain("Silber");
     expect(html).toContain(t("admin.anniversaries.confirmDelete.bodyWithTitle", { kind: "Dienst", year: "25", title: "Silber" }));
   });
 
   it("falls back to an em-dash and untitled delete text when title is null", async () => {
     yearsFixture = [makeYear({ year: 10, title: null })];
-    const html = await (await yearRoutes.request("/")).text();
+    const html = await (await yearsList()).text();
     expect(html).toContain(t("admin.anniversaries.confirmDelete.body", { kind: "Dienst", year: "10" }));
   });
 });
@@ -216,10 +219,10 @@ describe("GET /anniversaries", () => {
 describe("GET /anniversaries?kind=", () => {
   it("filters rows by kind", async () => {
     yearsFixture = [makeYear({ kind: "service", year: 25, title: "Dienst25" }), makeYear({ kind: "membership", year: 10, title: "Mitgl10" })];
-    const html = await (await yearRoutes.request("/?kind=membership")).text();
+    const html = await (await yearsList("kind=membership")).text();
     expect(html).toContain("Mitgl10");
     expect(html).not.toContain("Dienst25");
-    const all = await (await yearRoutes.request("/?kind=bogus")).text();
+    const all = await (await yearsList("kind=bogus")).text();
     expect(all).toContain("Dienst25");
   });
 });
@@ -227,9 +230,9 @@ describe("GET /anniversaries?kind=", () => {
 describe("GET /anniversaries?sort=", () => {
   it("sorts by year descending and ignores bogus sort values", async () => {
     yearsFixture = [makeYear({ year: 10, title: "Aa" }), makeYear({ year: 50, title: "Zz" })];
-    const html = await (await yearRoutes.request("/?sort=year&dir=desc")).text();
+    const html = await (await yearsList("sort=year&dir=desc")).text();
     expect(html.indexOf("Zz")).toBeLessThan(html.indexOf("Aa"));
-    const bogus = await (await yearRoutes.request("/?sort=x")).text();
+    const bogus = await (await yearsList("sort=x")).text();
     expect(bogus.indexOf("Aa")).toBeLessThan(bogus.indexOf("Zz"));
   });
 });
@@ -324,21 +327,21 @@ describe("anniversary-year permissions", () => {
   it("hides anniversary-year write and delete controls without those permissions", async () => {
     yearsFixture = [{ kind: "service", year: 25, title: null }];
     currentUser = { id: "u1", disabled: false, permissions: new Set(["anniversary-years:read"]) };
-    const ro = await (await yearRoutes.request("/")).text();
+    const ro = await (await yearsList()).text();
     expect(ro).not.toContain(t("admin.anniversaries.newYear"));
     expect(ro).not.toContain("/edit");
     expect(ro).not.toContain("delete-year-");
     currentUser = { id: "u1", disabled: false, permissions: new Set(["anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
-    const rw = await (await yearRoutes.request("/")).text();
+    const rw = await (await yearsList()).text();
     expect(rw).toContain(t("admin.anniversaries.newYear"));
     expect(rw).toContain("delete-year-");
   });
 });
 
-describe("GET /anniversary-years toggle filter", () => {
+describe("GET /anniversaries?view=years toggle filter", () => {
   const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
   it("both toggles on without a parameter, no \"Alle\" entry", async () => {
-    const html = await (await yearRoutes.request("/")).text();
+    const html = await (await yearsList()).text();
     const inputs = toggleInputs(html);
     expect(inputs).toHaveLength(2);
     expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(2);
@@ -348,12 +351,20 @@ describe("GET /anniversary-years toggle filter", () => {
 
   it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
     for (const [qs, idx] of [["?kind=service", 0], ["?kind=membership", 1]] as const) {
-      const inputs = toggleInputs(await (await yearRoutes.request(`/${qs}`)).text());
+      const inputs = toggleInputs(await (await yearsList(qs.slice(1))).text());
       expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
       expect(inputs[idx]).toContain("checked");
       expect(inputs[idx]).not.toContain("disabled");
       expect(inputs[idx]).toContain(["kind=service", "kind=membership"][1 - idx]);
       expect(inputs[1 - idx]).not.toContain("checked");
     }
+  });
+});
+
+describe("GET /anniversary-years (legacy)", () => {
+  it("redirects to the combined page and keeps the query", async () => {
+    const res = await yearRoutes.request("/?kind=service&sort=year");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/anniversaries?kind=service&sort=year&view=years");
   });
 });

@@ -17,6 +17,8 @@ import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
 import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
 import { t } from "../i18n/index.js";
+import { TitleSwitch } from "../components/title-switch.js";
+import { anniversaryViews, renderYears } from "./anniversary-years.js";
 
 export const anniversaryRoutes = new Hono<{ Variables: Variables }>();
 
@@ -197,8 +199,11 @@ function AnniversariesExportModal() {
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
-anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
+anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"]), async (c) => {
   const user = c.get("user")!;
+  const perms = user.permissions as Set<string>;
+  // Jahre-Ansicht, wenn gewünscht oder wenn nur dieses Recht vorhanden ist.
+  if ((c.req.query("view") === "years" || !perms.has("members:read")) && perms.has("anniversary-years:read")) return renderYears(c);
   const today = todayStr();
 
   const range = parseRange(c.req.query(), today, "future", { start: today, end: addMonths(today, 12) }, env.ANNIVERSARY_CUTOFF);
@@ -239,7 +244,7 @@ anniversaryRoutes.get("/", requireAuth("members:read"), async (c) => {
     <Layout title={t("anniversaries.title")} user={user}>
       <div class="max-w-4xl mx-auto">
       <div class="contents">
-        <PageHeader title={t("anniversaries.title")} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
+        <PageHeader title={<TitleSwitch items={anniversaryViews(perms, false)} />} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
 
         {/* Controls */}
         <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
