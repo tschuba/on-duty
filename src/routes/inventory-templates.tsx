@@ -3,10 +3,12 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryTemplates, inventoryTemplateFieldDefs, inventoryTemplateInspections } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
+import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { DeleteDialog } from "../components/delete-dialog.js";
+import { inventoryTitle } from "./inventory-fields.js";
 import { setFlash } from "../lib/flash.js";
 import { INSPECTION_NAME_MAX, INVENTORY_FIELDS, TEMPLATE_DESCRIPTION_MAX, isUniqueViolation, type InventoryField } from "../lib/inventory.js";
 import { trimmed, parseList } from "../lib/forms.js";
@@ -15,6 +17,7 @@ import { t } from "../i18n/index.js";
 export const inventoryTemplateRoutes = new Hono<{ Variables: Variables }>();
 const configure = requireAuth("inventory:configure"); // ein Recht für alles: kein Leserecht, daher kein Redirect /:id/edit → /:id
 const BASE = "/inventory/templates";
+export const LIST = "/inventory?view=templates";
 
 type FieldDef = { id: string; name: string; archived: boolean };
 type InspectionTemplate = { id: string; name: string };
@@ -84,11 +87,17 @@ function TemplateFields({ values, defs, inspections }: { values?: Values; defs: 
 }
 
 // ponytail: kein Pager, bei > ca. 50 Zeilen nachrüsten.
-inventoryTemplateRoutes.get("/", configure, async (c) => {
-  const rows = ((await db.query.inventoryTemplates.findMany({ with: { fieldDefs: true, inspections: true } })) as TemplateRow[]).sort(byName);
+export async function renderTemplateList(c: any) {
+  const search = (c.req.query("search") ?? "").trim().toLowerCase();
+  const rows = ((await db.query.inventoryTemplates.findMany({ with: { fieldDefs: true, inspections: true } })) as TemplateRow[]).filter((r) => r.name.toLowerCase().includes(search)).sort(byName);
   return c.html(
     <Layout title={t("inventory.itemTemplates.title")} user={c.get("user")!}>
-      <PageHeader title={t("inventory.itemTemplates.title")} backHref="/inventory" subtitle={t("inventory.itemTemplates.hint")} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.itemTemplates.new")} href={`${BASE}/new`} class="btn-primary" />} />
+      <PageHeader title={inventoryTitle("templates", true)} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.itemTemplates.new")} href={`${BASE}/new`} class="btn-primary" />} />
+      <p class="text-sm opacity-70 max-w-3xl mb-4">{t("inventory.itemTemplates.hint")}</p>
+      <form method="get" action="/inventory" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
+        <input type="hidden" name="view" value="templates" />
+        <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+      </form>
       <div class="overflow-x-auto max-w-3xl">
         <table class="table table-zebra w-full">
           <thead>
@@ -114,7 +123,9 @@ inventoryTemplateRoutes.get("/", configure, async (c) => {
       </div>
     </Layout>
   );
-});
+}
+
+inventoryTemplateRoutes.get("/", configure, (c) => c.redirect(LIST));
 
 async function renderForm(c: any, opts: { id?: string; values?: Values; error?: string; status?: 200 | 422 } = {}) {
   const { id } = opts;
@@ -128,7 +139,7 @@ async function renderForm(c: any, opts: { id?: string; values?: Values; error?: 
   const title = t(id ? "inventory.itemTemplates.edit" : "inventory.itemTemplates.new");
   return c.html(
     <Layout title={title} user={c.get("user")!}>
-      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : BASE} actions={<FormActions formId="item-template-form" cancelHref={id ? `${BASE}/${id}` : BASE} />} />
+      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : LIST} actions={<FormActions formId="item-template-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
       {opts.error && <div class="alert alert-error max-w-2xl mb-4" role="alert">{opts.error}</div>}
       <form id="item-template-form" method="post" action={id ? `${BASE}/${id}` : BASE} class="flex flex-col gap-4 max-w-2xl">
         <TemplateFields values={values} defs={defs} inspections={inspections} />
@@ -150,7 +161,7 @@ inventoryTemplateRoutes.get("/:id", configure, async (c) => {
   const remove = <DeleteDialog header id={`item-template-${id}`} action={`${BASE}/${id}/delete`} title={t("inventory.itemTemplates.deleteTitle")} body={t("inventory.itemTemplates.deleteConfirm")} />;
   return c.html(
     <Layout title={row.name} user={c.get("user")!}>
-      <PageHeader title={row.name} backHref={BASE} actions={<DetailActions editHref={`${BASE}/${id}/edit`} remove={remove} />} />
+      <PageHeader title={row.name} backHref={LIST} actions={<DetailActions editHref={`${BASE}/${id}/edit`} remove={remove} />} />
       <ViewGrid>
         <ViewField label={t("inventory.itemTemplates.name")} value={row.name} />
         <ViewField label={t("inventory.itemTemplates.description")} value={row.description} />
@@ -230,5 +241,5 @@ inventoryTemplateRoutes.post("/:id/delete", configure, async (c) => {
   if (!(await db.query.inventoryTemplates.findFirst({ where: eq(inventoryTemplates.id, id) }))) return c.notFound();
   await db.delete(inventoryTemplates).where(eq(inventoryTemplates.id, id));
   setFlash(c, t("inventory.templates.flash.deleted"), "success");
-  return c.redirect(BASE);
+  return c.redirect(LIST);
 });

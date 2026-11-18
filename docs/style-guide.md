@@ -101,8 +101,8 @@ Der `Pager` klebt unten am Viewport (`z-10`, `z-30` solange die Seitenwahl offen
 
 Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B. `/donations`: Zuwendungen | Spender; `/roles`: Funktionen | Funktionstypen), stehen sie als Umschalter im Seitentitel statt als eigene Menüeinträge: `TitleSwitch` (`src/components/title-switch.tsx`) als `title` des `PageHeader`.
 - Ansicht in der URL (`?view=…`), Links behalten Suche, Zeitraum und `pageSize`; Seite und Sortierung beginnen neu. Standardansicht = kein Parameter. Der Browser-Titel nennt die Ansicht („Spender · Spenden").
-- Ab `sm`: feste Reihenfolge, dünner Trenner (1 px, `bg-base-content/20`). Aktiv: `text-2xl` (Header-Standard), fett, Linie `border-b-2 border-gold/60`, `aria-current="page"`. Inaktiv: `text-xl`, `font-normal`, `text-base-content/50`; Hover voller Text plus 1-px-Unterstreichung.
-- Unter `sm`: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
+- Ab Header-Breite `@2xl` (Container-Query, nicht Viewport): feste Reihenfolge, dünner Trenner (1 px, `bg-base-content/20`). Aktiv: `text-2xl` (Header-Standard), fett, Linie `border-b-2 border-gold/60`, `aria-current="page"`. Inaktiv: `text-xl`, `font-normal`, `text-base-content/50`; Hover voller Text plus 1-px-Unterstreichung.
+- Darunter: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
 - Ein Eintrag kann einen Zähler (`count`, `badge badge-sm badge-warning`) tragen; er erscheint nur, solange die Ansicht **nicht** aktiv ist
 - Ansichten mit eigenen Rechten (`/roles`): der Umschalter zeigt nur die lesbaren Ansichten; bleibt eine, entfällt er und es steht nur der Titel.
 - Nicht für Unterseiten mit eigenen Zählern (dort Sidebar) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.

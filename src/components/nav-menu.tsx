@@ -63,10 +63,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("donations.tabs.donations"), href: "/donations", show: donations, count: c.receipts },
     ] },
     { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
-      { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read"), children: [
-        { label: t("inventory.tabs.fields"), href: "/inventory/fields", show: has("inventory:configure") },
-        { label: t("inventory.tabs.itemTemplates"), href: "/inventory/templates", show: has("inventory:configure") },
-      ] },
+      { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read") },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans + c.loanRequests, tip: [c.loans > 0 && t("common.nav.tip.overdue", { count: c.loans }), c.loanRequests > 0 && t(c.loanRequests === 1 ? "common.nav.tip.request" : "common.nav.tip.requests", { count: c.loanRequests })].filter(Boolean).join(", "), tone: c.loans > 0 ? "badge-error" : "badge-primary" },
     ] },
