@@ -47,7 +47,7 @@ daisyUI v5. Die v4-Klassen `form-control`, `label-text`, `input-bordered`, `sele
 - Sidebar (`src/components/nav-menu.tsx`) statt Tab-Leisten: ab `lg` dauerhaft links (`w-64`, einklappbar auf Icon-Leiste `w-14`), darunter Drawer per Hamburger in der Navbar.
 - Untermenüs sind `<details name="nav">` (Akkordeon); die Menüstruktur steht nur in `menuDefinition()`. Neue Seiten dort eintragen, nicht pro Route.
 - Dritte Ebene: Ein Eintrag kann `children` haben (z. B. Inventar > Bestand > Prüfvorlagen/Felder). Er bleibt ein Link; die Kinder stehen als verschachteltes `<ul>` (daisyUI-`menu`) darunter und sind nur sichtbar, wenn er oder ein Kind aktiv ist. Kinder erscheinen nur bei sichtbarem Eltern-Eintrag.
-- Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen); Obermenü zeigt die Summe, außer es ist aktiv.
+- Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen, `badge-error`, sobald im Eintrag etwas überfällig ist, z. B. Verleih); Obermenü zeigt die Summe, außer es ist aktiv.
 
 ## Seiten-Layout-Struktur
 
@@ -103,7 +103,21 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - Ansicht in der URL (`?view=…`), Links behalten Suche, Zeitraum und `pageSize`; Seite und Sortierung beginnen neu. Standardansicht = kein Parameter. Der Browser-Titel nennt die Ansicht („Spender · Spenden").
 - Ab `sm`: feste Reihenfolge, dünner Trenner (1 px, `bg-base-content/20`). Aktiv: `text-2xl` (Header-Standard), fett, Linie `border-b-2 border-gold/60`, `aria-current="page"`. Inaktiv: `text-xl`, `font-normal`, `text-base-content/50`; Hover voller Text plus 1-px-Unterstreichung.
 - Unter `sm`: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
+- Ein Eintrag kann einen Zähler (`count`, `badge badge-sm badge-warning`) tragen; er erscheint nur, solange die Ansicht **nicht** aktiv ist
 - Nicht für Unterseiten mit eigenen Rechten/Zählern (dort Sidebar) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
+
+## Statistikkarten
+
+Kennzahlen über der Liste (`/members`, `/donations`, `/inventory/lending`); als Überblick, nicht als Daten.
+
+- Wrapper `hidden sm:block @container mb-6` (unter `sm` aus), darin `grid grid-cols-2 @4xl:grid-cols-<N> gap-2 @4xl:gap-4`; ab sechs Karten zusätzlich `@xl:grid-cols-3`.
+- Karte: immer über `StatCard` (`src/components/stat-card.tsx`), nie lokal nachbauen: `stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4` mit `stat-title text-xs`, `stat-value text-2xl @4xl:text-3xl`, optional `stat-desc text-sm`.
+- Zahlenfarbe nur mit Bedeutung: `text-error` Überfälliges (nur bei > 0), `text-warning` Offenes, `text-info`/`text-success` Zustände; sonst neutral.
+- Klickbare Karte (`href`): `hover:bg-base-300`, `focus-visible`-Rahmen und ein Icon oben rechts (`opacity-50`), das auch auf Touch sichtbar ist: `funnel` = filtert die Liste, `arrow-right` = wechselt die Ansicht. Die Karte bleibt auch bei Wert 0 klickbar. Nicht klickbare Karten haben kein Icon.
+- Zustandszahlen (Anzahl je Status, z. B. Mitglieder, Verleih) zählen über den ganzen Bestand und ignorieren Suche und Filter der Liste. Summen und Durchschnitte über einen Zeitraum (z. B. Spenden) folgen dem Filter der Liste; der Zeitraum steht im Filter sichtbar daneben.
+- Der Link einer Karte muss die Liste so öffnen, dass sie dieselbe Zahl zeigt: Zustandskarten heben einen Standardzeitraum der Liste auf (z. B. `start=&end=` im Verleih), Zeitraumkarten behalten die aktuellen Filter (z. B. Spenden „Offen“).
+- Umschalter „Statistik“ (Icon `chart-bar`, `toggle`) im Seitenkopf, Zustand in `localStorage` unter `<seite>_statsVisible`. Nur in der Ansicht, die Karten hat.
+- ⚠️ Abweichung im Code: Das Umschalt-Skript steht dreimal kopiert (members, donations, lending); Zusammenführen in einem eigenen Task.
 
 ## Tabs
 
@@ -137,7 +151,7 @@ Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste 
 - `class="table table-zebra w-full"`
 - Sortierbare Spalten, wo fachlich sinnvoll (Klick auf Spaltenkopf, `SortIcon` als Indikator).
 - Pagination bei potenziell langen Listen: `Pager` (`src/components/pager.tsx`, gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase zur Seitenwahl) mit `sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers). Der Pager steht **außerhalb** des `overflow-x-auto`-Wrappers (siehe Sticky-Regeln). Unter `md` bricht er nie um: Zähler, Seitengrößen-Select (nur `aria-label`) und aktuelle Seite; die Seitenwahl läuft immer über die Sprechblase, auch bei ≤ 7 Seiten.
-- Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-8">{leerer-Text}</td></tr>`
+- Empty State: Ist die Liste leer, entfällt die Tabelle samt Kopf. Stattdessen steht `<p class="text-center opacity-50 py-8">{leerer-Text}</p>`, der erklärt, warum nichts angezeigt wird (z. B. Filter, Zeitraum). Filterleiste und Pager bleiben sichtbar. ⚠️ Abweichung im Code: Die übrigen Haupt-Listen (members, donors, donations, applications, anniversaries, `admin.tsx`) zeigen noch eine Leerzeile `<tr><td colspan={N} class="text-center opacity-50 py-8">` in der Tabelle; Umstellung in einem eigenen Task.
 
 ### Kleine Inline-Sub-Tabellen
 (alle Tabellen, die nicht die primäre Datenliste sind, z. B. Rollen-/Berechtigungs-Listen in `admin.tsx`, Zuweisungen in `members.tsx`, Teilnehmer-/Prüfungs-Tabellen in `events`, `training`, `inventory`, `import`)
@@ -157,6 +171,19 @@ Chronologische Einträge mit hervorgehobenem Datum (`/events`, `/events/public`,
 - Monatsüberschrift `h2 text-xl font-bold` über dem ersten Eintrag des Monats (technisch im Wrapper dieses Eintrags).
 - Eintrag: `flex gap-3 sm:gap-4`, Wrapper mit `mb-6`. Links Datumsblock `bg-primary text-primary-content rounded-box w-14 sm:w-16` (Tag fett groß, Monat in Versalien, Jahr abgeblasst), rechts Textspalte `min-w-0` (Titel `font-medium`, Zeitzeile/Beschreibung `text-sm opacity-70`, Tag-Badges zuletzt).
 - Aktionen (Löschen) rechtsbündig in der Zeile als `RowAction`.
+
+## Zeitleisten-Listen mit Zuständen (Verleih)
+
+`/inventory/lending` zeigt Vorgänge und offene Anfragen in einer Monats-Zeitleiste (eine Tabelle, Monatszeilen als Zwischenüberschriften, ein `thead`). Der linke Zeilenrand (`border-l-4` an der ersten Zelle, sonst transparent) trägt die Dringlichkeit:
+
+| Zeile | Rand | Badge |
+|---|---|---|
+| Überfällig | `border-l-error` (Zeitraum `text-error`) | `badge-error` |
+| Offene Anfrage | `border-l-primary` | `badge-primary badge-outline` |
+| Offene Anfrage mit Konflikt | `border-l-warning` + Dreieck `text-warning` vor dem Zeitraum | wie oben |
+| Abgelehnte Anfrage | transparent, Zeile `opacity-60` (nur auf Auswahl im Filter) | `badge-ghost` |
+
+Rot = eingetreten, Primär = wartet auf Entscheidung, Gelb = drohender Konflikt. Am selben Tag stehen Anfragen vor Vorgängen. Ist der Standard eines Mehrfach-Filters nicht „alles“, nennt der Button genau, was gilt („Alle außer Abgelehnt“).
 
 ## Badges
 

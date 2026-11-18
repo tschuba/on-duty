@@ -17,6 +17,7 @@ import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
+import { StatCard } from "../components/stat-card.js";
 import { TitleSwitch } from "../components/title-switch.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
@@ -346,21 +347,17 @@ export function sortDonations<T extends Sortable>(list: T[], sort: SortKey = "da
 const eur = (cents: number) => formatAmount(cents / 100);
 
 function DonationStats({ s, openHref }: { s: DonationSummary; openHref: string }) {
-  const card = "stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4";
-  const value = "stat-value text-2xl @4xl:text-3xl";
   const dash = (n: number, text: string) => (s.count === 0 ? "–" : n === 0 ? "0" : text);
   return (
     <div id="donations-stats" class="hidden sm:block @container mb-6">
       <div class="grid grid-cols-2 @4xl:grid-cols-5 gap-2 @4xl:gap-4">
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.total")}</div><div class={value}>{eur(s.cents)}</div></div>
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.count")}</div><div class={value}>{s.count}</div></div>
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.average")}</div><div class={value}>{s.count === 0 ? "–" : eur(s.averageCents)}</div></div>
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.donors")}</div><div class={value}>{s.donors}</div></div>
-        <a href={openHref} class={`${card} hover:bg-base-300`}>
-          <div class="stat-title text-xs">{t("donations.stats.open")}</div>
-          <div class={`${value} text-warning`}>{s.open.count}</div>
+        <StatCard label={t("donations.stats.total")} value={eur(s.cents)} />
+        <StatCard label={t("donations.stats.count")} value={s.count} />
+        <StatCard label={t("donations.stats.average")} value={s.count === 0 ? "–" : eur(s.averageCents)} />
+        <StatCard label={t("donations.stats.donors")} value={s.donors} />
+        <StatCard label={t("donations.stats.open")} value={s.open.count} tone="text-warning" href={openHref} link="filter">
           <div class="stat-desc text-sm">{dash(s.open.count, eur(s.open.cents))}</div>
-        </a>
+        </StatCard>
       </div>
     </div>
   );

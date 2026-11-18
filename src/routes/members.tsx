@@ -32,6 +32,7 @@ import { buildVars } from "../lib/mail-templates.js";
 import { TrainingSection, sortRecords } from "./training.js";
 import { trainingRecords } from "../db/schema/index.js";
 
+import { StatCard } from "../components/stat-card.js";
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -185,45 +186,23 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   return (
     <div id="members-stats" class="hidden sm:block @container mb-6">
     <div class="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-6 gap-2 @4xl:gap-4">
-      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
-        <div class="stat-title text-xs">{t("members.stats.active")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-2">
-          <div class="stat-value text-2xl @4xl:text-3xl text-success">{counts.active}</div>
-          <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
+      <StatCard label={t("members.stats.active")} value={counts.active} tone="text-success" inline>
+        <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
+      </StatCard>
+      <StatCard label={t("members.stats.passive")} value={counts.passive} />
+      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-secondary" />
+      <StatCard label={t("members.stats.youth")} value={counts.youth} tone="text-info" inline>
+        <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(youth)}</div>
+      </StatCard>
+      <StatCard label={t("members.stats.children")} value={counts.children} tone="text-warning" inline>
+        <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(children)}</div>
+      </StatCard>
+      <StatCard label={t("members.stats.former")} value={counts.left + counts.deceased} tone="text-base-content/40" inline>
+        <div class="stat-desc text-sm flex gap-x-2">
+          {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
+          {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
         </div>
-      </div>
-      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
-        <div class="stat-title text-xs">{t("members.stats.passive")}</div>
-        <div class="stat-value text-2xl @4xl:text-3xl">{counts.passive}</div>
-      </div>
-      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
-        <div class="stat-title text-xs">{t("members.stats.supporting")}</div>
-        <div class="stat-value text-2xl @4xl:text-3xl text-secondary">{counts.supporting}</div>
-      </div>
-      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
-        <div class="stat-title text-xs">{t("members.stats.youth")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-2">
-          <div class="stat-value text-2xl @4xl:text-3xl text-info">{counts.youth}</div>
-          <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(youth)}</div>
-        </div>
-      </div>
-      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
-        <div class="stat-title text-xs">{t("members.stats.children")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-2">
-          <div class="stat-value text-2xl @4xl:text-3xl text-warning">{counts.children}</div>
-          <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(children)}</div>
-        </div>
-      </div>
-      <div class="stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4">
-        <div class="stat-title text-xs">{t("members.stats.former")}</div>
-        <div class="flex flex-wrap items-baseline gap-x-2">
-          <div class="stat-value text-2xl @4xl:text-3xl text-base-content/40">{counts.left + counts.deceased}</div>
-          <div class="stat-desc text-sm flex gap-x-2">
-            {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
-            {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
-          </div>
-        </div>
-      </div>
+      </StatCard>
     </div>
     </div>
   );
