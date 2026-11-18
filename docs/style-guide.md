@@ -81,10 +81,6 @@ Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes For
 
 Stufe 1 (Kopf < `@xl`): Labels der sekundären Aktionen entfallen; Stufe 2 (< `@md`): auch das Label der primären Aktion. Icon bleibt, `aria-label`/`title` tragen den Namen.
 
-### Untermenü
-
-`SubNav` (`src/components/sub-nav.tsx`) ersetzt alle `tabs-lifted`: `tabs-sm` (~32 px), `bg-base-300`, 1 px Rahmen unten, aktiver Tab mit `primary`-Unterstrich.
-
 ### Sticky
 
 Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
@@ -92,18 +88,17 @@ Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
 | Ebene | Element | z-index | Sichtbar |
 |---|---|---|---|
 | 1 | Hauptnav | 40 | immer |
-| 2 | Untermenü (`.subnav`) | 30 | ab `md` |
-| 3 | `PageHeader` | 20 | immer |
-| 4 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
+| 2 | `PageHeader` | 20 | immer |
+| 3 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
 | unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase über der aktuellen Seite zur Seitenwahl; unter `md` nur aktuelle Seite mit Sprechblase, immer einzeilig) | 10 (30 solange die Seitenwahl offen ist) | immer |
 
-- Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--subnav-h`, `--header-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
+- Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--header-h`, `--filter-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
 - Sticky-Elemente brauchen einen deckenden Hintergrund (`bg-base-100`/`bg-base-300`).
 - Popover/Dropdowns (`MultiSelectFilter`) liegen über allen Ebenen (`z-50` bzw. Top Layer); neue Ebenen bleiben unter 20.
 - Kein Vorfahr darf `overflow` ≠ `visible` haben, sonst bricht Sticky. Deshalb stehen Pager und Leiste **außerhalb** von `overflow-x-auto`-Wrappern.
 - Sticky gilt nur innerhalb des Eltern-Elements: Leiste und Liste/Tabelle müssen im selben Container liegen, ohne Zwischen-Wrapper mit kurzer Höhe. Fehlerbild: Leiste scrollt nach kurzer Strecke weg (so zuvor in `/anniversaries`).
 - `display: contents` am Sticky-Element selbst ist wirkungslos; Klasse an das umgebende `<div>` setzen.
-- `--header-h` ist geschätzt (3.5rem); ändert sich die Höhe des `PageHeader`, muss der Wert mit.
+- `--header-h` ist geschätzt (4rem); `--filter-h` wird im Layout gemessen. Ändert sich die Höhe des `PageHeader`, muss der Wert mit; ändert sich die Höhe des `PageHeader`, muss der Wert mit.
 
 ## Ansichten-Umschalter
 
@@ -111,7 +106,7 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - Ansicht in der URL (`?view=…`), Links behalten Suche, Zeitraum und `pageSize`; Seite und Sortierung beginnen neu. Standardansicht = kein Parameter. Der Browser-Titel nennt die Ansicht („Spender · Spenden").
 - Ab `sm`: feste Reihenfolge, dünner Trenner (1 px, `bg-base-content/20`). Aktiv: `text-2xl` (Header-Standard), fett, Linie `border-b-2 border-gold/60`, `aria-current="page"`. Inaktiv: `text-xl`, `font-normal`, `text-base-content/50`; Hover voller Text plus 1-px-Unterstreichung.
 - Unter `sm`: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
-- Nicht für Unterseiten mit eigenen Rechten/Zählern (dort Sidebar/`SubNav`) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
+- Nicht für Unterseiten mit eigenen Rechten/Zählern (dort Sidebar) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
 
 ## Buttons
 
@@ -120,7 +115,7 @@ Die Bedeutung hängt an der Farb-/Outline-Kombination:
 | Klasse | Bedeutung |
 |---|---|
 | `btn btn-primary` (solid) | Primäre Aktion / Haupt-CTA (Speichern, Anlegen) |
-| `btn btn-error` (solid) | Destruktive Aktion, die **direkt** ausführt (z. B. Löschen im Formular) |
+| `btn btn-error` (solid) | Destruktive Aktion, die **direkt** ausführt (z. B. Löschen-Button im Bestätigungsdialog) |
 | `btn btn-outline btn-error` | Destruktiver **Trigger**, der zuerst einen Bestätigungsdialog öffnet — solid nur für den ausführenden Button im Dialog |
 | `btn btn-ghost` | Sekundäre/tertiäre Aktion, Navigation (Navbar-Links, Dropdown-Trigger) |
 | `btn btn-outline btn-primary` (in `join-item`-Gruppe) | Aktiver Zustand in Filter-/Quick-Link-Pillen; inaktive Geschwister nutzen `btn-ghost` |
@@ -182,14 +177,14 @@ Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donor
 
 - `GET /:id` = Read-only-Ansicht (`ViewGrid` + `ViewField` aus `src/components/field.tsx`, nie lokal neu definieren), `GET /:id/edit` = Formular. Ohne Schreibrecht leitet `/:id/edit` auf `/:id` um (entfällt bei `/inventory/fields`, `/inventory/inspection-templates`, `/inventory/templates`: ein einziges Recht `inventory:configure`, kein Leserecht). „Neu“-Formulare öffnen direkt im Bearbeiten-Modus.
 - Listen-Zeilenklick (auch bei Einträgen der Terminliste) führt auf `/:id`. Nach Speichern: Redirect auf `/:id` + Toast; bei Validierungsfehler im Formular bleiben.
-- Read-only-Header: `DetailActions` (`src/components/page-header.tsx`) – „Löschen“ (`btn-outline btn-error`, nur mit Löschrecht), rechts davon „Bearbeiten“ (`btn-primary`, `pencil`, nur mit Schreibrecht).
+- Read-only-Header: `DetailActions` (`src/components/page-header.tsx`) – „Löschen“ (`btn-outline btn-error`, nur mit Löschrecht), optional „Kopieren“ (`copyHref`, `btn-outline btn-primary`), rechts davon „Bearbeiten“ (`btn-primary`, `pencil`, nur mit Schreibrecht).
 - Formular-Header: `FormActions` mit `cancelHref` (Abbrechen → `/:id`, Rückfrage bei Änderungen), Verwerfen, Speichern. Kein Löschen im Formular.
 - Ausgenommen: anniversary-years, applications, Einstellungsseiten ohne Datensatz (`/admin/config`, `/organisation`, `/account`).
 
 ## Responsive Schwellen
 
-- **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische Filterleiste und Untermenü. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.
-- **Ausnahmen:** `sm:` für Formular-Grids (`sm:grid-cols-`, `sm:col-span-`); Spalten-Ausblendung (`md:`/`lg:`/`xl:table-cell`); Container-Queries im Seitenkopf (`HeaderAction`) und in der Kategorie-Auswahl des Inventar-Formulars (`@container`: `<select>` unter `@sm`, nur Icons bis `@xl`, darüber Icon + Text; Radios bleiben die einzige submittete Quelle, das `<select>` hat keinen `name`); PageHeader und Monatszeilen der Jubiläumsliste bleiben auch unter `md` sticky.
+- **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische Filterleiste. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.
+- **Ausnahmen:** `sm:` für Formular-Grids (`sm:grid-cols-`, `sm:col-span-`) und das Label des `ApplyButton`; Spalten-Ausblendung (`md:`/`lg:`/`xl:table-cell`); Container-Queries im Seitenkopf (`HeaderAction`) und in der Kategorie-Auswahl des Inventar-Formulars (`@container`: `<select>` unter `@sm`, nur Icons bis `@xl`, darüber Icon + Text; Radios bleiben die einzige submittete Quelle, das `<select>` hat keinen `name`); PageHeader und Monatszeilen der Jubiläumsliste bleiben auch unter `md` sticky.
 
 ## Touch-Ziele
 
