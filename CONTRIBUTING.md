@@ -87,13 +87,22 @@ Siehe [README](README.md).
 
 ## Datenbankmigrationen
 
-Nach Schema-Änderungen Migration generieren und committen:
+Das Schema steht in `src/db/schema/*.ts` (Einstieg `index.ts`), die Migrationen in `drizzle/`. Migrationen werden **nur generiert**, nie von Hand geschrieben.
 
-```bash
-pnpm db:generate
-```
+**Schema-Änderung**
 
-Reine SQL-Backfills mit `pnpm db:generate --custom --name=<name>` anlegen. `drizzle/meta/_journal.json` und die `when`-Werte nie von Hand bearbeiten: Der Migrator überspringt jede Migration, deren `when` nicht größer ist als das höchste bereits angewendete `created_at`. Bei einem Merge-Konflikt im Journal die eigene Migration samt Snapshot löschen und neu generieren. `src/tests/migration-journal.test.ts` prüft das in der CI.
+1. Schema in `src/db/schema/` ändern.
+2. `pnpm db:generate` ausführen. Das erzeugt `drizzle/NNNN_<name>.sql`, einen Snapshot in `drizzle/meta/` und den Eintrag in `drizzle/meta/_journal.json`.
+3. Die erzeugte SQL-Datei prüfen (Datenverlust? Default für neue `NOT NULL`-Spalten?), SQL, Snapshot und Journal zusammen committen.
+4. Lokal mit `pnpm db:migrate` anwenden und `pnpm test` ausführen. Die DB-Tests spielen alle Migrationen ein.
+
+**Reiner SQL-Backfill** (Daten, kein Schema): `pnpm db:generate --custom --name=<name>` legt eine leere Migration an, das SQL kommt hinein.
+
+Beim Start der App (`src/entrypoint.ts`) werden ausstehende Migrationen automatisch angewendet.
+
+**Nie von Hand ändern:** `drizzle/meta/_journal.json`, `when`-Werte und Snapshots. Der Migrator überspringt jede Migration, deren `when` nicht größer ist als das höchste bereits angewendete `created_at`. `src/tests/migration-journal.test.ts` prüft das in der CI.
+
+**Merge-Konflikt im Journal:** Eigene Migration samt Snapshot löschen, auf `master` rebasen und `pnpm db:generate` neu ausführen.
 
 **Ausnahme (Zukunfts-Timestamps):** Tragen die letzten Journal-Einträge ein `when` in der Zukunft (handgesetzt, weil Dev/Prod die Vorgänger schon angewendet hatten), würde ein echter Uhrwert von Prod übersprungen. Dann `pnpm db:generate` ausführen, `when` des neuen Eintrags auf den höchsten bisherigen Wert + 1 setzen, `LEGACY_MAX_IDX` in `src/tests/migration-journal.test.ts` auf den neuen `idx` anheben und dort einen Kommentar ergänzen (Migration, Issue, Grund). Ob eine Migration auf Prod schon angewendet ist, zeigt `select max(created_at) from drizzle.__drizzle_migrations;`. Entfällt, sobald die Uhr die Timestamps überholt hat.
 
