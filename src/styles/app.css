@@ -271,3 +271,6 @@ input[data-combo]::-webkit-calendar-picker-indicator { display: none !important;
 /* daisyUI-Tooltip nur bei Fokus im Feld, nicht bei Hover */
 .tooltip-focus-only:not(:has(:focus-visible)):is(:hover)::before,
 .tooltip-focus-only:not(:has(:focus-visible)):is(:hover)::after { opacity: 0; }
+
+/* Drawer: Chevron links neben dem Badge, Badge ganz rechts (Badge-Span hat order-2). */
+#nav-menu summary::after { order: 1; }
