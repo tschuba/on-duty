@@ -1,6 +1,5 @@
 // Loaded via `node --import` BEFORE any instrumented module (pg, http). No-op without OTEL_EXPORTER_OTLP_ENDPOINT.
 import { register } from "node:module";
-// @ts-expect-error -- package ships register-hooks.d.ts but no "types" mapping for this subpath
 import { register as registerSync, supportsSyncHooks } from "import-in-the-middle/register-hooks.mjs";
 import type { IncomingMessage } from "node:http";
 import { NodeSDK } from "@opentelemetry/sdk-node";
