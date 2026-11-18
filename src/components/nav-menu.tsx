@@ -8,7 +8,6 @@ import type { IconName } from "./icons.generated.js";
 export type NavCounts = {
   applications: number;
   receipts: number;
-  donors: number;
   inspections: number;
   loans: number;
   loanRequests: number;
@@ -54,7 +53,6 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     ] },
     { icon: "banknotes", label: t("common.nav.donations"), items: [
       { label: t("donations.tabs.donations"), href: "/donations", show: donations, count: c.receipts },
-      { label: t("donations.tabs.donors"), href: "/donors", show: donations, count: c.donors },
     ] },
     { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
       { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read"), children: [

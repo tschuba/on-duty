@@ -62,6 +62,12 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 
 **Untermenü:** `SubNav` (`src/components/sub-nav.tsx`) ersetzt alle `tabs-lifted`: `tabs-sm` (~32 px), `bg-base-300`, 1 px Rahmen unten, aktiver Tab mit `primary`-Unterstrich.
 
+**Ansichten-Umschalter (Titel):** Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B. `/donations`: Zuwendungen | Spender), stehen sie als Umschalter im Seitentitel statt als eigene Menüeinträge: `TitleSwitch` (`src/components/title-switch.tsx`) als `title` des `PageHeader`.
+- Ansicht in der URL (`?view=…`), Links behalten Suche, Zeitraum und `pageSize`; Seite und Sortierung beginnen neu. Standardansicht = kein Parameter. Der Browser-Titel nennt die Ansicht („Spender · Spenden").
+- Ab `sm`: feste Reihenfolge, dünner Trenner (1 px, `bg-base-content/20`). Aktiv: `text-2xl` (Header-Standard), fett, Linie `border-b-2 border-gold/60`, `aria-current="page"`. Inaktiv: `text-xl`, `font-normal`, `text-base-content/50`; Hover voller Text plus 1-px-Unterstreichung.
+- Unter `sm`: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
+- Nicht für Unterseiten mit eigenen Rechten/Zählern (dort Sidebar/`SubNav`) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
+
 **Sticky:** Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
 
 | Ebene | Element | z-index | Sichtbar |

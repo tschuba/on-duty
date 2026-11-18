@@ -48,3 +48,30 @@ export function summarizeDonations(list: SummaryInput[]): DonationSummary {
   }
   return { count: list.length, cents, averageCents: list.length ? Math.round(cents / list.length) : 0, donors: donors.size, open };
 }
+
+export type DonorSortKey = "donor" | "count" | "amount" | "last";
+export type DonorSummary<D> = { donor: D; count: number; cents: number; last: string | null };
+
+// Per-donor totals over the given donations (caller applies the date range); donors without donations stay with 0 / null.
+export function summarizeDonors<D extends { id: string; person: { firstName: string; lastName: string; companyName?: string | null } }>(
+  donors: D[],
+  donations: { donorId: string; amount: string | number; date: string }[],
+  sort: DonorSortKey = "donor",
+  dir: "asc" | "desc" = "asc",
+): DonorSummary<D>[] {
+  const by = new Map<string, DonorSummary<D>>(donors.map((donor) => [donor.id, { donor, count: 0, cents: 0, last: null }]));
+  for (const d of donations) {
+    const s = by.get(d.donorId);
+    if (!s) continue;
+    s.count++;
+    s.cents += Math.round(Number(d.amount) * 100);
+    if (!s.last || d.date > s.last) s.last = d.date;
+  }
+  const name = (s: DonorSummary<D>) => s.donor.person.companyName || s.donor.person.lastName;
+  const byName = (a: DonorSummary<D>, b: DonorSummary<D>) =>
+    name(a).localeCompare(name(b), "de") || a.donor.person.firstName.localeCompare(b.donor.person.firstName, "de");
+  const cmp = (a: DonorSummary<D>, b: DonorSummary<D>) =>
+    sort === "count" ? a.count - b.count : sort === "amount" ? a.cents - b.cents : sort === "last" ? (a.last ?? "").localeCompare(b.last ?? "") : byName(a, b);
+  const sign = dir === "asc" ? 1 : -1;
+  return [...by.values()].sort((a, b) => sign * cmp(a, b) || byName(a, b));
+}

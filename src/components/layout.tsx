@@ -28,9 +28,6 @@ export function ClickToEditHint() {
   return <p class="text-sm opacity-50 mb-2">{t("common.rowClickHint")}</p>;
 }
 
-// Platzhalter: künftige Spender-Zähler (z. B. unvollständige Adressen) hier einrechnen.
-export const DONORS_TAB_COUNT = 0;
-
 export { CountBadge };
 
 // Async component — hono/jsx resolves Promise children/return values during render,
@@ -51,7 +48,6 @@ export const Layout = async ({ title, children, user, path }: Props) => {
     counts = {
       applications: has("applications:read") ? await countOpenApplications() : 0,
       receipts: has("donations:issue-receipts") ? await countOpenReceipts() : 0,
-      donors: DONORS_TAB_COUNT,
       inspections: has("inventory:read") ? await countOverdueInspections() : 0,
       loans: has("lending:read") ? await countOverdueLoans() : 0,
       loanRequests: has("lending:manage") ? await countOpenLoanRequests() : 0,

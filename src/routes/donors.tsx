@@ -1,21 +1,18 @@
 import { Hono } from "hono";
-import { eq, or, ilike, asc, and, exists, sql } from "drizzle-orm";
+import { eq, or, ilike, asc, desc, and, exists, sql } from "drizzle-orm";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { db } from "../db/index.js";
-import { persons, donors, members } from "../db/schema/index.js";
+import { persons, donors, donations, members } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { recipientName } from "../lib/donations.js";
-import { ClickToEditHint, Layout } from "../components/layout.js";
-import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
+import { formatDate } from "../lib/format.js";
+import { Layout } from "../components/layout.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
-import { Icon } from "../components/icon.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
-import { SortIcon } from "./members.js";
-import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
-import { parsePagination, buildListUrl } from "../lib/list-query.js";
+import { buildListUrl } from "../lib/list-query.js";
 import { trimmed } from "../lib/forms.js";
 
 export const donorRoutes = new Hono<{ Variables: Variables }>();
@@ -222,104 +219,10 @@ donorRoutes.get("/search-persons", requireAuth("donations:record"), async (c) =>
   );
 });
 
-// ── List query parsing ──────────────────────────────────────────────────────
-
-type SortKey = "lastName" | "firstName";
-
-function parseListQuery(q: Record<string, string>) {
-  const search = q.search ?? "";
-  const sort: SortKey = q.sort === "firstName" ? "firstName" : "lastName";
-  const dir: "asc" | "desc" = q.sort_dir === "desc" ? "desc" : "asc";
-  const { page, pageSize } = parsePagination(q);
-  const member = q.member === "yes" || q.member === "no" ? q.member : "";
-  return { search, sort, dir, page, pageSize, member };
-}
-
-function donorListUrl(base: Record<string, string | number>) {
-  return buildListUrl("/donors", {}, base);
-}
-
-// GET /donors — sortable/paginated/searchable list, name + address only (see
-// Berechtigungsgrenze in the backlog note — no member-only data here).
-donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), async (c) => {
-  const user = c.get("user");
-  const { search, sort, dir, page, pageSize, member } = parseListQuery(c.req.query());
-  const canLink = Boolean(user.permissions.has("members:read"));
-  const canRecord = user.permissions.has("donations:record");
-
-  const all = (await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as DonorWithPerson[];
-  const needle = search.toLowerCase();
-  const filtered = all
-    .filter((d) => !search || `${d.person.companyName ?? ""} ${d.person.firstName} ${d.person.lastName}`.toLowerCase().includes(needle))
-    .filter((d) => !member || Boolean(d.person.member) === (member === "yes"));
-  const sorted = [...filtered].sort((a, b) => {
-    const cmp = a.person[sort].localeCompare(b.person[sort], "de");
-    return dir === "asc" ? cmp : -cmp;
-  });
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
-
-  return c.html(
-    <Layout title={t("donors.title")} user={user}>
-      <PageHeader title={t("donors.title")} actions={canRecord && <HeaderAction variant="primary" icon="plus" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />} />
-
-      <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
-        <form method="get" class="flex gap-2 w-full md:w-auto">
-          <label class="input flex items-center gap-2 min-w-0 flex-1 md:w-64 md:flex-none">
-            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
-            <input
-              type="search"
-              name="search"
-              placeholder={t("common.searchPlaceholder")}
-              value={search}
-              class="grow min-w-0"
-            />
-          </label>
-          <input type="hidden" name="sort" value={sort} />
-          <input type="hidden" name="sort_dir" value={dir} />
-          <input type="hidden" name="pageSize" value={pageSize} />
-          <input type="hidden" name="member" value={member} />
-          <button type="submit" class="btn">{t("common.show")}</button>
-        </form>
-        <ToggleFilter items={pairToggles(member,
-          [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.nonMembers") }],
-          (m) => donorListUrl({ search, sort, sort_dir: dir, pageSize, member: m }))} />
-      </div>
-
-      <ClickToEditHint />
-      <div class="overflow-x-auto">
-      <table class="table table-zebra w-full">
-        <thead>
-          <tr>
-            <th><a href={donorListUrl({ search, sort: "lastName", sort_dir: sort === "lastName" && dir === "asc" ? "desc" : "asc", pageSize, member })} class="link link-hover">{t("donors.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
-            <th><a href={donorListUrl({ search, sort: "firstName", sort_dir: sort === "firstName" && dir === "asc" ? "desc" : "asc", pageSize, member })} class="link link-hover">{t("donors.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
-            <th>{t("donors.table.companyName")}</th>
-            <th>{t("donors.table.address")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pageItems.length === 0 ? (
-            <tr><td colspan={4} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
-          ) : pageItems.map((d) => (
-            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donors/${d.id}'`}>
-              <td class="font-medium"><MemberLink memberId={d.person.member?.id} canLink={canLink}>{d.person.lastName || "—"}</MemberLink><MemberMark memberId={d.person.member?.id} canLink={canLink} /></td>
-              <td>{d.person.firstName}</td>
-              <td>{d.person.companyName ?? "—"}</td>
-              <td>{formatAddress(d.person)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-
-      <Pager
-        countLabel={t("donors.table.count", { count: sorted.length })}
-        page={page}
-        totalPages={totalPages}
-        pageUrl={(p) => donorListUrl({ search, sort, sort_dir: dir, pageSize, member, page: p })}
-      />
-    </Layout>
-  );
+// GET /donors — the list lives in /donations?view=donors; keep old links working.
+donorRoutes.get("/", requireAuth(["donations:read", "donations:record", "donations:issue-receipts"]), (c) => {
+  const { view: _view, ...rest } = c.req.query();
+  return c.redirect(buildListUrl("/donations", { ...rest, view: "donors" }));
 });
 
 // GET /donors/new — create a donor directly (search-or-create picker)
@@ -327,7 +230,7 @@ donorRoutes.get("/new", requireAuth("donations:record"), async (c) => {
   const user = c.get("user");
   return c.html(
     <Layout title={t("donors.newDonor")} user={user}>
-      <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
+      <PageHeader title={t("donors.newDonor")} backHref="/donations?view=donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
       <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
         <DonorPickerFields />
       </form>
@@ -347,7 +250,7 @@ donorRoutes.post("/new", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.newDonor")} user={user}>
-        <PageHeader title={t("donors.newDonor")} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
+        <PageHeader title={t("donors.newDonor")} backHref="/donations?view=donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" />} />
         <form id="donor-form" method="post" action="/donors/new" class="space-y-4 max-w-xl">
           <DonorPickerFields personId={personId} values={values} errors={errors} />
         </form>
@@ -382,16 +285,34 @@ donorRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "dona
   if (!donor) return c.notFound();
   const canLink = Boolean(user.permissions.has("members:read"));
   const canRecord = user.permissions.has("donations:record");
+  const history = await db.select().from(donations).where(eq(donations.donorId, donor.id)).orderBy(desc(donations.date));
 
   return c.html(
     <Layout title={recipientName(donor.person)} user={user}>
-      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" actions={<DetailActions editHref={canRecord ? `/donors/${donor.id}/edit` : undefined} />} />
+      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations?view=donors" actions={<DetailActions editHref={canRecord ? `/donors/${donor.id}/edit` : undefined} />} />
       <ViewGrid>
         <ViewField label={t("donors.table.companyName")} value={donor.person.companyName} />
         <ViewField label={t("donors.form.lastName")} value={donor.person.lastName} />
         <ViewField label={t("donors.form.firstName")} value={donor.person.firstName} />
         <ViewField label={t("donors.table.address")} value={formatAddress(donor.person)} />
       </ViewGrid>
+      <h2 class="font-semibold mt-6 mb-2">{t("donations.history")}</h2>
+      <div class="overflow-x-auto max-w-xl">
+        <table class="table table-zebra w-full">
+          <thead><tr><th>{t("donations.table.date")}</th><th class="text-right">{t("donations.table.amount")}</th><th>{t("donations.table.purpose")}</th></tr></thead>
+          <tbody>
+            {history.length === 0 ? (
+              <tr><td colspan={3} class="text-center opacity-50 py-4">{t("donations.table.empty")}</td></tr>
+            ) : history.map((d) => (
+              <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}'`}>
+                <td><a href={`/donations/${d.id}`} class="link">{formatDate(d.date)}</a></td>
+                <td class="text-right whitespace-nowrap">{Number(d.amount).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €</td>
+                <td>{d.purpose ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </Layout>
   );
 });
@@ -406,7 +327,7 @@ donorRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record", 
 
   return c.html(
     <Layout title={t("donors.editDonor")} user={user}>
-      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref={`/donors/${donor.id}`} />} />
+      <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations?view=donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref={`/donors/${donor.id}`} />} />
       <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
         <DonorPersonFields values={donor.person} />
       </form>
@@ -427,7 +348,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   if (Object.keys(errors).length > 0) {
     return c.html(
       <Layout title={t("donors.editDonor")} user={user}>
-        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref={`/donors/${donor.id}`} />} />
+        <PageHeader title={<><MemberLink memberId={donor.person.member?.id} canLink={canLink}>{recipientName(donor.person)}</MemberLink><MemberMark memberId={donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations?view=donors" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donor-form" cancelHref={`/donors/${donor.id}`} />} />
         <form id="donor-form" method="post" action={`/donors/${donor.id}/edit`} class="space-y-4 max-w-xl">
           <DonorPersonFields values={values} errors={errors} />
         </form>
