@@ -37,27 +37,24 @@ pnpm install  # richtet den Hook automatisch ein
 
 ## Pull Requests
 
+- Kein direktes Pushen auf `master`, ausschließlich per PR. Squash Merge.
 - PR-Titel und -Beschreibung sind immer auf **Englisch**.
-- Der PR-Titel muss dem Conventional-Commits-Format (`<type>[optional scope]: <description>`, erlaubte Typen siehe oben) entsprechen und den Check **PR Title** bestehen (`.github/workflows/pr-version-bump.yml`).
+- Der PR-Titel muss dem Conventional-Commits-Format (erlaubte Typen siehe oben) entsprechen und den Check **PR Title** bestehen (`.github/workflows/pr-version-bump.yml`). Er wird beim Squash Merge zur Commit-Nachricht und bestimmt die Version (siehe „Release“).
 
 ## Sprache
 
 | Bereich | Sprache |
 |---|---|
 | Quellcode, Bezeichner, Routen, Logs | Englisch |
+| Entwicklerwerkzeuge (Git-Hooks, `scripts/`: Kommentare, Ausgaben) | Englisch |
 | Dokumentation (README, Docs) | Deutsch |
-| UI-Texte | i18n-Dateien (`src/i18n/de.ts` + `src/i18n/en.ts`) |
+| UI-Texte | i18n-Datei `src/i18n/de.ts` |
+
+⚠️ Abweichung im Bestand: `.githooks/` und die meisten Skripte in `scripts/` sind noch deutsch. Neue Werkzeuge sind englisch; Bestand wird angeglichen, sobald eine Datei angefasst wird.
 
 Log-Nachrichten (Pino) sind durchgehend englisch, ohne Namen, E-Mails oder IBANs; Details als strukturierte Felder (`logger.error({ err }, "…")`).
 
-Keine UI-Texte direkt in Templates — ausschließlich über i18n-Schlüssel.
-
-## i18n
-
-Neue UI-Texte müssen in beiden Sprachdateien ergänzt werden:
-
-- `src/i18n/de.ts` — Deutsch
-- `src/i18n/en.ts` — Englisch
+Keine UI-Texte direkt in Templates, ausschließlich über i18n-Schlüssel. Neue Texte kommen in `src/i18n/de.ts` und werden mit `t("<key>")` verwendet.
 
 ## Konstanten statt Magic Values
 
@@ -90,25 +87,39 @@ Siehe [README](README.md).
 
 ## Datenbankmigrationen
 
-Nach Schema-Änderungen Migration generieren und committen:
+Das Schema steht in `src/db/schema/*.ts` (Einstieg `index.ts`), die Migrationen in `drizzle/`. Migrationen werden **nur generiert**, nie von Hand geschrieben.
 
-```bash
-pnpm db:generate
-```
+**Schema-Änderung**
 
-Reine SQL-Backfills mit `pnpm db:generate --custom --name=<name>` anlegen. `drizzle/meta/_journal.json` und die `when`-Werte nie von Hand bearbeiten: Der Migrator überspringt jede Migration, deren `when` nicht größer ist als das höchste bereits angewendete `created_at`. Bei einem Merge-Konflikt im Journal die eigene Migration samt Snapshot löschen und neu generieren. `src/tests/migration-journal.test.ts` prüft das in der CI.
+1. Schema in `src/db/schema/` ändern.
+2. `pnpm db:generate` ausführen. Das erzeugt `drizzle/NNNN_<name>.sql`, einen Snapshot in `drizzle/meta/` und den Eintrag in `drizzle/meta/_journal.json`.
+3. Die erzeugte SQL-Datei prüfen (Datenverlust? Default für neue `NOT NULL`-Spalten?), SQL, Snapshot und Journal zusammen committen.
+4. Lokal mit `pnpm db:migrate` anwenden und `pnpm test` ausführen. Die DB-Tests spielen alle Migrationen ein.
+
+**Reiner SQL-Backfill** (Daten, kein Schema): `pnpm db:generate --custom --name=<name>` legt eine leere Migration an, das SQL kommt hinein.
+
+Beim Start der App (`src/entrypoint.ts`) werden ausstehende Migrationen automatisch angewendet.
+
+**Nie von Hand ändern:** `drizzle/meta/_journal.json`, `when`-Werte und Snapshots. Der Migrator überspringt jede Migration, deren `when` nicht größer ist als das höchste bereits angewendete `created_at`. `src/tests/migration-journal.test.ts` prüft das in der CI.
+
+**Merge-Konflikt im Journal:** Eigene Migration samt Snapshot löschen, auf `master` rebasen und `pnpm db:generate` neu ausführen.
 
 **Ausnahme (Zukunfts-Timestamps):** Tragen die letzten Journal-Einträge ein `when` in der Zukunft (handgesetzt, weil Dev/Prod die Vorgänger schon angewendet hatten), würde ein echter Uhrwert von Prod übersprungen. Dann `pnpm db:generate` ausführen, `when` des neuen Eintrags auf den höchsten bisherigen Wert + 1 setzen, `LEGACY_MAX_IDX` in `src/tests/migration-journal.test.ts` auf den neuen `idx` anheben und dort einen Kommentar ergänzen (Migration, Issue, Grund). Ob eine Migration auf Prod schon angewendet ist, zeigt `select max(created_at) from drizzle.__drizzle_migrations;`. Entfällt, sobald die Uhr die Timestamps überholt hat.
 
+## Mail-Vorlagen
+
+Neue Mail = Katalogeintrag in `src/lib/mail-templates.ts` (Variablen, Pflichtplatzhalter, Beispiele, Builder) + Migration mit der `system`-Zeile in `mail_templates` + `pnpm mail:docs` (erzeugt `docs/mail-variables.md`; ein Test prüft, dass sie aktuell ist).
+
 ## Tests
 
-Vor jedem PR:
+Vor jedem PR (CI prüft zusätzlich beides):
 
 ```bash
+pnpm typecheck
 pnpm test
 ```
 
-Geteilte Test-Helper (z. B. Request-Builder) gehören nach `src/tests/test-utils.ts`, geteilte Daten-Fixtures nach `src/tests/fixtures.ts` — nicht pro Testdatei neu definieren.
+Geteilte Test-Helper (z. B. Request-Builder) gehören nach `src/tests/test-utils.ts`, geteilte Daten-Fixtures nach `src/tests/fixtures.ts`, nicht pro Testdatei neu definieren.
 
 ### Coverage
 
@@ -116,14 +127,9 @@ CI blockt PRs, die die Coverage ggü. `master` verschlechtern, sowie neue Zeilen
 
 Beim Nachziehen von Coverage auf Code, der Entscheidungen mit I/O mischt (z. B. Auth-/Berechtigungsprüfungen): nicht die Logik mit `v8 ignore` wegkommentieren oder in eine separate Pure-Function extrahieren, die die echten Verzweigungen nur nachbildet — beides lässt die eigentliche Entscheidung ungetestet und macht die Metrik hohl. Stattdessen an einer dünnen, stabilen Grenze mocken (der eine externe Call, die eine Query) und die echte Funktion end-to-end durchlaufen lassen.
 
-## Pull Requests
-
-- Kein direktes Pushen auf `main` — ausschließlich per PR
-- Squash Merge wird verwendet
-
 ## Release
 
-Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit-Nachricht). Der Check `Bump Version` setzt daraus die Version in `package.json` und pusht einen Bump-Commit auf den PR-Branch:
+Der Check `Bump Version` setzt daraus die Version in `package.json` und pusht einen Bump-Commit auf den PR-Branch:
 
 | Titel | Bump |
 | --- | --- |
@@ -132,14 +138,10 @@ Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit
 | `feat!:` / `BREAKING CHANGE` im PR-Text | major |
 | `chore:`, `docs:`, `test:`, `ci:`, `style:`, `build:`, `refactor:`, `revert:` | kein Bump |
 
-Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, Build-Configs, `scripts/zitadel-init.mjs`, `scripts/copy-*.mjs`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
+Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, `tsup.config.ts`, `drizzle.config.ts`, `branding/`, `scripts/zitadel-init.mjs`, `scripts/copy-fonts.mjs`, `scripts/copy-htmx.mjs`; maßgeblich ist `FILTER` in `pr-version-bump.yml`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
 
 Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft**; ältere, unveröffentlichte Drafts (inkl. Tags) werden dabei gelöscht. Das Veröffentlichen des Drafts baut die Docker-Tags `latest`, `X.Y.Z`, `X.Y`, `X`; `edge` kommt bei jedem Push auf `master`.
 
 ## Lizenz
 
 Beiträge stehen unter der [AGPL-3.0-or-later](LICENSE) (inbound = outbound). Es gibt kein Contributor License Agreement (CLA): Du unterschreibst nichts Zusätzliches, und deine Beiträge stehen unter derselben Lizenz wie das Projekt.
-
-## Mail-Vorlagen
-
-Neue Mail = Katalogeintrag in `src/lib/mail-templates.ts` (Variablen, Pflichtplatzhalter, Beispiele, Builder) + Migration mit der `system`-Zeile in `mail_templates` + `pnpm mail:docs` (erzeugt `docs/mail-variables.md`; ein Test prüft, dass sie aktuell ist).
