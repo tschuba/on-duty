@@ -16,10 +16,13 @@ import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, ca
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
-import { buildListUrl, parseMulti } from "../lib/list-query.js";
+import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
+import { StatCard } from "../components/stat-card.js";
+import { TitleSwitch } from "../components/title-switch.js";
+import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { SortIcon } from "./members.js";
-import { nextReceiptStatus, recipientName, summarizeDonations, type DonationSummary, type ReceiptAction } from "../lib/donations.js";
+import { nextReceiptStatus, recipientName, summarizeDonations, summarizeDonors, type DonationSummary, type DonorSortKey, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { DonorPickerFields, duplicatePersonError, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
@@ -323,6 +326,7 @@ function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnTyp
 
 export type SortKey = "date" | "donor" | "amount";
 const SORT_KEYS: readonly SortKey[] = ["date", "donor", "amount"];
+const DONOR_SORT_KEYS: readonly DonorSortKey[] = ["donor", "count", "amount", "last"];
 const RECEIPT_STATUSES = ["open", "issued", "not_required"] as const;
 
 type Sortable = { date: string; amount: string | number; donor: { person: { firstName: string; lastName: string; companyName?: string | null } } };
@@ -343,21 +347,17 @@ export function sortDonations<T extends Sortable>(list: T[], sort: SortKey = "da
 const eur = (cents: number) => formatAmount(cents / 100);
 
 function DonationStats({ s, openHref }: { s: DonationSummary; openHref: string }) {
-  const card = "stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4";
-  const value = "stat-value text-2xl @4xl:text-3xl";
   const dash = (n: number, text: string) => (s.count === 0 ? "–" : n === 0 ? "0" : text);
   return (
     <div id="donations-stats" class="hidden sm:block @container mb-6">
       <div class="grid grid-cols-2 @4xl:grid-cols-5 gap-2 @4xl:gap-4">
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.total")}</div><div class={value}>{eur(s.cents)}</div></div>
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.count")}</div><div class={value}>{s.count}</div></div>
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.average")}</div><div class={value}>{s.count === 0 ? "–" : eur(s.averageCents)}</div></div>
-        <div class={card}><div class="stat-title text-xs">{t("donations.stats.donors")}</div><div class={value}>{s.donors}</div></div>
-        <a href={openHref} class={`${card} hover:bg-base-300`}>
-          <div class="stat-title text-xs">{t("donations.stats.open")}</div>
-          <div class={`${value} text-warning`}>{s.open.count}</div>
+        <StatCard label={t("donations.stats.total")} value={eur(s.cents)} />
+        <StatCard label={t("donations.stats.count")} value={s.count} />
+        <StatCard label={t("donations.stats.average")} value={s.count === 0 ? "–" : eur(s.averageCents)} />
+        <StatCard label={t("donations.stats.donors")} value={s.donors} />
+        <StatCard label={t("donations.stats.open")} value={s.open.count} tone="text-warning" href={openHref} link="filter">
           <div class="stat-desc text-sm">{dash(s.open.count, eur(s.open.cents))}</div>
-        </a>
+        </StatCard>
       </div>
     </div>
   );
@@ -372,41 +372,60 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const search = q.search ?? "";
   const range = parseRange({ ...q, start: q.from, end: q.to }, todayStr(), "past", { start: "", end: "" }, undefined, true);
   const { start: from, end: to } = range;
-  const sort: SortKey = (SORT_KEYS as readonly string[]).includes(q.sort) ? (q.sort as SortKey) : "date";
+  const donorView = q.view === "donors";
+  const sort: string = ((donorView ? DONOR_SORT_KEYS : SORT_KEYS) as readonly string[]).includes(q.sort) ? q.sort : donorView ? "donor" : "date";
   const dir = q.sort_dir === "asc" || q.sort_dir === "desc" ? q.sort_dir : sort === "donor" ? "asc" : "desc";
-  const receipt = parseMulti(c.req.queries("receipt"), RECEIPT_STATUSES);
+  const receipt = donorView ? [] : parseMulti(c.req.queries("receipt"), RECEIPT_STATUSES);
 
   const all = await fetchDonations();
   const needle = search.toLowerCase();
-  const filtered = all.filter((d) => {
-    if (search && !`${d.donor.person.companyName ?? ""} ${d.donor.person.firstName} ${d.donor.person.lastName}`.toLowerCase().includes(needle)) return false;
-    if (receipt.length > 0 && !receipt.includes(d.receiptStatus)) return false;
-    if (from && d.date < from) return false;
-    if (to && d.date > to) return false;
-    return true;
-  });
-  const sorted = sortDonations(filtered, sort, dir);
-  const state = { search, from, to, sort: q.sort ? sort : undefined, sort_dir: q.sort ? dir : undefined, receipt };
-  const sortUrl = (col: SortKey) => buildListUrl("/donations", state, { sort: col, sort_dir: sort === col ? (dir === "asc" ? "desc" : "asc") : col === "donor" ? "asc" : "desc" });
-  const th = (col: SortKey, label: string, cls = "") => <th class={cls}><a href={sortUrl(col)} class="link link-hover">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>;
-
+  const inRange = (d: { date: string }) => !(from && d.date < from) && !(to && d.date > to);
+  const matchesName = (p: { firstName: string; lastName: string; companyName?: string | null }) => !search || `${p.companyName ?? ""} ${p.firstName} ${p.lastName}`.toLowerCase().includes(needle);
+  const filtered = all.filter((d) => matchesName(d.donor.person) && (receipt.length === 0 || receipt.includes(d.receiptStatus)) && inRange(d));
+  const { page: reqPage, pageSize } = parsePagination(q);
+  const sorted = donorView ? [] : sortDonations(filtered, sort as SortKey, dir);
+  // Donors without donations stay visible (0 / –); count, total and last donation refer to the selected range.
+  const donorRows = donorView
+    ? summarizeDonors(
+        ((await db.query.donors.findMany({ with: { person: { with: { member: true } } } })) as (DonorRow & { person: Person & { member: { id: string } | null } })[]).filter((d) => matchesName(d.person)),
+        all.filter(inRange),
+        sort as DonorSortKey,
+        dir,
+      )
+    : [];
+  const total = donorView ? donorRows.length : sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(reqPage, totalPages);
+  const slice = <T,>(l: T[]) => l.slice((page - 1) * pageSize, page * pageSize);
+  const pageRows = slice(sorted);
+  const pageDonorRows = slice(donorRows);
+  const state = { pageSize: q.pageSize ? pageSize : undefined, view: donorView ? "donors" : undefined, search, from, to, sort: q.sort ? sort : undefined, sort_dir: q.sort ? dir : undefined, receipt };
+  const sortUrl = (col: string) => buildListUrl("/donations", state, { sort: col, sort_dir: sort === col ? (dir === "asc" ? "desc" : "asc") : col === "donor" ? "asc" : "desc" });
+  const th = (col: string, label: string, cls = "") => <th class={cls}><a href={sortUrl(col)} class="link link-hover">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>;
+  const viewUrl = (view?: string) => buildListUrl("/donations", { view, search, from, to, pageSize: state.pageSize });
+  const views = [
+    { active: !donorView, href: viewUrl(), label: t("donations.view.donations") },
+    { active: donorView, href: viewUrl("donors"), label: t("donations.tabs.donors") },
+  ];
   const presets = rangePresets(todayStr(), "past", undefined, true);
   const canLink = user.permissions.has("members:read");
   const canRecord = user.permissions.has("donations:record");
 
   return c.html(
-    <Layout title={t("donations.title")} user={user}>
-      <PageHeader title={t("donations.title")} actions={<>
-        <label class="flex items-center gap-2 cursor-pointer" title={t("donations.stats.toggle")}>
+    <Layout title={donorView ? `${t("donations.tabs.donors")} · ${t("donations.title")}` : t("donations.title")} user={user}>
+      <PageHeader title={<TitleSwitch items={views} />} actions={<>
+        {!donorView && <label class="flex items-center gap-2 cursor-pointer" title={t("donations.stats.toggle")}>
           <Icon name="chart-bar" class="w-5 h-5" />
           <span class="@max-xl:hidden">{t("donations.stats.toggle")}</span>
           <input type="checkbox" id="donations-stats-toggle" class="toggle" aria-label={t("donations.stats.toggle")} onchange="toggleDonationsStats(this.checked)" />
-        </label>
-        {canRecord && <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />}
+        </label>}
+        {canRecord && (donorView
+          ? <HeaderAction variant="primary" icon="plus" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />
+          : <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />)}
       </>} />
 
-      <DonationStats s={summarizeDonations(filtered)} openHref={buildListUrl("/donations", { ...state, receipt: ["open"] })} />
-      <script dangerouslySetInnerHTML={{ __html: `
+      {!donorView && <DonationStats s={summarizeDonations(filtered)} openHref={buildListUrl("/donations", { ...state, receipt: ["open"] })} />}
+      {!donorView && <script dangerouslySetInnerHTML={{ __html: `
         (function() {
           const stats = document.getElementById('donations-stats');
           const saved = localStorage.getItem('donations_statsVisible');
@@ -417,9 +436,11 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             localStorage.setItem('donations_statsVisible', show ? '1' : '0');
           };
         })();
-      ` }} />
+      ` }} />}
 
       <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
+        {donorView && <input type="hidden" name="view" value="donors" />}
+        {q.pageSize && <input type="hidden" name="pageSize" value={pageSize} />}
         <div class="flex flex-col w-full md:w-auto">
           <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
@@ -427,8 +448,8 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
         {q.sort && <input type="hidden" name="sort_dir" value={dir} />}
         {receipt.map((r) => <input type="hidden" name="receipt" value={r} />)}
         <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
-          href={(p) => buildListUrl("/donations", { search, sort: state.sort, sort_dir: state.sort_dir, receipt }, p)} />
-        <MultiSelectFilter
+          href={(p) => buildListUrl("/donations", { view: state.view, pageSize: state.pageSize, search, sort: state.sort, sort_dir: state.sort_dir, receipt }, p)} />
+        {!donorView && <MultiSelectFilter
           param="receipt"
           autoApply
           options={RECEIPT_STATUSES.map((v) => ({ value: v, label: t(`donations.table.${v === "open" ? "receiptOpen" : v === "issued" ? "receiptIssued" : "receiptNotRequired"}`) }))}
@@ -437,11 +458,37 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           countLabel={(count) => t("donations.filter.receiptCount", { count })}
           applyLabel={t("common.apply")}
           resetLabel={t("common.reset")}
-        />
+        />}
       </form>
 
       <ClickToEditHint />
       <div class="overflow-x-auto">
+      {donorView ? (
+      <table class="table table-zebra w-full">
+        <thead>
+          <tr>
+            {th("donor", t("donations.table.donor"))}
+            <th class="hidden md:table-cell">{t("donors.table.address")}</th>
+            {th("count", t("donations.table.count"), "text-right")}
+            {th("amount", t("donations.table.amount"), "text-right")}
+            {th("last", t("donations.table.last"), "hidden sm:table-cell")}
+          </tr>
+        </thead>
+        <tbody>
+          {pageDonorRows.length === 0 ? (
+            <tr><td colspan={5} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
+          ) : pageDonorRows.map((r) => (
+            <tr key={r.donor.id} class={`cursor-pointer hover${r.count === 0 ? " opacity-60" : ""}`} onclick={`window.location='/donors/${r.donor.id}'`}>
+              <td><MemberLink memberId={r.donor.person.member?.id} canLink={canLink}>{recipientName(r.donor.person)}</MemberLink><MemberMark memberId={r.donor.person.member?.id} canLink={canLink} /></td>
+              <td class="hidden md:table-cell">{[[r.donor.person.street, r.donor.person.houseNumber].filter(Boolean).join(" "), [r.donor.person.zip, r.donor.person.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"}</td>
+              <td class="text-right">{r.count}</td>
+              <td class="text-right whitespace-nowrap">{r.count ? eur(r.cents) : "–"}</td>
+              <td class="hidden sm:table-cell">{r.last ? formatDate(r.last) : "–"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      ) : (
       <table class="table table-zebra w-full">
         <thead>
           <tr>
@@ -453,9 +500,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           </tr>
         </thead>
         <tbody>
-          {sorted.length === 0 ? (
+          {pageRows.length === 0 ? (
             <tr><td colspan={5} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
-          ) : sorted.map((d) => (
+          ) : pageRows.map((d) => (
             <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}'`}>
               <td>{formatDate(d.date)}</td>
               <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
@@ -472,7 +519,18 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           ))}
         </tbody>
       </table>
+      )}
       </div>
+
+      <Pager
+        countLabel={t(donorView ? "donors.table.count" : "donations.table.countLabel", { count: total })}
+        page={page}
+        totalPages={totalPages}
+        pageUrl={(p) => buildListUrl("/donations", state, { page: p })}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        pageSizeStorageKey="donations_pageSize"
+      />
     </Layout>
   );
 });

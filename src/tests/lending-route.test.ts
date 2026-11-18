@@ -9,6 +9,7 @@ let lendingItemsFindManyResult: any[] = [];
 let lendingItemsFindFirstResult: any = undefined;
 let lendingLoansFindManyResult: any[] = [];
 let lendingLoansFindFirstResult: any = undefined;
+let loanRequestsFindManyResult: any[] = [];
 let membersFindFirstResult: any = undefined;
 
 const insertCalls: { table: any; values: any }[] = [];
@@ -65,6 +66,9 @@ vi.mock("../db/index.js", () => ({
       members: {
         findFirst: vi.fn(() => Promise.resolve(membersFindFirstResult)),
       },
+      loanRequests: {
+        findMany: vi.fn(() => Promise.resolve(loanRequestsFindManyResult)),
+      },
     },
     insert,
     update,
@@ -83,6 +87,9 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
+vi.mock("../lib/settings.js", () => ({ getSettings: vi.fn(() => Promise.resolve({ loanRequestRetentionDays: "90" })) }));
+vi.mock("../lib/lending.js", async (orig) => ({ ...(await orig<typeof import("../lib/lending.js")>()), cleanupRejectedLoanRequests: vi.fn(() => Promise.resolve()) }));
+
 const { lendingRoutes } = await import("../routes/lending.js");
 
 beforeEach(() => {
@@ -94,6 +101,7 @@ beforeEach(() => {
   lendingItemsFindFirstResult = undefined;
   lendingLoansFindManyResult = [];
   lendingLoansFindFirstResult = undefined;
+  loanRequestsFindManyResult = [];
   membersFindFirstResult = undefined;
   searchPersonsResult = [];
   currentUser = { id: "u1", permissions: new Set(["lending:read", "lending:manage"]), disabled: false };
@@ -250,12 +258,69 @@ describe("GET /inventory/lending", () => {
 
   it("filters by status", async () => {
     lendingLoansFindManyResult = [
-      makeLoan({ id: "l1", borrower: person("Offen"), plannedFrom: "2999-01-01", plannedTo: "2999-01-05" }),
+      makeLoan({ id: "l1", borrower: person("Zukunftig"), plannedFrom: "2999-01-01", plannedTo: "2999-01-05" }),
       makeLoan({ id: "l2", borrower: person("Ueberfaellig"), plannedFrom: "2020-01-01", plannedTo: "2020-01-05", pickedUpAt: "2020-01-01" }),
     ];
     const html = await (await lendingRoutes.request("/?status=overdue&start=&end=")).text();
     expect(html).toContain("Ueberfaellig");
-    expect(html).not.toContain("Offen");
+    expect(html).not.toContain("Zukunftig");
+  });
+
+  describe("offene Anfragen in der Zeitleiste", () => {
+    const makeRequest = (overrides: Record<string, unknown> = {}) => ({
+      id: "req1", status: "open", quantity: 1,
+      plannedFrom: "2999-06-01", plannedTo: "2999-06-03", plannedFromTime: null, plannedToTime: null,
+      submittedAt: new Date("2026-01-01T10:00:00Z"),
+      person: person("Antragsteller"), lendingItem: makeLendingItem(),
+      ...overrides,
+    });
+
+    it("shows open requests outside the default window, not rejected ones", async () => {
+      loanRequestsFindManyResult = [makeRequest(), makeRequest({ id: "req2", status: "rejected", person: person("Abgelehnter") })];
+      const html = await (await lendingRoutes.request("/")).text();
+      expect(html).toContain("Antragsteller");
+      expect(html).toContain("Angefragt");
+      expect(html).toContain("border-l-primary");
+      expect(html).toContain("Alle außer Abgelehnt");
+      expect(html).not.toContain("Abgelehnter");
+      expect(html).toContain("/inventory/requests/req1");
+    });
+
+    it("shows rejected requests only when selected", async () => {
+      loanRequestsFindManyResult = [makeRequest({ status: "rejected", person: person("Abgelehnter") })];
+      const html = await (await lendingRoutes.request("/?status=rejected&start=&end=")).text();
+      expect(html).toContain("Abgelehnter");
+      expect(html).toContain("opacity-60");
+    });
+
+    it("applies an explicit range to requests by overlap", async () => {
+      loanRequestsFindManyResult = [makeRequest()];
+      const html = await (await lendingRoutes.request("/?range=custom&start=2026-01-01&end=2026-01-31")).text();
+      expect(html).not.toContain("Antragsteller");
+    });
+
+    it("flags a request that collides with an existing loan", async () => {
+      lendingLoansFindManyResult = [makeLoan({ plannedFrom: "2999-06-02", plannedTo: "2999-06-04", borrower: person("Belegt") })];
+      loanRequestsFindManyResult = [makeRequest()];
+      const html = await (await lendingRoutes.request("/?start=&end=")).text();
+      expect(html).toContain("Zeitraum bereits belegt");
+      expect(html).toContain("border-l-warning");
+    });
+
+    it("lists a request before a loan starting the same day", async () => {
+      lendingLoansFindManyResult = [makeLoan({ plannedFrom: "2999-06-01", plannedTo: "2999-06-01", borrower: person("Vorgang") })];
+      loanRequestsFindManyResult = [makeRequest({ plannedTo: "2999-06-01", lendingItem: makeLendingItem({ id: "li2" }) })];
+      const html = await (await lendingRoutes.request("/?start=&end=")).text();
+      expect(html.indexOf("Antragsteller")).toBeLessThan(html.indexOf("Vorgang"));
+    });
+
+    it("hides requests without lending:manage", async () => {
+      currentUser = { ...currentUser, permissions: new Set(["lending:read"]) };
+      loanRequestsFindManyResult = [makeRequest()];
+      const html = await (await lendingRoutes.request("/")).text();
+      expect(html).not.toContain("Antragsteller");
+      expect(html).not.toContain("Alle außer Abgelehnt");
+    });
   });
 
   it("filters by tag, matching any of several tags", async () => {

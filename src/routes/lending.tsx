@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { and, asc, eq, exists, ilike, or } from "drizzle-orm";
 import { EmailField, Field, PhoneField } from "../components/field.js";
 import { db } from "../db/index.js";
-import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
+import { inventoryItems, inventoryItemTags, lendingItems, lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
@@ -18,7 +18,9 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
+import { getSettings } from "../lib/settings.js";
+import { StatCard } from "../components/stat-card.js";
+import { checkAvailability as checkSharedAvailability, cleanupRejectedLoanRequests, effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
 
 export const lendingRoutes = new Hono<{ Variables: Variables }>();
 
@@ -135,11 +137,69 @@ function borrowerLabel(l: LoanWithBorrower): string {
   return personName(l.borrower) || "—";
 }
 
+// Kennzahlen über alle Vorgänge (nicht über die gefilterte Liste). Die Karten überschneiden sich:
+// „Überfällig“ und „Heute fällig“ sind meist auch „Verliehen“.
+function LendingStats({ loans, today, openRequests, requestsHref }: { loans: LoanRange[]; today: string; openRequests: number | null; requestsHref: string }) {
+  const open = loans.filter((l) => !l.returnedAt);
+  const overdue = loans.filter((l) => loanStatus(l, today) === "overdue").length;
+  // Leere start/end heben das Standardfenster auf, sonst weicht die Liste von der Kartenzahl ab.
+  const statusHref = (st: LoanStatus) => `/inventory/lending?status=${st}&start=&end=`;
+  return (
+    <div id="lending-stats" class="hidden sm:block @container mb-6">
+      <div class={`grid grid-cols-2 ${openRequests === null ? "@4xl:grid-cols-4" : "@4xl:grid-cols-5"} gap-2 @4xl:gap-4`}>
+        <StatCard label={t("lending.stats.out")} value={open.filter((l) => l.pickedUpAt).length} tone="text-info" />
+        <StatCard label={t("lending.stats.overdue")} value={overdue} tone={overdue > 0 ? "text-error" : undefined} href={statusHref("overdue")} link="filter" />
+        <StatCard label={t("lending.stats.dueToday")} value={open.filter((l) => l.plannedTo === today).length} />
+        <StatCard label={t("lending.stats.planned")} value={loans.filter((l) => loanStatus(l, today) === "planned").length} href={statusHref("planned")} link="filter" />
+        {openRequests !== null && <StatCard label={t("lending.stats.requests")} value={openRequests} tone={openRequests > 0 ? "text-primary" : undefined} href={requestsHref} link="filter" />}
+      </div>
+    </div>
+  );
+}
+
+// Zeile der Zeitleiste: Vorgang oder Anfrage (offen/abgelehnt). Genehmigte Anfragen stehen nur als Vorgang da.
+type RowState = LoanStatus | "requested" | "rejected";
+type Row = {
+  id: string; kind: "loan" | "request"; href: string; state: RowState;
+  lendingItem: LendingItemWithRelations; person: Person; quantity: number;
+  plannedFrom: string | null; plannedTo: string | null;
+  sortDate: string; monthDate: string; submittedAt: number;
+  conflict: boolean; range: { from: string; to: string } | null;
+};
+type RequestRow = typeof loanRequests.$inferSelect & { lendingItem: LendingItemWithRelations; person: Person };
+
+const ROW_STATE_LABEL: Record<RowState, string> = {
+  ...LOAN_STATUS_LABEL,
+  requested: t("lending.overview.status.requested"),
+  rejected: t("lending.overview.status.rejected"),
+};
+const ROW_STATE_BADGE: Record<RowState, string> = {
+  ...LOAN_STATUS_BADGE,
+  requested: "badge badge-primary badge-outline badge-sm",
+  rejected: "badge badge-ghost badge-sm",
+};
+const LOAN_STATES: RowState[] = ["planned", "active", "overdue", "returned"];
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+
+async function fetchAllRequests(): Promise<RequestRow[]> {
+  return db.query.loanRequests.findMany({
+    with: { lendingItem: { with: { inventoryItem: { with: { tags: true } } } }, person: { with: { member: true } } },
+  }) as unknown as Promise<RequestRow[]>;
+}
+
 lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
+  const canManage = user.permissions.has("lending:manage");
+  const canLink = user.permissions.has("members:read");
+  // Anfragen sieht nur, wer verwalten darf. Standard: alles außer „Abgelehnt“.
+  const allowedStates: RowState[] = canManage ? [...LOAN_STATES, "requested", "rejected"] : LOAN_STATES;
+  const defaultStates = allowedStates.filter((st) => st !== "rejected");
+  const picked = parseMulti(c.req.queries("status"), allowedStates) as RowState[];
+  const statusFilter = picked.length > 0 ? picked : defaultStates;
+  const statusIsDefault = sameSet(statusFilter, defaultStates);
+  const statusParam = statusIsDefault ? undefined : statusFilter;
   const search = (c.req.query("q") ?? "").trim();
-  const statusFilter = parseMulti(c.req.queries("status"), Object.keys(LOAN_STATUS_LABEL)) as LoanStatus[];
   const tagFilter = c.req.queries("tag") ?? [];
   // Ohne start/end in der URL gilt das Standardfenster; leere Felder heben es auf.
   const range = parseRange(c.req.query(), today, "future", { start: addDays(today, -14), end: addDays(today, 30) });
@@ -147,58 +207,110 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const rp = rangeParams(range);
   const itemFilter = c.req.query("item") ?? "";
   const member = c.req.query("member") === "yes" || c.req.query("member") === "no" ? c.req.query("member")! : "";
-  const canLink = user.permissions.has("members:read");
   const needle = search.toLowerCase();
 
-  const all = await fetchAllLoans();
-  const allTags = [...new Set(all.flatMap((l) => l.lendingItem.inventoryItem.tags.map((tg) => tg.tag)))].sort((a, b) => a.localeCompare(b, "de"));
+  // Lazy statt Scheduler, siehe Backlog-Doc "Aufbewahrung" — die App führt keinen eigenen Cron.
+  if (canManage) await cleanupRejectedLoanRequests(Number((await getSettings()).loanRequestRetentionDays));
 
-  const filtered = all.filter((l) => {
-    if (start || end) {
-      // Überlappung mit dem Filterzeitraum; Vorgänge ganz ohne Datum fallen raus.
-      // Überfällige sind noch draußen: offenes Ende statt plannedTo.
-      const r = effectiveRange(l);
-      if (r && loanStatus(l, today) === "overdue") r.to = "9999-12-31T23:59";
-      if (!r || !rangesOverlap(r, { from: `${start || "0000-01-01"}T00:00`, to: `${end || "9999-12-31"}T23:59` })) return false;
+  const all = await fetchAllLoans();
+  const requests = canManage ? (await fetchAllRequests()).filter((r) => r.status !== "approved") : [];
+  const openRequests = requests.filter((r) => r.status === "open").length;
+  const loansByItem = new Map<string, typeof all>();
+  for (const l of all) loansByItem.set(l.lendingItem.id, [...(loansByItem.get(l.lendingItem.id) ?? []), l]);
+
+  const loanRows: Row[] = all.map((l) => {
+    const state = loanStatus(l, today);
+    const r = effectiveRange(l);
+    // Überfällige sind noch draußen: offenes Ende statt plannedTo.
+    if (r && state === "overdue") r.to = "9999-12-31T23:59";
+    return {
+      id: l.id, kind: "loan", href: `/inventory/lending/loans/${l.id}`, state, lendingItem: l.lendingItem, person: l.borrower, quantity: l.quantity,
+      plannedFrom: l.plannedFrom, plannedTo: l.plannedTo,
+      sortDate: l.plannedFrom ?? l.pickedUpAt ?? "", monthDate: l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "",
+      submittedAt: 0, conflict: false, range: r,
+    };
+  });
+  const requestRows: Row[] = requests.map((q) => {
+    const cand = { plannedFrom: q.plannedFrom, plannedTo: q.plannedTo, plannedFromTime: q.plannedFromTime, plannedToTime: q.plannedToTime, pickedUpAt: null, returnedAt: null, quantity: q.quantity };
+    const item = q.lendingItem;
+    const conflict = q.status === "open" && checkSharedAvailability(
+      { individualTracking: item.individualTracking, stock: item.inventoryItem.quantity - item.inventoryItem.retiredQuantity },
+      loansByItem.get(item.id) ?? [], cand,
+    ).conflict;
+    return {
+      id: q.id, kind: "request", href: `/inventory/requests/${q.id}`, state: q.status === "open" ? "requested" : "rejected", lendingItem: item, person: q.person, quantity: q.quantity,
+      plannedFrom: q.plannedFrom, plannedTo: q.plannedTo, sortDate: q.plannedFrom, monthDate: q.plannedFrom,
+      submittedAt: q.submittedAt.getTime(), conflict, range: effectiveRange(cand),
+    };
+  });
+  const rows = [...loanRows, ...requestRows];
+  const allTags = [...new Set(rows.flatMap((r) => r.lendingItem.inventoryItem.tags.map((tg) => tg.tag)))].sort((a, b) => a.localeCompare(b, "de"));
+
+  const filtered = rows.filter((r) => {
+    // Offene Anfragen sind vom Standardfenster ausgenommen (bleiben sichtbar, bis entschieden); ein gewählter Zeitraum gilt auch für sie.
+    const windowExempt = r.state === "requested" && range.mode === "default";
+    if ((start || end) && !windowExempt) {
+      // Überlappung mit dem Filterzeitraum; Einträge ganz ohne Datum fallen raus.
+      if (!r.range || !rangesOverlap(r.range, { from: `${start || "0000-01-01"}T00:00`, to: `${end || "9999-12-31"}T23:59` })) return false;
     }
-    if (itemFilter && l.lendingItem.id !== itemFilter) return false;
-    if (statusFilter.length > 0 && !statusFilter.includes(loanStatus(l, today))) return false;
-    if (tagFilter.length > 0 && !tagFilter.some((wanted) => l.lendingItem.inventoryItem.tags.some((tg) => tg.tag === wanted))) return false;
-    if (member && Boolean(l.borrower.member) !== (member === "yes")) return false;
-    if (needle && !`${l.lendingItem.inventoryItem.name} ${borrowerLabel(l)}`.toLowerCase().includes(needle)) return false;
+    if (itemFilter && r.lendingItem.id !== itemFilter) return false;
+    if (!statusFilter.includes(r.state)) return false;
+    if (tagFilter.length > 0 && !tagFilter.some((wanted) => r.lendingItem.inventoryItem.tags.some((tg) => tg.tag === wanted))) return false;
+    if (member && Boolean(r.person.member) !== (member === "yes")) return false;
+    if (needle && !`${r.lendingItem.inventoryItem.name} ${personName(r.person)}`.toLowerCase().includes(needle)) return false;
     return true;
   });
 
-  const sorted = [...filtered].sort((a, b) => {
-    const da = a.plannedFrom ?? a.pickedUpAt ?? "";
-    const db_ = b.plannedFrom ?? b.pickedUpAt ?? "";
-    return da.localeCompare(db_);
-  });
+  // Am selben Tag stehen Anfragen vor Vorgängen (Handlungsbedarf), untereinander nach Eingang.
+  const sorted = [...filtered].sort((a, b) =>
+    a.sortDate.localeCompare(b.sortDate) || Number(b.kind === "request") - Number(a.kind === "request") || a.submittedAt - b.submittedAt);
 
-  const groups = new Map<string, typeof sorted>();
-  for (const l of sorted) {
-    const date = l.plannedFrom ?? l.pickedUpAt ?? l.plannedTo ?? l.returnedAt ?? "";
-    const key = date.slice(0, 7);
+  const groups = new Map<string, Row[]>();
+  for (const r of sorted) {
+    const key = r.monthDate.slice(0, 7);
     let bucket = groups.get(key);
     if (!bucket) { bucket = []; groups.set(key, bucket); }
-    bucket.push(l);
+    bucket.push(r);
   }
 
   const presets = rangePresets(today, "future");
-  const hasFilter = Boolean(itemFilter || search || statusFilter.length || tagFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
-  const canManage = user.permissions.has("lending:manage");
+  const hasFilter = Boolean(itemFilter || search || !statusIsDefault || tagFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
+  const statusLabel = sameSet(statusFilter, allowedStates) ? t("lending.filter.allStatus")
+    : statusIsDefault ? (canManage ? t("lending.filter.allButRejected") : t("lending.filter.allStatus")) : undefined;
 
   return c.html(
     <Layout title={t("lending.title")} user={user}>
-      <PageHeader title={t("lending.title")} actions={user.permissions.has("lending:manage") && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />} />
+      <PageHeader title={t("lending.title")} actions={<>
+        <label class="flex items-center gap-2 cursor-pointer" title={t("lending.stats.toggle")}>
+          <Icon name="chart-bar" class="w-5 h-5" />
+          <span class="@max-xl:hidden">{t("lending.stats.toggle")}</span>
+          <input type="checkbox" id="lending-stats-toggle" class="toggle" aria-label={t("lending.stats.toggle")} onchange="toggleLendingStats(this.checked)" />
+        </label>
+        {canManage && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />}
+      </>} />
+
+      <LendingStats loans={all} today={today} openRequests={canManage ? openRequests : null} requestsHref="/inventory/lending?status=requested" />
+      <script dangerouslySetInnerHTML={{ __html: `
+        (function() {
+          const stats = document.getElementById('lending-stats');
+          const saved = localStorage.getItem('lending_statsVisible');
+          if (saved) stats.style.display = saved === '1' ? 'block' : 'none';
+          document.getElementById('lending-stats-toggle').checked = getComputedStyle(stats).display !== 'none';
+          window.toggleLendingStats = function(show) {
+            stats.style.display = show ? 'block' : 'none';
+            localStorage.setItem('lending_statsVisible', show ? '1' : '0');
+          };
+        })();
+      ` }} />
 
       <form method="get" action="/inventory/lending" class="filter-bar flex gap-2 items-center flex-wrap mb-4">
         <label class="input flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
         <MultiSelectFilter
           param="status"
-          options={(Object.keys(LOAN_STATUS_LABEL) as LoanStatus[]).map((s) => ({ value: s, label: LOAN_STATUS_LABEL[s] }))}
+          options={allowedStates.map((st) => ({ value: st, label: ROW_STATE_LABEL[st] }))}
           selected={statusFilter}
           allLabel={t("lending.filter.allStatus")}
+          labelOverride={statusLabel}
           countLabel={(count) => t("lending.filter.statusCount", { count })}
           applyLabel={t("common.apply")}
           resetLabel={t("common.reset")}
@@ -217,44 +329,55 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         />
         <input type="hidden" name="member" value={member} />
         <input type="hidden" name="item" value={itemFilter} />
-        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusFilter, tag: tagFilter, member, ...rp })} class="badge badge-neutral gap-1">{all.find((l) => l.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
+        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusParam, tag: tagFilter, member, ...rp })} class="badge badge-neutral gap-1">{rows.find((r) => r.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
         <ToggleFilter items={pairToggles(member,
           [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }],
-          (m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, tag: tagFilter, ...rp }, { member: m }))} />
+          (m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusParam, tag: tagFilter, ...rp }, { member: m }))} />
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
-          href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusFilter, tag: tagFilter, member }, p)} />
+          href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusParam, tag: tagFilter, member }, p)} />
         {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
       </form>
 
       {sorted.length === 0 ? (
-        <p class="text-base-content/60 py-8">{t("lending.overview.empty")}</p>
+        <p class="text-center opacity-50 py-8">{t("lending.overview.empty")}</p>
       ) : (
         <div class="overflow-x-auto">
-          {canManage && <p class="text-sm text-base-content/60 mb-2">{t("lending.overview.editHint")}</p>}
           <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
+            <thead>
+              <tr>
+                <th class="pl-5 border-l-4 border-l-transparent">{t("lending.overview.col.start")}</th>
+                <th>{t("lending.loans.form.item")}</th>
+                <th>{t("lending.loans.table.borrower")}</th>
+                <th>{t("lending.loans.table.status")}</th>
+                <th>{t("lending.overview.col.period")}</th>
+              </tr>
+            </thead>
             <tbody>
-              {[...groups.entries()].map(([month, loans], i) => (
+              {[...groups.entries()].map(([month, group], i) => (
                 <>
                   <tr>
                     <td colspan={5} class={`text-base font-semibold text-base-content/70 pb-1${i > 0 ? " pt-8" : " pt-2"}`}>
                       {formatMonth(month)}
                     </td>
                   </tr>
-                  {loans.map((l, idx) => {
-                    const loanState = loanStatus(l, today);
-                    const date = l.plannedFrom ?? l.pickedUpAt ?? "";
+                  {group.map((r, idx) => {
                     const border = idx > 0 ? " border-t border-base-300" : "";
+                    const clickable = r.kind === "request" || canManage;
+                    const edge = r.state === "overdue" ? "border-l-error" : r.state === "requested" ? (r.conflict ? "border-l-warning" : "border-l-primary") : "border-l-transparent";
                     return (
                       <tr
-                        key={l.id}
-                        class={`${canManage ? "cursor-pointer hover" : ""}${loanState === "overdue" ? " text-error" : ""}`}
-                        {...(canManage ? { onclick: `window.location='/inventory/lending/loans/${l.id}'` } : {})}
+                        key={`${r.kind}-${r.id}`}
+                        class={`${clickable ? "cursor-pointer hover" : ""}${r.state === "rejected" ? " opacity-60" : ""}`}
+                        {...(clickable ? { onclick: `window.location='${r.href}'` } : {})}
                       >
-                        <td class={`whitespace-nowrap text-sm pl-6${border}`}>{formatDate(date)}</td>
-                        <td class={border}>{l.lendingItem.inventoryItem.name}</td>
-                        <td class={border}><MemberLink memberId={l.borrower.member?.id} canLink={canLink}>{borrowerLabel(l)}</MemberLink><MemberMark memberId={l.borrower.member?.id} canLink={canLink} /><BorrowerContact person={l.borrower} /></td>
-                        <td class={border}><span class={LOAN_STATUS_BADGE[loanState]}>{LOAN_STATUS_LABEL[loanState]}</span></td>
-                        <td class={`text-sm${border}`}>{formatDate(l.plannedFrom)} – {formatDate(l.plannedTo)}</td>
+                        <td class={`whitespace-nowrap text-sm pl-5 border-l-4 ${edge}${border}`}>{formatDate(r.sortDate)}</td>
+                        <td class={border}>{r.lendingItem.inventoryItem.name}{r.quantity > 1 && ` × ${r.quantity}`}</td>
+                        <td class={border}><MemberLink memberId={r.person.member?.id} canLink={canLink}>{personName(r.person) || "—"}</MemberLink><MemberMark memberId={r.person.member?.id} canLink={canLink} /><BorrowerContact person={r.person} /></td>
+                        <td class={border}><span class={ROW_STATE_BADGE[r.state]}>{ROW_STATE_LABEL[r.state]}</span></td>
+                        <td class={`text-sm${r.state === "overdue" ? " text-error" : ""}${border}`}>
+                          {r.conflict && <span class="inline-block mr-1 align-text-bottom text-warning" title={t("lending.overview.conflict")}><Icon name="exclamation-triangle" class="w-4 h-4" /><span class="sr-only">{t("lending.overview.conflict")}</span></span>}
+                          {formatDate(r.plannedFrom)} – {formatDate(r.plannedTo)}
+                        </td>
                       </tr>
                     );
                   })}

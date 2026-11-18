@@ -47,3 +47,23 @@ describe("summarizeDonations", () => {
     expect(s).toMatchObject({ count: 3, cents: 6000, averageCents: 2000, donors: 2, open: { count: 2, cents: 4000 } });
   });
 });
+
+import { summarizeDonors } from "../lib/donations.js";
+describe("summarizeDonors", () => {
+  const person = (lastName: string) => ({ firstName: "A", lastName });
+  const donors = [{ id: "1", person: person("Bauer") }, { id: "2", person: person("Adler") }, { id: "3", person: person("Zorn") }];
+  const list = [
+    { donorId: "1", amount: "10.10", date: "2026-01-01" },
+    { donorId: "1", amount: "5.20", date: "2026-03-01" },
+    { donorId: "2", amount: "1.00", date: "2026-02-01" },
+  ];
+  it("counts, sums in cents, finds last date; donors without donations stay with 0 / null", () => {
+    const r = summarizeDonors(donors, list);
+    expect(r.map((x) => x.donor.id)).toEqual(["2", "1", "3"]);
+    expect(r.find((x) => x.donor.id === "1")).toMatchObject({ count: 2, cents: 1530, last: "2026-03-01" });
+    expect(r.find((x) => x.donor.id === "3")).toMatchObject({ count: 0, cents: 0, last: null });
+  });
+  it("sorts by amount desc", () => {
+    expect(summarizeDonors(donors, list, "amount", "desc").map((x) => x.donor.id)).toEqual(["1", "2", "3"]);
+  });
+});

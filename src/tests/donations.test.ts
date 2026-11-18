@@ -16,6 +16,7 @@ function chainOf(rows: unknown) {
 
 let donationsFindManyResult: any[] = [];
 let donationsFindFirstResult: any = undefined;
+let donorsFindManyResult: any[] = [];
 let donorLookupResult: any[] = [];
 let orgConfigFixture: any[] = [];
 let openReceiptsFixture: any[] = [];
@@ -68,6 +69,7 @@ const transaction = vi.fn(async (cb: any) => cb({ select, insert, update, delete
 vi.mock("../db/index.js", () => ({
   db: {
     query: {
+      donors: { findMany: vi.fn(() => Promise.resolve(donorsFindManyResult)) },
       donations: {
         findMany: vi.fn(() => Promise.resolve(donationsFindManyResult)),
         findFirst: vi.fn(() => Promise.resolve(donationsFindFirstResult)),
@@ -144,6 +146,33 @@ function makeDonation(overrides: Record<string, unknown> = {}) {
 }
 
 // ── GET / (list) ─────────────────────────────────────────────────────────────
+
+describe("GET /?view=donors", () => {
+  it("shows per-donor count/sum/last within the range, incl. donors without donations; no stats/receipt filter", async () => {
+    const d = makeDonation({ date: "2026-03-01" });
+    donationsFindManyResult = [d, makeDonation({ id: "old", amount: "7.00", date: "2020-01-01" })];
+    donorsFindManyResult = [d.donor, { id: "dx", person: { firstName: "Zed", lastName: "Zorn", companyName: null, member: null } }];
+    const html = await (await donationRoutes.request("/?view=donors&from=2026-01-01&to=2026-12-31")).text();
+    expect(html).toContain("Bauer");
+    expect(html).toContain("100,00");
+    expect(html).not.toContain("107,00");
+    expect(html).toContain("Zorn");
+    expect(html).toContain('href="/donors/');
+    expect(html).not.toContain('id="donations-stats"');
+  });
+});
+
+describe("GET / paging", () => {
+  it("paginates donations and donors (pageSize 10, page 2)", async () => {
+    donationsFindManyResult = Array.from({ length: 12 }, (_, i) => makeDonation({ id: `x${i}`, date: `2026-01-${String(i + 1).padStart(2, "0")}` }));
+    donorsFindManyResult = donationsFindManyResult.map((d, i) => ({ ...d.donor, id: `dd${i}` }));
+    for (const v of ["", "view=donors&"]) {
+      const html = await (await donationRoutes.request(`/?${v}pageSize=10&page=2`)).text();
+      expect(html).toContain("12 Spende");
+      expect(html.match(/<tr [^>]*class="cursor-pointer hover[ "]/g)).toHaveLength(2);
+    }
+  });
+});
 
 describe("GET /", () => {
   it("lists donations with donor name and formatted amount", async () => {

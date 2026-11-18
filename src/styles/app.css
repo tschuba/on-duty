@@ -40,7 +40,6 @@
   --color-accent: #2a8c94;
   --color-accent-content: #ffffff;
   --color-gold: #ffc107;
-  --color-surface: #f8f8f8;
   --font-heading: "Oswald", sans-serif;
   --font-body: "Inter", sans-serif;
 }
@@ -58,7 +57,6 @@
   --color-accent: #2a8c94;
   --color-accent-content: #ffffff;
   --color-gold: #ffc107;
-  --color-surface: #f8f8f8;
 }
 
 @media (prefers-color-scheme: dark) {

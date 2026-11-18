@@ -48,6 +48,7 @@ const ICONS = {
   "arrow-up-tray": "upload",
   "arrow-uturn-left": "arrow-back-up",
   "arrow-left": "arrow-left",
+  "arrow-right": "arrow-right",
   pencil: "pencil",
   "arrow-right-start-on-rectangle": "logout",
   "arrow-top-right-on-square": "external-link",
