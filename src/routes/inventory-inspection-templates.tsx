@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryInspectionTemplates, inventoryTemplateInspections } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
+import { Icon } from "../components/icon.js";
+import { TitleSwitch } from "../components/title-switch.js";
 import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
@@ -27,13 +29,31 @@ async function usedIn(id: string) {
   return links.map((l) => l.template).sort((a, b) => a.name.localeCompare(b.name, "de"));
 }
 
+export const LIST = "/inventory/inspections?view=templates";
+
+// Titel-Umschalter Prüfungen | Prüfartvorlagen (nur mit inventory:configure, sonst schlichter Titel).
+export function inspectionTitle(active: "inspections" | "templates", canConfigure: boolean) {
+  if (!canConfigure) return t("inventory.inspections.title");
+  return <TitleSwitch items={[
+    { active: active === "inspections", href: "/inventory/inspections", label: t("inventory.inspections.title") },
+    { active: active === "templates", href: LIST, label: t("inventory.tabs.inspectionTemplates") },
+  ]} />;
+}
+
 // ponytail: kein Pager, bei > ca. 50 Zeilen nachrüsten.
-inventoryInspectionTemplateRoutes.get("/", configure, async (c) => {
-  const rows = (await db.query.inventoryInspectionTemplates.findMany()) as Template[];
+export async function renderTemplateList(c: any) {
+  const search = (c.req.query("search") ?? "").trim();
+  const needle = search.toLowerCase();
+  const rows = ((await db.query.inventoryInspectionTemplates.findMany()) as Template[]).filter((r) => r.name.toLowerCase().includes(needle));
   rows.sort((a, b) => a.name.localeCompare(b.name, "de"));
   return c.html(
-    <Layout title={t("inventory.templates.title")} user={c.get("user")!}>
-      <PageHeader title={t("inventory.templates.title")} backHref="/inventory" subtitle={t("inventory.templates.hint")} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.templates.new")} href={`${BASE}/new`} class="btn-primary" />} />
+    <Layout title={`${t("inventory.tabs.inspectionTemplates")} · ${t("inventory.inspections.title")}`} user={c.get("user")!}>
+      <PageHeader title={inspectionTitle("templates", true)} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.templates.new")} href={`${BASE}/new`} class="btn-primary" />} />
+      <p class="text-sm opacity-70 max-w-3xl mb-4">{t("inventory.templates.hint")}</p>
+      <form method="get" action="/inventory/inspections" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
+        <input type="hidden" name="view" value="templates" />
+        <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+      </form>
       <div class="overflow-x-auto max-w-3xl">
         <table class="table table-zebra w-full">
           <thead>
@@ -55,7 +75,9 @@ inventoryInspectionTemplateRoutes.get("/", configure, async (c) => {
       </div>
     </Layout>
   );
-});
+}
+
+inventoryInspectionTemplateRoutes.get("/", configure, (c) => c.redirect(LIST));
 
 async function renderForm(c: any, opts: { id?: string; values?: Values; error?: string; status?: 200 | 422 } = {}) {
   const { id } = opts;
@@ -68,7 +90,7 @@ async function renderForm(c: any, opts: { id?: string; values?: Values; error?: 
   const title = t(id ? "inventory.templates.edit" : "inventory.templates.new");
   return c.html(
     <Layout title={title} user={c.get("user")!}>
-      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : BASE} actions={<FormActions formId="inspection-template-form" cancelHref={id ? `${BASE}/${id}` : BASE} />} />
+      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : LIST} actions={<FormActions formId="inspection-template-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
       {opts.error && <div class="alert alert-error max-w-2xl mb-4" role="alert">{opts.error}</div>}
       <form id="inspection-template-form" method="post" action={id ? `${BASE}/${id}` : BASE} class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
         <Field label={t("inventory.form.inspectionName")} required>
@@ -96,7 +118,7 @@ inventoryInspectionTemplateRoutes.get("/:id", configure, async (c) => {
   );
   return c.html(
     <Layout title={row.name} user={c.get("user")!}>
-      <PageHeader title={row.name} backHref={BASE} actions={<DetailActions editHref={`${BASE}/${id}/edit`} remove={remove} />} />
+      <PageHeader title={row.name} backHref={LIST} actions={<DetailActions editHref={`${BASE}/${id}/edit`} remove={remove} />} />
       <ViewGrid>
         <ViewField label={t("inventory.form.inspectionName")} value={row.name} />
         <ViewField label={t("inventory.templates.interval")} value={row.defaultIntervalMonths} />
@@ -150,5 +172,5 @@ inventoryInspectionTemplateRoutes.post("/:id/delete", configure, async (c) => {
   if (!(await db.query.inventoryInspectionTemplates.findFirst({ where: eq(inventoryInspectionTemplates.id, id) }))) return c.notFound();
   await db.delete(inventoryInspectionTemplates).where(eq(inventoryInspectionTemplates.id, id));
   setFlash(c, t("inventory.templates.flash.deleted"), "success");
-  return c.redirect(BASE);
+  return c.redirect(LIST);
 });

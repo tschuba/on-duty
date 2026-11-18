@@ -64,7 +64,6 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     ] },
     { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
       { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read"), children: [
-        { label: t("inventory.tabs.inspectionTemplates"), href: "/inventory/inspection-templates", show: has("inventory:configure") },
         { label: t("inventory.tabs.fields"), href: "/inventory/fields", show: has("inventory:configure") },
         { label: t("inventory.tabs.itemTemplates"), href: "/inventory/templates", show: has("inventory:configure") },
       ] },

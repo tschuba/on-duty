@@ -743,6 +743,24 @@ describe("inspection types", () => {
     expect(insertCalls.find((c) => c.table === inventoryInspections)).toBeUndefined();
   });
 
+  it("shows the Prüfartvorlagen view and title switch on /inspections only with inventory:configure", async () => {
+    const own = currentUser;
+    try {
+      currentUser = { id: "u1", permissions: new Set(["inventory:read"]), disabled: false };
+      const plain = await (await inventoryRoutes.request("/inspections?view=templates")).text();
+      expect(plain).toContain("Keine Prüfungen im gewählten Zeitraum.");
+      expect(plain).not.toContain("view=templates");
+      currentUser = { id: "u1", permissions: new Set(["inventory:read", "inventory:configure"]), disabled: false };
+      const list = await (await inventoryRoutes.request("/inspections")).text();
+      expect(list).toContain('href="/inventory/inspections?view=templates"');
+      const tpl = await (await inventoryRoutes.request("/inspections?view=templates")).text();
+      expect(tpl).toContain("Neue Vorlage");
+      expect(tpl).not.toContain("Keine Prüfungen im gewählten Zeitraum.");
+    } finally {
+      currentUser = own;
+    }
+  });
+
   it("offers the configuration links in the item form (new tab) only with inventory:configure, and no gear in the list", async () => {
     const plain = await (await inventoryRoutes.request("/new?template=none")).text();
     expect(plain).not.toContain('href="/inventory/inspection-templates"');

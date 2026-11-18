@@ -45,8 +45,17 @@ beforeEach(() => {
 });
 
 describe("inspection templates", () => {
+  it("redirects the old list URL into the Prüfungen view", async () => {
+    const res = await get("/");
+    expect(res.headers.get("location")).toBe("/inventory/inspections?view=templates");
+  });
+
   it("lists templates sorted, each row linking to its detail page", async () => {
-    const html = await (await get("/")).text();
+    const { renderTemplateList } = await import("../routes/inventory-inspection-templates.js");
+    const app = new (await import("hono")).Hono();
+    app.use("*", async (c, next) => { c.set("user" as never, { id: "u1", permissions: new Set(["inventory:configure"]) } as never); await next(); });
+    app.get("/", renderTemplateList);
+    const html = await (await app.request("/")).text();
     expect(html).toContain("/inventory/inspection-templates/t1");
     expect(html).not.toContain("confirm(");
   });
