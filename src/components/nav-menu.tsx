@@ -174,7 +174,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
               <summary class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={groupTip(g.label, g.items)}>
                 <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{sum > 0 && <span class={`indicator-item badge ${groupTone(g.items) ?? "badge-warning"} badge-xs is-drawer-open:hidden`} />}</span>
                 <span class={`is-drawer-close:hidden ${open ? "font-semibold" : ""}`}>{g.label}</span>
-                <span class="is-drawer-close:hidden group-open:hidden"><GroupBadge items={g.items} /></span>
+                <span class="order-2 is-drawer-close:hidden group-open:hidden"><GroupBadge items={g.items} /></span>
               </summary>
               <ul class="is-drawer-close:hidden">
                 {g.items.map((i) => {
@@ -184,7 +184,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
                       <a href={i.href} class={i.href === active ? "menu-active" : ""} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
                         {i.label as Child}
                         {i.external && <Icon name="arrow-top-right-on-square" class="h-4 w-4" />}
-                        {i.dot ? <DotBadge /> : <CountBadge count={i.count ?? 0} tone={i.tone} />}
+                        {i.href === active ? null : i.dot ? <DotBadge /> : <CountBadge count={i.count ?? 0} tone={i.tone} />}
                       </a>
                       {showKids && (
                         <ul>
