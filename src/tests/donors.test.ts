@@ -186,66 +186,12 @@ describe("GET /search-persons", () => {
 // ── GET / (list) ─────────────────────────────────────────────────────────────
 
 describe("GET /", () => {
-  it("lists donors by name and address only", async () => {
-    donorsFindManyResult = [{ id: "d1", personId: "p1", person: makePerson() }];
-    const res = await donorRoutes.request("/");
-    const html = await res.text();
-    expect(html).toContain("Bauer");
-    expect(html).toContain("Musterweg");
-  });
-
-  it("filters by search term", async () => {
-    donorsFindManyResult = [
-      { id: "d1", personId: "p1", person: makePerson({ lastName: "Bauer", firstName: "Anna" }) },
-      { id: "d2", personId: "p2", person: makePerson({ lastName: "Adler", firstName: "Ben" }) },
-    ];
+  it("redirects to the donor view of /donations, keeping filters", async () => {
     const res = await donorRoutes.request("/?search=bau");
-    const html = await res.text();
-    expect(html).toContain("Bauer");
-    expect(html).not.toContain("Adler");
-  });
-
-  const mixed = () => {
-    donorsFindManyResult = [
-      { id: "d1", personId: "p1", person: { ...makePerson({ lastName: "Bauer", firstName: "Anna" }), member: { id: "m1" } } },
-      { id: "d2", personId: "p2", person: { ...makePerson({ lastName: "Adler", firstName: "Ben" }), member: null } },
-    ];
-  };
-
-  it("marks members; icon is a link only with members:read", async () => {
-    mixed();
-    let html = await (await donorRoutes.request("/")).text();
-    expect(html.match(/title="Mitglied"/g)).toHaveLength(1);
-    expect(html).not.toContain("/members/m1");
-    currentUser = { ...currentUser, permissions: new Set(["donations:issue-receipts", "members:read"]) };
-    html = await (await donorRoutes.request("/")).text();
-    expect(html).toContain('href="/members/m1"');
-  });
-
-  it("filters by membership, combined with search", async () => {
-    mixed();
-    let html = await (await donorRoutes.request("/?member=yes")).text();
-    expect(html).toContain("Bauer");
-    expect(html).not.toContain("Adler");
-    html = await (await donorRoutes.request("/?member=no")).text();
-    expect(html).toContain("Adler");
-    expect(html).not.toContain("Bauer");
-    html = await (await donorRoutes.request("/?member=yes&search=adl")).text();
-    expect(html).not.toContain("Adler");
-  });
-
-  it("sorts by first name descending when requested", async () => {
-    donorsFindManyResult = [
-      { id: "d1", personId: "p1", person: makePerson({ lastName: "Bauer", firstName: "Anna" }) },
-      { id: "d2", personId: "p2", person: makePerson({ lastName: "Adler", firstName: "Ben" }) },
-    ];
-    const res = await donorRoutes.request("/?sort=firstName&sort_dir=desc");
-    const html = await res.text();
-    expect(html.indexOf("Ben")).toBeLessThan(html.indexOf("Anna"));
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/donations?search=bau&view=donors");
   });
 });
-
-// ── POST /new ────────────────────────────────────────────────────────────────
 
 describe("POST /new", () => {
   it("returns 422 with field errors when required fields are missing", async () => {
@@ -303,29 +249,6 @@ describe("parseDonorPersonFields with company", () => {
   });
   it("still requires the address", () => {
     expect(Object.keys(parseDonorPersonFields({ companyName: "Müller GmbH" }).errors).sort()).toEqual(["city", "houseNumber", "street", "zip"]);
-  });
-});
-
-describe("GET /donors toggle filter", () => {
-  const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
-  it("both toggles on without a parameter, no \"Alle\" entry", async () => {
-    const html = await (await donorRoutes.request("/")).text();
-    const inputs = toggleInputs(html);
-    expect(inputs).toHaveLength(2);
-    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(2);
-    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
-    expect(html).not.toContain(">Alle<");
-  });
-
-  it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
-    for (const [qs, idx] of [["?member=yes", 0], ["?member=no", 1]] as const) {
-      const inputs = toggleInputs(await (await donorRoutes.request(`/${qs}`)).text());
-      expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
-      expect(inputs[idx]).toContain("checked");
-      expect(inputs[idx]).not.toContain("disabled");
-      expect(inputs[idx]).toContain(["member=yes", "member=no"][1 - idx]);
-      expect(inputs[1 - idx]).not.toContain("checked");
-    }
   });
 });
 

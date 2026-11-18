@@ -107,15 +107,12 @@ describe("Sidebar — Aktiv-Erkennung und Zähler", () => {
     expect(findActiveHref(["/members"], "/membership")).toBeNull();
   });
 
-  it("opens the parent of the active page and hides its sum badge", async () => {
+  it("donations is a single menu link (no Spender entry) with the open-receipts badge", async () => {
     openDonationsFixture = [{ id: "d1" }];
-    const active = await renderAt("/donations", "donations:issue-receipts");
-    expect(active).toContain("<details");
-    expect(active).toMatch(/<details[^>]* open/);
-    const other = await renderAt("/events", "donations:issue-receipts");
-    expect(other).not.toMatch(/<details[^>]* open/);
-    expect(other).toContain('badge-warning ml-1">1<');
-    expect(other).toContain("group-open:hidden");
+    const html = await renderAt("/events", "donations:issue-receipts");
+    expect(html).toContain('href="/donations"');
+    expect(html).not.toContain('href="/donors"');
+    expect(html).toContain("badge-warning");
   });
 
   it("never queries the DB for a user without the permission", async () => {
