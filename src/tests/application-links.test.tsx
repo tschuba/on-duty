@@ -7,7 +7,7 @@ vi.mock("../components/impressum-hint.js", () => ({ ImpressumHint: () => null })
 const { formatFormStatusText, ApplicationLinks, ApplicationFormSettings } = await import("../components/application-links.js");
 
 const form = (o: object) => ({ isActive: true, startDate: null, endDate: null, ...o }) as never;
-const html = async (el: unknown) => new Hono().get("/", (c) => c.html(el as never)).request("/").then((r) => r.text());
+const html = async (el: unknown) => (await new Hono().get("/", (c) => c.html(el as never)).request("/")).text();
 
 describe("formatFormStatusText", () => {
   it("describes missing and unbounded forms", () => {
