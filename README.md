@@ -57,7 +57,7 @@ docker compose -f docker-compose.prod.yml exec app \
 
 ## Lokale Entwicklung
 
-**Voraussetzungen:** Node.js 22, pnpm, Docker
+**Voraussetzungen:** Node.js (Version siehe `engines` in `package.json`), pnpm, Docker
 
 ```bash
 # 1. Abhängigkeiten installieren (kopiert auch Fonts nach public/fonts/)
