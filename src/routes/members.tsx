@@ -1029,7 +1029,8 @@ function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) 
 }
 
 // GET /members — list
-memberRoutes.get("/", requireAuth("members:read"), async (c) => {
+// applications:read alone shows only the open applications (no member data).
+memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async (c) => {
   const user = c.get("user");
   const q = c.req.query();
   const statusParams = c.req.queries("status") ?? [];
@@ -1039,7 +1040,8 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   // Offene Anträge: standardmäßig sichtbar, wie offene Verleih-Anfragen; nur mit applications:read.
   const canReview = user.permissions.has("applications:read");
   const showRequests = canReview && (statusParams.length === 0 || statusParams.includes("requested"));
-  const membersHidden = statusParams.length > 0 && statusParams.every((s) => s === "requested");
+  const canMembers = user.permissions.has("members:read");
+  const membersHidden = !canMembers || (statusParams.length > 0 && statusParams.every((s) => s === "requested"));
   const forms = canReview ? await loadApplicationForms() : {};
   const needle = search.toLowerCase();
   const requests: RequestRow[] = showRequests
@@ -1050,7 +1052,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   const shownStatus: string[] = membersHidden ? ["requested"] : [...statusFilter, ...(showRequests ? ["requested"] : [])];
 
   const [all, allRoles, activeRoleRows] = await Promise.all([
-    fetchMembersWithStatus(search || undefined),
+    canMembers ? fetchMembersWithStatus(search || undefined) : Promise.resolve([]),
     fetchRoles(),
     db.selectDistinct({ id: memberRoleAssignments.memberRoleId }).from(memberRoleAssignments).where(isNull(memberRoleAssignments.to)),
   ]);
@@ -1106,7 +1108,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       </>} />
 
       {canReview && user.permissions.has("applications:manage") && <ApplicationFormSettings forms={forms} />}
-      <StatsCards all={all} openRequests={canReview ? await countOpenRequests() : null} />
+      {canMembers && <StatsCards all={all} openRequests={canReview ? await countOpenRequests() : null} />}
 
       {/* Toolbar */}
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
