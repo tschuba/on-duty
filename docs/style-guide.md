@@ -13,6 +13,7 @@ Definiert in `src/styles/app.css`. daisyUI liest die Farbtokens aus `:root`, dah
 | `--color-primary` | `#2a5280` (Dark: `#5b8fd0`) | Blau; treibt alle daisyUI-`primary`-Klassen (`btn-primary`, `text-primary`, Badges, Datumsblock) |
 | `--color-error` | `#cc0000` (Dark: `#ff6b6b`) | Feuerwehr-Rot, nur für Fehler und Destruktives |
 | `--color-gold` | `#ffc107` | Nur für die Menü-Icons (`text-gold`) |
+| `--color-surface` | `#f8f8f8` | ⚠️ Reserviert, aktuell **ungenutzt** |
 
 Sonst daisyUI-Semantikfarben (`base-100`/`-200`/`-300`, `error`, `success`, `info`, `warning`, `neutral`), keine Hex-Werte oder Arbitrary-Values im Markup.
 
