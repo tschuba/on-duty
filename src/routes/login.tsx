@@ -44,7 +44,7 @@ loginRoutes.get("/login", async (c) => {
       <div class="flex min-h-[70vh] items-center justify-center rounded-box bg-base-200 p-4">
         <div class="card bg-base-100 border border-base-300 w-full max-w-sm shadow">
           <div class="card-body gap-4 items-center text-center">
-            <Icon name="fire" class="w-12 h-12 text-primary" />
+            <Icon name="icon-[tabler--flame]" class="w-12 h-12 text-primary" />
             <h1 class="card-title text-2xl" style="font-family: var(--font-heading)">
               {heading}
             </h1>

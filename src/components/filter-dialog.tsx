@@ -44,7 +44,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
         {s.title}
         <span class="badge badge-primary badge-sm" data-fd-count hidden={s.selected.length === 0}>{s.selected.length}</span>
       </h4>
-      <label class="input flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={labels.searchPlaceholder} class="grow min-w-0" data-fd-search /></label>
+      <label class="input flex items-center gap-2 w-full mb-2"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="text" placeholder={labels.searchPlaceholder} class="grow min-w-0" data-fd-search /></label>
       {s.unused && <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-sm text-base-content/80"><input type="checkbox" class="toggle toggle-xs" data-fd-unused />{s.unused.label}</label>}
       <ul class={`space-y-0.5 min-h-24 overflow-y-auto ${s.compact ? "max-h-40" : "max-h-[40dvh]"}`}>
         {s.options.map((o, i) => (
@@ -99,7 +99,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
   return (
     <>
       <button type="button" class={`btn ${active ? "btn-primary" : ""}`} aria-label={labels.button} title={labels.button} onclick={`document.getElementById('${id}').showModal()`}>
-        <Icon name="funnel" class="h-5 w-5 shrink-0" />
+        <Icon name="icon-[tabler--filter]" class="h-5 w-5 shrink-0" />
         <span class="max-md:hidden">{labels.button}</span>
         {active > 0 && <span class="badge badge-sm">{active}</span>}
       </button>
@@ -120,7 +120,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
           </div>
           <div class="modal-action">
             <button type="button" class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} data-fd-reset aria-label={labels.reset} title={labels.reset}>
-              <Icon name="arrow-uturn-left" class="h-5 w-5 shrink-0" /><span class="max-md:hidden">{labels.reset}</span>
+              <Icon name="icon-[tabler--arrow-back-up]" class="h-5 w-5 shrink-0" /><span class="max-md:hidden">{labels.reset}</span>
             </button>
             <button type="button" class="btn" onclick="this.closest('dialog').close()">{labels.close}</button>
             <button type="submit" class="btn btn-primary">{labels.apply}</button>

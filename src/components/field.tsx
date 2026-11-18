@@ -42,7 +42,7 @@ export function EmailInput({ id, name, value, placeholder, required, disabled, e
 }) {
   return (
     <label class={`input validator flex items-center gap-2 w-full${error ? " input-error" : ""} ${cls}`}>
-      <Icon name="envelope" class="w-4 h-4 opacity-60" />
+      <Icon name="icon-[tabler--mail]" class="w-4 h-4 opacity-60" />
       <input type="email" id={id} name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} class="grow min-w-0" />
     </label>
   );
@@ -69,7 +69,7 @@ export function PhoneInput({ id, name, value, placeholder, required, disabled, e
 }) {
   return (
     <label class={`input validator flex items-center gap-2 w-full${error ? " input-error" : ""} ${cls}`}>
-      <Icon name={mobile ? "device-phone-mobile" : "phone"} class="w-4 h-4 opacity-60" />
+      <Icon name={mobile ? "icon-[tabler--device-mobile]" : "icon-[tabler--phone]"} class="w-4 h-4 opacity-60" />
       <input type="tel" id={id} name={name} value={value ?? ""} placeholder={placeholder} required={required} disabled={disabled} pattern="[0-9+()\/ \-]*" title={t("common.phoneInvalid")} class="grow min-w-0" />
     </label>
   );

@@ -61,10 +61,10 @@ function NameActions({ editing = false, oob = false }: { editing?: boolean; oob?
   return (
     <div id="account-actions" class="contents" hx-swap-oob={oob ? "true" : undefined}>
       {editing ? (<>
-        <HeaderAction icon="x-mark" label={t("common.cancel")} class="btn-outline" attrs={{ "hx-get": "/account/name", ...NAME_SWAP }} />
-        <HeaderAction variant="primary" icon="check" label={t("common.save")} form="account-name-form" class="btn-primary" />
+        <HeaderAction icon="icon-[tabler--x]" label={t("common.cancel")} class="btn-outline" attrs={{ "hx-get": "/account/name", ...NAME_SWAP }} />
+        <HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("common.save")} form="account-name-form" class="btn-primary" />
       </>) : (
-        <HeaderAction variant="primary" icon="pencil" label={t("common.edit")} class="btn-primary" attrs={{ "hx-get": "/account/name/edit", ...NAME_SWAP }} />
+        <HeaderAction variant="primary" icon="icon-[tabler--pencil]" label={t("common.edit")} class="btn-primary" attrs={{ "hx-get": "/account/name/edit", ...NAME_SWAP }} />
       )}
     </div>
   );

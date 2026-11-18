@@ -435,7 +435,7 @@ function InspectionRowFields({ row, error }: { row: InspectionFormRow; error?: I
           <input type="date" name="insp_due" value={row.due} class={`input w-full${error === "date" ? " input-error" : ""}`} />
         </Field>
         <button type="button" class="btn btn-ghost btn-square" aria-label={t("common.delete")} title={t("common.delete")} onclick="this.closest('[data-inspection-row]').remove()">
-          <Icon name="trash" class="h-5 w-5" />
+          <Icon name="icon-[tabler--trash]" class="h-5 w-5" />
         </button>
       </div>
       {error && <span class="text-error text-sm">{t(`inventory.form.inspectionError.${error}`)}</span>}
@@ -469,14 +469,14 @@ function FieldConfigurator({ formId, values, canConfigure }: { formId: string; v
         {lock && checked && <input type="hidden" name={name} value={value} form={formId} />}
         <span class="flex flex-col">
           <span class="font-medium">{label}</span>
-          <span class="text-xs opacity-70 flex items-center gap-1">{lock && <Icon name="lock" class="h-3.5 w-3.5 shrink-0" />}{lock ?? desc}</span>
+          <span class="text-xs opacity-70 flex items-center gap-1">{lock && <Icon name="icon-[tabler--lock]" class="h-3.5 w-3.5 shrink-0" />}{lock ?? desc}</span>
         </span>
       </label>
     );
   };
   return (
     <div class="inline-block">
-      <HeaderAction icon="cog-6-tooth" label={t("inventory.form.configureFields")} attrs={{ popovertarget: id }} />
+      <HeaderAction icon="icon-[tabler--settings]" label={t("inventory.form.configureFields")} attrs={{ popovertarget: id }} />
       <div id={id} popover="auto" class="qrf-popup qrf-editor bg-base-100 border border-base-300 rounded-box shadow-lg p-4 m-0 w-96 max-w-full">
         <span data-arrow class="absolute -top-[7px] size-3 rotate-45 border-t border-l border-base-300 bg-base-100 max-sm:hidden" aria-hidden="true" />
         <h3 class="font-bold mb-2">{t("inventory.form.configureFields")}</h3>
@@ -486,7 +486,7 @@ function FieldConfigurator({ formId, values, canConfigure }: { formId: string; v
         </div>
         {canConfigure && (
           <div class="mt-2 flex flex-col">
-            <a href="/inventory?view=fields" target="_blank" rel="noopener" class="btn btn-ghost justify-start gap-2 min-h-11"><Icon name="cog-6-tooth" class="h-5 w-5" />{t("inventory.form.manageFields")}</a>
+            <a href="/inventory?view=fields" target="_blank" rel="noopener" class="btn btn-ghost justify-start gap-2 min-h-11"><Icon name="icon-[tabler--settings]" class="h-5 w-5" />{t("inventory.form.manageFields")}</a>
           </div>
         )}
         <div class="mt-3 sm:hidden">
@@ -823,15 +823,15 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
       <PageHeader title={inventoryTitle("stock", canConfigure)} actions={<>
-        <HeaderAction icon="map-2" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} hideLabel="@max-4xl:hidden" />
-        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" hideLabel="@max-4xl:hidden" />}
-        {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
+        <HeaderAction icon="icon-[tabler--map-2]" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} hideLabel="@max-4xl:hidden" />
+        {user.permissions.has("import:run") && <HeaderAction icon="icon-[tabler--upload]" label={t("import.action")} href="/import?kind=inventory" hideLabel="@max-4xl:hidden" />}
+        {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <form method="get" action="/inventory" class="contents">
           <label class="input flex items-center gap-2 w-72">
-            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
             <input
               type="search"
               name="q"
@@ -868,6 +868,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             { type: "list", param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
           ]}
         />
+        {(search || tagFilter.length > 0 || inspectionFilter.length > 0 || dueFilter.length > 0 || showArchived || lendableOnly || noCoordsOnly) && <a href="/inventory" class="btn btn-ghost">{t("common.reset")}</a>}
       </div>
 
       {(() => {
@@ -884,7 +885,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         return chips.length > 0 && (
           <div class="flex flex-wrap items-center gap-2 mb-4">
             {chips.map(([label, href]) => (
-              <a href={href} class="badge badge-primary badge-outline gap-1 py-3" aria-label={`${label} – ${t("common.reset")}`}>{label}<Icon name="x-mark" class="w-3 h-3" /></a>
+              <a href={href} class="badge badge-primary badge-outline gap-1 py-3" aria-label={`${label} – ${t("common.reset")}`}>{label}<Icon name="icon-[tabler--x]" class="w-3 h-3" /></a>
             ))}
           </div>
         );
@@ -1076,7 +1077,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                       <div class="flex items-center gap-2">
                         <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
                         <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">
-                          <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                          <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
                           <span class="max-sm:hidden">{t("common.copy")}</span>
                         </button>
                       </div>
@@ -1132,11 +1133,11 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
     const card = "card card-border bg-base-100 border-base-300 hover:border-primary h-full sm:min-h-28 focus-visible:outline-2 focus-visible:outline-primary";
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
-        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="cog-6-tooth" label={t("inventory.new.manageTemplates")} href="/inventory?view=templates" />} />
+        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="icon-[tabler--settings]" label={t("inventory.new.manageTemplates")} href="/inventory?view=templates" />} />
         <div id="template-choice" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 2xl:max-w-6xl">
           <a href="/inventory/new?template=none" class={`${card} border-dashed`}>
             <div class="card-body p-4 sm:p-5 lg:p-6 flex-row items-start gap-3 sm:gap-4">
-              <TagAvatar fallbackIcon="file" />
+              <TagAvatar fallbackIcon="icon-[tabler--file]" />
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
                 <div class="font-medium lg:text-lg">{t("inventory.new.noTemplate")}</div>
                 <p class="text-sm opacity-70 line-clamp-2 lg:line-clamp-3">{t("inventory.new.noTemplateHint")}</p>
@@ -1293,11 +1294,11 @@ function RetireAction({ item, isBatch, availableToRetire }: { item: ItemWithRela
   return (
     item.retiredAt ? (
       <form method="post" action={`/inventory/${item.id}/reactivate`} onsubmit={`return confirm('${t("inventory.reactivate.confirm")}')`}>
-        <HeaderAction type="submit" icon="check" label={t("inventory.reactivate.button")} class="btn-outline" />
+        <HeaderAction type="submit" icon="icon-[tabler--check]" label={t("inventory.reactivate.button")} class="btn-outline" />
       </form>
     ) : (
       <>
-        <HeaderAction icon="no-symbol" label={t("inventory.retire.button")} class="btn-outline btn-warning" onclick="document.getElementById('retire-modal').showModal()" />
+        <HeaderAction icon="icon-[tabler--ban]" label={t("inventory.retire.button")} class="btn-outline btn-warning" onclick="document.getElementById('retire-modal').showModal()" />
         <dialog id="retire-modal" class="modal">
           <div class="modal-box">
             <h3 class="font-bold text-lg">{t("inventory.retire.confirmTitle")}</h3>
@@ -1600,7 +1601,7 @@ inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
     const status: DueStatus = earliestDueStatus(open.map((r) => r.dueDate), today);
     const tagNames = item.tags.map((x) => x.tag);
     const styleTag = tagNames.find((x) => TAG_STYLES[x.toLowerCase()]);
-    const icon = <Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "map-pin"} />;
+    const icon = <Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "icon-[tabler--map-pin]"} />;
     const numbers = item.numbers.map((n) => n.number);
     const tone = { none: "badge-ghost", ok: "badge-success", soon: "badge-warning", overdue: "badge-error" }[status];
     const popup = (
@@ -1621,7 +1622,7 @@ inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
 
   return c.html(
     <Layout title={t("inventory.map.title")} user={user}>
-      <PageHeader title={t("inventory.map.title")} actions={<HeaderAction icon="clipboard-list" label={t("inventory.map.toList")} href={buildListUrl("/inventory", { tag: tagFilter })} />} />
+      <PageHeader title={t("inventory.map.title")} actions={<HeaderAction icon="icon-[tabler--clipboard-list]" label={t("inventory.map.toList")} href={buildListUrl("/inventory", { tag: tagFilter })} />} />
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <MultiSelectFilter
           param="tag"
@@ -1715,6 +1716,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
             <input class="btn" type="radio" name="status" value={s} aria-label={t(`inventory.inspections.status.${s}`)} checked={status === s} onchange="this.form.submit()" />
           ))}
         </form>
+        {(range.mode !== "default" || inspectionFilter.length > 0 || status !== "all") && <a href="/inventory/inspections" class="btn btn-ghost self-end">{t("common.reset")}</a>}
       </div>
 
       <table class="table table-zebra w-full">
@@ -1843,7 +1845,7 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
                 <td class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
                 {canInspect && (
                   <td class="text-right">
-                    <button type="button" class="btn btn-sm btn-outline btn-primary" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="checkup-list" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
+                    <button type="button" class="btn btn-sm btn-outline btn-primary" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="icon-[tabler--checkup-list]" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
                     <dialog id={dialogId} class="modal text-left">
                       <div class="modal-box">
                         <h3 class="font-bold text-lg">{t("inventory.inspection.doneTitle", { name: r.name })}</h3>
@@ -2123,7 +2125,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           const hasCoords = item.latitude != null && item.longitude != null;
           const status = earliestDueStatus(item.inspections.map((r) => r.dueDate), new Date().toISOString().slice(0, 10));
           const styleTag = item.tags.map((x) => x.tag).find((x) => TAG_STYLES[x.toLowerCase()]);
-          const pinIcon = (<Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "map-pin"} />).toString();
+          const pinIcon = (<Icon name={styleTag ? TAG_STYLES[styleTag.toLowerCase()].icon : "icon-[tabler--map-pin]"} />).toString();
           const coords = hasCoords ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : null;
           return (
             <div class="sm:col-span-2 space-y-2">
@@ -2134,14 +2136,14 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
                 <script src="/js/location-view.min.js" defer></script>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <div class="flex flex-col gap-1 md:flex-row md:gap-4">
-                    <span class="inline-flex items-center gap-1" title={t("inventory.location.latitude")}><Icon name="world-latitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.latitude")}: </span>{Number(item.latitude).toFixed(6)}</span>
-                    <span class="inline-flex items-center gap-1" title={t("inventory.location.longitude")}><Icon name="world-longitude" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.longitude")}: </span>{Number(item.longitude).toFixed(6)}</span>
+                    <span class="inline-flex items-center gap-1" title={t("inventory.location.latitude")}><Icon name="icon-[tabler--world-latitude]" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.latitude")}: </span>{Number(item.latitude).toFixed(6)}</span>
+                    <span class="inline-flex items-center gap-1" title={t("inventory.location.longitude")}><Icon name="icon-[tabler--world-longitude]" class="h-4 w-4 opacity-60" /><span class="sr-only">{t("inventory.location.longitude")}: </span>{Number(item.longitude).toFixed(6)}</span>
                   </div>
                   <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={coords} onclick="navigator.clipboard.writeText(this.dataset.url)">
-                    <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                    <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
                   </button>
                   <div class="dropdown dropdown-end">
-                    <div tabindex={0} role="button" class="btn btn-ghost btn-sm min-h-11">{t("inventory.location.openIn")} <Icon name="chevron-down" class="h-4 w-4" /></div>
+                    <div tabindex={0} role="button" class="btn btn-ghost btn-sm min-h-11">{t("inventory.location.openIn")} <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4" /></div>
                     <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
                       <li class="hidden pointer-coarse:flex"><a href={`geo:${item.latitude},${item.longitude}`}>{t("inventory.location.navigate")}</a></li>
                       <li><a href={`https://www.openstreetmap.org/?mlat=${item.latitude}&mlon=${item.longitude}#map=18/${item.latitude}/${item.longitude}`} target="_blank" rel="noopener noreferrer">{t("inventory.location.osm")}</a></li>
@@ -2169,7 +2171,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
               <div class="flex items-center gap-2">
                 <a href={href} target="_blank" rel="noopener" class="link link-primary break-all">{href}</a>
                 <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={href} onclick="navigator.clipboard.writeText(this.dataset.url)">
-                  <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                  <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
                 </button>
               </div>
             </div>

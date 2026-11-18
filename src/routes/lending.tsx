@@ -10,9 +10,8 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
-import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
-import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { FilterDialog } from "../components/filter-dialog.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -147,11 +146,11 @@ function LendingStats({ loans, today, openRequests, requestsHref }: { loans: Loa
   return (
     <div id="lending-stats" class="hidden sm:block @container mb-6">
       <div class={`grid grid-cols-2 ${openRequests === null ? "@4xl:grid-cols-4" : "@4xl:grid-cols-5"} gap-2 @4xl:gap-4`}>
-        <StatCard label={t("lending.stats.out")} value={open.filter((l) => l.pickedUpAt).length} tone="text-info" />
         <StatCard label={t("lending.stats.overdue")} value={overdue} tone={overdue > 0 ? "text-error" : undefined} href={statusHref("overdue")} link="filter" />
+        {openRequests !== null && <StatCard label={t("lending.stats.requests")} value={openRequests} tone={openRequests > 0 ? "text-primary" : undefined} href={requestsHref} link="filter" />}
+        <StatCard label={t("lending.stats.out")} value={open.filter((l) => l.pickedUpAt).length} tone="text-info" />
         <StatCard label={t("lending.stats.dueToday")} value={open.filter((l) => l.plannedTo === today).length} />
         <StatCard label={t("lending.stats.planned")} value={loans.filter((l) => loanStatus(l, today) === "planned").length} href={statusHref("planned")} link="filter" />
-        {openRequests !== null && <StatCard label={t("lending.stats.requests")} value={openRequests} tone={openRequests > 0 ? "text-primary" : undefined} href={requestsHref} link="filter" />}
       </div>
     </div>
   );
@@ -206,7 +205,9 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const { start, end } = range;
   const rp = rangeParams(range);
   const itemFilter = c.req.query("item") ?? "";
-  const member = c.req.query("member") === "yes" || c.req.query("member") === "no" ? c.req.query("member")! : "";
+  // Beide (oder keine) Werte gewählt = kein Filter.
+  const memberPicked = parseMulti(c.req.queries("member"), ["yes", "no"]);
+  const member = memberPicked.length === 1 ? memberPicked[0] : "";
   const needle = search.toLowerCase();
 
   // Lazy statt Scheduler, siehe Backlog-Doc "Aufbewahrung" — die App führt keinen eigenen Cron.
@@ -275,18 +276,16 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
 
   const presets = rangePresets(today, "future");
   const hasFilter = Boolean(itemFilter || search || !statusIsDefault || tagFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
-  const statusLabel = sameSet(statusFilter, allowedStates) ? t("lending.filter.allStatus")
-    : statusIsDefault ? (canManage ? t("lending.filter.allButRejected") : t("lending.filter.allStatus")) : undefined;
 
   return c.html(
     <Layout title={t("lending.title")} user={user}>
       <PageHeader title={t("lending.title")} actions={<>
         <label class="flex items-center gap-2 cursor-pointer" title={t("lending.stats.toggle")}>
-          <Icon name="chart-bar" class="w-5 h-5" />
+          <Icon name="icon-[tabler--chart-bar]" class="w-5 h-5" />
           <span class="@max-xl:hidden">{t("lending.stats.toggle")}</span>
           <input type="checkbox" id="lending-stats-toggle" class="toggle" aria-label={t("lending.stats.toggle")} onchange="toggleLendingStats(this.checked)" />
         </label>
-        {canManage && <HeaderAction variant="primary" icon="plus" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />}
+        {canManage && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("lending.newLoan")} href="/inventory/lending/loans/new" class="btn-primary" />}
       </>} />
 
       <LendingStats loans={all} today={today} openRequests={canManage ? openRequests : null} requestsHref="/inventory/lending?status=requested" />
@@ -303,40 +302,37 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         })();
       ` }} />
 
-      <form method="get" action="/inventory/lending" class="filter-bar flex gap-2 items-center flex-wrap mb-4">
-        <label class="input flex items-center gap-2 w-56"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
-        <MultiSelectFilter
-          param="status"
-          options={allowedStates.map((st) => ({ value: st, label: ROW_STATE_LABEL[st] }))}
-          selected={statusFilter}
-          allLabel={t("lending.filter.allStatus")}
-          labelOverride={statusLabel}
-          countLabel={(count) => t("lending.filter.statusCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
-        <MultiSelectFilter
-          param="tag"
-          searchable
-          options={allTags.map((tag) => ({ value: tag, label: tag }))}
-          selected={tagFilter}
-          allLabel={t("inventory.filter.allTags")}
-          countLabel={(count) => t("inventory.filter.tagCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-          searchPlaceholder={t("common.searchPlaceholder")}
-          emptyLabel={t("inventory.filter.noTags")}
-        />
-        <input type="hidden" name="member" value={member} />
+      <div class="filter-bar flex gap-2 items-center flex-wrap mb-4">
+      <form method="get" action="/inventory/lending" class="contents">
+        <label class="input flex items-center gap-2 w-56"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
+        {statusParam?.map((v) => <input type="hidden" name="status" value={v} />)}
+        {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
+        {member && <input type="hidden" name="member" value={member} />}
         <input type="hidden" name="item" value={itemFilter} />
         {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusParam, tag: tagFilter, member, ...rp })} class="badge badge-neutral gap-1">{rows.find((r) => r.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
-        <ToggleFilter items={pairToggles(member,
-          [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }],
-          (m) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusParam, tag: tagFilter, ...rp }, { member: m }))} />
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
           href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusParam, tag: tagFilter, member }, p)} />
-        {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
       </form>
+      <FilterDialog
+        id="lending-filter-dialog"
+        hidden={[
+          ...(search ? [["q", search] as [string, string]] : []),
+          ...(itemFilter ? [["item", itemFilter] as [string, string]] : []),
+          ...Object.entries(rp).flatMap(([k, v]) => (v ? [[k, v] as [string, string]] : [])),
+        ]}
+        labels={{ button: t("lending.filter.button"), title: t("lending.filter.title"), quick: t("lending.filter.quick"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults") }}
+        quick={[
+          ...(canManage ? [{ label: ROW_STATE_LABEL.requested, values: { status: ["requested"] } }] : []),
+          { label: ROW_STATE_LABEL.overdue, values: { status: ["overdue"] } },
+        ]}
+        sections={[
+          { type: "chips", param: "status", title: t("lending.loans.table.status"), options: allowedStates.map((st) => ({ value: st, label: ROW_STATE_LABEL[st] })), selected: statusFilter, defaults: defaultStates },
+          { type: "chips", param: "member", title: t("lending.filter.borrower"), options: [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }], selected: member ? [member] : [] },
+          { type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
+        ]}
+      />
+        {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
+      </div>
 
       {sorted.length === 0 ? (
         <p class="text-center opacity-50 py-8">{t("lending.overview.empty")}</p>
@@ -375,7 +371,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
                         <td class={border}><MemberLink memberId={r.person.member?.id} canLink={canLink}>{personName(r.person) || "—"}</MemberLink><MemberMark memberId={r.person.member?.id} canLink={canLink} /><BorrowerContact person={r.person} /></td>
                         <td class={border}><span class={ROW_STATE_BADGE[r.state]}>{ROW_STATE_LABEL[r.state]}</span></td>
                         <td class={`text-sm${r.state === "overdue" ? " text-error" : ""}${border}`}>
-                          {r.conflict && <span class="inline-block mr-1 align-text-bottom text-warning" title={t("lending.overview.conflict")}><Icon name="exclamation-triangle" class="w-4 h-4" /><span class="sr-only">{t("lending.overview.conflict")}</span></span>}
+                          {r.conflict && <span class="inline-block mr-1 align-text-bottom text-warning" title={t("lending.overview.conflict")}><Icon name="icon-[tabler--alert-triangle]" class="w-4 h-4" /><span class="sr-only">{t("lending.overview.conflict")}</span></span>}
                           {formatDate(r.plannedFrom)} – {formatDate(r.plannedTo)}
                         </td>
                       </tr>
@@ -402,8 +398,8 @@ function LoanPage({ loan, item }: { loan: LoanWithBorrower; item: LendingItemWit
   return (
     <>
       <PageHeader title={<a href={`/inventory/${item.inventoryItem.id}`} class="link link-hover">{item.inventoryItem.name}</a>} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={<>
-        <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-loan-modal').showModal()" />
-        <HeaderAction variant="primary" icon="check" label={t("common.save")} form="loan-form" class="btn-primary" />
+        <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-loan-modal').showModal()" />
+        <HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("common.save")} form="loan-form" class="btn-primary" />
       </>} />
       <div class="mb-4">
         <dl class="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
@@ -575,7 +571,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
         {errors?.times && <p class="text-error text-sm sm:col-span-2">{errors.times}</p>}
         <Field label={t("lending.loans.form.pickedUpAt")} after={
           <button type="button" id="loan-takeFrom" disabled={!v.plannedFrom} class="btn min-h-11 w-full mt-2" onclick="document.getElementById('loan-pickedUpAt').value=document.getElementById('loan-plannedFrom').value">
-            <Icon name="arrow-up" class="w-4 h-4" />
+            <Icon name="icon-[tabler--arrow-up]" class="w-4 h-4" />
             {t("lending.loans.form.takeOverFrom")}
           </button>
         }>
@@ -583,7 +579,7 @@ function LoanForm({ action, item, items, values, errors, maxQuantity }: {
         </Field>
         <Field label={t("lending.loans.form.returnedAt")} after={
           <button type="button" id="loan-takeTo" disabled={!v.plannedTo} class="btn min-h-11 w-full mt-2" onclick="document.getElementById('loan-returnedAt').value=document.getElementById('loan-plannedTo').value">
-            <Icon name="arrow-up" class="w-4 h-4" />
+            <Icon name="icon-[tabler--arrow-up]" class="w-4 h-4" />
             {t("lending.loans.form.takeOverTo")}
           </button>
         }>

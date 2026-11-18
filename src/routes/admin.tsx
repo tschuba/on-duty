@@ -123,7 +123,7 @@ adminRoutes.get("/users", guard, async (c) => {
   return c.html(
     <Layout title={t("admin.users.title")} user={user}>
       <BackupWarnBanner {...warn} />
-      <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
+      <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
       {pendingCount > 0 && (
         <form method="get" class="mb-2">
@@ -186,9 +186,9 @@ adminRoutes.get("/users", guard, async (c) => {
                         {u.disabled ? (
                           <>
                             <form method="post" action={`/admin/users/${u.id}/activate`}>
-                              <RowAction icon="check" label={t("admin.users.activate")} class="btn-ghost text-success" type="submit" onclick="event.stopPropagation()" />
+                              <RowAction icon="icon-[tabler--check]" label={t("admin.users.activate")} class="btn-ghost text-success" type="submit" onclick="event.stopPropagation()" />
                             </form>
-                            <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`} />
+                            <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-${u.id}').showModal()`} />
                             <dialog id={`delete-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
                                 <h3 class="font-bold text-lg">{t("admin.users.confirmDelete.title")}</h3>
@@ -215,7 +215,7 @@ adminRoutes.get("/users", guard, async (c) => {
                           <>
                             {isPending(u) && u.id !== user.id && (
                               <>
-                                <RowAction icon="x-mark" label={t("admin.users.reject")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('reject-${u.id}').showModal()`} />
+                                <RowAction icon="icon-[tabler--x]" label={t("admin.users.reject")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('reject-${u.id}').showModal()`} />
                                 <dialog id={`reject-${u.id}`} class="modal" onclick="event.stopPropagation()">
                                   <div class="modal-box">
                                     <h3 class="font-bold text-lg">{t("admin.users.confirmReject.title")}</h3>
@@ -237,7 +237,7 @@ adminRoutes.get("/users", guard, async (c) => {
                                 </dialog>
                               </>
                             )}
-                            <RowAction icon="no-symbol" label={t("admin.users.deactivate")} class={`btn-ghost ${u.id === user.id ? "text-base-content/30" : "text-error"}`} onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`} disabled={u.id === user.id} title={u.id === user.id ? t("admin.users.cannotDeactivateSelf") : undefined} />
+                            <RowAction icon="icon-[tabler--ban]" label={t("admin.users.deactivate")} class={`btn-ghost ${u.id === user.id ? "text-base-content/30" : "text-error"}`} onclick={u.id === user.id ? "event.stopPropagation()" : `event.stopPropagation(); document.getElementById('deactivate-${u.id}').showModal()`} disabled={u.id === user.id} title={u.id === user.id ? t("admin.users.cannotDeactivateSelf") : undefined} />
                             <dialog id={`deactivate-${u.id}`} class="modal" onclick="event.stopPropagation()">
                               <div class="modal-box">
                                 <h3 class="font-bold text-lg">{t("admin.users.confirmDeactivate.title")}</h3>
@@ -287,7 +287,7 @@ function RoleCheckboxes({
   return (
     <div class="role-picker flex flex-col gap-2">
       <label class="input input-sm flex items-center gap-2 w-full">
-        <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+        <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
         <input
           type="text"
           autocomplete="off"
@@ -314,7 +314,7 @@ function RoleCheckboxes({
                 onclick="event.preventDefault();const p=this.nextElementSibling;p.hidden=!p.hidden;this.setAttribute('aria-expanded',String(!p.hidden));this.querySelector('svg').classList.toggle('rotate-180')"
               >
                 {t("admin.users.modal.roleDetails")}
-                <Icon name="chevron-down" class="h-4 w-4 opacity-60" />
+                <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4 opacity-60" />
               </button>
               <div hidden class="mt-1"><PermissionBadges permissions={permsByRole.get(r.id) ?? []} /></div>
             </div>
@@ -674,10 +674,10 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="plus" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
+      <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
       <div class="filter-bar mb-3"><label class="input flex items-center gap-2 w-full max-w-xs">
-        <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+        <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
         <input
           type="search"
           class="grow min-w-0"
@@ -722,10 +722,10 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   </td>
                   <td>
                     <div class="flex gap-2 justify-end">
-                      <RowAction icon="document-duplicate" label={t("common.copy")} class="btn-outline btn-primary" href={`/admin/permissions/new?copyFrom=${r.id}`} onclick="event.stopPropagation()" />
+                      <RowAction icon="icon-[tabler--copy]" label={t("common.copy")} class="btn-outline btn-primary" href={`/admin/permissions/new?copyFrom=${r.id}`} onclick="event.stopPropagation()" />
                       {canDelete ? (
                         <>
-                          <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`} />
+                          <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-perm-role-${r.id}').showModal()`} />
                           <dialog id={`delete-perm-role-${r.id}`} class="modal" onclick="event.stopPropagation()">
                             <div class="modal-box">
                               <h3 class="font-bold text-lg">{t("admin.permissions.confirmDelete.title")}</h3>
@@ -749,7 +749,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                           </dialog>
                         </>
                       ) : (
-                        <RowAction icon="trash" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={
+                        <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={
                             r.isProtected
                               ? t("admin.permissions.cannotDelete.protected")
                               : assignmentCount === 1
@@ -862,7 +862,7 @@ adminRoutes.get("/permissions/:id", guard, async (c) => {
   const canDelete = !role.isProtected && cnt === 0;
   const remove = canDelete && (
     <>
-      <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`document.getElementById('delete-perm-role-${id}').showModal()`} />
+      <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`document.getElementById('delete-perm-role-${id}').showModal()`} />
       <dialog id={`delete-perm-role-${id}`} class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{t("admin.permissions.confirmDelete.title")}</h3>
@@ -1011,10 +1011,10 @@ adminRoutes.get("/config", guard, async (c) => {
     <Layout title={t("admin.config.title")} user={user}>
       <BackupWarnBanner {...warn} />
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="check" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
+      <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
         <div class="filter-bar flex flex-wrap items-center gap-2 mb-4">
-          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
+          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
           <label class="label cursor-pointer gap-2">
             <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
             <span class="text-sm">{t("admin.config.filter.writable")}</span>
@@ -1107,11 +1107,11 @@ adminRoutes.post("/config", guard, async (c) => {
 });
 
 const BACKUP_STATE_STYLE = {
-  ok: { icon: "check" as const, color: "text-success", stat: "bg-success/10" },
-  failed: { icon: "exclamation-triangle" as const, color: "text-error", stat: "bg-error/10" },
-  stale: { icon: "clock" as const, color: "text-error", stat: "bg-error/10" },
-  unknown: { icon: "cog-6-tooth" as const, color: "text-base-content/50", stat: "bg-base-200" },
-  unconfigured: { icon: "cog-6-tooth" as const, color: "text-base-content/50", stat: "bg-base-200" },
+  ok: { icon: "icon-[tabler--check]" as const, color: "text-success", stat: "bg-success/10" },
+  failed: { icon: "icon-[tabler--alert-triangle]" as const, color: "text-error", stat: "bg-error/10" },
+  stale: { icon: "icon-[tabler--clock]" as const, color: "text-error", stat: "bg-error/10" },
+  unknown: { icon: "icon-[tabler--settings]" as const, color: "text-base-content/50", stat: "bg-base-200" },
+  unconfigured: { icon: "icon-[tabler--settings]" as const, color: "text-base-content/50", stat: "bg-base-200" },
 };
 
 // ── /admin/backup ──────────────────────────────────────────────────────────────

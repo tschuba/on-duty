@@ -14,8 +14,8 @@ describe("TagBadges", () => {
     const html = render(["Halle", "hydrant", "Fahrzeug", "Keller"]);
     const order = ["hydrant", "Fahrzeug", "Halle", "Keller"].map((t) => html.indexOf(`${t}</span>`));
     expect(order).toEqual([...order].sort((x, y) => x - y));
-    expect(html.match(/<svg/g)).toHaveLength(1);
-    expect(html.indexOf("<svg")).toBeLessThan(html.indexOf("hydrant</span>"));
+    expect(html.match(/icon-\[tabler--/g)).toHaveLength(1);
+    expect(html.indexOf("icon-[tabler--")).toBeLessThan(html.indexOf("hydrant</span>"));
     expect(html).toContain("badge-primary"); // Fahrzeug keeps its color, just no icon
   });
 

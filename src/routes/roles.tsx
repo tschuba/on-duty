@@ -93,8 +93,8 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
   return (
     <form method="post" action={action} class="join" onclick="event.stopPropagation()">
       <input type="hidden" name="id" value={id} />
-      <RowAction icon="arrow-up" label={t("admin.roles.moveUp")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "up" }} />
-      <RowAction icon="arrow-down" label={t("admin.roles.moveDown")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "down" }} />
+      <RowAction icon="icon-[tabler--arrow-up]" label={t("admin.roles.moveUp")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "up" }} />
+      <RowAction icon="icon-[tabler--arrow-down]" label={t("admin.roles.moveDown")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "down" }} />
     </form>
   );
 }
@@ -148,7 +148,7 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
 
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>
-      <PageHeader title={title} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={title} actions={canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(activeFilter === "1" || activeFilter === "0" ? activeFilter : "",
           [{ value: "1", label: t("admin.roles.filterActive") }, { value: "0", label: t("admin.roles.filterPassive") }],
@@ -224,7 +224,7 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
                             body={t("admin.roles.confirmDelete.body", { title: r.title })}
                           />
                         ) : canDeletePerm && (
-                          <RowAction icon="trash" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={
+                          <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={
                               r.isProtected
                                 ? t("admin.roles.cannotDelete.protected")
                                 : r.assignmentCount === 1
@@ -247,7 +247,7 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
       </>)}
 
       {tab === "types" && (<>
-      <PageHeader title={title} actions={canWriteTypes && <HeaderAction variant="primary" icon="plus" label={t("admin.roleTypes.new")} class="btn-primary" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={title} actions={canWriteTypes && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roleTypes.new")} class="btn-primary" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
           <thead>
@@ -285,7 +285,7 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
                           body={t("admin.roleTypes.confirmDelete.body", { name: ty.name })}
                         />
                       ) : canDeleteTypes && (
-                        <RowAction icon="trash" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: n })} />
+                        <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: n })} />
                       )}
                     </div>
                   </td>

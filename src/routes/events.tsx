@@ -7,7 +7,7 @@ import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, FieldGroup, ViewField, ViewGrid } from "../components/field.js";
 import { Icon } from "../components/icon.js";
-import type { IconName } from "../components/icons.generated.js";
+import type { IconName } from "../components/icon.js";
 import { LocationPicker } from "../components/location-picker.js";
 import { osmUrl, parseCoordinates } from "../lib/coordinates.js";
 import { Section } from "../components/section.js";
@@ -199,7 +199,7 @@ function EventCards({ rows, tz, canManage, linked }: { rows: EventRow[]; tz: str
                 <span class="text-xs opacity-80">{day.slice(0, 4)}</span>
               </div>
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
-                <div class="font-medium lg:text-lg"><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-sm badge-error ml-2">{t("events.cancelled")}</span>}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}{linked && ev.visibility === "public" && <span class="inline-block ml-2 align-middle text-primary" title={t("events.form.visibility.public")}><Icon name="world" class="h-4 w-4" /><span class="sr-only">{t("events.form.visibility.public")}</span></span>}</div>
+                <div class="font-medium lg:text-lg"><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-sm badge-error ml-2">{t("events.cancelled")}</span>}{orphanMembers && <span class="badge badge-sm badge-warning ml-2">{t("events.orphanMembers")}</span>}{linked && ev.visibility === "public" && <span class="inline-block ml-2 align-middle text-primary" title={t("events.form.visibility.public")}><Icon name="icon-[tabler--world]" class="h-4 w-4" /><span class="sr-only">{t("events.form.visibility.public")}</span></span>}</div>
                 <div class="text-sm opacity-70"><EventTimeLabel ev={ev} tz={tz} card />{(ev.location || ev.latitude != null) && <> · <EventPlace ev={ev} /></>}</div>
                 <RsvpLine ev={ev} />
                 {ev.description && <p class="text-sm opacity-70 line-clamp-3">{ev.description}</p>}
@@ -224,8 +224,8 @@ function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: bool
 function ViewSwitch() {
   return (
     <div class="lg:hidden">
-      <button type="button" data-ev-m="list" class="btn btn-outline btn-primary gap-2 hidden"><Icon name="list" class="h-5 w-5" />{t("events.view.list")}</button>
-      <button type="button" data-ev-m="cal" class="btn btn-outline btn-primary gap-2"><Icon name="calendar-days" class="h-5 w-5" />{t("events.view.calendar")}</button>
+      <button type="button" data-ev-m="icon-[tabler--list]" class="btn btn-outline btn-primary gap-2 hidden"><Icon name="icon-[tabler--list]" class="h-5 w-5" />{t("events.view.list")}</button>
+      <button type="button" data-ev-m="cal" class="btn btn-outline btn-primary gap-2"><Icon name="icon-[tabler--calendar]" class="h-5 w-5" />{t("events.view.calendar")}</button>
     </div>
   );
 }
@@ -432,7 +432,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
         {canManage ? (
           <div class="dropdown dropdown-end">
             <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={t("events.settings")}>
-              <Icon name="cog-6-tooth" class="h-5 w-5" />
+              <Icon name="icon-[tabler--settings]" class="h-5 w-5" />
               <span class="hidden sm:inline">{t("events.settings")}</span>
             </div>
             <div tabindex={0} class="dropdown-content bg-base-200 rounded-box z-10 w-72 p-3 shadow space-y-2">
@@ -446,33 +446,33 @@ eventRoutes.get("/", requireAuth(), async (c) => {
               {publicEnabled ? (
                 <div class="flex items-center gap-2">
                   <a href="/events/public" target="_blank" rel="noopener" class="btn btn-sm btn-ghost flex-1 justify-start">
-                    <Icon name="arrow-top-right-on-square" class="h-4 w-4" />{t("events.publicSettings.open")}
+                    <Icon name="icon-[tabler--external-link]" class="h-4 w-4" />{t("events.publicSettings.open")}
                   </a>
                   <button type="button" class="btn btn-sm btn-ghost btn-square" title={t("applications.links.copy")} aria-label={t("applications.links.copy")}
                     data-url={new URL("/events/public", env.OIDC_APP_URL).toString()}
                     onclick={`navigator.clipboard.writeText(this.dataset.url).then(function(){document.body.dispatchEvent(new CustomEvent('showToast',{detail:{message:${JSON.stringify(t("applications.links.copied")).replace(/</g, "\\u003c")},type:'info'}}))})`}>
-                    <Icon name="clipboard-document" class="h-4 w-4" />
+                    <Icon name="icon-[tabler--clipboard]" class="h-4 w-4" />
                   </button>
                 </div>
               ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
               <ImpressumHint />
               <div class="divider my-1" />
               <a href="/mail/templates?category=event" class="btn btn-sm btn-ghost w-full justify-start">
-                <Icon name="envelope" class="h-4 w-4" />{t("mailTemplates.settings")}
+                <Icon name="icon-[tabler--mail]" class="h-4 w-4" />{t("mailTemplates.settings")}
               </a>
               {infoMail && (
                 <>
                   <div class="divider my-1" />
                   <h3 class="text-xs font-semibold uppercase opacity-60">{t("events.infoMail.section")}</h3>
                   <button type="button" class="btn btn-sm btn-ghost w-full justify-start" onclick="document.getElementById('info-mail-dialog').showModal()">
-                    <Icon name="envelope" class="h-4 w-4" />{t("events.infoMail.button")}
+                    <Icon name="icon-[tabler--mail]" class="h-4 w-4" />{t("events.infoMail.button")}
                   </button>
                 </>
               )}
             </div>
           </div>
-        ) : publicEnabled && <HeaderAction icon="arrow-top-right-on-square" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
-        {canManage && <HeaderAction variant="primary" icon="plus" label={t("common.create")} href="/events/new" class="btn-primary" />}
+        ) : publicEnabled && <HeaderAction icon="icon-[tabler--external-link]" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
+        {canManage && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("common.create")} href="/events/new" class="btn-primary" />}
       </>} />
       {infoMail && (
         <dialog id="info-mail-dialog" class="modal">
@@ -854,9 +854,9 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
   const cancelKind = ev.cancelledAt ? "uncancel" : "cancel";
   const askMail = smtp && ev.endsAt > now(); // Rückfrage nur sinnvoll, wenn Mails überhaupt rausgehen können
   const cancelAction = canManage && (ev.cancelledAt
-    ? <HeaderAction icon="arrow-uturn-left" label={t("events.uncancel")} class="btn-outline" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" } })} />
-    : <HeaderAction icon="no-symbol" label={t("events.cancel")} class="btn-outline btn-warning" hideLabel="@max-2xl:hidden" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
-  const deleteAction = canManage && <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" hideLabel="@max-2xl:hidden" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
+    ? <HeaderAction icon="icon-[tabler--arrow-back-up]" label={t("events.uncancel")} class="btn-outline" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" } })} />
+    : <HeaderAction icon="icon-[tabler--ban]" label={t("events.cancel")} class="btn-outline btn-warning" hideLabel="@max-2xl:hidden" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
+  const deleteAction = canManage && <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" hideLabel="@max-2xl:hidden" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
   const notify = canManage && smtp && c.req.query("notify") === "created" && !ev.cancelledAt ? await createdTargets(ev) : null;
   const cancelRecipients = canManage && askMail ? await eventMailRecipients(ev) : [];
   const delivery = canManage ? await eventDelivery(ev) : [];
@@ -865,7 +865,7 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
       <div class="max-w-2xl mx-auto">
       {notify && <MailChoiceDialog id="notify-dialog" auto action={`/events/${ev.id}/notify`} title={t("events.notify.title")} sections={[{ title: t("events.notify.kind.created"), recipients: notify.recipients }]} defaultSend />}
       {canManage && askMail && <MailChoiceDialog id="cancel-dialog" action={`/events/${ev.id}/${cancelKind}`} title={t(ev.cancelledAt ? "events.notify.uncancelTitle" : "events.notify.cancelTitle", { title: ev.title })} sections={[{ title: t(ev.cancelledAt ? "events.notify.kind.uncancelled" : "events.notify.kind.cancelled"), recipients: cancelRecipients }]} defaultSend={false} />}
-      <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{canManage && <HeaderAction icon="mailbox" label={t("events.mailLog.link")} href={`/events/${ev.id}/mail-log`} class="btn-outline" hideLabel="hidden" />}{cancelAction}{deleteAction}</>} />} />
+      <PageHeader title={<><span class={ev.cancelledAt ? "line-through" : ""}>{ev.title}</span>{ev.cancelledAt && <span class="badge badge-error ml-2 align-middle">{t("events.cancelled")}</span>}</>} backHref="/events" actions={<DetailActions editHref={canManage ? `/events/${ev.id}/edit` : undefined} remove={<>{canManage && <HeaderAction icon="icon-[tabler--mailbox]" label={t("events.mailLog.link")} href={`/events/${ev.id}/mail-log`} class="btn-outline" hideLabel="hidden" />}{cancelAction}{deleteAction}</>} />} />
       <LocalTimes tz={tz} />
       <ViewGrid>
         <div class="sm:col-span-2"><div class="text-sm opacity-60">{t("events.form.start")}</div><div class="font-medium"><EventTimeLabel ev={ev} tz={tz} /></div></div>
@@ -873,7 +873,7 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
         {ev.latitude != null && ev.longitude != null && (
           <div class="sm:col-span-2 space-y-2">
             <link rel="stylesheet" href="/css/leaflet.css" />
-            <div id="location-view-map" role="region" aria-label={t("events.location.mapAria")} data-lat={ev.latitude} data-lng={ev.longitude} data-status="none" data-icon={(<Icon name="calendar-days" />).toString()} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
+            <div id="location-view-map" role="region" aria-label={t("events.location.mapAria")} data-lat={ev.latitude} data-lng={ev.longitude} data-status="none" data-icon={(<Icon name="icon-[tabler--calendar]" />).toString()} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
             <script src="/js/location-view.min.js" defer></script>
             <a href={osmUrl(ev.latitude, ev.longitude)} target="_blank" rel="noopener noreferrer" class="link">{t("inventory.location.osm")}</a>
           </div>
@@ -1050,8 +1050,8 @@ async function CatchUpButton({ ev, header }: { ev: Event; header?: boolean }) {
   const catchUp = await createdTargets(ev);
   if (!catchUp.recipients.some((r) => r.state === "send")) return <></>;
   const label = t(catchUp.mode === "failed" ? "events.notify.retry" : "events.notify.catchUp");
-  if (header) return <HeaderAction variant="primary" icon="send" label={label} href={`/events/${ev.id}?notify=created`} class="btn-primary" />;
-  return <a class="tooltip btn btn-primary btn-square btn-sm" data-tip={label} aria-label={label} href={`/events/${ev.id}?notify=created`}><Icon name="send" class="h-5 w-5" /></a>;
+  if (header) return <HeaderAction variant="primary" icon="icon-[tabler--send]" label={label} href={`/events/${ev.id}?notify=created`} class="btn-primary" />;
+  return <a class="tooltip btn btn-primary btn-square btn-sm" data-tip={label} aria-label={label} href={`/events/${ev.id}?notify=created`}><Icon name="icon-[tabler--send]" class="h-5 w-5" /></a>;
 }
 
 // Versandstatus je Mitglied (letzter mail_log-Eintrag bzw. berechneter Grund).
@@ -1074,11 +1074,11 @@ function DeliverySection({ ev, rows }: { ev: Event; rows: Awaited<ReturnType<typ
 }
 
 const DELIVERY_ICON: Partial<Record<DeliveryState, { icon: IconName; tone: string }>> = {
-  sent: { icon: "mail-check", tone: "text-success" },
-  failed: { icon: "mail-exclamation", tone: "text-error" },
-  pending: { icon: "mail-fast", tone: "opacity-60" },
-  "opted-out": { icon: "mail-off", tone: "opacity-60" },
-  "no-email": { icon: "at-off", tone: "opacity-60" },
+  sent: { icon: "icon-[tabler--mail-check]", tone: "text-success" },
+  failed: { icon: "icon-[tabler--mail-exclamation]", tone: "text-error" },
+  pending: { icon: "icon-[tabler--mail-fast]", tone: "opacity-60" },
+  "opted-out": { icon: "icon-[tabler--mail-off]", tone: "opacity-60" },
+  "no-email": { icon: "icon-[tabler--at-off]", tone: "opacity-60" },
 };
 
 function DeliveryBadge({ state, tip = "" }: { state: DeliveryState; tip?: string }) {
@@ -1187,7 +1187,7 @@ function RsvpButton({ status, mine, disabled, url, resetUrl, vals = {}, size = "
   return (
     <button type="button" class={`btn ${size} join-item ${cls}`} aria-label={label} title={active && resetUrl ? t("events.rsvp.reset") : label} aria-pressed={active ? "true" : "false"} disabled={disabled}
       {...(post ? { "hx-post": post.url, "hx-vals": JSON.stringify(post.vals), "hx-target": `#${SECTION}`, "hx-swap": "outerHTML" } : {})}>
-      <Icon name={status === "yes" ? "check" : "x-mark"} class="h-4 w-4 shrink-0 md:hidden" />
+      <Icon name={status === "yes" ? "icon-[tabler--check]" : "icon-[tabler--x]"} class="h-4 w-4 shrink-0 md:hidden" />
       <span class="max-md:hidden">{label}</span>
     </button>
   );
@@ -1256,9 +1256,9 @@ async function RsvpSection({ ev, user, tz, notice, sort = "name", dir = "asc" }:
       {manager && (
         <div class="space-y-4">
           <StatBar items={[
-            { label: t("events.rsvp.groupOpen"), value: open.length, icon: "clock", tone: "opacity-60" },
-            { label: t("events.rsvp.groupYes"), value: ev.maxParticipants == null ? yes : `${yes}/${ev.maxParticipants}`, icon: "check", tone: "text-success" },
-            { label: t("events.rsvp.groupNo"), value: no, icon: "x-mark", tone: "text-error" },
+            { label: t("events.rsvp.groupOpen"), value: open.length, icon: "icon-[tabler--clock]", tone: "opacity-60" },
+            { label: t("events.rsvp.groupYes"), value: ev.maxParticipants == null ? yes : `${yes}/${ev.maxParticipants}`, icon: "icon-[tabler--check]", tone: "text-success" },
+            { label: t("events.rsvp.groupNo"), value: no, icon: "icon-[tabler--x]", tone: "text-error" },
             ...(mail ? deliveryItems(mail.values(), <CatchUpButton ev={ev} />) : []),
           ]} />
           <input type="search" class="input w-full" data-rsvp-filter placeholder={t("events.rsvp.filter")} aria-label={t("events.rsvp.filter")} />

@@ -153,7 +153,7 @@ describe("GET /inventory/lending", () => {
   it("keeps range/rel/dir on member-filter links and the hidden fields", async () => {
     lendingLoansFindManyResult = [makeLoan()];
     const html = (await (await lendingRoutes.request("/?range=rel&rel=P1M&dir=both&member=yes")).text()).replace(/&amp;/g, "&");
-    expect(html).toMatch(/href="\/inventory\/lending\?[^"]*range=rel&rel=P1M&dir=both[^"]*member=no/);
+    expect(html).toMatch(/<input[^>]*name="member"[^>]*value="yes"[^>]*checked/);
     expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="rel" value="P1M"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="dir" value="both"(?![^>]*disabled)/);
@@ -281,7 +281,6 @@ describe("GET /inventory/lending", () => {
       expect(html).toContain("Antragsteller");
       expect(html).toContain("Angefragt");
       expect(html).toContain("border-l-primary");
-      expect(html).toContain("Alle außer Abgelehnt");
       expect(html).not.toContain("Abgelehnter");
       expect(html).toContain("/inventory/requests/req1");
     });
@@ -809,25 +808,16 @@ describe("loan page", () => {
   });
 });
 
-describe("GET /lending toggle filter", () => {
-  const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
-  it("both toggles on without a parameter, no \"Alle\" entry", async () => {
+describe("GET /lending member filter", () => {
+  const memberChips = (html: string) => html.match(/<input[^>]*name="member"[^>]*>/g) ?? [];
+  const checked = (html: string) => memberChips(html).filter((i) => i.includes("checked")).map((i) => i.match(/value="(\w+)"/)![1]);
+  it("no chip is checked without a parameter (no filter)", async () => {
     const html = await (await lendingRoutes.request("/")).text();
-    const inputs = toggleInputs(html);
-    expect(inputs).toHaveLength(2);
-    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(2);
-    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
-    expect(html).not.toContain(">Alle<");
+    expect(memberChips(html)).toHaveLength(2);
+    expect(checked(html)).toEqual([]);
   });
 
-  it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
-    for (const [qs, idx] of [["?member=yes", 0], ["?member=no", 1]] as const) {
-      const inputs = toggleInputs(await (await lendingRoutes.request(`/${qs}`)).text());
-      expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
-      expect(inputs[idx]).toContain("checked");
-      expect(inputs[idx]).not.toContain("disabled");
-      expect(inputs[idx]).toContain(["member=yes", "member=no"][1 - idx]);
-      expect(inputs[1 - idx]).not.toContain("checked");
-    }
+  it("a single value (old link) checks only that chip", async () => {
+    for (const v of ["yes", "no"]) expect(checked(await (await lendingRoutes.request(`/?member=${v}`)).text())).toEqual([v]);
   });
 });

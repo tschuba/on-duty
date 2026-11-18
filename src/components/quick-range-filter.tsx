@@ -11,7 +11,7 @@ const DIR_KEY = { past: "filter.quick.dir.past", future: "filter.quick.dir.futur
 export function ApplyButton({ full = false }: { full?: boolean }) {
   return (
     <button type="submit" class={`btn ${full ? "btn-primary" : ""}`} aria-label={t("common.show")} title={t("common.show")}>
-      {!full && <Icon name="check" class="w-5 h-5 sm:hidden" />}
+      {!full && <Icon name="icon-[tabler--check]" class="w-5 h-5 sm:hidden" />}
       <span class={full ? "" : "hidden sm:inline"}>{t("common.show")}</span>
     </button>
   );
@@ -121,7 +121,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               <input type="date" name="ref" data-qrf-ref={todayStr()} value={rel.ref ?? todayStr()} required class="input w-full min-h-11 text-base" placeholder={t("filter.quick.ref")} disabled={!showRel} />
             </Field>
             <button type="button" data-qrf-today class="btn min-h-11" aria-label={t("filter.quick.todayBtn")} title={t("filter.quick.todayBtn")} disabled={!rel.ref}>
-              <Icon name="arrow-uturn-left" class="w-5 h-5 sm:hidden" />
+              <Icon name="icon-[tabler--arrow-back-up]" class="w-5 h-5 sm:hidden" />
               <span class="hidden sm:inline">{t("filter.quick.todayBtn")}</span>
             </button>
           </div>

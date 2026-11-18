@@ -48,7 +48,7 @@ export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, pl
                 <button type="button" class={CHIP_REMOVE_CLASS} aria-label={t("common.remove")}>×</button>
               </span>
             ))}</span>
-          : <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />}
+          : <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />}
         <input
           type="text"
           name="q"
@@ -69,7 +69,7 @@ export function EntityPicker({ id, name, searchUrl, selectedId, selectedName, pl
         />
         {!multiple && (
           <button type="button" class="picker-clear btn btn-ghost btn-xs btn-circle" aria-label={t("common.remove")} hidden={!sel}>
-            <Icon name="x-mark" class="w-4 h-4" />
+            <Icon name="icon-[tabler--x]" class="w-4 h-4" />
           </button>
         )}
       </Box>
@@ -111,7 +111,7 @@ export function PickerOptions({ options, empty, createLabel, heading }: { option
       {createLabel && (
         <li role="option" data-create class={options.length > 0 ? "border-t border-base-300 pt-1 mt-1" : ""}>
           <a class="text-primary pointer-coarse:min-h-11">
-            <Icon name="plus" class="w-4 h-4" />
+            <Icon name="icon-[tabler--plus]" class="w-4 h-4" />
             {createLabel}
           </a>
         </li>

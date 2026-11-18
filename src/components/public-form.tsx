@@ -1,4 +1,4 @@
-import { Icon } from "./icon.js";
+import { Icon, type IconName } from "./icon.js";
 import { t } from "../i18n/index.js";
 import { env } from "../env.js";
 import { capEnabled } from "../lib/cap.js";
@@ -48,7 +48,7 @@ export async function ContactFooter({ hint, subject, body }: { hint?: string; su
     [c.orgZip, c.orgCity].filter(Boolean).join(" "),
   ].filter(Boolean).join(", ");
   if (!c.orgContactEmail && !c.orgContactPhone && !address) return <></>;
-  const row = (icon: "map-pin" | "phone" | "envelope", content: unknown) => (
+  const row = (icon: IconName, content: unknown) => (
     <p class="flex items-center gap-2 pl-4"><Icon name={icon} class="size-4 shrink-0" /><span>{content}</span></p>
   );
   return (
@@ -56,9 +56,9 @@ export async function ContactFooter({ hint, subject, body }: { hint?: string; su
       <p class="font-semibold">{t("contact.title")}</p>
       {hint && <p>{hint}</p>}
       {c.orgName && <p class="pl-4">{c.orgName}</p>}
-      {address && row("map-pin", address)}
-      {c.orgContactPhone && row("phone", <a class="link" href={`tel:${c.orgContactPhone}`}>{c.orgContactPhone}</a>)}
-      {c.orgContactEmail && row("envelope", <a class="link" href={`mailto:${c.orgContactEmail}${[subject && `subject=${encodeURIComponent(subject)}`, body && `body=${encodeURIComponent(body)}`].filter(Boolean).map((p, i) => (i ? "&" : "?") + p).join("")}`}>{c.orgContactEmail}</a>)}
+      {address && row("icon-[tabler--map-pin]", address)}
+      {c.orgContactPhone && row("icon-[tabler--phone]", <a class="link" href={`tel:${c.orgContactPhone}`}>{c.orgContactPhone}</a>)}
+      {c.orgContactEmail && row("icon-[tabler--mail]", <a class="link" href={`mailto:${c.orgContactEmail}${[subject && `subject=${encodeURIComponent(subject)}`, body && `body=${encodeURIComponent(body)}`].filter(Boolean).map((p, i) => (i ? "&" : "?") + p).join("")}`}>{c.orgContactEmail}</a>)}
     </div>
   );
 }

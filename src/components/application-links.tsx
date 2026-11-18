@@ -36,27 +36,33 @@ type Forms = Partial<Record<"membership" | "youth", ApplicationForm | undefined>
 // Links zu den öffentlichen Antragsformularen (Dropdown) – gezeigt in der Mitgliederliste.
 export function ApplicationLinks({ forms, canManageForms }: { forms: Forms; canManageForms: boolean }) {
   return (
-        <div class="dropdown dropdown-end">
+        <div class="dropdown dropdown-end" onfocusin={`
+          const c = this.querySelector('.dropdown-content');
+          c.style.translate = '';
+          const b = c.getBoundingClientRect(), vw = document.documentElement.clientWidth, m = 8;
+          const dx = Math.max(m - b.left, Math.min(0, vw - m - b.right));
+          if (dx) c.style.translate = dx + 'px';
+        `}>
           <div
             tabindex={0}
             role="button"
             class="btn btn-ghost gap-2"
             aria-label={`${t("applications.links.title")}: ${(["membership", "youth"] as const).map((type) => `${TYPE_LABELS[type]}: ${formatFormStatusText(forms[type]).text}`).join(", ")}`}
           >
-            <Icon name="link" class="h-5 w-5" />
+            <Icon name="icon-[tabler--link]" class="h-5 w-5" />
             <span class="@max-4xl:hidden">{t("applications.links.title")}</span>
             <span class="flex items-center gap-2 border-l border-base-content/20 pl-2">
               {(["membership", "youth"] as const).map((type) => {
                 const status = formatFormStatusText(forms[type]);
                 return (
                   <span key={type} class={`flex items-center gap-1 ${status.active ? "text-success" : "text-error opacity-40"}`} title={`${TYPE_LABELS[type]}: ${status.text}`}>
-                    <Icon name={type === "membership" ? "users-plus" : "mood-boy"} class="h-5 w-5" />
+                    <Icon name={type === "membership" ? "icon-[tabler--users-plus]" : "icon-[tabler--mood-boy]"} class="h-5 w-5" />
                   </span>
                 );
               })}
             </span>
           </div>
-          <ul tabindex={0} class="dropdown-content bg-base-200 rounded-box z-50 w-72 p-2 shadow">
+          <ul tabindex={0} class="dropdown-content bg-base-200 rounded-box z-50 w-72 max-w-[calc(100vw-1rem)] p-2 shadow">
             {(["membership", "youth"] as const).map((type) => {
               const url = new URL(type === "membership" ? "/apply" : "/apply/youth", env.OIDC_APP_URL).toString();
               const status = formatFormStatusText(forms[type]);
@@ -69,10 +75,10 @@ export function ApplicationLinks({ forms, canManageForms }: { forms: Forms; canM
                   </div>
                   <div class="join w-full mt-2">
                     <button type="button" class="btn join-item flex-1 h-11 apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
-                      <Icon name="clipboard-document" class="h-5 w-5" />
+                      <Icon name="icon-[tabler--clipboard]" class="h-5 w-5" />
                     </button>
                     <a href={url} target="_blank" rel="noopener" class="btn join-item flex-1 h-11" title={t("applications.links.open")} aria-label={t("applications.links.open")} onclick="document.activeElement.blur()">
-                      <Icon name="arrow-top-right-on-square" class="h-5 w-5" />
+                      <Icon name="icon-[tabler--external-link]" class="h-5 w-5" />
                     </a>
                     {canManageForms && (
                       <button
@@ -82,7 +88,7 @@ export function ApplicationLinks({ forms, canManageForms }: { forms: Forms; canM
                         aria-label={t("applications.links.settings")}
                         onclick={`document.getElementById('form-settings-${type}').showModal();document.activeElement.blur()`}
                       >
-                        <Icon name="cog-6-tooth" class="h-5 w-5" />
+                        <Icon name="icon-[tabler--settings]" class="h-5 w-5" />
                       </button>
                     )}
                   </div>

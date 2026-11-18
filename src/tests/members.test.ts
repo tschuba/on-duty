@@ -396,8 +396,8 @@ describe("StatsCards", () => {
     const html = await (await renderApp(StatsCards({ all }))).text();
     expect(html).toMatch(/text-primary">1</);
     expect(html).toMatch(/text-base-content\/40">3</);
-    expect(html).toMatch(/2 <svg/);
-    expect(html).toMatch(/1 <svg/);
+    expect(html).toMatch(/2 <span class="icon-/);
+    expect(html).toMatch(/1 <span class="icon-/);
   });
 });
 

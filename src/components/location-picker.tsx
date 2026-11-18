@@ -15,7 +15,7 @@ export function LocationPicker({ value, error, labels }: {
       {error && <span class="text-error text-sm">{error}</span>}
       <link rel="stylesheet" href="/css/leaflet.css" />
       <div id="location-picker" class="hidden flex-col gap-2" data-geo-error={labels.geoError} data-locate-label={labels.useLocation} data-attribution={labels.attribution}>
-        <template><Icon name="current-location" class="size-5" /></template>
+        <template><Icon name="icon-[tabler--current-location]" class="size-5" /></template>
         <p data-role="status" class="text-sm text-error" role="status" />
         <div id="location-map" role="region" aria-label={labels.mapAria} class="h-72 rounded-box border border-base-300 z-0" />
         <button type="button" data-act="apply" class="btn btn-sm btn-primary self-start" disabled>{labels.apply}</button>
