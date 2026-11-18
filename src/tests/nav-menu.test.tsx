@@ -52,14 +52,15 @@ const renderAt = async (path: string, ...perms: string[]) => {
 };
 
 describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
-  it("hides Anträge without applications:read", async () => {
-    expect(await renderAt("/", "members:write")).not.toContain("Anträge");
+  it("hides the application count without applications:read", async () => {
+    openApplicationsFixture = [{ id: "a1" }];
+    expect(await renderAt("/", "members:read")).not.toContain('badge-warning ml-1">1<');
   });
 
-  it("shows Anträge with applications:read and the open count on the parent menu", async () => {
+  it("shows the open application count on Mitglieder with applications:read", async () => {
     openApplicationsFixture = [{ id: "a1" }, { id: "a2" }, { id: "a3" }];
     const html = await renderAt("/events", "members:read", "applications:read");
-    expect(html).toContain("Anträge");
+    expect(html).not.toContain(">Anträge<");
     expect(html).toContain('badge-warning ml-1">3<');
   });
 

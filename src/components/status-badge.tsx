@@ -15,9 +15,9 @@ export const STATUS_LABELS: Record<MemberStatus, string> = {
 export const STATUS_BADGE_CLASS: Record<MemberStatus, string> = {
   active: "badge badge-sm badge-success",
   passive: "badge badge-sm badge-neutral",
-  supporting: "badge badge-sm badge-secondary",
-  children: "badge badge-sm badge-warning",
-  youth: "badge badge-sm badge-info",
+  supporting: "badge badge-sm badge-primary",
+  children: "badge badge-sm badge-info",
+  youth: "badge badge-sm badge-secondary",
   left: "badge badge-sm badge-ghost opacity-60",
   deceased: "",
 };

@@ -122,7 +122,7 @@ app.get("/", requireAuth(), (c) => {
     [["inventory:read"], "/inventory"],
     [["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"], "/organisation"],
     [["training:read"], "/training"],
-    [["applications:read"], "/applications"],
+    [["applications:read"], "/members?status=requested"],
     [["system:admin"], "/admin"],
     [["import:run"], "/import"],
     [["member-roles:read"], "/roles"],

@@ -7,6 +7,7 @@ import { testDetailPageContract } from "./detail-page-contract.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
 process.env.YOUTH_AGE_LIMIT = "18";
+process.env.OIDC_APP_URL = "http://localhost:3000";
 process.env.ORG_NAME = "Test Feuerwehr";
 
 // ── DB chain-stub helpers ───────────────────────────────────────────────────
@@ -31,6 +32,7 @@ let findManyResult: any[] = [];
 let findFirstResult: any = undefined;
 let personLookupResult: any[] = []; // db.select().from(persons).where(...) — GET/POST /new personId linking
 let memberLookupResult: any[] = []; // db.select().from(members).where(...) — "already a member" guard / linkMemberId target lookup
+let applicationFindManyResult: any[] = [];
 let applicationFindFirstResult: any = undefined; // db.query.applications.findFirst(...) — linkMemberId prefill
 let donorLookupResult: any[] = []; // db.select().from(donors).where(...) — delete blocking check
 let inventoryAssignmentRowsFixture: { quantity: number }[] = []; // db.select().from(inventoryItemAssignments).where(...) — delete confirmation count
@@ -98,8 +100,10 @@ vi.mock("../db/index.js", () => ({
       memberRoles: {
         findMany: vi.fn(() => Promise.resolve(rolesFixture)),
       },
+      applicationForms: { findMany: vi.fn(() => Promise.resolve([])) },
       applications: {
         findFirst: vi.fn(() => Promise.resolve(applicationFindFirstResult)),
+        findMany: vi.fn(() => Promise.resolve(applicationFindManyResult)),
       },
     },
     select,
@@ -111,7 +115,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["members:read", "members:write"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -146,11 +150,12 @@ beforeEach(() => {
   personLookupResult = [];
   memberLookupResult = [];
   applicationFindFirstResult = undefined;
+  applicationFindManyResult = [];
   donorLookupResult = [];
   inventoryAssignmentRowsFixture = [];
   applicationLookupResult = [];
   applicationGuardianLookupResult = [];
-  currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
+  currentUser = { id: "u1", permissions: new Set(["members:read", "members:write"]), disabled: false };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -389,7 +394,7 @@ describe("StatsCards", () => {
       { ...makeMember(), status: "deceased", gender: null },
     ] as any;
     const html = await (await renderApp(StatsCards({ all }))).text();
-    expect(html).toMatch(/text-secondary">1</);
+    expect(html).toMatch(/text-primary">1</);
     expect(html).toMatch(/text-base-content\/40">3</);
     expect(html).toMatch(/2 <svg/);
     expect(html).toMatch(/1 <svg/);
@@ -542,6 +547,29 @@ describe("GET /", () => {
     for (const v of ["youth", "children"]) expect(html).not.toContain(`name="status" value="${v}"`);
     for (const v of ["children", "youth", "adult", "senior"]) expect(html).toContain(`name="age" value="${v}"`);
     for (const k of ["current", "activeAll", "activeYouth", "former"]) expect(html).toContain(`>${t(`members.filter.preset.${k}` as never)}</button>`);
+  });
+
+  it("lists open applications for applications:read and hides them otherwise", async () => {
+    const req = (id: string, lastName: string, firstName: string) => ({ id, submittedAt: new Date("2025-01-01"), person: { lastName, firstName, birthDate: null } });
+    applicationFindManyResult = [req("a1", "Meier", "Anna"), req("a2", "Bauer", "Ben")];
+    applicationLookupResult = [{ id: "a1" }, { id: "a2" }];
+    currentUser = { ...currentUser, permissions: new Set(["members:read", "applications:read"]) };
+    const html = await (await memberRoutes.request("/")).text();
+    expect(html).toContain("/applications/a1");
+    expect(html).toContain("Antrag offen");
+    expect(html).toContain("/apply/youth"); // ApplicationLinks dropdown
+    expect(await (await memberRoutes.request("/?search=bau")).text()).not.toContain("/applications/a1");
+    currentUser = { ...currentUser, permissions: new Set(["members:read"]) };
+    expect(await (await memberRoutes.request("/")).text()).not.toContain("/applications/a1");
+  });
+
+  it("shows only requests for applications:read without members:read", async () => {
+    applicationFindManyResult = [{ id: "a1", submittedAt: new Date("2025-01-01"), person: { lastName: "Meier", firstName: "Anna", birthDate: null } }];
+    findManyResult = [makeMember({ lastName: "Geheim" })];
+    currentUser = { ...currentUser, permissions: new Set(["applications:read"]) };
+    const html = await (await memberRoutes.request("/")).text();
+    expect(html).toContain("/applications/a1");
+    expect(html).not.toContain("Geheim");
   });
 
   it("shows no active-filter badge for the default selection and a count otherwise", async () => {

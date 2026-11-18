@@ -3,7 +3,8 @@ import { Icon } from "./icon.js";
 
 // Statistikkachel. Mit `href` klickbar: `funnel` = filtert die Liste, `arrow-right` = wechselt die Ansicht.
 // Doku: docs/style-guide.md → „Statistikkarten".
-export function StatCard({ label, value, tone, href, link, inline, children }: {
+export function StatCard({ label, value, tone, href, link, inline, highlight, children }: {
+  highlight?: boolean; // Aufmerksamkeit: Ring, Glow, getönter Hintergrund
   label: string;
   value: Child;
   tone?: string; // Textfarbe der Zahl, z. B. "text-error"
@@ -22,8 +23,10 @@ export function StatCard({ label, value, tone, href, link, inline, children }: {
         : <>{num}{children}</>}
     </>
   );
-  const cls = "stat bg-base-200 rounded-box px-3 py-2 @4xl:p-4 relative";
-  return href
+  const cls = `stat ${highlight ? "bg-base-200 text-base-content" : "bg-base-200"} rounded-box px-3 py-2 @4xl:p-4 relative`;
+  const card = href
     ? <a href={href} class={`${cls} hover:bg-base-300 focus-visible:outline-2 focus-visible:outline-primary`}>{body}</a>
     : <div class={cls}>{body}</div>;
+  // daisyUI-Aura: Wrapper mit rotierendem Lichtrand; Farbe über text-*
+  return highlight ? <div class="aura aura-gold flex">{card}</div> : card;
 }

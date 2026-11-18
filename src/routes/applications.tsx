@@ -8,7 +8,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { ImpressumHint } from "../components/impressum-hint.js";
 import { Icon } from "../components/icon.js";
-import { PageHeader } from "../components/page-header.js";
+import { HeaderAction, PageHeader } from "../components/page-header.js";
 import { SortIcon } from "./members.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -141,237 +141,8 @@ function formatFormStatusText(form: ApplicationForm | undefined): { text: string
 
 const ALL_STATUSES: ApplicationStatus[] = ["open", "approved", "rejected"];
 
-// GET /applications — queue, defaults to open only
-applicationRoutes.get("/", guard, async (c) => {
-  const user = c.get("user");
-  const statusRaw = (c.req.queries("status") ?? []).filter(Boolean);
-  const statusFilter: ApplicationStatus[] = statusRaw[0] === "all"
-    ? ALL_STATUSES
-    : statusRaw.length > 0 ? (statusRaw as ApplicationStatus[]) : ["open"];
-
-  const sort = ((c.req.query("sort") as SortKey) || "submittedAt");
-  const dir = ((c.req.query("sort_dir") as "asc" | "desc") || "desc");
-
-  const range = parseRange({ ...c.req.query(), start: c.req.query("from"), end: c.req.query("to") }, todayStr(), "past", { start: "", end: "" }, undefined, true);
-  const { start: from, end: to } = range;
-  const rp = rangeParams(range, { start: "from", end: "to" });
-  const dayOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const inRange = (a: { submittedAt: Date }) => {
-    const day = dayOf(a.submittedAt);
-    return (!from || day >= from) && (!to || day <= to);
-  };
-  const rows = sortApplications((await fetchApplications()).filter((a) => statusFilter.includes(a.status) && inRange(a)), sort, dir);
-  const presets = rangePresets(todayStr(), "past", undefined, true);
-  const forms = await loadApplicationForms();
-  const canManageForms = user.permissions.has("applications:manage");
-
-  function filterUrl(next: ApplicationStatus[]) {
-    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, ...rp }, { status: next });
-  }
-
-  function sortUrl(col: SortKey) {
-    const defaultDir = DATE_SORT_KEYS.includes(col) ? "desc" : "asc";
-    const newDir = sort === col ? (dir === "asc" ? "desc" : "asc") : defaultDir;
-    return buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir, ...rp }, { sort: col, sort_dir: newDir });
-  }
-
-  return c.html(
-    <Layout title={t("applications.title")} user={user}>
-      <PageHeader title={t("applications.title")} actions={
-        <div class="dropdown dropdown-end">
-          <div
-            tabindex={0}
-            role="button"
-            class="btn btn-ghost gap-2"
-            aria-label={`${t("applications.links.title")}: ${(["membership", "youth"] as const).map((type) => `${TYPE_LABELS[type]}: ${formatFormStatusText(forms[type]).text}`).join(", ")}`}
-          >
-            <Icon name="link" class="h-5 w-5" />
-            <span class="hidden sm:inline">{t("applications.links.title")}</span>
-            <span class="flex items-center gap-2 border-l border-base-content/20 pl-2">
-              {(["membership", "youth"] as const).map((type) => {
-                const status = formatFormStatusText(forms[type]);
-                return (
-                  <span key={type} class={`flex items-center gap-1 ${status.active ? "text-success" : "text-error opacity-40"}`} title={`${TYPE_LABELS[type]}: ${status.text}`}>
-                    <Icon name={type === "membership" ? "users-plus" : "mood-boy"} class="h-5 w-5" />
-                    <span class="hidden md:inline text-xs text-base-content/70">{TYPE_LABELS[type]}</span>
-                  </span>
-                );
-              })}
-            </span>
-          </div>
-          <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-64 p-2 shadow">
-            <li class="menu-title">{t("applications.links.title")}</li>
-            {(["membership", "youth"] as const).map((type) => {
-              const url = new URL(type === "membership" ? "/apply" : "/apply/youth", env.OIDC_APP_URL).toString();
-              const status = formatFormStatusText(forms[type]);
-              return (
-                <li key={type}>
-                  <div class="flex flex-col gap-0.5 px-1 py-1 w-full">
-                    <div class="flex items-center justify-between gap-2 w-full">
-                      <a href={url} target="_blank" rel="noopener" class="flex-1" onclick="document.activeElement.blur()">{TYPE_LABELS[type]}</a>
-                      <button type="button" class="btn btn-md btn-ghost btn-square apply-link-copy" data-url={url} title={t("applications.links.copy")} aria-label={t("applications.links.copy")}>
-                        <Icon name="clipboard-document" class="h-4 w-4" />
-                      </button>
-                      {canManageForms && (
-                        <button
-                          type="button"
-                          class="btn btn-md btn-ghost btn-square"
-                          title={t("applications.links.settings")}
-                          aria-label={t("applications.links.settings")}
-                          onclick={`document.getElementById('form-settings-${type}').showModal();document.activeElement.blur()`}
-                        >
-                          <Icon name="cog-6-tooth" class="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                    <div class="flex items-center gap-1.5 text-xs opacity-60 pl-1 w-full">
-                      <span class={`inline-block h-2 w-2 rounded-full ${status.active ? "bg-success" : "bg-error"}`} />
-                      {status.text}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      } />
-      {canManageForms && (["membership", "youth"] as const).map((type) => {
-        const form = forms[type];
-        return (
-          <dialog id={`form-settings-${type}`} class="modal" key={`form-settings-${type}`}>
-            <div class="modal-box">
-              <h3 class="font-bold text-lg mb-4">{t("applications.formSettings.title", { type: TYPE_LABELS[type] })}</h3>
-              <form method="post" action={`/applications/forms/${type}`} class="space-y-4 form-settings-form">
-                <label class="label cursor-pointer justify-start gap-3">
-                  <input type="checkbox" name="status" value="active" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content" checked={form?.isActive === true} />
-                  <span class="text-sm">{t("applications.formSettings.active")}</span>
-                </label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label={t("applications.formSettings.startDate")} class="form-start">
-                    <input type="date" name="startDate" value={form?.startDate ?? ""} class="input w-full" />
-                  </Field>
-                  <Field label={t("applications.formSettings.endDate")} class="form-end">
-                    <input type="date" name="endDate" value={form?.endDate ?? ""} class="input w-full" />
-                  </Field>
-                </div>
-                <p class="text-sm form-status-preview"></p>
-                <p class="text-xs opacity-60">{t("applications.formSettings.dateHint")}</p>
-                <ImpressumHint />
-                <div class="modal-action">
-                  <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
-                  <button type="submit" class="btn btn-primary">{t("applications.formSettings.save")}</button>
-                </div>
-              </form>
-            </div>
-            <form method="dialog" class="modal-backdrop">
-              <button>{t("common.close")}</button>
-            </form>
-          </dialog>
-        );
-      })}
-      <script dangerouslySetInnerHTML={{ __html: `
-        (function() {
-          document.querySelectorAll('.apply-link-copy').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-              navigator.clipboard.writeText(btn.dataset.url).then(function() {
-                document.body.dispatchEvent(new CustomEvent('showToast', { detail: { message: ${JSON.stringify(t("applications.links.copied"))}, type: 'info' } }));
-              });
-            });
-          });
-
-          var labels = {
-            active: { start: ${JSON.stringify(t("applications.formSettings.startDate"))}, end: ${JSON.stringify(t("applications.formSettings.endDate"))} },
-            inactive: { start: ${JSON.stringify(t("applications.formSettings.inactiveStartDate"))}, end: ${JSON.stringify(t("applications.formSettings.inactiveEndDate"))} },
-          };
-          var statusText = {
-            active: ${JSON.stringify(t("applications.formStatus.active"))},
-            inactive: ${JSON.stringify(t("applications.formStatus.inactive"))},
-            activeFrom: ${JSON.stringify(t("applications.formStatus.activeFrom"))},
-            activeUntil: ${JSON.stringify(t("applications.formStatus.activeUntil"))},
-            activeRange: ${JSON.stringify(t("applications.formStatus.activeRange"))},
-            inactiveFrom: ${JSON.stringify(t("applications.formStatus.inactiveFrom"))},
-            inactiveUntil: ${JSON.stringify(t("applications.formStatus.inactiveUntil"))},
-            inactiveRange: ${JSON.stringify(t("applications.formStatus.inactiveRange"))},
-          };
-          function fmt(iso) {
-            var p = iso.split('-');
-            return p[2] + '.' + p[1] + '.' + p[0];
-          }
-          document.querySelectorAll('.form-settings-form').forEach(function(form) {
-            var startInput = form.querySelector('input[name="startDate"]');
-            var endInput = form.querySelector('input[name="endDate"]');
-            var startLabel = form.querySelector('.form-start label > span');
-            var endLabel = form.querySelector('.form-end label > span');
-            var preview = form.querySelector('.form-status-preview');
-            function update() {
-              var mode = form.querySelector('input[name="status"]').checked ? 'active' : 'inactive';
-              startLabel.textContent = labels[mode].start;
-              endLabel.textContent = labels[mode].end;
-              var start = startInput.value, end = endInput.value;
-              if (!start && !end) preview.textContent = statusText[mode];
-              else if (start && !end) preview.textContent = statusText[mode + 'From'].replace('{date}', fmt(start));
-              else if (!start && end) preview.textContent = statusText[mode + 'Until'].replace('{date}', fmt(end));
-              else preview.textContent = statusText[mode + 'Range'].replace('{start}', fmt(start)).replace('{end}', fmt(end));
-            }
-            form.querySelector('input[name="status"]').addEventListener('change', update);
-            startInput.addEventListener('input', update);
-            endInput.addEventListener('input', update);
-            form.closest('dialog').addEventListener('close', function() { form.reset(); update(); });
-            update();
-          });
-        })();
-      ` }} />
-      <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
-        <QuickRangeFilter presets={presets} range={range} dir="past" action="/applications" names={{ start: "from", end: "to" }}
-          hidden={[...statusFilter.map((st): [string, string] => ["status", st]), ["sort", sort], ["sort_dir", dir]]}
-          href={(p) => buildListUrl("/applications", { status: statusFilter, sort, sort_dir: dir }, p)} />
-        {ALL_STATUSES.map((s) => {
-          const on = statusFilter.includes(s);
-          return (
-            <label key={s} class="flex items-center gap-2 min-h-11 cursor-pointer">
-              <input
-                type="checkbox"
-                class="toggle toggle-primary"
-                checked={on}
-                disabled={on && statusFilter.length === 1}
-                data-href={filterUrl(on ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
-              />
-              <span class="text-sm">{STATUS_LABELS[s]}</span>
-            </label>
-          );
-        })}
-        <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('change',function(e){var h=e.target.dataset&&e.target.dataset.href;if(h)location.href=h;});" }} />
-      </div>
-      <ClickToEditHint />
-      <div class="overflow-x-auto">
-      <table class="table table-zebra w-full">
-        <thead>
-          <tr>
-            <th><a href={sortUrl("lastName")} class="link link-hover">{t("applications.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
-            <th><a href={sortUrl("firstName")} class="link link-hover">{t("applications.table.firstName")} <SortIcon col="firstName" active={sort} dir={dir} /></a></th>
-            <th>{t("applications.table.type")}</th>
-            <th><a href={sortUrl("submittedAt")} class="link link-hover">{t("applications.table.submittedAt")} <SortIcon col="submittedAt" active={sort} dir={dir} /></a></th>
-            <th>{t("applications.table.status")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr><td colspan={5} class="text-center opacity-50 py-8">{t("applications.table.empty")}</td></tr>
-          ) : rows.map((a) => (
-            <tr key={a.id} class="cursor-pointer hover" onclick={`window.location='/applications/${a.id}'`}>
-              <td>{a.person.lastName}</td>
-              <td>{a.person.firstName}</td>
-              <td>{TYPE_LABELS[a.type]}</td>
-              <td>{formatDateTime(a.submittedAt)}</td>
-              <td><span class={STATUS_BADGE_CLASS[a.status]}>{STATUS_LABELS[a.status]}</span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </Layout>
-  );
-});
+// GET /applications — die Liste lebt in /members (offene Anträge dort mit Statusfilter)
+applicationRoutes.get("/", guard, (c) => c.redirect("/members?status=requested", 301));
 
 // GET /applications/:id — detail, duplicate check, edit form
 applicationRoutes.get("/:id", guard, async (c) => {
@@ -390,17 +161,34 @@ applicationRoutes.get("/:id", guard, async (c) => {
   const memberMatch = memberMatches[0];
   const memberMatchIsArchived = !!(memberMatch?.exitDate || memberMatch?.deathDate);
   const ageWarning = app.type === "youth" && app.person.birthDate ? ageInYears(app.person.birthDate) >= env.YOUTH_AGE_LIMIT : false;
+  const canDecide = app.status === "open" && canReview;
+  const showSave = app.status === "open" && canEdit;
+  const actions = (
+    <>
+      {canDecide && (
+        <div class="flex items-center gap-2 mr-3">
+        <HeaderAction icon="x-mark" label={t("applications.actions.reject")} hideLabel="@max-3xl:hidden" class="btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()" />
+        {memberMatch
+          ? <HeaderAction icon="check" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" class="btn-success" attrs={{ id: "create-member-btn" }} onclick="document.getElementById('approve-modal').showModal()" />
+          : <HeaderAction icon="check" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" form="application-approve-form" class="btn-success" attrs={{ id: "create-member-btn" }} />}
+        </div>
+      )}
+      {showSave && <HeaderAction variant="primary" icon="check" label={t("applications.actions.save")} form="application-edit-form" class="btn-primary" />}
+    </>
+  );
+  const cardCls = "card card-border bg-base-100 border-base-300";
 
   return c.html(
     <Layout title={`${app.person.firstName} ${app.person.lastName}`} user={user}>
-      <PageHeader title={<>{app.person.firstName} {app.person.lastName} <span class={STATUS_BADGE_CLASS[app.status]}>{STATUS_LABELS[app.status]}</span></>} backHref="/applications" subtitle={<>{t("applications.detail.submittedAt", { date: formatDateTime(app.submittedAt) })} · {TYPE_LABELS[app.type]}</>} />
+      <PageHeader title={<>{app.person.firstName} {app.person.lastName} <span class={STATUS_BADGE_CLASS[app.status]}>{STATUS_LABELS[app.status]}</span></>} backHref="/members?status=requested" subtitle={<>{t("applications.detail.submittedAt", { date: formatDateTime(app.submittedAt) })} · {TYPE_LABELS[app.type]}</>} actions={actions} />
 
       {hasDuplicates && (
-        <div class="alert alert-warning mb-4 max-w-2xl">
+        <div class="alert alert-warning mb-4" role="alert">
+          <Icon name="exclamation-triangle" class="h-5 w-5 shrink-0" />
           <div>
             {memberMatches.length > 0 && (
               <>
-                <p class="font-bold">{t("applications.duplicate.isMember")}</p>
+                <p class="font-bold">{t("applications.duplicate.isMember")}: <a class="link" href={`/members/${memberMatch.id}`}>{memberMatch.firstName} {memberMatch.lastName}</a></p>
                 <p class="text-sm">{t(memberMatchIsArchived ? "applications.duplicate.statusArchived" : "applications.duplicate.statusActive")}</p>
               </>
             )}
@@ -409,88 +197,99 @@ applicationRoutes.get("/:id", guard, async (c) => {
         </div>
       )}
 
-      <div class="max-w-2xl border border-base-300 rounded-box p-6 mb-6">
-        <form id="application-edit-form" method="post" action={`/applications/${app.id}`} class="space-y-4">
-          <fieldset disabled={!canEdit} class="space-y-4 border-0 p-0 m-0 min-w-0">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={t("apply.form.lastName")}>
-              <input type="text" name="lastName" value={app.person.lastName} class="input w-full" placeholder={t("apply.form.lastName")} />
-            </Field>
-            <Field label={t("apply.form.firstName")}>
-              <input type="text" name="firstName" value={app.person.firstName} class="input w-full" placeholder={t("apply.form.firstName")} />
-            </Field>
-          </div>
-          <Field label={t("apply.form.birthDate")}>
-            <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input w-full" />
-          </Field>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label={t("apply.form.street")}>
-              <input type="text" name="street" value={app.person.street ?? ""} class="input w-full" placeholder={t("apply.form.street")} />
-            </Field>
-            <Field label={t("apply.form.houseNumber")}>
-              <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input w-full" placeholder={t("apply.form.houseNumber")} />
-            </Field>
-            <Field label={t("apply.form.zip")}>
-              <input type="text" name="zip" value={app.person.zip ?? ""} class="input w-full" placeholder={t("apply.form.zip")} />
-            </Field>
-          </div>
-          <Field label={t("apply.form.city")}>
-            <input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} />
-          </Field>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <EmailField label={t("apply.form.email")} name="email" value={app.person.email ?? ""} />
-            <Field label={t("apply.form.phone")}>
-              <input type="tel" name="phone" value={app.person.phone ?? ""} class="input w-full" placeholder={t("apply.form.phone")} />
-            </Field>
-          </div>
-          <Field label={t("applications.detail.message")}>
-            <textarea name="message" class="textarea w-full" rows={3} placeholder={t("applications.detail.message")}>{app.message ?? ""}</textarea>
-          </Field>
-          </fieldset>
-        </form>
-        {app.guardians.length > 0 && (
-          <div class="mt-4">
-            <div class="divider">{t("applications.detail.guardians")}</div>
-            <ul class="space-y-1 text-sm">
-              {app.guardians.map((g) => (
-                <li key={g.id}>{g.person.firstName} {g.person.lastName} — {g.person.email || g.person.phone || "—"}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {app.status === "rejected" && app.rejectedReason && (
-          <div class="mt-4">
-            <div class="divider">{t("applications.detail.rejectedReason")}</div>
-            <p class="text-sm">{app.rejectedReason}</p>
-          </div>
-        )}
-      </div>
-
-      {app.status === "open" && (canEdit || canReview) && (
-        <div class="max-w-2xl space-y-4">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              {canEdit && <button type="submit" form="application-edit-form" class="btn btn-primary btn-outline">{t("applications.actions.save")}</button>}
-              {canReview && (memberMatch ? (
-                <button type="button" id="create-member-btn" class="btn btn-primary" onclick="document.getElementById('approve-modal').showModal()">{t("applications.actions.approve")}</button>
-              ) : (
-                <button type="submit" form="application-approve-form" id="create-member-btn" class="btn btn-primary">{t("applications.actions.approve")}</button>
-              ))}
-            </div>
-            {canReview && <button type="button" class="btn btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()">{t("applications.actions.reject")}</button>}
-          </div>
-
-          <form id="application-approve-form" method="post" action={`/applications/${app.id}/approve`}>
-            {ageWarning && (
-              <>
-                <p class="text-warning text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
-                <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
-                  <input type="checkbox" name="confirmAge" class="checkbox" />
-                  <span class="text-sm">{t("applications.ageWarning.confirm")}</span>
-                </label>
-              </>
+      {ageWarning && app.status === "open" && (
+        <div class="alert alert-warning mb-4" role="alert">
+          <Icon name="exclamation-triangle" class="h-5 w-5 shrink-0" />
+          <div>
+            <p class="text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
+            {canDecide && (
+              <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
+                <input type="checkbox" name="confirmAge" form="application-approve-form" class="checkbox" />
+                <span class="text-sm">{t("applications.ageWarning.confirm")}</span>
+              </label>
             )}
-          </form>
+          </div>
+        </div>
+      )}
+
+      <form id="application-edit-form" method="post" action={`/applications/${app.id}`} class="mb-6">
+        <fieldset disabled={!canEdit} class="border-0 p-0 m-0 min-w-0 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <section class={`${cardCls} card-body gap-4`}>
+            <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="user" class="h-5 w-5 opacity-60" />{t("applications.detail.person")}</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("apply.form.lastName")}>
+                <input type="text" name="lastName" value={app.person.lastName} class="input w-full" placeholder={t("apply.form.lastName")} />
+              </Field>
+              <Field label={t("apply.form.firstName")}>
+                <input type="text" name="firstName" value={app.person.firstName} class="input w-full" placeholder={t("apply.form.firstName")} />
+              </Field>
+            </div>
+            <Field label={t("apply.form.birthDate")}>
+              <input type="date" name="birthDate" value={app.person.birthDate ?? ""} class="input w-full" />
+            </Field>
+          </section>
+
+          <section class={`${cardCls} card-body gap-4`}>
+            <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="envelope" class="h-5 w-5 opacity-60" />{t("applications.detail.contact")}</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <EmailField label={t("apply.form.email")} name="email" value={app.person.email ?? ""} />
+              <Field label={t("apply.form.phone")}>
+                <input type="tel" name="phone" value={app.person.phone ?? ""} class="input w-full" placeholder={t("apply.form.phone")} />
+              </Field>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label={t("apply.form.street")} class="sm:col-span-2">
+                <input type="text" name="street" value={app.person.street ?? ""} class="input w-full" placeholder={t("apply.form.street")} />
+              </Field>
+              <Field label={t("apply.form.houseNumber")}>
+                <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input w-full" placeholder={t("apply.form.houseNumber")} />
+              </Field>
+              <Field label={t("apply.form.zip")}>
+                <input type="text" name="zip" value={app.person.zip ?? ""} class="input w-full" placeholder={t("apply.form.zip")} />
+              </Field>
+              <Field label={t("apply.form.city")} class="sm:col-span-2">
+                <input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} />
+              </Field>
+            </div>
+          </section>
+
+          <section class={`${cardCls} card-body gap-4 lg:col-span-2`}>
+            <h2 class="card-title text-base" style="font-family: var(--font-heading)">{t("applications.detail.message")}</h2>
+            <Field label={t("applications.detail.message")}>
+              <textarea name="message" class="textarea w-full" rows={3} placeholder={t("applications.detail.message")}>{app.message ?? ""}</textarea>
+            </Field>
+          </section>
+        </fieldset>
+      </form>
+
+      {(app.guardians.length > 0 || (app.status === "rejected" && app.rejectedReason)) && (
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {app.guardians.length > 0 && (
+            <section class={`${cardCls} card-body gap-2`}>
+              <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="users" class="h-5 w-5 opacity-60" />{t("applications.detail.guardians")}</h2>
+              <ul class="space-y-1 text-sm">
+                {app.guardians.map((g) => (
+                  <li key={g.id}>
+                    {g.person.firstName} {g.person.lastName} —{" "}
+                    {g.person.email ? <a class="link" href={`mailto:${g.person.email}`}>{g.person.email}</a>
+                      : g.person.phone ? <a class="link" href={`tel:${g.person.phone}`}>{g.person.phone}</a> : "—"}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {app.status === "rejected" && app.rejectedReason && (
+            <section class="card card-border bg-base-100 border-error card-body gap-2">
+              <h2 class="card-title text-base text-error" style="font-family: var(--font-heading)"><Icon name="x-mark" class="h-5 w-5" />{t("applications.detail.rejectedReason")}</h2>
+              <p class="text-sm">{app.rejectedReason}</p>
+            </section>
+          )}
+        </div>
+      )}
+
+      {canDecide && (
+        <>
+          <form id="application-approve-form" method="post" action={`/applications/${app.id}/approve`} />
 
           {memberMatch && (
             <dialog id="approve-modal" class="modal">
@@ -541,7 +340,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
               <button>{t("common.close")}</button>
             </form>
           </dialog>
-        </div>
+        </>
       )}
     </Layout>
   );
@@ -629,7 +428,7 @@ applicationRoutes.post("/:id/reject", reviewGuard, async (c) => {
   }
 
   setFlash(c, t("applications.flash.rejected"), "success");
-  return c.redirect("/applications");
+  return c.redirect("/members");
 });
 
 // POST /applications/forms/:type — de-/activate a public application form,
@@ -646,5 +445,5 @@ applicationRoutes.post("/forms/:type", requireAuth("applications:manage"), async
   });
 
   setFlash(c, t("applications.flash.formSettingsSaved"), "success");
-  return c.redirect("/applications");
+  return c.redirect("/members");
 });
