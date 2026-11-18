@@ -16,8 +16,8 @@ export type NavCounts = {
   pendingUsers: number;
 };
 
-type Tone = "badge-warning" | "badge-primary";
-type Leaf = { label: string; href: string; show: boolean; count?: number; dot?: boolean; tone?: Tone; external?: boolean; children?: Leaf[] };
+type Tone = "badge-warning" | "badge-primary" | "badge-error";
+type Leaf = { label: string; href: string; show: boolean; count?: number; tip?: string; dot?: boolean; tone?: Tone; external?: boolean; children?: Leaf[] };
 type Group = { icon: IconName; label: string; items: Leaf[] };
 
 export function CountBadge({ count, tone = "badge-warning" }: { count: number; tone?: Tone }) {
@@ -30,10 +30,21 @@ function DotBadge() {
 }
 
 // Zahl nur bei Zählerpunkten (Summe inkl. 1 je Punkt), sonst nur der Punkt.
+// Gruppe ohne eigenen Ton: Rot, sobald ein Eintrag mit Zähler rot ist.
+function groupTone(items: Leaf[], tone?: Tone): Tone | undefined {
+  return tone ?? (items.some((i) => (i.count ?? 0) > 0 && i.tone === "badge-error") ? "badge-error" : undefined);
+}
+
+// Tooltip im eingeklappten Menü: Gruppenname plus Aufschlüsselung der Zähler.
+function groupTip(label: string, items: Leaf[]): string {
+  const parts = items.filter((i) => (i.count ?? 0) > 0).map((i) => i.tip ?? `${i.label} ${i.count}`);
+  return parts.length ? `${label} · ${parts.join(", ")}` : label;
+}
+
 function GroupBadge({ items, tone }: { items: Leaf[]; tone?: Tone }) {
   const counted = items.reduce((n, i) => n + (i.count ?? 0), 0);
   const dots = items.filter((i) => i.dot).length;
-  return counted > 0 ? <CountBadge count={counted + dots} tone={tone} /> : dots > 0 ? <DotBadge /> : null;
+  return counted > 0 ? <CountBadge count={counted + dots} tone={groupTone(items, tone)} /> : dots > 0 ? <DotBadge /> : null;
 }
 
 function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
@@ -61,8 +72,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
         { label: t("inventory.tabs.itemTemplates"), href: "/inventory/templates", show: has("inventory:configure") },
       ] },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
-      { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans, tone: "badge-primary" },
-      { label: t("lend.requests.title"), href: "/inventory/requests", show: has("lending:manage"), count: c.loanRequests },
+      { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans + c.loanRequests, tip: [c.loans > 0 && t("common.nav.tip.overdue", { count: c.loans }), c.loanRequests > 0 && t(c.loanRequests === 1 ? "common.nav.tip.request" : "common.nav.tip.requests", { count: c.loanRequests })].filter(Boolean).join(", "), tone: c.loans > 0 ? "badge-error" : "badge-primary" },
     ] },
     { icon: "building-office", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
@@ -156,8 +166,8 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
           const isActive = i.href === active;
           return (
             <li data-nav-top data-label={lc(g.label)}>
-              <a href={i.href} class={`is-drawer-close:tooltip is-drawer-close:tooltip-right ${isActive ? "menu-active" : ""}`} data-tip={g.label} data-label={lc(g.label)}>
-                <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{!isActive && sum > 0 && <span class="indicator-item badge badge-warning badge-xs is-drawer-open:hidden" />}</span>
+              <a href={i.href} class={`is-drawer-close:tooltip is-drawer-close:tooltip-right ${isActive ? "menu-active" : ""}`} data-tip={groupTip(g.label, g.items)} data-label={lc(g.label)}>
+                <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{sum > 0 && <span class={`indicator-item badge ${groupTone(g.items) ?? "badge-warning"} badge-xs is-drawer-open:hidden`} />}</span>
                 {label}
                 {!isActive && <span class="is-drawer-close:hidden"><GroupBadge items={g.items} tone={i.tone} /></span>}
               </a>
@@ -168,8 +178,8 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
         return (
           <li data-nav-top data-label={lc(g.label)}>
             <details name="nav" data-nav class="group is-drawer-close:overflow-visible" open={open} data-active={open ? "" : undefined}>
-              <summary class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={g.label}>
-                <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{!open && sum > 0 && <span class="indicator-item badge badge-warning badge-xs is-drawer-open:hidden" />}</span>
+              <summary class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={groupTip(g.label, g.items)}>
+                <span class="indicator"><Icon name={g.icon} class="h-5 w-5" />{sum > 0 && <span class={`indicator-item badge ${groupTone(g.items) ?? "badge-warning"} badge-xs is-drawer-open:hidden`} />}</span>
                 <span class={`is-drawer-close:hidden ${open ? "font-semibold" : ""}`}>{g.label}</span>
                 <span class="is-drawer-close:hidden group-open:hidden"><GroupBadge items={g.items} /></span>
               </summary>

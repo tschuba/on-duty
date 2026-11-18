@@ -1,4 +1,4 @@
-import { Hono, type Context } from "hono";
+import { Hono } from "hono";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
@@ -10,19 +10,16 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { buildListUrl } from "../lib/list-query.js";
-import { checkAvailability, cleanupRejectedLoanRequests, matchCandidates } from "../lib/lending.js";
+import { checkAvailability, matchCandidates } from "../lib/lending.js";
 import { env } from "../env.js";
 import { sendMail } from "../lib/mail.js";
 import { buildVars } from "../lib/mail-templates.js";
 import { loadOrgConfig } from "../lib/org-config.js";
-import { getSettings } from "../lib/settings.js";
 
 export const loanRequestRoutes = new Hono<{ Variables: Variables }>();
 const guard = requireAuth("lending:manage");
 
 type RequestStatus = "open" | "approved" | "rejected";
-const ALL_STATUSES: RequestStatus[] = ["open", "approved", "rejected"];
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
   open: t("lend.status.open"),
@@ -57,79 +54,8 @@ function ReadField({ label, value, class: cls }: { label: string; value: string;
   );
 }
 
-function periodLabel(r: { plannedFrom: string; plannedTo: string }): string {
-  return r.plannedFrom === r.plannedTo ? formatDate(r.plannedFrom) : `${formatDate(r.plannedFrom)} – ${formatDate(r.plannedTo)}`;
-}
-
-// GET /inventory/requests — Standard: offene Anfragen.
-loanRequestRoutes.get("/", guard, async (c) => {
-  const user = c.get("user");
-  const statusRaw = c.req.queries("status") ?? [];
-  const statusFilter: RequestStatus[] = statusRaw.length > 0 ? (statusRaw as RequestStatus[]) : ["open"];
-
-  // Lazy statt Scheduler, siehe Backlog-Doc "Aufbewahrung" — die App führt keinen eigenen Cron.
-  const { loanRequestRetentionDays } = await getSettings();
-  await cleanupRejectedLoanRequests(Number(loanRequestRetentionDays));
-
-  const all = await fetchRequests();
-  const rows = all
-    .filter((r) => statusFilter.includes(r.status))
-    .sort((a, b) => b.submittedAt.getTime() - a.submittedAt.getTime());
-
-  function filterUrl(next: RequestStatus[]) {
-    return buildListUrl("/inventory/requests", { status: statusFilter }, { status: next });
-  }
-
-  return c.html(
-    <Layout title={t("lend.requests.title")} user={user}>
-      <PageHeader title={t("lend.requests.title")} />
-      <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
-        {ALL_STATUSES.map((s) => {
-          const on = statusFilter.includes(s);
-          return (
-            <label key={s} class="flex items-center gap-2 min-h-11 cursor-pointer">
-              <input
-                type="checkbox"
-                class="toggle toggle-primary"
-                checked={on}
-                disabled={on && statusFilter.length === 1}
-                data-href={filterUrl(on ? statusFilter.filter((x) => x !== s) : [...statusFilter, s])}
-              />
-              <span class="text-sm">{STATUS_LABEL[s]}</span>
-            </label>
-          );
-        })}
-        <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('change',function(e){var h=e.target.dataset&&e.target.dataset.href;if(h)location.href=h;});" }} />
-      </div>
-      <div class="overflow-x-auto">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th>{t("lending.loans.form.item")}</th>
-              <th>{t("apply.form.lastName")}</th>
-              <th>{t("lend.form.plannedFrom")}</th>
-              <th>{t("lend.status.submittedAt")}</th>
-              <th>{t("lend.status.status")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr><td colspan={5} class="text-center opacity-50 py-8">{t("lend.requests.empty")}</td></tr>
-            ) : rows.map((r) => (
-              <tr key={r.id} class="cursor-pointer hover" onclick={`window.location='/inventory/requests/${r.id}'`}>
-                <td>{r.lendingItem.inventoryItem.name}</td>
-                <td>{r.person.lastName}, {r.person.firstName}{r.person.companyName && ` (${r.person.companyName})`}</td>
-                <td>{periodLabel(r)}</td>
-                <td>{formatDate(r.submittedAt.toISOString().slice(0, 10))}</td>
-                <td><span class={STATUS_BADGE_CLASS[r.status]}>{STATUS_LABEL[r.status]}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Layout>
-  );
-});
+// Alte Listen-URL: Anfragen stehen jetzt in der Verleihliste.
+loanRequestRoutes.get("/", guard, (c) => c.redirect("/inventory/lending?status=requested", 301));
 
 // GET /inventory/requests/:id — Detail.
 loanRequestRoutes.get("/:id", guard, async (c) => {
@@ -145,7 +71,7 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
     <Layout title={request.lendingItem.inventoryItem.name} user={user}>
       <PageHeader
         title={<>{request.lendingItem.inventoryItem.name} <span class={STATUS_BADGE_CLASS[request.status]}>{STATUS_LABEL[request.status]}</span></>}
-        backHref="/inventory/requests"
+        backHref="/inventory/lending?status=requested"
       />
       <div class="max-w-2xl">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">

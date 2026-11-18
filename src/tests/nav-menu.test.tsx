@@ -27,12 +27,18 @@ vi.mock("../lib/inventory.js", () => ({ countOverdueInspections: async () => 0 }
 let pendingRsvps = 0;
 vi.mock("../lib/events.js", () => ({ countPendingRsvps: async () => pendingRsvps }));
 
+let overdueLoans = 0;
+let openLoanRequests = 0;
+vi.mock("../lib/lending.js", () => ({ countOverdueLoans: async () => overdueLoans, countOpenLoanRequests: async () => openLoanRequests }));
+
 const { Layout } = await import("../components/layout.js");
 
 beforeEach(() => {
   pendingRsvps = 0;
   openApplicationsFixture = [];
   openDonationsFixture = [];
+  overdueLoans = 0;
+  openLoanRequests = 0;
 });
 
 function userWith(...permissions: string[]) {
@@ -130,5 +136,21 @@ describe("events count badge", () => {
     expect(await renderAt("/", "members:read")).toMatch(/Termine[\s\S]{0,200}badge-warning[^>]*>3</);
     pendingRsvps = 0;
     expect(await renderAt("/", "members:read")).not.toMatch(/Termine[\s\S]{0,200}badge-warning[^>]*>\d</);
+  });
+});
+
+describe("Verleih-Zähler", () => {
+  it("sums overdue loans and open requests, red once something is overdue", async () => {
+    openLoanRequests = 2;
+    expect(await renderAt("/", "lending:read", "lending:manage")).toMatch(/badge-primary[^>]*>2</);
+    overdueLoans = 1;
+    const html = await renderAt("/", "lending:read", "lending:manage");
+    expect(html).toMatch(/badge-error[^>]*>3</);
+    expect(html).toMatch(/indicator-item badge badge-error/);
+    expect(html).toContain('data-tip="Inventar · 1 überfällig, 2 Anfragen"');
+    // Punkt im eingeklappten Menü auch, wenn die Gruppe gerade aktiv ist.
+    expect(await renderAt("/inventory/lending", "lending:read", "lending:manage")).toMatch(/indicator-item badge badge-error/);
+    openLoanRequests = 1;
+    expect(await renderAt("/", "lending:read", "lending:manage")).toContain("1 überfällig, 1 Anfrage\"");
   });
 });

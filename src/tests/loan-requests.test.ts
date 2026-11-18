@@ -102,13 +102,10 @@ beforeEach(() => {
 });
 
 describe("GET /inventory/requests", () => {
-  it("defaults to open requests and lists them", async () => {
-    requestsFixture = [makeRequest(), makeRequest({ id: "req-2", status: "rejected" })];
+  it("redirects to the lending view", async () => {
     const res = await loanRequestRoutes.request("/");
-    expect(res.status).toBe(200);
-    const html = await res.text();
-    expect(html).toContain("Anhänger");
-    expect(html).not.toContain("req-2");
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("/inventory/lending?status=requested");
   });
 });
 
