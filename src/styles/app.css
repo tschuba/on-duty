@@ -272,5 +272,5 @@ input[data-combo]::-webkit-calendar-picker-indicator { display: none !important;
 .tooltip-focus-only:not(:has(:focus-visible)):is(:hover)::before,
 .tooltip-focus-only:not(:has(:focus-visible)):is(:hover)::after { opacity: 0; }
 
-/* Drawer: Chevron links neben dem Badge, Badge ganz rechts (Badge-Span hat order-2). */
+/* Drawer: chevron left of the badge, badge far right (badge span has order-2). */
 #nav-menu summary::after { order: 1; }
