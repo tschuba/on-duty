@@ -144,9 +144,9 @@ Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste 
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-8">{leerer-Text}</td></tr>`
 
 ### Kleine Inline-Sub-Tabellen
-(z. B. Rollen-/Berechtigungs-Listen in `admin.tsx`, Rollen-Zuweisungszeilen in `members.tsx`: wenige Zeilen, meist im Formular-/Admin-Kontext)
+(alle Tabellen, die nicht die primäre Datenliste sind, z. B. Rollen-/Berechtigungs-Listen in `admin.tsx`, Zuweisungen in `members.tsx`, Teilnehmer-/Prüfungs-Tabellen in `events`, `training`, `inventory`, `import`)
 
-- `class="table w-full"` (kein `table-zebra`)
+- `class="table w-full"` (kein `table-zebra`); `w-full` ist der Standard, `table-sm` oder `max-w-*` nur, wenn der Platz es verlangt (z. B. `table-sm` in `mail-templates.tsx`, `max-w-2xl` in `donations.tsx`)
 - Keine Sortierung, keine Pagination
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-4">{leerer-Text}</td></tr>` (`py-4` statt `py-8`, kompakter)
 
