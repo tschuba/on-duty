@@ -19,6 +19,7 @@ const ICONS = {
   "building-warehouse": "building-warehouse",
   "building-office": "building",
   link: "link",
+  "ellipsis-vertical": "dots-vertical",
   "magnifying-glass": "search",
   "clipboard-document": "clipboard",
   "cog-6-tooth": "settings",

@@ -32,6 +32,8 @@ import { buildVars } from "../lib/mail-templates.js";
 import { TrainingSection, sortRecords } from "./training.js";
 import { trainingRecords } from "../db/schema/index.js";
 
+import { ApplicationFormSettings, ApplicationLinks } from "../components/application-links.js";
+import { loadApplicationForms } from "../lib/application-forms.js";
 import { StatCard } from "../components/stat-card.js";
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
@@ -53,6 +55,7 @@ export function fetchRoles(): Promise<Role[]> {
     .orderBy(asc(memberRoleTypes.sortOrder), asc(memberRoles.sortOrder));
 }
 type Assignment = typeof memberRoleAssignments.$inferSelect & { role: Role };
+type RequestRow = typeof applications.$inferSelect & { person: Person };
 type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStatus };
 
 // ── DB helpers ───────────────────────────────────────────────────────────────
@@ -163,11 +166,15 @@ export function SortIcon<T extends string>({ col, active, dir }: { col: T; activ
   return <span class="ml-1">{dir === "asc" ? "↑" : "↓"}</span>;
 }
 
+async function countOpenRequests() {
+  return (await db.select({ id: applications.id }).from(applications).where(eq(applications.status, "open"))).length;
+}
+
 function genderBreakdown(c: { m: number; w: number; o: number }) {
   return <>{c.m > 0 && <span>{c.m} ♂</span>}{c.w > 0 && <span>{c.w} ♀</span>}{c.o > 0 && <span>{c.o} o.A.</span>}</>;
 }
 
-export function StatsCards({ all }: { all: MemberWithStatus[] }) {
+export function StatsCards({ all, openRequests = null }: { all: MemberWithStatus[]; openRequests?: number | null }) {
   const counts = { active: 0, passive: 0, supporting: 0, children: 0, youth: 0, left: 0, deceased: 0 };
   const genderCount = (status: "active" | "children" | "youth") => {
     const subset = all.filter((m) => m.status === status);
@@ -184,17 +191,18 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
   const children = genderCount("children");
 
   return (
-    <div id="members-stats" class="hidden sm:block @container mb-6">
-    <div class="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-6 gap-2 @4xl:gap-4">
+    <div id="members-stats" class={`hidden sm:block @container mb-6${openRequests ? " pt-3" : ""}`}>
+    <div style={!openRequests ? undefined : "--stat-cols:7"} class="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-[repeat(var(--stat-cols,6),minmax(0,1fr))] gap-2 @4xl:gap-4">
+      {openRequests ? <StatCard label={t("members.stats.requested")} value={openRequests} tone="text-warning font-bold" href="/members?status=requested" link="filter" highlight /> : null}
       <StatCard label={t("members.stats.active")} value={counts.active} tone="text-success" inline>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
       </StatCard>
       <StatCard label={t("members.stats.passive")} value={counts.passive} />
-      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-secondary" />
-      <StatCard label={t("members.stats.youth")} value={counts.youth} tone="text-info" inline>
+      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-primary" />
+      <StatCard label={t("members.stats.youth")} value={counts.youth} tone="text-secondary" inline>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(youth)}</div>
       </StatCard>
-      <StatCard label={t("members.stats.children")} value={counts.children} tone="text-warning" inline>
+      <StatCard label={t("members.stats.children")} value={counts.children} tone="text-info" inline>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(children)}</div>
       </StatCard>
       <StatCard label={t("members.stats.former")} value={counts.left + counts.deceased} tone="text-base-content/40" inline>
@@ -209,9 +217,11 @@ export function StatsCards({ all }: { all: MemberWithStatus[] }) {
 }
 
 export function MembersTable({
-  items, sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, ageFilter, isEditor,
+  items, requests = [], sort, dir, page, pageSize, totalPages, totalCount, search, statusFilter, roleFilter, ageFilter, isEditor,
 }: {
   items: MemberWithStatus[];
+  // Offene Anträge (wie offene Verleih-Anfragen): stehen auf Seite 1 über den Mitgliedern.
+  requests?: RequestRow[];
   sort: SortKey;
   dir: "asc" | "desc";
   page: number;
@@ -219,7 +229,7 @@ export function MembersTable({
   totalPages: number;
   totalCount: number;
   search: string;
-  statusFilter: MemberStatus[];
+  statusFilter: string[];
   roleFilter: string[];
   ageFilter: AgeGroup[];
   isEditor: boolean;
@@ -255,7 +265,17 @@ export function MembersTable({
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {page === 1 && requests.map((a) => (
+              <tr key={a.id} class="cursor-pointer hover bg-warning/10!" onclick={`window.location='/applications/${a.id}'`}>
+                <td class="font-medium border-l-4 border-l-warning">{a.person.lastName}</td>
+                <td>{a.person.firstName}</td>
+                <td class="hidden xl:table-cell">{formatDate(a.person.birthDate)}</td>
+                <td class="hidden lg:table-cell"></td>
+                <td class="hidden md:table-cell"></td>
+                <td><span class="badge badge-sm badge-warning badge-outline">{t("members.status.requested")}</span></td>
+              </tr>
+            ))}
+            {items.length === 0 && requests.length === 0 ? (
               <tr><td colspan={6} class="text-center opacity-50 py-8">{t("members.table.empty")}</td></tr>
             ) : items.map((m) => (
               <tr
@@ -263,7 +283,7 @@ export function MembersTable({
                 class="cursor-pointer hover"
                 onclick={`window.location='/members/${m.id}'`}
               >
-                <td class="font-medium">{m.lastName}</td>
+                <td class="font-medium border-l-4 border-l-transparent">{m.lastName}</td>
                 <td>{m.firstName}</td>
                 <td class="hidden xl:table-cell">{formatDate(m.birthDate)}</td>
                 <td class="hidden lg:table-cell">{formatDate(m.entryDate)}</td>
@@ -920,10 +940,11 @@ const QUICK_FILTERS: { key: string; status: MemberStatus[]; age: AgeGroup[] }[] 
   { key: "former", status: ["left", "deceased"], age: [] },
 ];
 
-function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilter, hidden }: {
+function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilter, hidden, canReview }: {
+  canReview: boolean;
   roles: Role[];
   activeRoleIds: Set<string>;
-  statusFilter: MemberStatus[];
+  statusFilter: string[];
   roleFilter: string[];
   ageFilter: AgeGroup[];
   hidden: [string, string][];
@@ -943,9 +964,12 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
         button: t("members.filter.button"), title: t("members.filter.title"), quick: t("members.filter.quick"),
         apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults"),
       }}
-      quick={QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), values: { status: f.status, age: f.age } }))}
+      quick={[
+        ...QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), values: { status: f.key === "current" && canReview ? [...f.status, "requested"] : f.status, age: f.age } })),
+        ...(canReview ? [{ label: t("members.filter.preset.requested"), values: { status: ["requested"], age: [] } }] : []),
+      ]}
       sections={[
-        { type: "chips", param: "status", title: t("members.table.status"), options: STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABELS[s], icon: s === "deceased" ? "cross" : undefined })), selected: statusFilter, defaults: DEFAULT_STATUS },
+        { type: "chips", param: "status", title: t("members.table.status"), options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("cross" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
         { type: "chips", param: "age", title: t("members.filter.age"), options: AGE_GROUPS.map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter },
         {
           type: "list", param: "role", title: t("members.table.roles"),
@@ -996,9 +1020,11 @@ export function filterMembers(all: MemberWithStatus[], statusFilter: MemberStatu
 // Export-Button der Mitgliederliste; bei leerer Trefferliste deaktiviert. oob: per HTMX nachführen.
 function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) {
   return (
-    <span id="members-export-btn" class="contents" {...(oob ? { "hx-swap-oob": "true" } : {})}>
-      <HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('members-export-modal').showModal()" disabled={empty ? t("common.exportEmpty") : undefined} />
-    </span>
+    <li id="members-export-btn" class={empty ? "menu-disabled" : ""} title={empty ? t("common.exportEmpty") : undefined} {...(oob ? { "hx-swap-oob": "true" } : {})}>
+      <button type="button" disabled={empty} onclick="document.getElementById('members-export-modal').showModal();document.activeElement.blur()">
+        <Icon name="arrow-down-tray" class="h-5 w-5" />{t("common.export")}
+      </button>
+    </li>
   );
 }
 
@@ -1006,9 +1032,22 @@ function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) 
 memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const q = c.req.query();
+  const statusParams = c.req.queries("status") ?? [];
   const { search, sort, dir, statusFilter, roleFilter, ageFilter, page, pageSize } = parseListQuery(
-    q, c.req.queries("status") ?? [], c.req.queries("role") ?? [], c.req.queries("age") ?? []
+    q, statusParams, c.req.queries("role") ?? [], c.req.queries("age") ?? []
   );
+  // Offene Anträge: standardmäßig sichtbar, wie offene Verleih-Anfragen; nur mit applications:read.
+  const canReview = user.permissions.has("applications:read");
+  const showRequests = canReview && (statusParams.length === 0 || statusParams.includes("requested"));
+  const membersHidden = statusParams.length > 0 && statusParams.every((s) => s === "requested");
+  const forms = canReview ? await loadApplicationForms() : {};
+  const needle = search.toLowerCase();
+  const requests: RequestRow[] = showRequests
+    ? (await db.query.applications.findMany({ where: eq(applications.status, "open"), with: { person: true } }))
+        .filter((a) => !needle || a.person.lastName.toLowerCase().includes(needle) || a.person.firstName.toLowerCase().includes(needle))
+        .sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime())
+    : [];
+  const shownStatus: string[] = membersHidden ? ["requested"] : [...statusFilter, ...(showRequests ? ["requested"] : [])];
 
   const [all, allRoles, activeRoleRows] = await Promise.all([
     fetchMembersWithStatus(search || undefined),
@@ -1017,7 +1056,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   ]);
   // Unabhängig von Suche/Statusfilter, damit "ungenutzt" stabil bleibt.
   const activeRoleIds = new Set(activeRoleRows.map((r) => r.id));
-  const filtered = filterMembers(all, statusFilter, roleFilter, ageFilter);
+  const filtered = membersHidden ? [] : filterMembers(all, statusFilter, roleFilter, ageFilter);
   const sorted = sortMembers(filtered, sort, dir);
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const pageItems = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -1028,6 +1067,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
   const tableEl = (
     <MembersTable
       items={pageItems}
+      requests={requests}
       sort={sort}
       dir={dir}
       page={page}
@@ -1035,7 +1075,7 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       totalPages={totalPages}
       totalCount={sorted.length}
       search={search}
-      statusFilter={statusFilter}
+      statusFilter={shownStatus}
       roleFilter={roleFilter}
       ageFilter={ageFilter}
       isEditor={isEditor}
@@ -1049,15 +1089,24 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
       <PageHeader title={t("members.title")} actions={<>
         <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
           <Icon name="chart-bar" class="w-5 h-5" />
-          <span class="@max-xl:hidden">{t("members.stats.toggle")}</span>
+          <span class="@max-4xl:hidden">{t("members.stats.toggle")}</span>
           <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
         </label>
-        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=members" />}
-        <MembersExportButton empty={sorted.length === 0} />
+        {canReview && <ApplicationLinks forms={forms} canManageForms={user.permissions.has("applications:manage")} />}
+        <div class="dropdown dropdown-end ml-2">
+          <div tabindex={0} role="button" class="btn btn-neutral btn-square" aria-label={t("common.moreActions")} title={t("common.moreActions")}>
+            <Icon name="ellipsis-vertical" class="h-5 w-5" />
+          </div>
+          <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-44 p-2 shadow">
+            {user.permissions.has("import:run") && <li><a href="/import?kind=members"><Icon name="arrow-up-tray" class="h-5 w-5" />{t("import.action")}</a></li>}
+            <MembersExportButton empty={sorted.length === 0} />
+          </ul>
+        </div>
         {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />
 
-      <StatsCards all={all} />
+      {canReview && user.permissions.has("applications:manage") && <ApplicationFormSettings forms={forms} />}
+      <StatsCards all={all} openRequests={canReview ? await countOpenRequests() : null} />
 
       {/* Toolbar */}
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
@@ -1073,10 +1122,10 @@ memberRoutes.get("/", requireAuth("members:read"), async (c) => {
             hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
             hx-target="#members-results"
             hx-include="[name='search']"
-            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: statusFilter, role: roleFilter, age: ageFilter, page: 1, pageSize })}
+            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: shownStatus, role: roleFilter, age: ageFilter, page: 1, pageSize })}
           />
         </label>
-        <MembersFilter roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={statusFilter} roleFilter={roleFilter} ageFilter={ageFilter}
+        <MembersFilter canReview={canReview} roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={shownStatus} roleFilter={roleFilter} ageFilter={ageFilter}
           hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...(search ? [["search", search] as [string, string]] : [])]} />
       </div>
 

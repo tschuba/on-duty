@@ -109,71 +109,10 @@ function makeApplication(overrides: Record<string, unknown> = {}) {
 }
 
 describe("GET /", () => {
-  it("lists applications with name and type", async () => {
-    findManyResult = [makeApplication()];
+  it("redirects to the combined members list", async () => {
     const res = await applicationRoutes.request("/");
-    const html = await res.text();
-    expect(html).toContain("Anna");
-    expect(html).toContain("Bauer");
-  });
-
-  it("keeps range/rel/dir on sort and status filter links", async () => {
-    findManyResult = [makeApplication()];
-    const html = await (await applicationRoutes.request("/?range=rel&rel=P3M&dir=past")).text();
-    expect(html).toContain("sort=lastName");
-    expect(html).toMatch(/href="[^"]*sort=lastName[^"]*"/);
-    const sortHref = html.match(/href="([^"]*sort=lastName[^"]*)"/)![1].replace(/&amp;/g, "&");
-    expect(sortHref).toContain("range=rel");
-    expect(sortHref).toContain("rel=P3M");
-    expect(sortHref).toContain("dir=past");
-    const hrefs = [...html.matchAll(/data-href="([^"]*)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
-    expect(hrefs).toHaveLength(3);
-    for (const h of hrefs) expect(h).toContain("range=rel&rel=P3M&dir=past");
-  });
-
-  it("offers the all-time preset and shows it as the default range", async () => {
-    const html = await (await applicationRoutes.request("/")).text();
-    expect(html).toContain("range=all");
-    expect(html).toContain("Gesamter Zeitraum");
-  });
-
-  it("renders status toggles; the last active one is disabled", async () => {
-    const html = await (await applicationRoutes.request("/")).text();
-    const inputs = html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g)!;
-    expect(inputs).toHaveLength(3);
-    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
-    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(1);
-    expect(html).not.toContain(">Alle<");
-  });
-
-  it("status=all activates all three toggles, none disabled", async () => {
-    const html = await (await applicationRoutes.request("/?status=all")).text();
-    const inputs = html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g)!;
-    expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(3);
-    expect(inputs.filter((i) => i.includes("disabled"))).toHaveLength(0);
-  });
-
-  it("shows each form's status but hides the settings gear without applications:manage", async () => {
-    applicationFormsFixture.membership = { type: "membership", isActive: false, startDate: null, endDate: "2026-09-01" };
-    const res = await applicationRoutes.request("/");
-    const html = await res.text();
-    expect(html).toContain(t("applications.formStatus.inactiveUntil", { date: "01.09.2026" }));
-    expect(html).not.toContain('id="form-settings-membership"');
-  });
-
-  it("shows form status on the links button without opening the dropdown", async () => {
-    applicationFormsFixture.membership = { type: "membership", isActive: false, startDate: null, endDate: null };
-    const html = await (await applicationRoutes.request("/")).text();
-    expect(html).toContain('class="flex items-center gap-1 text-error opacity-40"');
-    expect(html).toContain('class="flex items-center gap-1 text-success"');
-  });
-
-  it("shows the settings gear and modal for a user with applications:manage", async () => {
-    currentUser.permissions = new Set(["applications:read", "applications:record", "applications:review", "applications:manage"]);
-    const res = await applicationRoutes.request("/");
-    const html = await res.text();
-    expect(html).toContain('id="form-settings-membership"');
-    expect(html).toContain('id="form-settings-youth"');
+    expect(res.status).toBe(301);
+    expect(res.headers.get("location")).toBe("/members?status=requested");
   });
 });
 
@@ -314,7 +253,7 @@ describe("POST /:id/reject", () => {
       body: formBody({ rejectedReason: "Kein Bedarf" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/applications");
+    expect(res.headers.get("location")).toBe("/members");
     const appUpdate = updateCalls.find((c) => c.table === applications);
     expect(appUpdate?.set.status).toBe("rejected");
     expect(appUpdate?.set.rejectedReason).toBe("Kein Bedarf");
@@ -329,7 +268,7 @@ describe("POST /forms/:type", () => {
       body: formBody({ status: "active", startDate: "2026-09-01", endDate: "2026-10-31" }),
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/applications");
+    expect(res.headers.get("location")).toBe("/members");
     expect(saveApplicationFormCalls).toEqual([
       { type: "youth", values: { isActive: true, startDate: "2026-09-01", endDate: "2026-10-31" } },
     ]);
