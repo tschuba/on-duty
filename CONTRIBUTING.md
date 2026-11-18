@@ -37,8 +37,9 @@ pnpm install  # richtet den Hook automatisch ein
 
 ## Pull Requests
 
+- Kein direktes Pushen auf `master`, ausschließlich per PR. Squash Merge.
 - PR-Titel und -Beschreibung sind immer auf **Englisch**.
-- Der PR-Titel muss dem Conventional-Commits-Format (`<type>[optional scope]: <description>`, erlaubte Typen siehe oben) entsprechen und den Check **PR Title** bestehen (`.github/workflows/pr-version-bump.yml`).
+- Der PR-Titel muss dem Conventional-Commits-Format (erlaubte Typen siehe oben) entsprechen und den Check **PR Title** bestehen (`.github/workflows/pr-version-bump.yml`). Er wird beim Squash Merge zur Commit-Nachricht und bestimmt die Version (siehe „Release“).
 
 ## Sprache
 
@@ -46,18 +47,11 @@ pnpm install  # richtet den Hook automatisch ein
 |---|---|
 | Quellcode, Bezeichner, Routen, Logs | Englisch |
 | Dokumentation (README, Docs) | Deutsch |
-| UI-Texte | i18n-Dateien (`src/i18n/de.ts` + `src/i18n/en.ts`) |
+| UI-Texte | i18n-Datei `src/i18n/de.ts` |
 
 Log-Nachrichten (Pino) sind durchgehend englisch, ohne Namen, E-Mails oder IBANs; Details als strukturierte Felder (`logger.error({ err }, "…")`).
 
-Keine UI-Texte direkt in Templates — ausschließlich über i18n-Schlüssel.
-
-## i18n
-
-Neue UI-Texte müssen in beiden Sprachdateien ergänzt werden:
-
-- `src/i18n/de.ts` — Deutsch
-- `src/i18n/en.ts` — Englisch
+Keine UI-Texte direkt in Templates, ausschließlich über i18n-Schlüssel. Neue Texte kommen in `src/i18n/de.ts` und werden mit `t("<key>")` verwendet.
 
 ## Konstanten statt Magic Values
 
@@ -102,13 +96,14 @@ Reine SQL-Backfills mit `pnpm db:generate --custom --name=<name>` anlegen. `driz
 
 ## Tests
 
-Vor jedem PR:
+Vor jedem PR (CI prüft zusätzlich beides):
 
 ```bash
+pnpm typecheck
 pnpm test
 ```
 
-Geteilte Test-Helper (z. B. Request-Builder) gehören nach `src/tests/test-utils.ts`, geteilte Daten-Fixtures nach `src/tests/fixtures.ts` — nicht pro Testdatei neu definieren.
+Geteilte Test-Helper (z. B. Request-Builder) gehören nach `src/tests/test-utils.ts`, geteilte Daten-Fixtures nach `src/tests/fixtures.ts`, nicht pro Testdatei neu definieren.
 
 ### Coverage
 
@@ -116,14 +111,9 @@ CI blockt PRs, die die Coverage ggü. `master` verschlechtern, sowie neue Zeilen
 
 Beim Nachziehen von Coverage auf Code, der Entscheidungen mit I/O mischt (z. B. Auth-/Berechtigungsprüfungen): nicht die Logik mit `v8 ignore` wegkommentieren oder in eine separate Pure-Function extrahieren, die die echten Verzweigungen nur nachbildet — beides lässt die eigentliche Entscheidung ungetestet und macht die Metrik hohl. Stattdessen an einer dünnen, stabilen Grenze mocken (der eine externe Call, die eine Query) und die echte Funktion end-to-end durchlaufen lassen.
 
-## Pull Requests
-
-- Kein direktes Pushen auf `main` — ausschließlich per PR
-- Squash Merge wird verwendet
-
 ## Release
 
-Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit-Nachricht). Der Check `Bump Version` setzt daraus die Version in `package.json` und pusht einen Bump-Commit auf den PR-Branch:
+Der Check `Bump Version` setzt daraus die Version in `package.json` und pusht einen Bump-Commit auf den PR-Branch:
 
 | Titel | Bump |
 | --- | --- |
@@ -132,7 +122,7 @@ Der PR-Titel ist ein Conventional Commit (Squash-Merge übernimmt ihn als Commit
 | `feat!:` / `BREAKING CHANGE` im PR-Text | major |
 | `chore:`, `docs:`, `test:`, `ci:`, `style:`, `build:`, `refactor:`, `revert:` | kein Bump |
 
-Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, Build-Configs, `scripts/zitadel-init.mjs`, `scripts/copy-*.mjs`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
+Ändert ein PR Dateien, die ins Image einfließen (`src/`, `drizzle/`, `public/`, `package.json`, Lockfile, `Dockerfile`, `tsup.config.ts`, `drizzle.config.ts`, `branding/`, `scripts/zitadel-init.mjs`, `scripts/copy-fonts.mjs`, `scripts/copy-htmx.mjs`; maßgeblich ist `FILTER` in `pr-version-bump.yml`), ist ein Bump-Typ (`fix`/`feat`/`perf`) Pflicht, sonst schlägt der Check fehl.
 
 Nach dem Merge mit neuer Version entstehen Tag `vX.Y.Z` und ein Release-**Draft**; ältere, unveröffentlichte Drafts (inkl. Tags) werden dabei gelöscht. Das Veröffentlichen des Drafts baut die Docker-Tags `latest`, `X.Y.Z`, `X.Y`, `X`; `edge` kommt bei jedem Push auf `master`.
 
