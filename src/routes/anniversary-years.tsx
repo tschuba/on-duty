@@ -1,7 +1,7 @@
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
 import { Field } from "../components/field.js";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { eq, and, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { anniversaryYears } from "../db/schema/index.js";
@@ -13,6 +13,7 @@ import { SortIcon } from "./members.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { t } from "../i18n/index.js";
+import { TitleSwitch } from "../components/title-switch.js";
 
 export const yearRoutes = new Hono<{ Variables: Variables }>();
 const yearsRead = requireAuth("anniversary-years:read");
@@ -24,8 +25,19 @@ type AnniversaryKind = (typeof ANNIVERSARY_KINDS)[number];
 const isKind = (k: string): k is AnniversaryKind => (ANNIVERSARY_KINDS as readonly string[]).includes(k);
 
 // ── /anniversary-years ──────────────────────────────────────────────────────
-yearRoutes.get("/", yearsRead, async (c) => {
-  const user = c.get("user");
+// Ansichten-Umschalter für die gemeinsame Seite /anniversaries (Jubiläen | Jubiläumsjahre); nur erlaubte Ansichten.
+export function anniversaryViews(perms: Set<string>, years: boolean) {
+  return [
+    ...(perms.has("members:read") ? [{ active: !years, href: "/anniversaries", label: t("anniversaries.title") }] : []),
+    ...(perms.has("anniversary-years:read") ? [{ active: years, href: "/anniversaries?view=years", label: t("common.nav.anniversaryYears") }] : []),
+  ];
+}
+
+// Alte Links (/anniversary-years?kind=…&sort=…) bleiben gültig.
+yearRoutes.get("/", yearsRead, (c) => c.redirect(`/anniversaries?${new URLSearchParams({ ...c.req.query(), view: "years" })}`));
+
+export async function renderYears(c: Context<{ Variables: Variables }>) {
+  const user = c.get("user")!;
   const canWrite = user.permissions.has("anniversary-years:write");
   const canDelete = user.permissions.has("anniversary-years:delete");
   const kindParam = c.req.query("kind") ?? "";
@@ -49,18 +61,18 @@ yearRoutes.get("/", yearsRead, async (c) => {
     if (kindFilter) q.set("kind", kindFilter);
     q.set("sort", col);
     q.set("dir", sort === col && dir === "asc" ? "desc" : "asc");
-    return `/anniversary-years?${q}`;
+    return `/anniversaries?view=years&${q}`;
   };
 
   return c.html(
     <Layout title={t("admin.anniversaries.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={t("admin.anniversaries.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={<TitleSwitch items={anniversaryViews(user.permissions as Set<string>, true)} />} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
 
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(kindFilter ?? "",
           [{ value: "service", label: t("admin.anniversaries.kind.service") }, { value: "membership", label: t("admin.anniversaries.kind.membership") }],
-          (v) => `/anniversary-years?${v ? `kind=${v}&` : ""}sort=${sort}&dir=${dir}`)} />
+          (v) => `/anniversaries?view=years&${v ? `kind=${v}&` : ""}sort=${sort}&dir=${dir}`)} />
       </div>
 
       {canWrite && <ClickToEditHint />}
@@ -135,7 +147,7 @@ yearRoutes.get("/", yearsRead, async (c) => {
       <ModalScaffold />
     </Layout>
   );
-});
+}
 
 // HTMX fragment: new anniversary year modal
 yearRoutes.get("/new", yearsWrite, (c) => {
@@ -222,12 +234,12 @@ yearRoutes.post("/", yearsWrite, async (c) => {
 
   if (!isKind(kind) || !year || year < 1 || year > 200) {
     setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
-    return c.redirect("/anniversary-years");
+    return c.redirect("/anniversaries?view=years");
   }
 
   await db.insert(anniversaryYears).values({ kind, year, title }).onConflictDoNothing();
   setFlash(c, t("admin.anniversaries.flash.added", { year }), "success");
-  return c.redirect("/anniversary-years");
+  return c.redirect("/anniversaries?view=years");
 });
 
 // POST /anniversary-years/:year — update
@@ -245,7 +257,7 @@ yearRoutes.post("/:kind/:year", yearsWrite, async (c) => {
 
   if (!isKind(newKind) || !newYear || newYear < 1 || newYear > 200) {
     setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
-    return c.redirect("/anniversary-years");
+    return c.redirect("/anniversaries?view=years");
   }
 
   if (newYear !== oldYear || newKind !== oldKind) {
@@ -255,7 +267,7 @@ yearRoutes.post("/:kind/:year", yearsWrite, async (c) => {
       .where(and(eq(anniversaryYears.kind, newKind), eq(anniversaryYears.year, newYear)));
     if (conflict) {
       setFlash(c, t("admin.anniversaries.flash.yearExists", { year: newYear }), "error");
-      return c.redirect("/anniversary-years");
+      return c.redirect("/anniversaries?view=years");
     }
   }
 
@@ -264,7 +276,7 @@ yearRoutes.post("/:kind/:year", yearsWrite, async (c) => {
     .set({ kind: newKind, year: newYear, title })
     .where(and(eq(anniversaryYears.kind, oldKind), eq(anniversaryYears.year, oldYear)));
   setFlash(c, t("admin.anniversaries.flash.saved"), "success");
-  return c.redirect("/anniversary-years");
+  return c.redirect("/anniversaries?view=years");
 });
 
 // POST /anniversary-years/:year/delete
@@ -274,6 +286,6 @@ yearRoutes.post("/:kind/:year/delete", yearsDelete, async (c) => {
   const year = parseInt(c.req.param("year"), 10);
   await db.delete(anniversaryYears).where(and(eq(anniversaryYears.kind, kind), eq(anniversaryYears.year, year)));
   setFlash(c, t("admin.anniversaries.flash.deleted", { year }), "success");
-  return c.redirect("/anniversary-years");
+  return c.redirect("/anniversaries?view=years");
 });
 
