@@ -46,8 +46,11 @@ pnpm install  # richtet den Hook automatisch ein
 | Bereich | Sprache |
 |---|---|
 | Quellcode, Bezeichner, Routen, Logs | Englisch |
+| Entwicklerwerkzeuge (Git-Hooks, `scripts/`: Kommentare, Ausgaben) | Englisch |
 | Dokumentation (README, Docs) | Deutsch |
 | UI-Texte | i18n-Datei `src/i18n/de.ts` |
+
+⚠️ Abweichung im Bestand: `.githooks/` und die meisten Skripte in `scripts/` sind noch deutsch. Neue Werkzeuge sind englisch; Bestand wird angeglichen, sobald eine Datei angefasst wird.
 
 Log-Nachrichten (Pino) sind durchgehend englisch, ohne Namen, E-Mails oder IBANs; Details als strukturierte Felder (`logger.error({ err }, "…")`).
 
