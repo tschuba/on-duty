@@ -111,7 +111,7 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 
-let currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
+let currentUser = { id: "u1", permissions: new Set(["members:read", "members:write"]), disabled: false };
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
@@ -150,7 +150,7 @@ beforeEach(() => {
   inventoryAssignmentRowsFixture = [];
   applicationLookupResult = [];
   applicationGuardianLookupResult = [];
-  currentUser = { id: "u1", permissions: new Set(["members:write"]), disabled: false };
+  currentUser = { id: "u1", permissions: new Set(["members:read", "members:write"]), disabled: false };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -389,7 +389,7 @@ describe("StatsCards", () => {
       { ...makeMember(), status: "deceased", gender: null },
     ] as any;
     const html = await (await renderApp(StatsCards({ all }))).text();
-    expect(html).toMatch(/text-secondary">1</);
+    expect(html).toMatch(/text-primary">1</);
     expect(html).toMatch(/text-base-content\/40">3</);
     expect(html).toMatch(/2 <svg/);
     expect(html).toMatch(/1 <svg/);
