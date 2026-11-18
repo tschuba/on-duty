@@ -57,8 +57,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
       { label: t("common.nav.members"), href: "/members", show: any("members:read", "applications:read"), count: has("applications:read") ? c.applications : 0 },
       { label: t("common.nav.anniversaries"), href: "/anniversaries", show: any("members:read", "anniversary-years:read") },
       { label: t("common.nav.training"), href: "/training", show: has("training:read") },
-      { label: t("common.nav.roles"), href: "/roles", show: has("member-roles:read") },
-      { label: t("common.nav.roleTypes"), href: "/role-types", show: has("member-role-types:read") },
+      { label: t("common.nav.roles"), href: "/roles", show: any("member-roles:read", "member-role-types:read") },
     ] },
     { icon: "banknotes", label: t("common.nav.donations"), items: [
       { label: t("donations.tabs.donations"), href: "/donations", show: donations, count: c.receipts },
