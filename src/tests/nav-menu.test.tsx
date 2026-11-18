@@ -69,14 +69,13 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
     expect(await renderAt("/", "training:read")).toContain('href="/training"');
   });
 
-  it("shows Funktionen and Funktionstypen only with their own permission", async () => {
-    const roles = await renderAt("/", "member-roles:read");
-    expect(roles).toContain('href="/roles"');
-    expect(roles).not.toContain("/role-types");
-    expect(roles).not.toContain('href="/members"');
-    const types = await renderAt("/", "member-role-types:read");
-    expect(types).toContain('href="/role-types"');
-    expect(types).not.toContain('href="/roles"');
+  it("shows Funktionen with either role or role-type permission, one entry", async () => {
+    for (const p of ["member-roles:read", "member-role-types:read"]) {
+      const html = await renderAt("/", p);
+      expect(html).toContain('href="/roles"');
+      expect(html).not.toContain("/role-types");
+      expect(html).not.toContain('href="/members"');
+    }
   });
 
   it("turns a menu with a single visible item into a plain link", async () => {

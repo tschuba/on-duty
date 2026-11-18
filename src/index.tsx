@@ -125,8 +125,7 @@ app.get("/", requireAuth(), (c) => {
     [["applications:read"], "/members?status=requested"],
     [["system:admin"], "/admin"],
     [["import:run"], "/import"],
-    [["member-roles:read"], "/roles"],
-    [["member-role-types:read"], "/role-types"],
+    [["member-roles:read", "member-role-types:read"], "/roles"],
     [["anniversary-years:read"], "/anniversaries"],
   ];
   return c.redirect(landing.find(([ps]) => ps.some((p) => perms.has(p as never)))?.[1] ?? "/account");

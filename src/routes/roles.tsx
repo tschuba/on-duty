@@ -6,6 +6,7 @@ import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schem
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { TitleSwitch } from "../components/title-switch.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
 import { RowAction } from "../components/row-action.js";
 import { DeleteDialog } from "../components/delete-dialog.js";
@@ -98,8 +99,18 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
   );
 }
 
-const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Variables }>) => {
+const rolesPage = async (c: Context<{ Variables: Variables }>) => {
   const user = c.get("user");
+  const canViewRoles = user.permissions.has("member-roles:read");
+  const canViewTypes = user.permissions.has("member-role-types:read");
+  // Nur lesbare Ansichten; ohne Funktionen-Recht ist Typen die einzige.
+  const tab: "roles" | "types" = canViewTypes && (c.req.query("view") === "types" || !canViewRoles) ? "types" : "roles";
+  const viewUrl = (v?: string) => (v ? `/roles?view=${v}` : "/roles");
+  const views = [
+    ...(canViewRoles ? [{ active: tab === "roles", href: viewUrl(), label: t("admin.roles.title") }] : []),
+    ...(canViewTypes ? [{ active: tab === "types", href: viewUrl("types"), label: t("admin.roleTypes.title") }] : []),
+  ];
+  const title = views.length > 1 ? <TitleSwitch items={views} /> : t(tab === "types" ? "admin.roleTypes.title" : "admin.roles.title");
   const activeFilter = c.req.query("active"); // "1" | "0" | undefined
 
   const [types, rolesWithCount] = await Promise.all([
@@ -133,11 +144,11 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
   const canReorder = canWrite && !activeFilter;
 
   return c.html(
-    <Layout title={t("admin.roles.title")} user={user}>
+    <Layout title={tab === "types" ? `${t("admin.roleTypes.title")} · ${t("admin.roles.title")}` : t("admin.roles.title")} user={user}>
 
       <div class="max-w-4xl mx-auto">
       {tab === "roles" && (<>
-      <PageHeader title={t("admin.roles.title")} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={title} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(activeFilter === "1" || activeFilter === "0" ? activeFilter : "",
           [{ value: "1", label: t("admin.roles.filterActive") }, { value: "0", label: t("admin.roles.filterPassive") }],
@@ -236,7 +247,7 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
       </>)}
 
       {tab === "types" && (<>
-      <PageHeader title={t("admin.roleTypes.title")} actions={canWriteTypes && <HeaderAction variant="primary" icon="plus" label={t("admin.roleTypes.new")} class="btn-primary" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={title} actions={canWriteTypes && <HeaderAction variant="primary" icon="plus" label={t("admin.roleTypes.new")} class="btn-primary" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra w-full">
           <thead>
@@ -292,8 +303,8 @@ const rolesPage = (tab: "roles" | "types") => async (c: Context<{ Variables: Var
     </Layout>
   );
 };
-roleRoutes.get("/roles", rolesRead, rolesPage("roles"));
-roleRoutes.get("/role-types", typesRead, rolesPage("types"));
+roleRoutes.get("/roles", requireAuth(["member-roles:read", "member-role-types:read"]), rolesPage);
+roleRoutes.get("/role-types", typesRead, (c) => c.redirect("/roles?view=types"));
 
 function RoleForm({ types, role, hasAssignments, affected }: {
   types: (typeof memberRoleTypes.$inferSelect)[];
@@ -610,7 +621,7 @@ roleRoutes.get("/role-types/:id", typesRead, async (c) => {
   return c.html(
     <Layout title={type.name} user={user}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={<>{type.isProtected && "🔒 "}{type.name}</>} backHref="/role-types" actions={<DetailActions editHref={canWrite ? `/role-types/${id}/edit` : undefined} remove={remove} />} />
+      <PageHeader title={<>{type.isProtected && "🔒 "}{type.name}</>} backHref="/roles?view=types" actions={<DetailActions editHref={canWrite ? `/role-types/${id}/edit` : undefined} remove={remove} />} />
       <ViewGrid>
         <ViewField label={t("admin.roleTypes.table.description")} value={type.description} />
         <ViewField label={t("admin.roleTypes.table.allowsActiveLong")} value={type.allowsActiveStatus ? t("common.yes") : t("common.no")} />
@@ -642,7 +653,7 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
   const name = String(body.name ?? "").trim();
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/role-types");
+    return c.redirect("/roles?view=types");
   }
   const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${memberRoleTypes.sortOrder}), 0)` }).from(memberRoleTypes);
   const id = crypto.randomUUID();
@@ -676,7 +687,7 @@ roleRoutes.post("/role-types/:id/allows-active", typesWrite, async (c) => {
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
   if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
   await db.update(memberRoleTypes).set({ allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
-  return c.redirect("/role-types");
+  return c.redirect("/roles?view=types");
 });
 
 roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
@@ -688,7 +699,7 @@ roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
   const allowsActiveStatus = body.allowsActiveStatus === "1";
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/role-types");
+    return c.redirect("/roles?view=types");
   }
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
   if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
@@ -700,12 +711,12 @@ roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
 roleRoutes.post("/role-types/:id/delete", typesDelete, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
-  if (!type) return c.redirect("/role-types");
+  if (!type) return c.redirect("/roles?view=types");
   if (type.isProtected) return badRequest(c, t("admin.roleTypes.cannotDelete.protected"));
   const assigned = await db.select({ title: memberRoles.title }).from(memberRoles).where(eq(memberRoles.typeId, id));
   if (assigned.length > 0) return badRequest(c, t("admin.roleTypes.flash.notEmpty"), assigned.map((r) => r.title));
   await db.delete(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roleTypes.flash.deleted", { name: type.name }), "success");
-  return c.redirect("/role-types");
+  return c.redirect("/roles?view=types");
 });
 
