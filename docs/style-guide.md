@@ -36,8 +36,7 @@ Quelle: [Tabler Icons](https://tabler.io/icons) (Outline), Stroke 1,5. Neue Icon
 
 daisyUI v5. Die v4-Klassen `form-control`, `label-text`, `input-bordered`, `select-bordered` sind verboten (Grep-Test `daisyui-v4-classes.test.ts`).
 
-- **Text/Select/Textarea:** `Field` (`src/components/field.tsx`) mit Floating Label; `placeholder` wiederholt den Labeltext. Pflichtstern (`text-error ml-1`) sitzt in `Field`.
-- **Datumsfelder** (`date`, `datetime-local`, `month`): normales `Field` mit Floating Label; das native Browser-Format kollidiert nicht damit (geprüft in `inventory.tsx`, leer und vorbelegt, Desktop und mobil).
+- **Text/Select/Textarea/Datum** (`date`, `datetime-local`, `month`): `Field` (`src/components/field.tsx`) mit Floating Label; `placeholder` wiederholt den Labeltext. Pflichtstern (`text-error ml-1`) sitzt in `Field`. Das native Datumsformat kollidiert nicht mit dem Floating Label (geprüft in `inventory.tsx`, leer und vorbelegt, Desktop und mobil).
 - **Checkbox/Toggle/Radio:** `<label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">` um Input + Text.
 - **Gruppen** (Radio-Liste, Von/Bis, Kategorie-/Rollen-Auswahl): `Field floating={false}` (`fieldset` + festes Label darüber) bzw. `FieldGroup`.
 - **Beispiele/Formatvorgaben:** als `hint` unter dem Feld, nicht als Placeholder.
@@ -87,7 +86,8 @@ Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
 | 1 | Hauptnav | 40 | immer |
 | 2 | `PageHeader` | 20 | immer |
 | 3 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
-| unten | `Pager` (gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase über der aktuellen Seite zur Seitenwahl; unter `md` nur aktuelle Seite mit Sprechblase, immer einzeilig) | 10 (30 solange die Seitenwahl offen ist) | immer |
+
+Der `Pager` klebt unten am Viewport (`z-10`, `z-30` solange die Seitenwahl offen ist) und ist immer sichtbar; Details siehe „Haupt-Listen-Tabellen“.
 
 - Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--header-h`, `--filter-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
 - Sticky-Elemente brauchen einen deckenden Hintergrund (`bg-base-100`/`bg-base-300`).
@@ -127,10 +127,6 @@ Die Bedeutung hängt an der Farb-/Outline-Kombination:
 
 Größen: `btn` (ohne Modifier) für Aktionen innerhalb einer Seite (Header-Zeile), `btn-sm` für kompakte, `btn-xs` für sehr kompakte Kontexte (z. B. Tabellenzelle).
 
-### Zeilenaktionen
-
-Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, Kopieren, Aktivieren, ↑/↓) ist eine `RowAction` (`src/components/row-action.tsx`): `btn btn-xs` mit Icon, das Label verschwindet unter `md` (`max-md:hidden`). `aria-label` ist immer das Label, `title` standardmäßig ebenfalls; bei deaktivierten Buttons trägt `title` die Begründung. Icons: Bearbeiten `pencil`, Löschen `trash`, Kopieren `document-duplicate`, Aktivieren `check`, Ablehnen `x-mark`, Deaktivieren `no-symbol`, ↑/↓ `arrow-up`/`arrow-down`. Nicht betroffen: Buttons außerhalb von Tabellenzeilen.
-
 ## Tabellen
 
 Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste ihres Tabs/ihrer Seite** ist, nicht eine Breiten-Einschränkung (`max-w-*` ist ein zusätzlicher Modifier auf Wrapper/Tabelle). Neue Tabelle zuerst einer Kategorie zuordnen, dann deren Muster kopieren; innerhalb einer Kategorie sind Klassen und Empty-State-Padding identisch.
@@ -140,7 +136,7 @@ Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste 
 
 - `class="table table-zebra w-full"`
 - Sortierbare Spalten, wo fachlich sinnvoll (Klick auf Spaltenkopf, `SortIcon` als Indikator).
-- Pagination bei potenziell langen Listen: `Pager` (`src/components/pager.tsx`) mit `sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers). Der Pager steht **außerhalb** des `overflow-x-auto`-Wrappers (siehe Sticky-Regeln). Unter `md` bricht er nie um: Zähler, Seitengrößen-Select (nur `aria-label`) und aktuelle Seite; die Seitenwahl läuft immer über die Sprechblase, auch bei ≤ 7 Seiten.
+- Pagination bei potenziell langen Listen: `Pager` (`src/components/pager.tsx`, gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase zur Seitenwahl) mit `sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers). Der Pager steht **außerhalb** des `overflow-x-auto`-Wrappers (siehe Sticky-Regeln). Unter `md` bricht er nie um: Zähler, Seitengrößen-Select (nur `aria-label`) und aktuelle Seite; die Seitenwahl läuft immer über die Sprechblase, auch bei ≤ 7 Seiten.
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-8">{leerer-Text}</td></tr>`
 
 ### Kleine Inline-Sub-Tabellen
@@ -149,6 +145,10 @@ Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste 
 - `class="table w-full"` (kein `table-zebra`); `w-full` ist der Standard, `table-sm` oder `max-w-*` nur, wenn der Platz es verlangt (z. B. `table-sm` in `mail-templates.tsx`, `max-w-2xl` in `donations.tsx`)
 - Keine Sortierung, keine Pagination
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-4">{leerer-Text}</td></tr>` (`py-4` statt `py-8`, kompakter)
+
+### Zeilenaktionen
+
+Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, Kopieren, Aktivieren, ↑/↓) ist eine `RowAction` (`src/components/row-action.tsx`): `btn btn-xs` mit Icon, das Label verschwindet unter `md` (`max-md:hidden`). `aria-label` ist immer das Label, `title` standardmäßig ebenfalls; bei deaktivierten Buttons trägt `title` die Begründung. Icons: Bearbeiten `pencil`, Löschen `trash`, Kopieren `document-duplicate`, Aktivieren `check`, Ablehnen `x-mark`, Deaktivieren `no-symbol`, ↑/↓ `arrow-up`/`arrow-down`. Nicht betroffen: Buttons außerhalb von Tabellenzeilen.
 
 ## Terminliste (Datumsblock-Liste)
 
