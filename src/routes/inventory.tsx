@@ -30,7 +30,7 @@ import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
 import { inventoryFieldRoutes } from "./inventory-fields.js";
-import { inventoryInspectionTemplateRoutes } from "./inventory-inspection-templates.js";
+import { inventoryInspectionTemplateRoutes, inspectionTitle, renderTemplateList } from "./inventory-inspection-templates.js";
 import { inventoryTemplateRoutes } from "./inventory-templates.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
@@ -1650,6 +1650,8 @@ inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
 
 inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
+  const canConfigure = user.permissions.has("inventory:configure");
+  if (canConfigure && c.req.query("view") === "templates") return renderTemplateList(c);
   const today = new Date().toISOString().slice(0, 10);
 
   const range = parseRange(c.req.query(), today, "future", { start: addMonths(today, -12), end: addMonths(today, 12) });
@@ -1685,7 +1687,7 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
 
   return c.html(
     <Layout title={t("inventory.inspections.title")} user={user}>
-      <PageHeader title={t("inventory.inspections.title")} />
+      <PageHeader title={inspectionTitle("inspections", canConfigure)} />
 
       <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
         <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/inspections"

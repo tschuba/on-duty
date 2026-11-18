@@ -92,9 +92,8 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
 
   it("nests the inventory configuration entries under Bestand, visible only when it is active", async () => {
     const onStock = await renderAt("/inventory", "inventory:read", "inventory:configure");
-    expect(onStock).toContain('href="/inventory/inspection-templates"');
+    expect(onStock).not.toContain('href="/inventory/inspection-templates"');
     expect(onStock).toContain('href="/inventory/fields"');
-    expect(await renderAt("/inventory/fields", "inventory:read", "inventory:configure")).toContain('href="/inventory/inspection-templates"');
     expect(await renderAt("/inventory/inspections", "inventory:read", "inventory:configure")).not.toContain('href="/inventory/fields"');
     expect(await renderAt("/inventory", "inventory:read")).not.toContain('href="/inventory/fields"');
     expect(await renderAt("/inventory", "inventory:configure")).not.toContain('href="/inventory/fields"');
