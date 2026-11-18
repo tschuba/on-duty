@@ -97,9 +97,17 @@ describe("inventory field definitions", () => {
     expect(deletes.length).toBe(1);
   });
 
+  it("redirects the old list URL into the Bestand view", async () => {
+    expect((await get("/")).headers.get("location")).toBe("/inventory?view=fields");
+  });
+
   it("lists fields with type, usage and status, rows linking to the detail page", async () => {
     defsFindManyResult = [{ id: "d1", name: "Nennweite", type: "select", archived: true, values: [{ id: "v" }] }];
-    const html = await (await get("/")).text();
+    const { renderFieldList } = await import("../routes/inventory-fields.js");
+    const app = new (await import("hono")).Hono();
+    app.use("*", async (c, next) => { c.set("user" as never, { id: "u1", permissions: new Set(["inventory:configure"]) } as never); await next(); });
+    app.get("/", renderFieldList);
+    const html = await (await app.request("/")).text();
     expect(html).toContain("/inventory/fields/d1");
     expect(html).toContain(t("inventory.fields.archived"));
   });

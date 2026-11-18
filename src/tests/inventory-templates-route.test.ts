@@ -53,8 +53,16 @@ beforeEach(() => {
 });
 
 describe("item templates", () => {
+  it("redirects the old list URL into the Bestand view", async () => {
+    expect((await get("/")).headers.get("location")).toBe("/inventory?view=templates");
+  });
+
   it("lists templates with counts, rows linking to the detail page", async () => {
-    const html = await (await get("/")).text();
+    const { renderTemplateList } = await import("../routes/inventory-templates.js");
+    const app = new (await import("hono")).Hono();
+    app.use("*", async (c, next) => { c.set("user" as never, { id: "u1", permissions: new Set(["inventory:configure"]) } as never); await next(); });
+    app.get("/", renderTemplateList);
+    const html = await (await app.request("/")).text();
     expect(html).toContain("Hydrant");
     expect(html).toContain("/inventory/templates/t1");
   });

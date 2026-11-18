@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryFieldDefs, inventoryFieldValues, inventoryTemplateFieldDefs } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
+import { Icon } from "../components/icon.js";
+import { TitleSwitch } from "../components/title-switch.js";
 import { Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
@@ -15,6 +17,17 @@ import { t } from "../i18n/index.js";
 export const inventoryFieldRoutes = new Hono<{ Variables: Variables }>();
 const configure = requireAuth("inventory:configure"); // ein Recht für alles: kein Leserecht, daher kein Redirect /:id/edit → /:id
 const BASE = "/inventory/fields";
+export const LIST = "/inventory?view=fields";
+
+// Titel-Umschalter Bestand | Gegenstandsvorlagen | Felder (nur mit inventory:configure, sonst schlichter Titel).
+export function inventoryTitle(active: "stock" | "fields" | "templates", canConfigure: boolean) {
+  if (!canConfigure) return t("inventory.title");
+  return <TitleSwitch items={[
+    { active: active === "stock", href: "/inventory", label: t("inventory.tabs.stock") },
+    { active: active === "templates", href: "/inventory?view=templates", label: t("inventory.tabs.itemTemplates") },
+    { active: active === "fields", href: LIST, label: t("inventory.tabs.fields") },
+  ]} />;
+}
 
 const TYPES: FieldDefType[] = ["text", "number", "date", "boolean", "select"];
 const trimmed = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -23,11 +36,17 @@ type Def = typeof inventoryFieldDefs.$inferSelect;
 type Values = { name: string; type: string; options: string };
 
 // ponytail: kein Pager, bei > ca. 50 Zeilen nachrüsten.
-inventoryFieldRoutes.get("/", configure, async (c) => {
-  const defs = (await db.query.inventoryFieldDefs.findMany({ with: { values: true }, orderBy: (d: any, { asc }: any) => [asc(d.name)] })) as (Def & { values: { id: string }[] })[];
+export async function renderFieldList(c: any) {
+  const search = (c.req.query("search") ?? "").trim().toLowerCase();
+  const defs = ((await db.query.inventoryFieldDefs.findMany({ with: { values: true }, orderBy: (d: any, { asc }: any) => [asc(d.name)] })) as (Def & { values: { id: string }[] })[]).filter((d) => d.name.toLowerCase().includes(search));
   return c.html(
     <Layout title={t("inventory.fields.title")} user={c.get("user")!}>
-      <PageHeader title={t("inventory.fields.title")} backHref="/inventory" subtitle={t("inventory.fields.hint")} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.fields.new")} href={`${BASE}/new`} class="btn-primary" />} />
+      <PageHeader title={inventoryTitle("fields", true)} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.fields.new")} href={`${BASE}/new`} class="btn-primary" />} />
+      <p class="text-sm opacity-70 max-w-3xl mb-4">{t("inventory.fields.hint")}</p>
+      <form method="get" action="/inventory" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
+        <input type="hidden" name="view" value="fields" />
+        <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+      </form>
       <div class="overflow-x-auto max-w-3xl">
         <table class="table table-zebra w-full">
           <thead>
@@ -53,7 +72,9 @@ inventoryFieldRoutes.get("/", configure, async (c) => {
       </div>
     </Layout>
   );
-});
+}
+
+inventoryFieldRoutes.get("/", configure, (c) => c.redirect(LIST));
 
 // Neu: Typ und Auswahlwerte wählbar; Bearbeiten: der Typ bleibt fix.
 async function renderForm(c: any, opts: { id?: string; values?: Values; error?: string; status?: 200 | 422 } = {}) {
@@ -68,7 +89,7 @@ async function renderForm(c: any, opts: { id?: string; values?: Values; error?: 
   const title = t(id ? "inventory.fields.edit" : "inventory.fields.new");
   return c.html(
     <Layout title={title} user={c.get("user")!}>
-      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : BASE} actions={<FormActions formId="field-form" cancelHref={id ? `${BASE}/${id}` : BASE} />} />
+      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : LIST} actions={<FormActions formId="field-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
       {opts.error && <div class="alert alert-error max-w-2xl mb-4" role="alert">{opts.error}</div>}
       <form id="field-form" method="post" action={id ? `${BASE}/${id}` : BASE} class="flex flex-col gap-4 max-w-2xl">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -109,7 +130,7 @@ async function renderDetail(c: any, id: string, opts: { error?: string; status?:
   );
   return c.html(
     <Layout title={def.name} user={c.get("user")!}>
-      <PageHeader title={def.name} backHref={BASE} actions={<DetailActions editHref={`${BASE}/${id}/edit`} remove={remove} />} />
+      <PageHeader title={def.name} backHref={LIST} actions={<DetailActions editHref={`${BASE}/${id}/edit`} remove={remove} />} />
       {opts.error && <div class="alert alert-error max-w-2xl mb-4" role="alert">{opts.error}</div>}
       <form id="field-archive-form" method="post" action={`${BASE}/${id}/archive`} />
       <ViewGrid>
@@ -183,5 +204,5 @@ inventoryFieldRoutes.post("/:id/delete", configure, async (c) => {
   if (count > 0) return renderDetail(c, id, { error: t("inventory.fields.deleteBlocked", { count }), status: 422 });
   await db.delete(inventoryFieldDefs).where(eq(inventoryFieldDefs.id, id));
   setFlash(c, t("inventory.fields.flash.deleted"), "success");
-  return c.redirect(BASE);
+  return c.redirect(LIST);
 });

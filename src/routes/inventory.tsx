@@ -29,9 +29,9 @@ import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js"
 import { availableQuantity, itemStatus } from "../lib/lending.js";
 import { deriveMemberStatus } from "../lib/status.js";
 import { env } from "../env.js";
-import { inventoryFieldRoutes } from "./inventory-fields.js";
+import { inventoryFieldRoutes, inventoryTitle, renderFieldList } from "./inventory-fields.js";
 import { inventoryInspectionTemplateRoutes, inspectionTitle, renderTemplateList } from "./inventory-inspection-templates.js";
-import { inventoryTemplateRoutes } from "./inventory-templates.js";
+import { inventoryTemplateRoutes, renderTemplateList as renderItemTemplateList } from "./inventory-templates.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const inventoryRoutes = new Hono<{ Variables: Variables }>();
@@ -486,7 +486,7 @@ function FieldConfigurator({ formId, values, canConfigure }: { formId: string; v
         </div>
         {canConfigure && (
           <div class="mt-2 flex flex-col">
-            <a href="/inventory/fields" target="_blank" rel="noopener" class="btn btn-ghost justify-start gap-2 min-h-11"><Icon name="cog-6-tooth" class="h-5 w-5" />{t("inventory.form.manageFields")}</a>
+            <a href="/inventory?view=fields" target="_blank" rel="noopener" class="btn btn-ghost justify-start gap-2 min-h-11"><Icon name="cog-6-tooth" class="h-5 w-5" />{t("inventory.form.manageFields")}</a>
           </div>
         )}
         <div class="mt-3 sm:hidden">
@@ -759,6 +759,9 @@ async function fieldLocks(item: ItemWithRelations): Promise<Record<string, strin
 inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   const user = c.get("user")!;
   const q = c.req.query();
+  const canConfigure = user.permissions.has("inventory:configure");
+  if (canConfigure && q.view === "fields") return renderFieldList(c);
+  if (canConfigure && q.view === "templates") return renderItemTemplateList(c);
   const tagFilter = c.req.queries("tag") ?? [];
   const inspectionFilter = c.req.queries("inspection") ?? [];
   const dueFilter = parseMulti(c.req.queries("due"), ["overdue", "soon"]);
@@ -819,9 +822,9 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
-      <PageHeader title={t("inventory.title")} actions={<>
-        <HeaderAction icon="map-2" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} />
-        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" />}
+      <PageHeader title={inventoryTitle("stock", canConfigure)} actions={<>
+        <HeaderAction icon="map-2" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} hideLabel="@max-4xl:hidden" />
+        {user.permissions.has("import:run") && <HeaderAction icon="arrow-up-tray" label={t("import.action")} href="/import?kind=inventory" hideLabel="@max-4xl:hidden" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="plus" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 
@@ -1129,7 +1132,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
     const card = "card card-border bg-base-100 border-base-300 hover:border-primary h-full sm:min-h-28 focus-visible:outline-2 focus-visible:outline-primary";
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
-        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="cog-6-tooth" label={t("inventory.new.manageTemplates")} href="/inventory/templates" />} />
+        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="cog-6-tooth" label={t("inventory.new.manageTemplates")} href="/inventory?view=templates" />} />
         <div id="template-choice" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 2xl:max-w-6xl">
           <a href="/inventory/new?template=none" class={`${card} border-dashed`}>
             <div class="card-body p-4 sm:p-5 lg:p-6 flex-row items-start gap-3 sm:gap-4">
