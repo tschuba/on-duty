@@ -6,7 +6,7 @@ import { db } from "../db/index.js";
 import { persons, donors, donations, users } from "../db/schema/index.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
-import type { IconName } from "../components/icons.generated.js";
+import type { IconName } from "../components/icon.js";
 import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
@@ -49,9 +49,9 @@ function OrgIncompleteAlert({ config, perms }: { config: Record<string, string>;
 // Status changes only here (detail area); offers only transitions valid from the current status.
 function ReceiptStatusButtons({ d }: { d: DonationRow }) {
   const actions: { action: ReceiptAction; icon: IconName; label: string; hint: string; confirm?: string }[] = [
-    { action: "markNotRequired", icon: "no-symbol", label: t("donations.receiptStatus.markNotRequired"), hint: t("donations.receiptStatus.markNotRequiredHint") },
-    { action: "reopen", icon: "arrow-uturn-left", label: t("donations.receiptStatus.reopen"), hint: t("donations.receiptStatus.reopenHint") },
-    { action: "revoke", icon: "x-mark", label: t("donations.receiptStatus.revoke"), hint: t("donations.receiptStatus.revokeHint"), confirm: t("donations.receiptStatus.revokeConfirm") },
+    { action: "markNotRequired", icon: "icon-[tabler--ban]", label: t("donations.receiptStatus.markNotRequired"), hint: t("donations.receiptStatus.markNotRequiredHint") },
+    { action: "reopen", icon: "icon-[tabler--arrow-back-up]", label: t("donations.receiptStatus.reopen"), hint: t("donations.receiptStatus.reopenHint") },
+    { action: "revoke", icon: "icon-[tabler--x]", label: t("donations.receiptStatus.revoke"), hint: t("donations.receiptStatus.revokeHint"), confirm: t("donations.receiptStatus.revokeConfirm") },
   ];
   return (
     <>
@@ -278,7 +278,7 @@ function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnTyp
         <ReceiptStatusButtons d={d} />
         <form method="post" action={`/donations/${d.id}/mark-issued`}>
           <button type="submit" class="btn btn-primary btn-sm" disabled={!orgComplete} title={t(issued ? "donations.receipt.downloadHint" : "donations.receipt.generateHint")} aria-label={mainLabel}>
-            <ActionContent icon="arrow-down-tray" label={mainLabel} variant="primary" />
+            <ActionContent icon="icon-[tabler--download]" label={mainLabel} variant="primary" />
           </button>
         </form>
       </div>
@@ -351,13 +351,13 @@ function DonationStats({ s, openHref }: { s: DonationSummary; openHref: string }
   return (
     <div id="donations-stats" class="hidden sm:block @container mb-6">
       <div class="grid grid-cols-2 @4xl:grid-cols-5 gap-2 @4xl:gap-4">
+        <StatCard label={t("donations.stats.open")} value={s.open.count} tone="text-warning" href={openHref} link="filter">
+          <div class="stat-desc text-sm">{dash(s.open.count, eur(s.open.cents))}</div>
+        </StatCard>
         <StatCard label={t("donations.stats.total")} value={eur(s.cents)} />
         <StatCard label={t("donations.stats.count")} value={s.count} />
         <StatCard label={t("donations.stats.average")} value={s.count === 0 ? "–" : eur(s.averageCents)} />
         <StatCard label={t("donations.stats.donors")} value={s.donors} />
-        <StatCard label={t("donations.stats.open")} value={s.open.count} tone="text-warning" href={openHref} link="filter">
-          <div class="stat-desc text-sm">{dash(s.open.count, eur(s.open.cents))}</div>
-        </StatCard>
       </div>
     </div>
   );
@@ -415,13 +415,13 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
     <Layout title={donorView ? `${t("donations.tabs.donors")} · ${t("donations.title")}` : t("donations.title")} user={user}>
       <PageHeader title={<TitleSwitch items={views} />} actions={<>
         {!donorView && <label class="flex items-center gap-2 cursor-pointer" title={t("donations.stats.toggle")}>
-          <Icon name="chart-bar" class="w-5 h-5" />
+          <Icon name="icon-[tabler--chart-bar]" class="w-5 h-5" />
           <span class="@max-xl:hidden">{t("donations.stats.toggle")}</span>
           <input type="checkbox" id="donations-stats-toggle" class="toggle" aria-label={t("donations.stats.toggle")} onchange="toggleDonationsStats(this.checked)" />
         </label>}
         {canRecord && (donorView
-          ? <HeaderAction variant="primary" icon="plus" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />
-          : <HeaderAction variant="primary" icon="plus" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />)}
+          ? <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("donors.addDonor")} href="/donors/new" class="btn-primary" />
+          : <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("donations.newDonation")} href="/donations/new" class="btn-primary" />)}
       </>} />
 
       {!donorView && <DonationStats s={summarizeDonations(filtered)} openHref={buildListUrl("/donations", { ...state, receipt: ["open"] })} />}
@@ -442,7 +442,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
         {donorView && <input type="hidden" name="view" value="donors" />}
         {q.pageSize && <input type="hidden" name="pageSize" value={pageSize} />}
         <div class="flex flex-col w-full md:w-auto">
-          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
         </div>
         {q.sort && <input type="hidden" name="sort" value={sort} />}
         {q.sort && <input type="hidden" name="sort_dir" value={dir} />}
@@ -459,6 +459,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           applyLabel={t("common.apply")}
           resetLabel={t("common.reset")}
         />}
+        {(search || from || to || receipt.length > 0) && <a href={donorView ? "/donations?view=donors" : "/donations"} class="btn btn-ghost">{t("common.reset")}</a>}
       </form>
 
       <ClickToEditHint />
@@ -613,7 +614,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
-      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="trash" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} />} />
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} />} />
       {d.receiptStatus === "issued" && !canIssue && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       {!showReceipt && <ReceiptStatusActions d={d} canIssue={canIssue} />}
       <ViewGrid>

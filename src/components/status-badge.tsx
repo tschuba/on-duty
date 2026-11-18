@@ -27,9 +27,9 @@ export function StatusBadge({ status, compact = false }: { status: MemberStatus;
   if (status === "deceased") {
     const label = STATUS_LABELS.deceased;
     return compact ? (
-      <span class="badge badge-sm badge-ghost opacity-60" title={label} role="img" aria-label={label}><Icon name="cross" class="w-3.5 h-3.5" /></span>
+      <span class="badge badge-sm badge-ghost opacity-60" title={label} role="img" aria-label={label}><Icon name="icon-[tabler--cross]" class="w-3.5 h-3.5" /></span>
     ) : (
-      <span class="badge badge-sm badge-ghost opacity-60 gap-1"><Icon name="cross" class="w-3.5 h-3.5" />{label}</span>
+      <span class="badge badge-sm badge-ghost opacity-60 gap-1"><Icon name="icon-[tabler--cross]" class="w-3.5 h-3.5" />{label}</span>
     );
   }
   return <span class={STATUS_BADGE_CLASS[status]}>{STATUS_LABELS[status]}</span>;

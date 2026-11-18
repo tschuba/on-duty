@@ -4,7 +4,7 @@ import { t } from "../i18n/index.js";
 // "Ist Mitglied"-Markierung (nur Icon). Navigation läuft über MemberLink am Namen.
 export function MemberMark({ memberId, class: size = "w-4 h-4" }: { memberId: string | null | undefined; canLink?: boolean; class?: string }) {
   if (!memberId) return null;
-  return <span class="inline-block align-middle ml-1 p-1 opacity-70" title={t("common.member")} role="img" aria-label={t("common.member")}><Icon name="users" class={`inline-block ${size} align-middle`} /></span>;
+  return <span class="inline-block align-middle ml-1 p-1 opacity-70" title={t("common.member")} role="img" aria-label={t("common.member")}><Icon name="icon-[tabler--users]" class={`inline-block ${size} align-middle`} /></span>;
 }
 
 // Name als Link auf die Mitgliederseite, nur mit members:read.

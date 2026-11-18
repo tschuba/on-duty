@@ -16,7 +16,7 @@ export function StatCard({ label, value, tone, href, link, inline, highlight, ch
   const num = <div class={`stat-value text-2xl @4xl:text-3xl${tone ? ` ${tone}` : ""}`}>{value}</div>;
   const body = (
     <>
-      {href && <Icon name={link === "view" ? "arrow-right" : "funnel"} class="absolute top-2 right-2 w-4 h-4 opacity-50" />}
+      {href && <Icon name={link === "view" ? "icon-[tabler--arrow-right]" : "icon-[tabler--filter]"} class="absolute top-2 right-2 w-4 h-4 opacity-50" />}
       <div class="stat-title text-xs">{label}</div>
       {inline
         ? <div class="flex flex-wrap items-baseline gap-x-2">{num}{children}</div>

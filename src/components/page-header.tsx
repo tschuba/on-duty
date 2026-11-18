@@ -1,6 +1,6 @@
 import type { Child } from "hono/jsx";
 import { Icon } from "./icon.js";
-import type { IconName } from "./icons.generated.js";
+import type { IconName } from "./icon.js";
 import { t } from "../i18n/index.js";
 
 // Icon + Label einer Aktion; das Label verschwindet per Container-Query (der nächste @container-Vorfahr zählt).
@@ -69,10 +69,10 @@ export function FormActions({ formId, saveAndNew, cancelHref }: { formId: string
   // Verwerfen-Button ist nur bei Änderungen sichtbar → dient als Dirty-Flag
   const confirmJs = `var d=document.querySelector('[data-discard="${formId}"]');return !d||d.classList.contains('hidden')||confirm(${JSON.stringify(t("common.cancelConfirm"))})`;
   return (<>
-    <HeaderAction icon="arrow-uturn-left" label={t("common.discard")} type="reset" form={formId} class="btn-outline hidden" attrs={{ "data-discard": formId }} />
-    {cancelHref && <HeaderAction icon="x-mark" label={t("common.cancel")} href={cancelHref} class="btn-outline" attrs={{ onclick: confirmJs }} />}
-    {saveAndNew && <HeaderAction icon="plus" label={t("common.saveAndNew")} form={formId} name="_action" value="save_and_new" class="btn-outline btn-primary" />}
-    <HeaderAction variant="primary" icon="check" label={t("common.save")} form={formId} class="btn-primary" />
+    <HeaderAction icon="icon-[tabler--arrow-back-up]" label={t("common.discard")} type="reset" form={formId} class="btn-outline hidden" attrs={{ "data-discard": formId }} />
+    {cancelHref && <HeaderAction icon="icon-[tabler--x]" label={t("common.cancel")} href={cancelHref} class="btn-outline" attrs={{ onclick: confirmJs }} />}
+    {saveAndNew && <HeaderAction icon="icon-[tabler--plus]" label={t("common.saveAndNew")} form={formId} name="_action" value="save_and_new" class="btn-outline btn-primary" />}
+    <HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("common.save")} form={formId} class="btn-primary" />
   </>);
 }
 
@@ -80,7 +80,7 @@ export function FormActions({ formId, saveAndNew, cancelHref }: { formId: string
 export function DetailActions({ editHref, copyHref, remove }: { editHref?: string; copyHref?: string; remove?: unknown }) {
   return (<>
     {remove as never}
-    {copyHref && <HeaderAction icon="document-duplicate" label={t("common.copy")} href={copyHref} class="btn-outline btn-primary" />}
-    {editHref && <HeaderAction variant="primary" icon="pencil" label={t("common.edit")} href={editHref} class="btn-primary" />}
+    {copyHref && <HeaderAction icon="icon-[tabler--copy]" label={t("common.copy")} href={copyHref} class="btn-outline btn-primary" />}
+    {editHref && <HeaderAction variant="primary" icon="icon-[tabler--pencil]" label={t("common.edit")} href={editHref} class="btn-primary" />}
   </>);
 }

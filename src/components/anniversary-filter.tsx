@@ -50,10 +50,10 @@ export function AnniversaryFilter({ kinds, mods, gte, action, hidden = [] }: {
           </div>
           <div class="flex gap-2 justify-end mt-4 [&>*]:min-h-11">
             <button type="button" data-reset class="btn btn-ghost mr-auto" aria-label={t("common.reset")} title={t("common.reset")} disabled={!active}>
-              <Icon name="arrow-uturn-left" class="w-5 h-5" />
+              <Icon name="icon-[tabler--arrow-back-up]" class="w-5 h-5" />
             </button>
             <button type="button" class="btn btn-ghost" popovertarget={id} popovertargetaction="hide" aria-label={t("common.cancel")} title={t("common.cancel")}>
-              <Icon name="x-mark" class="w-5 h-5" />
+              <Icon name="icon-[tabler--x]" class="w-5 h-5" />
             </button>
             <ApplyButton full />
           </div>

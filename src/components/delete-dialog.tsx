@@ -8,8 +8,8 @@ export function DeleteDialog({ id, action, title, body, header }: { id: string; 
   return (
     <>
       {header
-        ? <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={open} />
-        : <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={open} />}
+        ? <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={open} />
+        : <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={open} />}
       <dialog id={`delete-${id}`} class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{title}</h3>

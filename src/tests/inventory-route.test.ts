@@ -205,7 +205,7 @@ describe("GET /", () => {
     const res = await inventoryRoutes.request("/");
     const html = await res.text();
     expect(html).toContain("TSF-W");
-    expect(html).toMatch(/<span class="badge badge-sm badge-primary gap-1"><svg[^>]*>[\s\S]*?<\/svg>Fahrzeug<\/span>/);
+    expect(html).toMatch(/<span class="badge badge-sm badge-primary gap-1"><span class="icon-\[tabler--[a-z-]+\] [^"]*" aria-hidden="true"><\/span>Fahrzeug<\/span>/);
     expect(html).toContain('class="badge badge-sm badge-ghost hidden lg:inline-flex">Halle 2</span>');
     expect(html).toContain('lg:hidden');
     expect(html).not.toContain("inventory-category-select");
@@ -528,7 +528,7 @@ describe("GET /map", () => {
     const html = await (await inventoryRoutes.request("/map")).text();
     const [m] = markersOf(html);
     expect(m).toMatchObject({ id: "a", name: "Pumpe", lat: 49.5, lng: 11.2, status: "overdue" });
-    expect(m.icon).toContain("<svg");
+    expect(m.icon).toContain("icon-[tabler--");
     expect(m.popup).toContain('href="/inventory/a"');
     expect(m.popup).toContain("Halle 1");
     expect(m.popup).toContain("N1 +1");

@@ -30,7 +30,7 @@ Weitere Heading-Ebenen (`h3`) sind nicht festgelegt. Bei Bedarf hier ergänzen, 
 
 ## Icons
 
-Quelle: [Tabler Icons](https://tabler.io/icons) (Outline), Stroke 1,5. Neue Icons nur über die `ICONS`-Liste in `scripts/generate-icons.mjs` ergänzen (Name im Code → Tabler-Dateiname) und `pnpm icons:generate` ausführen; `icons.generated.ts` nie von Hand editieren. Es werden nur `<path>`-Icons unterstützt.
+Quelle: [Tabler Icons](https://tabler.io/icons) über `@iconify/tailwind4`. Icons nur als `<Icon name="icon-[tabler--trash]" />` mit vollständigem Klassenliteral (nie zusammengesetzt, sonst erzeugt Tailwind sie nicht); Namen stehen auf tabler.io. Das Icon `cross` gibt es bei Tabler als `icon-[tabler--cross]`. Hinweis: Die Strichstärke ist die Tabler-Standardstärke 2 (früher 1,5).
 
 ## Formulare & Labels
 

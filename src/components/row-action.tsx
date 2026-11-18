@@ -1,5 +1,5 @@
 import { Icon } from "./icon.js";
-import type { IconName } from "./icons.generated.js";
+import type { IconName } from "./icon.js";
 
 // Action button inside a table row: icon always, label only from md up (see style guide "Responsive thresholds").
 // aria-label is always the label; title falls back to it (disabled buttons carry their reason in title).

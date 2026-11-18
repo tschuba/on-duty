@@ -41,11 +41,11 @@ export async function renderFieldList(c: any) {
   const defs = ((await db.query.inventoryFieldDefs.findMany({ with: { values: true }, orderBy: (d: any, { asc }: any) => [asc(d.name)] })) as (Def & { values: { id: string }[] })[]).filter((d) => d.name.toLowerCase().includes(search));
   return c.html(
     <Layout title={t("inventory.fields.title")} user={c.get("user")!}>
-      <PageHeader title={inventoryTitle("fields", true)} actions={<HeaderAction variant="primary" icon="plus" label={t("inventory.fields.new")} href={`${BASE}/new`} class="btn-primary" />} />
+      <PageHeader title={inventoryTitle("fields", true)} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("inventory.fields.new")} href={`${BASE}/new`} class="btn-primary" />} />
       <p class="text-sm opacity-70 max-w-3xl mb-4">{t("inventory.fields.hint")}</p>
       <form method="get" action="/inventory" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
         <input type="hidden" name="view" value="fields" />
-        <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
+        <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
       </form>
       <div class="overflow-x-auto max-w-3xl">
         <table class="table table-zebra w-full">
@@ -123,8 +123,8 @@ async function renderDetail(c: any, id: string, opts: { error?: string; status?:
   const actions = fieldActions({ archived: def.archived, usage: def.values.length });
   const remove = (
     <>
-      {actions.includes("archive") && <HeaderAction icon="archive-box" label={t("inventory.fields.archive")} form="field-archive-form" class="btn-outline" />}
-      {actions.includes("unarchive") && <HeaderAction icon="arrow-uturn-left" label={t("inventory.fields.unarchive")} form="field-archive-form" class="btn-outline" />}
+      {actions.includes("archive") && <HeaderAction icon="icon-[tabler--archive]" label={t("inventory.fields.archive")} form="field-archive-form" class="btn-outline" />}
+      {actions.includes("unarchive") && <HeaderAction icon="icon-[tabler--arrow-back-up]" label={t("inventory.fields.unarchive")} form="field-archive-form" class="btn-outline" />}
       {actions.includes("delete") && <DeleteDialog header id={`field-${id}`} action={`${BASE}/${id}/delete`} title={t("inventory.fields.deleteTitle")} body={t("inventory.fields.deleteConfirm")} />}
     </>
   );

@@ -67,7 +67,7 @@ export async function renderYears(c: Context<{ Variables: Variables }>) {
   return c.html(
     <Layout title={t("admin.anniversaries.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={<TitleSwitch items={anniversaryViews(user.permissions as Set<string>, true)} />} actions={canWrite && <HeaderAction variant="primary" icon="plus" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={<TitleSwitch items={anniversaryViews(user.permissions as Set<string>, true)} />} actions={canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.anniversaries.newYear")} class="btn-primary" attrs={{ "hx-get": "/anniversary-years/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
 
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(kindFilter ?? "",
@@ -110,7 +110,7 @@ export async function renderYears(c: Context<{ Variables: Variables }>) {
                   {canDelete && (
                   <td>
                     <div class="flex gap-2 justify-end">
-                      <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.kind}-${y.year}').showModal()`} />
+                      <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.kind}-${y.year}').showModal()`} />
                     </div>
                     <dialog id={`delete-year-${y.kind}-${y.year}`} class="modal" onclick="event.stopPropagation()">
                       <div class="modal-box">

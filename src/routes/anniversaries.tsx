@@ -244,7 +244,7 @@ anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"
     <Layout title={t("anniversaries.title")} user={user}>
       <div class="max-w-4xl mx-auto">
       <div class="contents">
-        <PageHeader title={<TitleSwitch items={anniversaryViews(perms, false)} />} actions={<HeaderAction icon="arrow-down-tray" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
+        <PageHeader title={<TitleSwitch items={anniversaryViews(perms, false)} />} actions={<HeaderAction icon="icon-[tabler--download]" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
 
         {/* Controls */}
         <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
@@ -253,6 +253,7 @@ anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"
             href={(p) => qs(p)} />
 
           <AnniversaryFilter kinds={filters} mods={mods} gte={gte} action="/anniversaries" hidden={rpHidden} />
+          {(range.mode !== "default" || kindsParam.length > 0 || mods.length > 0 || gte > 0) && <a href="/anniversaries" class="btn btn-ghost self-end">{t("common.reset")}</a>}
         </div>
       </div>
 

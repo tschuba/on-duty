@@ -61,8 +61,8 @@ export function TrainingBox({ memberId, rows, canWrite, canDelete, sort, dir }: 
                 <td>{r.expiresAt ? formatDate(r.expiresAt) : "–"}</td>
                 <td>{r.organizer}</td>
                 <td class="text-right whitespace-nowrap">
-                  {canWrite && <RowAction icon="pencil" label={t("common.edit")} attrs={{ "hx-get": `/members/${memberId}/training/${r.id}/edit`, "hx-target": "#training-modal-body", "hx-swap": "innerHTML", "hx-on::after-request": OPEN_MODAL }} />}
-                  {canDelete && <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/members/${memberId}/training/${r.id}/delete`, "hx-confirm": t("training.confirmDelete"), "hx-target": "#training-box", "hx-swap": "outerHTML" }} />}
+                  {canWrite && <RowAction icon="icon-[tabler--pencil]" label={t("common.edit")} attrs={{ "hx-get": `/members/${memberId}/training/${r.id}/edit`, "hx-target": "#training-modal-body", "hx-swap": "innerHTML", "hx-on::after-request": OPEN_MODAL }} />}
+                  {canDelete && <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/members/${memberId}/training/${r.id}/delete`, "hx-confirm": t("training.confirmDelete"), "hx-target": "#training-box", "hx-swap": "outerHTML" }} />}
                 </td>
               </tr>
             ))}
@@ -81,7 +81,7 @@ export function TrainingSection({ memberId, rows, canWrite, canDelete }: { membe
     <>
       <Section title={t("training.title")} badge={<span id="training-count">{rows.length}</span>} class="mt-6" actions={canWrite && (
         <button type="button" class="btn btn-outline btn-primary" aria-label={t("training.add")} title={t("training.add")} onclick="event.preventDefault();event.stopPropagation()" hx-get={`/members/${memberId}/training/new`} hx-target="#training-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": OPEN_MODAL }}>
-          <ActionContent icon="plus" label={t("training.add")} />
+          <ActionContent icon="icon-[tabler--plus]" label={t("training.add")} />
         </button>
       )}>
         <TrainingBox memberId={memberId} rows={rows} canWrite={canWrite} canDelete={canDelete} />
@@ -119,8 +119,8 @@ function TrainingForm({ action, title, values = {}, error }: { action: string; t
       <Field label={t("training.form.organizer")}><input type="text" name="organizer" class="input w-full" placeholder={t("training.form.organizer")} value={values.organizer ?? ""} /></Field>
       <Field label={t("training.form.notes")}><textarea name="notes" rows={3} class="textarea w-full" placeholder={t("training.form.notes")}>{values.notes ?? ""}</textarea></Field>
       <div class="modal-action">
-        <button type="button" class="btn" onclick="this.closest('dialog').close()"><ActionContent icon="x-mark" label={t("common.cancel")} variant="primary" /></button>
-        <button type="submit" class="btn btn-primary"><ActionContent icon="check" label={t("common.save")} variant="primary" /></button>
+        <button type="button" class="btn" onclick="this.closest('dialog').close()"><ActionContent icon="icon-[tabler--x]" label={t("common.cancel")} variant="primary" /></button>
+        <button type="submit" class="btn btn-primary"><ActionContent icon="icon-[tabler--check]" label={t("common.save")} variant="primary" /></button>
       </div>
     </form>
   );

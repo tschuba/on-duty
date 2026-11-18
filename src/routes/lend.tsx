@@ -105,7 +105,7 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
   return (
     <Layout title={t("lend.title", { name: item.inventoryItem.name })}>
       <div class="max-w-xl mx-auto">
-        <PageHeader title={item.inventoryItem.name} subtitle={t("lend.form.subtitle", { org: orgName })} actions={<HeaderAction variant="primary" type="submit" form="lend-form" icon="check" label={t("lend.form.submit")} class="btn-primary" />} />
+        <PageHeader title={item.inventoryItem.name} subtitle={t("lend.form.subtitle", { org: orgName })} actions={<HeaderAction variant="primary" type="submit" form="lend-form" icon="icon-[tabler--check]" label={t("lend.form.submit")} class="btn-primary" />} />
         {maxQuantity > 1 && !item.individualTracking && (
           <p class="text-sm opacity-70 mb-4">{t("lend.form.maxQuantityHint", { max: maxQuantity })}</p>
         )}
@@ -259,7 +259,7 @@ function StatusPage({ request, justSubmitted }: { request: RequestWithItem; just
             <div class="flex items-center gap-2">
               <code class="flex-1 text-xs break-all select-all">{statusUrl}</code>
               <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={statusUrl} onclick="navigator.clipboard.writeText(this.dataset.url)">
-                <Icon name="document-duplicate" class="h-5 w-5 shrink-0" />
+                <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
                 <span class="max-sm:hidden">{t("common.copy")}</span>
               </button>
             </div>

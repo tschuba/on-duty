@@ -13,8 +13,8 @@ describe("PageHeader", () => {
     expect(html).toContain('value="save_and_new"');
   });
   it("gives every action aria-label and title; label hides per variant", async () => {
-    const sec = await render(<HeaderAction icon="x-mark" label="Weg" href="/x" />);
-    const pri = await render(<HeaderAction variant="primary" icon="check" label="Ok" form="f" />);
+    const sec = await render(<HeaderAction icon="icon-[tabler--x]" label="Weg" href="/x" />);
+    const pri = await render(<HeaderAction variant="primary" icon="icon-[tabler--check]" label="Ok" form="f" />);
     expect(sec).toContain('aria-label="Weg"');
     expect(sec).toContain('title="Weg"');
     expect(sec).toContain("@max-xl:hidden");

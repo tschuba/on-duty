@@ -3,7 +3,7 @@ import type { AuthedUser } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { env } from "../env.js";
 import { Icon } from "./icon.js";
-import type { IconName } from "./icons.generated.js";
+import type { IconName } from "./icon.js";
 
 export type NavCounts = {
   applications: number;
@@ -52,27 +52,27 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
   const any = (...p: string[]) => p.some(has);
   const donations = any("donations:read", "donations:record", "donations:issue-receipts");
   return [
-    { icon: "calendar-days", label: t("common.nav.events"), items: [{ label: t("common.nav.events"), href: "/events", show: true, count: c.events }] },
-    { icon: "users", label: t("common.nav.members"), items: [
+    { icon: "icon-[tabler--calendar]", label: t("common.nav.events"), items: [{ label: t("common.nav.events"), href: "/events", show: true, count: c.events }] },
+    { icon: "icon-[tabler--users]", label: t("common.nav.members"), items: [
       { label: t("common.nav.members"), href: "/members", show: any("members:read", "applications:read"), count: has("applications:read") ? c.applications : 0 },
       { label: t("common.nav.anniversaries"), href: "/anniversaries", show: any("members:read", "anniversary-years:read") },
       { label: t("common.nav.training"), href: "/training", show: has("training:read") },
       { label: t("common.nav.roles"), href: "/roles", show: any("member-roles:read", "member-role-types:read") },
     ] },
-    { icon: "banknotes", label: t("common.nav.donations"), items: [
+    { icon: "icon-[tabler--cash]", label: t("common.nav.donations"), items: [
       { label: t("donations.tabs.donations"), href: "/donations", show: donations, count: c.receipts },
     ] },
-    { icon: "building-warehouse", label: t("common.nav.inventory"), items: [
+    { icon: "icon-[tabler--building-warehouse]", label: t("common.nav.inventory"), items: [
       { label: t("inventory.tabs.stock"), href: "/inventory", show: has("inventory:read") },
       { label: t("inventory.tabs.inspections"), href: "/inventory/inspections", show: has("inventory:read"), count: c.inspections, tone: "badge-primary" },
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans + c.loanRequests, tip: [c.loans > 0 && t("common.nav.tip.overdue", { count: c.loans }), c.loanRequests > 0 && t(c.loanRequests === 1 ? "common.nav.tip.request" : "common.nav.tip.requests", { count: c.loanRequests })].filter(Boolean).join(", "), tone: c.loans > 0 ? "badge-error" : "badge-primary" },
     ] },
-    { icon: "building-office", label: t("common.nav.organisation"), items: [
+    { icon: "icon-[tabler--building]", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
     ] },
-    { icon: "envelope", label: t("mailTemplates.title"), items: [{ label: t("mailTemplates.title"), href: "/mail/templates", show: true }] },
-    { icon: "arrow-down-tray", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
-    { icon: "cog-6-tooth", label: t("common.nav.admin"), items: [
+    { icon: "icon-[tabler--mail]", label: t("mailTemplates.title"), items: [{ label: t("mailTemplates.title"), href: "/mail/templates", show: true }] },
+    { icon: "icon-[tabler--download]", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
+    { icon: "icon-[tabler--settings]", label: t("common.nav.admin"), items: [
       { label: t("admin.tabs.users"), href: "/admin/users", show: has("system:admin"), count: c.pendingUsers },
       { label: t("admin.tabs.permissions"), href: "/admin/permissions", show: has("system:admin") },
       { label: t("admin.tabs.config"), href: "/admin/config", show: has("system:admin") },
@@ -136,19 +136,19 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
     <ul id="nav-menu" class="menu w-full grow flex-nowrap gap-1 overflow-auto is-drawer-close:overflow-visible p-2">
       <li class="hidden lg:block mt-1.5">
         <label for="nav-drawer" class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={t("common.nav.toggleSidebar")} aria-label={t("common.nav.toggleSidebar")}>
-          <Icon name="sidebar-collapse" class="h-5 w-5 text-gold is-drawer-close:hidden" />
-          <Icon name="sidebar-expand" class="h-5 w-5 text-gold hidden is-drawer-close:block" />
+          <Icon name="icon-[tabler--layout-sidebar-left-collapse]" class="h-5 w-5 text-gold is-drawer-close:hidden" />
+          <Icon name="icon-[tabler--layout-sidebar-left-expand]" class="h-5 w-5 text-gold hidden is-drawer-close:block" />
         </label>
       </li>
       <li class="is-drawer-close:hidden">
         <label class="input input-sm flex items-center gap-2">
-          <Icon name="magnifying-glass" class="h-4 w-4 opacity-60" />
+          <Icon name="icon-[tabler--search]" class="h-4 w-4 opacity-60" />
           <input id="nav-search" type="search" class="grow" placeholder={t("common.nav.search")} aria-label={t("common.nav.search")} autocomplete="off" />
         </label>
       </li>
       <li class="hidden is-drawer-close:block">
         <button type="button" data-nav-search class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={t("common.nav.search")} aria-label={t("common.nav.search")}>
-          <Icon name="magnifying-glass" class="h-5 w-5" />
+          <Icon name="icon-[tabler--search]" class="h-5 w-5" />
         </button>
       </li>
       {groups.map((g) => {
@@ -183,7 +183,7 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
                     <li data-label={lc([i.label, ...i.children.map((k) => k.label)].join(" "))}>
                       <a href={i.href} class={i.href === active ? "menu-active" : ""} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
                         {i.label as Child}
-                        {i.external && <Icon name="arrow-top-right-on-square" class="h-4 w-4" />}
+                        {i.external && <Icon name="icon-[tabler--external-link]" class="h-4 w-4" />}
                         {i.href === active ? null : i.dot ? <DotBadge /> : <CountBadge count={i.count ?? 0} tone={i.tone} />}
                       </a>
                       {showKids && (

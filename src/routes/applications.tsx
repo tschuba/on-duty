@@ -167,13 +167,13 @@ applicationRoutes.get("/:id", guard, async (c) => {
     <>
       {canDecide && (
         <div class="flex items-center gap-2 mr-3">
-        <HeaderAction icon="x-mark" label={t("applications.actions.reject")} hideLabel="@max-3xl:hidden" class="btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()" />
+        <HeaderAction icon="icon-[tabler--x]" label={t("applications.actions.reject")} hideLabel="@max-3xl:hidden" class="btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()" />
         {memberMatch
-          ? <HeaderAction icon="check" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" class="btn-success" attrs={{ id: "create-member-btn" }} onclick="document.getElementById('approve-modal').showModal()" />
-          : <HeaderAction icon="check" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" form="application-approve-form" class="btn-success" attrs={{ id: "create-member-btn" }} />}
+          ? <HeaderAction icon="icon-[tabler--check]" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" class="btn-success" attrs={{ id: "create-member-btn" }} onclick="document.getElementById('approve-modal').showModal()" />
+          : <HeaderAction icon="icon-[tabler--check]" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" form="application-approve-form" class="btn-success" attrs={{ id: "create-member-btn" }} />}
         </div>
       )}
-      {showSave && <HeaderAction variant="primary" icon="check" label={t("applications.actions.save")} form="application-edit-form" class="btn-primary" />}
+      {showSave && <HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("applications.actions.save")} form="application-edit-form" class="btn-primary" />}
     </>
   );
   const cardCls = "card card-border bg-base-100 border-base-300";
@@ -184,7 +184,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
 
       {hasDuplicates && (
         <div class="alert alert-warning mb-4" role="alert">
-          <Icon name="exclamation-triangle" class="h-5 w-5 shrink-0" />
+          <Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5 shrink-0" />
           <div>
             {memberMatches.length > 0 && (
               <>
@@ -199,7 +199,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
 
       {ageWarning && app.status === "open" && (
         <div class="alert alert-warning mb-4" role="alert">
-          <Icon name="exclamation-triangle" class="h-5 w-5 shrink-0" />
+          <Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5 shrink-0" />
           <div>
             <p class="text-sm">{t("applications.ageWarning", { limit: String(env.YOUTH_AGE_LIMIT) })}</p>
             {canDecide && (
@@ -215,7 +215,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
       <form id="application-edit-form" method="post" action={`/applications/${app.id}`} class="mb-6">
         <fieldset disabled={!canEdit} class="border-0 p-0 m-0 min-w-0 grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
           <section class={`${cardCls} card-body gap-4`}>
-            <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="user" class="h-5 w-5 opacity-60" />{t("applications.detail.person")}</h2>
+            <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="icon-[tabler--user]" class="h-5 w-5 opacity-60" />{t("applications.detail.person")}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label={t("apply.form.lastName")}>
                 <input type="text" name="lastName" value={app.person.lastName} class="input w-full" placeholder={t("apply.form.lastName")} />
@@ -230,7 +230,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
           </section>
 
           <section class={`${cardCls} card-body gap-4`}>
-            <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="envelope" class="h-5 w-5 opacity-60" />{t("applications.detail.contact")}</h2>
+            <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="icon-[tabler--mail]" class="h-5 w-5 opacity-60" />{t("applications.detail.contact")}</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <EmailField label={t("apply.form.email")} name="email" value={app.person.email ?? ""} />
               <Field label={t("apply.form.phone")}>
@@ -266,7 +266,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           {app.guardians.length > 0 && (
             <section class={`${cardCls} card-body gap-2`}>
-              <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="users" class="h-5 w-5 opacity-60" />{t("applications.detail.guardians")}</h2>
+              <h2 class="card-title text-base" style="font-family: var(--font-heading)"><Icon name="icon-[tabler--users]" class="h-5 w-5 opacity-60" />{t("applications.detail.guardians")}</h2>
               <ul class="space-y-1 text-sm">
                 {app.guardians.map((g) => (
                   <li key={g.id}>
@@ -280,7 +280,7 @@ applicationRoutes.get("/:id", guard, async (c) => {
           )}
           {app.status === "rejected" && app.rejectedReason && (
             <section class="card card-border bg-base-100 border-error card-body gap-2">
-              <h2 class="card-title text-base text-error" style="font-family: var(--font-heading)"><Icon name="x-mark" class="h-5 w-5" />{t("applications.detail.rejectedReason")}</h2>
+              <h2 class="card-title text-base text-error" style="font-family: var(--font-heading)"><Icon name="icon-[tabler--x]" class="h-5 w-5" />{t("applications.detail.rejectedReason")}</h2>
               <p class="text-sm">{app.rejectedReason}</p>
             </section>
           )}

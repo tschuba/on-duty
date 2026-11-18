@@ -1,5 +1,5 @@
 import { Icon } from "./icon.js";
-import type { IconName } from "./icons.generated.js";
+import type { IconName } from "./icon.js";
 export type FilterOption = { value: string; label: string; dim?: boolean; hint?: string; group?: string; icon?: IconName; unused?: boolean };
 
 // Semantikneutral: rendert nur Auswahl und sendet wiederholte Parameter (?p=a&p=b).
@@ -39,7 +39,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
         <>
           <button type="button" class={`input input-sm w-56 items-center gap-1 m-0 pointer-coarse:min-h-11 ${tone ? `input-${tone}` : ""}`} popovertarget={id} aria-label={ariaLabel} disabled={disabled}>
             <span class="grow min-w-0 truncate text-left" data-msf-label>{label}</span>
-            <Icon name="chevron-down" class="pointer-events-none h-4 w-4 shrink-0 opacity-60" />
+            <Icon name="icon-[tabler--chevron-down]" class="pointer-events-none h-4 w-4 shrink-0 opacity-60" />
           </button>
           <input type="hidden" name={param} value={selected[0] ?? ""} disabled={disabled} />
         </>
@@ -48,7 +48,7 @@ export function MultiSelectFilter({ param, options, selected, allLabel, countLab
       )}
       <div id={id} popover="auto" class="msf-panel bg-base-100 border border-base-300 rounded-box shadow-lg w-64 p-2 m-0">
         {searchable && (
-          <label class="input flex items-center gap-2 w-full mb-2"><Icon name="magnifying-glass" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
+          <label class="input flex items-center gap-2 w-full mb-2"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="text" placeholder={searchPlaceholder} class="grow min-w-0" data-msf-search /></label>
         )}
         {unusedToggle && (
           <label class="flex items-center gap-2 px-2 py-1 cursor-pointer text-xs opacity-60"><input type="checkbox" class="toggle toggle-xs" data-msf-unused-toggle />{unusedToggle.label}</label>

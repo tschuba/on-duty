@@ -207,8 +207,8 @@ export function StatsCards({ all, openRequests = null }: { all: MemberWithStatus
       </StatCard>
       <StatCard label={t("members.stats.former")} value={counts.left + counts.deceased} tone="text-base-content/40" inline>
         <div class="stat-desc text-sm flex gap-x-2">
-          {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="arrow-right-start-on-rectangle" class="w-3.5 h-3.5" /></span>}
-          {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="cross" class="w-3.5 h-3.5" /></span>}
+          {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="icon-[tabler--logout]" class="w-3.5 h-3.5" /></span>}
+          {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="icon-[tabler--cross]" class="w-3.5 h-3.5" /></span>}
         </div>
       </StatCard>
     </div>
@@ -369,12 +369,12 @@ function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData;
         <td class="text-right whitespace-nowrap">
           {!readOnly && memberId && (
             <>
-              <RowAction icon="pencil" label={t("common.edit")} attrs={{ "hx-get": `/members/${memberId}/assignments/${r.id}/edit`, "hx-target": "#assignment-modal-body", "hx-swap": "innerHTML", "hx-on::after-request": ADD_CLICK }} />
-              <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/members/${memberId}/assignments/${r.id}/delete`, "hx-confirm": t("members.assignment.confirmDelete"), "hx-target": "#assignments-box", "hx-swap": "outerHTML" }} />
+              <RowAction icon="icon-[tabler--pencil]" label={t("common.edit")} attrs={{ "hx-get": `/members/${memberId}/assignments/${r.id}/edit`, "hx-target": "#assignment-modal-body", "hx-swap": "innerHTML", "hx-on::after-request": ADD_CLICK }} />
+              <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/members/${memberId}/assignments/${r.id}/delete`, "hx-confirm": t("members.assignment.confirmDelete"), "hx-target": "#assignments-box", "hx-swap": "outerHTML" }} />
             </>
           )}
           {!readOnly && !memberId && (
-            <RowAction icon="trash" label={t("common.delete")} class="btn-outline btn-error" onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))" />
+            <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick="var f=this.closest('form'),tr=this.closest('tr');tr.nextElementSibling.remove();tr.remove();f.dispatchEvent(new Event('change',{bubbles:true}))" />
           )}
         </td>
       </tr>
@@ -387,7 +387,7 @@ function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData;
 function AssignmentAddButton({ memberId }: { memberId?: string }) {
   return (
     <button type="button" class="btn btn-outline btn-primary" aria-label={t("members.form.addAssignment")} title={t("members.form.addAssignment")} onclick="event.preventDefault();event.stopPropagation()" hx-get={memberId ? `/members/${memberId}/assignments/new` : "/members/assignments/new"} hx-target="#assignment-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": ADD_CLICK }}>
-      <ActionContent icon="plus" label={t("members.form.addAssignment")} />
+      <ActionContent icon="icon-[tabler--plus]" label={t("members.form.addAssignment")} />
     </button>
   );
 }
@@ -453,9 +453,9 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
         <div class="role-picker" data-selected={selectedId ?? ""}>
           <input type="hidden" name="role" class="role-picker-value" value={selectedId ?? ""} />
           <label class="input flex items-center gap-2 w-full mb-1">
-            <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+            <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
             <input type="text" autocomplete="off" role="searchbox" aria-controls="role-picker-list" class="role-picker-search grow min-w-0" placeholder={t("common.searchPlaceholder")} />
-            <button type="button" class="role-picker-clear btn btn-ghost btn-xs btn-circle hidden" aria-label={t("common.reset")}><Icon name="x-mark" class="w-4 h-4" /></button>
+            <button type="button" class="role-picker-clear btn btn-ghost btn-xs btn-circle hidden" aria-label={t("common.reset")}><Icon name="icon-[tabler--x]" class="w-4 h-4" /></button>
           </label>
           {types.length > 1 && (
             <div role="tablist" class="role-picker-tabs tabs tabs-border mb-1">
@@ -487,9 +487,9 @@ export function AssignmentModalForm({ roles, action, values = {}, error, title, 
       </Field>
       <div class="modal-action @container">
         <div class="flex w-full justify-end gap-2">
-          <button type="button" class="btn" aria-label={t("common.cancel")} title={t("common.cancel")} onclick="this.closest('dialog').close()"><ActionContent icon="x-mark" label={t("common.cancel")} variant="primary" /></button>
-          <button type="submit" name="more" value="1" class="btn btn-outline btn-primary" aria-label={t("common.saveAndNew")} title={t("common.saveAndNew")}><ActionContent icon="plus" label={t("common.saveAndNew")} variant="primary" /></button>
-          <button type="submit" class="btn btn-primary" aria-label={t("common.save")} title={t("common.save")}><ActionContent icon="check" label={t("common.save")} variant="primary" /></button>
+          <button type="button" class="btn" aria-label={t("common.cancel")} title={t("common.cancel")} onclick="this.closest('dialog').close()"><ActionContent icon="icon-[tabler--x]" label={t("common.cancel")} variant="primary" /></button>
+          <button type="submit" name="more" value="1" class="btn btn-outline btn-primary" aria-label={t("common.saveAndNew")} title={t("common.saveAndNew")}><ActionContent icon="icon-[tabler--plus]" label={t("common.saveAndNew")} variant="primary" /></button>
+          <button type="submit" class="btn btn-primary" aria-label={t("common.save")} title={t("common.save")}><ActionContent icon="icon-[tabler--check]" label={t("common.save")} variant="primary" /></button>
         </div>
       </div>
       <script dangerouslySetInnerHTML={{ __html: `
@@ -831,7 +831,7 @@ function DeleteMemberButton({
         aria-label={t("common.delete")}
         title={t(`members.delete.blocked${blockedBy === "donor" ? "Donor" : blockedBy === "loan" ? "Loan" : "Application"}`)}
       >
-        <Icon name="trash" class="h-5 w-5" />
+        <Icon name="icon-[tabler--trash]" class="h-5 w-5" />
         <span class="@max-xl:hidden">{t("common.delete")}</span>
       </button>
     );
@@ -839,7 +839,7 @@ function DeleteMemberButton({
 
   return (
     <>
-      <HeaderAction icon="trash" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-member-modal').showModal()" />
+      <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error mr-6" onclick="document.getElementById('delete-member-modal').showModal()" />
       <dialog id="delete-member-modal" class="modal">
         <div class="modal-box">
           <h3 class="font-bold text-lg">{t("members.delete.confirmTitle")}</h3>
@@ -969,7 +969,7 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
         ...(canReview ? [{ label: t("members.filter.preset.requested"), values: { status: ["requested"], age: [] } }] : []),
       ]}
       sections={[
-        { type: "chips", param: "status", title: t("members.table.status"), options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("cross" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
+        { type: "chips", param: "status", title: t("members.table.status"), options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("icon-[tabler--cross]" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
         { type: "chips", param: "age", title: t("members.filter.age"), options: AGE_GROUPS.map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter },
         {
           type: "list", param: "role", title: t("members.table.roles"),
@@ -1022,7 +1022,7 @@ function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) 
   return (
     <li id="members-export-btn" class={empty ? "menu-disabled" : ""} title={empty ? t("common.exportEmpty") : undefined} {...(oob ? { "hx-swap-oob": "true" } : {})}>
       <button type="button" disabled={empty} onclick="document.getElementById('members-export-modal').showModal();document.activeElement.blur()">
-        <Icon name="arrow-down-tray" class="h-5 w-5" />{t("common.export")}
+        <Icon name="icon-[tabler--download]" class="h-5 w-5" />{t("common.export")}
       </button>
     </li>
   );
@@ -1090,21 +1090,21 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async 
     <Layout title={t("members.title")} user={user}>
       <PageHeader title={t("members.title")} actions={<>
         <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
-          <Icon name="chart-bar" class="w-5 h-5" />
+          <Icon name="icon-[tabler--chart-bar]" class="w-5 h-5" />
           <span class="@max-4xl:hidden">{t("members.stats.toggle")}</span>
           <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
         </label>
         {canReview && <ApplicationLinks forms={forms} canManageForms={user.permissions.has("applications:manage")} />}
         <div class="dropdown dropdown-end ml-2">
           <div tabindex={0} role="button" class="btn btn-neutral btn-square" aria-label={t("common.moreActions")} title={t("common.moreActions")}>
-            <Icon name="ellipsis-vertical" class="h-5 w-5" />
+            <Icon name="icon-[tabler--dots-vertical]" class="h-5 w-5" />
           </div>
           <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-44 p-2 shadow">
-            {user.permissions.has("import:run") && <li><a href="/import?kind=members"><Icon name="arrow-up-tray" class="h-5 w-5" />{t("import.action")}</a></li>}
+            {user.permissions.has("import:run") && <li><a href="/import?kind=members"><Icon name="icon-[tabler--upload]" class="h-5 w-5" />{t("import.action")}</a></li>}
             <MembersExportButton empty={sorted.length === 0} />
           </ul>
         </div>
-        {isEditor && <HeaderAction variant="primary" icon="plus" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
+        {isEditor && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
       </>} />
 
       {canReview && user.permissions.has("applications:manage") && <ApplicationFormSettings forms={forms} />}
@@ -1113,7 +1113,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async 
       {/* Toolbar */}
       <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
         <label class="input flex items-center gap-2 w-64">
-          <Icon name="magnifying-glass" class="w-4 h-4 opacity-60" />
+          <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
           <input
             type="search"
             name="search"
@@ -1129,6 +1129,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async 
         </label>
         <MembersFilter canReview={canReview} roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={shownStatus} roleFilter={roleFilter} ageFilter={ageFilter}
           hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...(search ? [["search", search] as [string, string]] : [])]} />
+        {(search || roleFilter.length > 0 || ageFilter.length > 0 || (statusParams.length > 0 && [...shownStatus].sort().join() !== [...DEFAULT_STATUS, ...(canReview ? ["requested"] : [])].sort().join())) && <a href="/members" class="btn btn-ghost">{t("common.reset")}</a>}
       </div>
 
       {tableEl}

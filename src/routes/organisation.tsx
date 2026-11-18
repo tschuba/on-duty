@@ -49,7 +49,7 @@ function PrivacyGroup({ values, editable }: { values: Record<string, string>; ed
         {values.orgPrivacyText?.trim() && (
           <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
             <a href="/datenschutz" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
-              <Icon name="arrow-top-right-on-square" class="h-4 w-4 shrink-0" />
+              <Icon name="icon-[tabler--external-link]" class="h-4 w-4 shrink-0" />
               {t("organisation.privacy.preview")}
             </a>
             <span class="text-xs text-base-content/60">{t("organisation.privacy.previewHint")}</span>
@@ -100,7 +100,7 @@ function OrgSection({ tab, values, editable }: { tab: OrgTab; values: Record<str
               label={t(`admin.orgConfig.field.${key}` as never)}
               after={missingReason(key, values) && (
                 <span class="tooltip tooltip-left before:whitespace-normal before:max-w-xs absolute right-3 top-3" data-tip={missingReason(key, values)}>
-                  <Icon name="exclamation-triangle" class="h-5 w-5 text-warning" />
+                  <Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5 text-warning" />
                   <span class="sr-only">{missingReason(key, values)}</span>
                 </span>
               )}

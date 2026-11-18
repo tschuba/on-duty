@@ -17,9 +17,9 @@ export function TitleSwitch({ items }: { items: TitleSwitchItem[] }) {
         </>))}
       </span>
       <details id="title-switch" class="relative @2xl:hidden">
-        <summary class="btn btn-ghost border border-base-300 text-2xl font-bold h-auto min-h-11 px-3 py-1 list-none inline-flex items-center gap-2" aria-label={t("common.switchView")}>{current.label}<Icon name="chevron-down" class="w-5 h-5" /></summary>
+        <summary class="btn btn-ghost border border-base-300 text-2xl font-bold h-auto min-h-11 px-3 py-1 list-none inline-flex items-center gap-2" aria-label={t("common.switchView")}>{current.label}<Icon name="icon-[tabler--chevron-down]" class="w-5 h-5" /></summary>
         <ul class="menu absolute left-0 top-full mt-1 bg-base-100 rounded-box shadow-lg border border-base-300 z-30 w-56 p-2 text-base font-normal">
-          {items.map((v) => <li><a href={v.href} class={v.active ? "menu-active" : ""}>{v.label}{!v.active && v.count ? <span class="badge badge-sm badge-warning">{v.count}</span> : null}{v.active && <Icon name="check" class="w-4 h-4 ml-auto" />}</a></li>)}
+          {items.map((v) => <li><a href={v.href} class={v.active ? "!bg-gold/60 !text-base-content" : ""}>{v.label}{!v.active && v.count ? <span class="badge badge-sm badge-warning">{v.count}</span> : null}{v.active && <Icon name="icon-[tabler--check]" class="w-4 h-4 ml-auto" />}</a></li>)}
         </ul>
       </details>
       <script dangerouslySetInnerHTML={{ __html: "document.addEventListener('click',function(e){var d=document.getElementById('title-switch');if(d&&d.open&&!d.contains(e.target))d.open=false;});" }} />

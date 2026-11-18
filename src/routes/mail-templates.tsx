@@ -72,7 +72,7 @@ mailTemplateRoutes.get("/", async (c) => {
   return c.html(
     <Layout title={t("mailTemplates.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-        <PageHeader title={t("mailTemplates.title")} actions={mayCreate(user) && <HeaderAction variant="primary" icon="plus" label={t("mailTemplates.new")} href="/mail/templates/new" class="btn-primary" />} />
+        <PageHeader title={t("mailTemplates.title")} actions={mayCreate(user) && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("mailTemplates.new")} href="/mail/templates/new" class="btn-primary" />} />
         {all.length > 0 && (
           <form method="get" role="search" class="mb-4">
             {cat && <input type="hidden" name="category" value={cat} />}
@@ -98,12 +98,12 @@ mailTemplateRoutes.get("/", async (c) => {
                       <td class="text-right whitespace-nowrap">
                         {x.custom && maySend(user) && (
                           <a href={`/mail/templates/${x.key}/send`} class="btn btn-ghost btn-sm btn-square" title={t("mailTemplates.send")} aria-label={`${x.custom.meta.name}: ${t("mailTemplates.send")}`} onclick="event.stopPropagation()">
-                            <Icon name="envelope" class="h-5 w-5" />
+                            <Icon name="icon-[tabler--mail]" class="h-5 w-5" />
                           </a>
                         )}
                         <button type="button" class="btn btn-ghost btn-sm btn-square" title={t("mailTemplates.quick")} aria-label={`${x.custom ? x.custom.meta.name : CATALOG[x.key].name}: ${t("mailTemplates.quick")}`}
                           hx-get={`/mail/templates/${x.key}/quick`} hx-target="#quick-body" {...{ "hx-on::after-request": "if(event.detail.successful)document.getElementById('quick-dialog').showModal()" }} onclick="event.stopPropagation()">
-                          <Icon name="magnifying-glass" class="h-5 w-5" />
+                          <Icon name="icon-[tabler--search]" class="h-5 w-5" />
                         </button>
                       </td>
                     </tr>
@@ -169,7 +169,7 @@ function RequiredChecklist({ status, oob }: { status: ReturnType<typeof required
   const missing = incomplete ? 0 : items.filter((i) => !i.ok).length;
   const live = <span id="req-live" class="sr-only" aria-live="polite" {...(oob ? { "hx-swap-oob": "innerHTML" } : {})}>{items.length ? liveText(missing, incomplete) : ""}</span>;
   if (!items.length || (!incomplete && !missing)) return <><span id="req-wrap" />{live}</>; // alles vorhanden: kein Button, nur Live-Text
-  const icon = incomplete ? <Icon name="checkup-list" class="h-4 w-4 text-base-content/60" /> : <Icon name="exclamation-triangle" class="h-4 w-4 text-warning" />;
+  const icon = incomplete ? <Icon name="icon-[tabler--checkup-list]" class="h-4 w-4 text-base-content/60" /> : <Icon name="icon-[tabler--alert-triangle]" class="h-4 w-4 text-warning" />;
   return (
     <>
       <span id="req-wrap">
@@ -179,7 +179,7 @@ function RequiredChecklist({ status, oob }: { status: ReturnType<typeof required
         <div id="req-check" popover="auto" style="position-anchor:--req-btn" aria-label={t("mailTemplates.req.title")} class="dropdown w-72 max-w-[calc(100vw-1rem)] rounded-box border border-base-300 bg-base-100 p-3 space-y-2 text-sm shadow-xl">
           <h3 class="font-semibold">{t("mailTemplates.req.title")}</h3>
           {incomplete ? <p class="text-base-content/60">{t("mailTemplates.req.syntax")}</p> : (
-            <ul class="space-y-1">{items.map((i) => <li class="flex items-center gap-2"><Icon name={i.ok ? "check" : "exclamation-triangle"} class={`h-4 w-4 shrink-0 ${i.ok ? "text-success" : "text-warning"}`} /><span class="grow">{i.label} <code class="text-xs text-base-content/60">{i.list ? `{{#${i.list}}}{{${i.name}}}{{/${i.list}}}` : `{{${i.name}}}`}</code></span><span class="text-base-content/60">{i.ok ? t("mailTemplates.req.ok") : t("mailTemplates.req.missing")}</span></li>)}</ul>
+            <ul class="space-y-1">{items.map((i) => <li class="flex items-center gap-2"><Icon name={i.ok ? "icon-[tabler--check]" : "icon-[tabler--alert-triangle]"} class={`h-4 w-4 shrink-0 ${i.ok ? "text-success" : "text-warning"}`} /><span class="grow">{i.label} <code class="text-xs text-base-content/60">{i.list ? `{{#${i.list}}}{{${i.name}}}{{/${i.list}}}` : `{{${i.name}}}`}</code></span><span class="text-base-content/60">{i.ok ? t("mailTemplates.req.ok") : t("mailTemplates.req.missing")}</span></li>)}</ul>
           )}
         </div>
       </span>
@@ -208,9 +208,9 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
         <PageHeader
           title={cf?.isNew ? t("mailTemplates.new") : entry.name} backHref={back} backLabel={back === "/mail/templates" ? undefined : t("mailTemplates.back")} subtitle={entry.description}
           actions={<>
-            {tpl.override && <HeaderAction icon="arrow-uturn-left" label={t("mailTemplates.reset")} class="btn-outline" onclick="document.getElementById('reset-dialog').showModal()" />}
-            {cf && !cf.isNew && maySend(user) && <HeaderAction icon="envelope" label={t("mailTemplates.send")} href={`/mail/templates/${key}/send${fromQs(back)}`} />}
-            {cf && !cf.isNew && <HeaderAction icon="trash" label={t("mailTemplates.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-dialog').showModal()" />}
+            {tpl.override && <HeaderAction icon="icon-[tabler--arrow-back-up]" label={t("mailTemplates.reset")} class="btn-outline" onclick="document.getElementById('reset-dialog').showModal()" />}
+            {cf && !cf.isNew && maySend(user) && <HeaderAction icon="icon-[tabler--mail]" label={t("mailTemplates.send")} href={`/mail/templates/${key}/send${fromQs(back)}`} />}
+            {cf && !cf.isNew && <HeaderAction icon="icon-[tabler--trash]" label={t("mailTemplates.delete")} class="btn-outline btn-error" onclick="document.getElementById('delete-dialog').showModal()" />}
             <FormActions formId="tpl-form" />
           </>}
         />
@@ -221,7 +221,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
           <form id="tpl-form" method="post" action={`${base}${fromQs(back)}`} class="space-y-4 min-w-0">
             <input type="hidden" name="updatedAt" value={expected} />
               <details id="tpl-meta" open={!!cf?.isNew || errors.some((e) => e.startsWith("form: ") || e.startsWith("headers: "))} data-err={errors.some((e) => e.startsWith("form: ") || e.startsWith("headers: ")) ? "1" : undefined} class="collapse collapse-arrow bg-base-200 border border-base-300 rounded-box">
-                <summary class="collapse-title font-semibold"><span class="flex items-center gap-2">{t("mailTemplates.section.meta")}<span id="tpl-meta-warn" hidden class="badge badge-error badge-soft"><Icon name="exclamation-triangle" class="h-4 w-4" />{t("mailTemplates.section.meta.missing")}</span></span></summary>
+                <summary class="collapse-title font-semibold"><span class="flex items-center gap-2">{t("mailTemplates.section.meta")}<span id="tpl-meta-warn" hidden class="badge badge-error badge-soft"><Icon name="icon-[tabler--alert-triangle]" class="h-4 w-4" />{t("mailTemplates.section.meta.missing")}</span></span></summary>
                 <div class={`collapse-content grid gap-6 ${cf ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]" : ""}`}>
                   {cf && <div class="space-y-4 min-w-0">
               <Field label={t("mailTemplates.custom.name")} required><input id="tpl-name" name="name" class="input w-full" placeholder={t("mailTemplates.custom.name")} value={cf.name} required /></Field>
@@ -270,7 +270,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
               <div class="space-y-2">
                 <div class="@container flex items-center justify-between gap-2">
                   <h4 class="text-sm opacity-60">{t("mailTemplates.technical.headers")}</h4>
-                  {cf && <button type="button" class="btn btn-outline btn-xs" aria-label={t("mailTemplates.custom.headers.add")} title={t("mailTemplates.custom.headers.add")} onclick="document.getElementById('hdr-rows').appendChild(document.getElementById('hdr-tpl').content.cloneNode(true))"><Icon name="plus" class="h-3 w-3" /><span class="hidden @xs:inline">{t("mailTemplates.custom.headers.add")}</span></button>}
+                  {cf && <button type="button" class="btn btn-outline btn-xs" aria-label={t("mailTemplates.custom.headers.add")} title={t("mailTemplates.custom.headers.add")} onclick="document.getElementById('hdr-rows').appendChild(document.getElementById('hdr-tpl').content.cloneNode(true))"><Icon name="icon-[tabler--plus]" class="h-3 w-3" /><span class="hidden @xs:inline">{t("mailTemplates.custom.headers.add")}</span></button>}
                 </div>
                 {[["Category", tpl.category], ["Event", cf ? `custom-${cf.key || tpl.key}` : tpl.key], ["Audience", tpl.audience]].map(([n, v]) => (
                   <code class="block font-mono text-xs bg-base-200 rounded-field px-2 py-1 break-all">X-On-Duty-{n}: {v}</code>
@@ -289,7 +289,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
           <div class="tab-content bg-base-100 border-base-300 p-4">
             <div id="tpl-bar" role="toolbar" aria-label={t("mailTemplates.bar")} class="sticky top-0 z-10 -mx-4 -mt-4 mb-4">
               <div class="flex items-center gap-1 rounded-t-box rounded-tl-none border-b border-base-300 bg-base-200 px-4 py-2">
-                <button type="button" id="ph-btn" class="btn btn-ghost btn-sm" popovertarget="side-ph" style="anchor-name:--ph-btn" aria-expanded="false" aria-controls="side-ph" title={t("mailTemplates.placeholders")}><Icon name="plus" class="h-4 w-4" /><span class="max-sm:hidden">{t("mailTemplates.placeholders")}</span></button>
+                <button type="button" id="ph-btn" class="btn btn-ghost btn-sm" popovertarget="side-ph" style="anchor-name:--ph-btn" aria-expanded="false" aria-controls="side-ph" title={t("mailTemplates.placeholders")}><Icon name="icon-[tabler--plus]" class="h-4 w-4" /><span class="max-sm:hidden">{t("mailTemplates.placeholders")}</span></button>
                 <RequiredChecklist status={reqStatus} />
                 <span class="ml-auto text-xs text-base-content/60 max-sm:hidden">{t("mailTemplates.bar.hint")} <kbd class="kbd kbd-xs">{"{{"}</kbd></span>
               </div>
@@ -304,7 +304,7 @@ function Editor({ user, back, tpl, values, errors, expected, conflict, cf }: { u
                 const items = entries.filter(([k, v]) => !inList(k) && !(listName && k.startsWith("recipient.")) && groupOf(k, v, !!cf) === g);
                 const listItems = g === "recipient" && listName ? entries.filter(([k]) => inList(k)) : [];
                 // Eine Zeile je Platzhalter: Beschriftung + Beispielwert (Textwerte) links, Token rechts (bei Hover/Fokus), optional ein „nur wenn“-Button.
-                const plus = <span aria-hidden="true" class="grid size-6 shrink-0 place-items-center rounded-full bg-primary/25 text-primary"><Icon name="plus" class="h-3.5 w-3.5" /></span>;
+                const plus = <span aria-hidden="true" class="grid size-6 shrink-0 place-items-center rounded-full bg-primary/25 text-primary"><Icon name="icon-[tabler--plus]" class="h-3.5 w-3.5" /></span>;
                 const row = (k: string, v: { desc: string; example?: string; optional?: boolean; type: string }, label: string, attrs: Record<string, string | undefined>, hov = "hover:bg-base-200 focus-within:bg-base-200") => {
                   const bool = v.type === "boolean", cond = (v.optional || bool) && !requiredNames.has(k);
                   const star = requiredNames.has(k) ? " *" : "";
@@ -599,8 +599,8 @@ async function sendForm(c: any, tpl: TemplateView, values: Record<string, string
       <div class="max-w-2xl mx-auto">
         <PageHeader title={T("mailTemplates.send.title", { name: meta.name })} backHref={`/mail/templates/${tpl.key}${fromQs(back)}`}
           actions={<>
-            <HeaderAction icon="mailbox" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />
-            <HeaderAction variant="primary" class="btn-primary" icon="envelope" label={t("mailTemplates.send")} form="send-form" attrs={{ formmethod: "post", ...(!smtp || !counts.send ? { disabled: "" } : {}) }} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send, mails: counts.mails }))})`} />
+            <HeaderAction icon="icon-[tabler--mailbox]" label={t("mailTemplates.log")} href={`/mail/templates/${tpl.key}/log${fromQs(back)}`} />
+            <HeaderAction variant="primary" class="btn-primary" icon="icon-[tabler--mail]" label={t("mailTemplates.send")} form="send-form" attrs={{ formmethod: "post", ...(!smtp || !counts.send ? { disabled: "" } : {}) }} onclick={`return confirm(${JSON.stringify(T("mailTemplates.send.confirm", { send: counts.send, mails: counts.mails }))})`} />
           </>} />
         {errors.length > 0 && <div role="alert" class="alert alert-error mb-4"><ul>{errors.map((e) => <li>{e}</li>)}</ul></div>}
         {!smtp && <div role="alert" class="alert alert-warning mb-4">{t("mailTemplates.send.noSmtp")}</div>}
