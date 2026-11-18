@@ -91,7 +91,7 @@ Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
 
 - Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--header-h`, `--filter-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
 - Sticky-Elemente brauchen einen deckenden Hintergrund (`bg-base-100`/`bg-base-300`).
-- Popover/Dropdowns (`MultiSelectFilter`) liegen über allen Ebenen (`z-50` bzw. Top Layer); neue Ebenen bleiben unter 20.
+- Popover/Dropdowns (`MultiSelectFilter`, `TitleSwitch`, Pager-Seitenwahl) liegen über allen sticky Ebenen (`z-20` bis `z-50` bzw. Top Layer); neue sticky Ebenen bleiben unter 20.
 - Kein Vorfahr darf `overflow` ≠ `visible` haben, sonst bricht Sticky. Deshalb stehen Pager und Leiste **außerhalb** von `overflow-x-auto`-Wrappern.
 - Sticky gilt nur innerhalb des Eltern-Elements: Leiste und Liste/Tabelle müssen im selben Container liegen, ohne Zwischen-Wrapper mit kurzer Höhe. Fehlerbild: Leiste scrollt nach kurzer Strecke weg (so zuvor in `/anniversaries`).
 - `display: contents` am Sticky-Element selbst ist wirkungslos; Klasse an das umgebende `<div>` setzen.
