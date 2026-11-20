@@ -3,11 +3,11 @@ import { RowAction } from "./row-action.js";
 import { t } from "../i18n/index.js";
 
 // Löschen mit Bestätigungsdialog: Trigger `btn-outline btn-error`, ausführender Button solid. `header`: Trigger im Seitenkopf statt in einer Tabellenzeile.
-export function DeleteDialog({ id, action, title, body, header }: { id: string; action: string; title: string; body: string; header?: boolean }) {
+export function DeleteDialog({ id, action, title, body, header, triggerless }: { id: string; action: string; title: string; body: string; header?: boolean; triggerless?: boolean }) {
   const open = `event.stopPropagation(); document.getElementById('delete-${id}').showModal()`;
   return (
     <>
-      {header
+      {triggerless ? null : header
         ? <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={open} />
         : <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={open} />}
       <dialog id={`delete-${id}`} class="modal">
