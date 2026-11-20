@@ -37,7 +37,9 @@ vi.mock("../middleware/auth.js", async () => {
   };
 });
 
-const { trainingRoutes } = await import("../routes/training.js");
+const { trainingRoutes, renderTraining } = await import("../routes/training.js");
+const { Hono } = await import("hono");
+const listApp = new Hono().use(async (c, next) => { c.set("user" as never, { id: "u1", permissions: perms } as never); await next(); }).get("/training", (c) => renderTraining(c as never));
 const post = (path: string, fields: Record<string, string>) =>
   trainingRoutes.request(path, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: formBody(fields) });
 
@@ -50,7 +52,8 @@ beforeEach(() => {
 describe("permissions", () => {
   it("403 without training:read (list and fragment)", async () => {
     perms = new Set(["members:read"]);
-    expect((await trainingRoutes.request("/training")).status).toBe(403);
+    const res = await trainingRoutes.request("/training");
+    expect(res.status).toBe(403);
     expect((await trainingRoutes.request("/members/m1/training")).status).toBe(403);
   });
   it("write-only user may not delete", async () => {
@@ -98,7 +101,7 @@ describe("GET /training", () => {
       { r: { id: "a", memberId: "m1", title: "Atemschutz", completedAt: "2000-01-01", expiresAt: "2001-01-01", organizer: null }, firstName: "Max", lastName: "Muster", exitDate: null },
       { r: { id: "b", memberId: "m2", title: "Alt", completedAt: "2000-01-01", expiresAt: null, organizer: null }, firstName: "Ex", lastName: "Mitglied", exitDate: "2010-01-01" },
     ]];
-    const html = await (await trainingRoutes.request("/training")).text();
+    const html = await (await listApp.request("/training")).text();
     expect(html).toContain("Muster, Max");
     expect(html).toContain("abgelaufen");
     expect(html).not.toContain("Mitglied, Ex");

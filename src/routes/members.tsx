@@ -29,7 +29,9 @@ import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
 import { sendMail } from "../lib/mail.js";
 import { buildVars } from "../lib/mail-templates.js";
-import { TrainingSection, sortRecords } from "./training.js";
+import { TrainingSection, sortRecords, renderTraining } from "./training.js";
+import { rolesPage } from "./roles.js";
+import { TitleSwitch } from "../components/title-switch.js";
 import { trainingRecords } from "../db/schema/index.js";
 
 import { ApplicationFormSettings, ApplicationLinks } from "../components/application-links.js";
@@ -1028,10 +1030,28 @@ function MembersExportButton({ empty, oob }: { empty: boolean; oob?: boolean }) 
   );
 }
 
-// GET /members — list
+// Ansichten-Umschalter für /members (Mitglieder | Ausbildungen | Funktionen); nur erlaubte Ansichten.
+type MemberView = "members" | "training" | "roles";
+const allowedMemberViews = (p: Set<string>): MemberView[] => [
+  ...(p.has("members:read") || p.has("applications:read") ? ["members" as const] : []),
+  ...(p.has("training:read") ? ["training" as const] : []),
+  ...(p.has("member-roles:read") || p.has("member-role-types:read") ? ["roles" as const] : []),
+];
+export function memberViews(perms: Set<string>, active: MemberView) {
+  const label = { members: t("members.title"), training: t("common.nav.training"), roles: t("common.nav.roles") };
+  const href = { members: "/members", training: "/members?view=training", roles: "/members?view=roles" };
+  const vs = allowedMemberViews(perms);
+  return (vs.length ? vs : ["members" as const]).map((v) => ({ active: v === active, href: href[v], label: label[v] }));
+}
+
+// GET /members — list (+ views training/roles)
 // applications:read alone shows only the open applications (no member data).
-memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async (c) => {
+memberRoutes.get("/", requireAuth(["members:read", "applications:read", "training:read", "member-roles:read", "member-role-types:read"]), async (c) => {
   const user = c.get("user");
+  const allowed = allowedMemberViews(user.permissions as Set<string>);
+  const view = allowed.find((v) => v === c.req.query("view")) ?? allowed[0];
+  if (view === "training") return renderTraining(c);
+  if (view === "roles") return rolesPage(c);
   const q = c.req.query();
   const statusParams = c.req.queries("status") ?? [];
   const { search, sort, dir, statusFilter, roleFilter, ageFilter, page, pageSize } = parseListQuery(
@@ -1088,10 +1108,10 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async 
 
   return c.html(
     <Layout title={t("members.title")} user={user}>
-      <PageHeader title={t("members.title")} actions={<>
+      <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "members")} />} actions={<>
         <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
           <Icon name="icon-[tabler--chart-bar]" class="w-5 h-5" />
-          <span class="@max-4xl:hidden">{t("members.stats.toggle")}</span>
+          <span class="@max-6xl:hidden">{t("members.stats.toggle")}</span>
           <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
         </label>
         {canReview && <ApplicationLinks forms={forms} canManageForms={user.permissions.has("applications:manage")} />}
@@ -1104,7 +1124,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read"]), async 
             <MembersExportButton empty={sorted.length === 0} />
           </ul>
         </div>
-        {isEditor && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("members.addMember")} href="/members/new" class="btn-primary" />}
+        {isEditor && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("members.addMember")} href="/members/new" class="btn-primary" hideLabel="@max-4xl:hidden" />}
       </>} />
 
       {canReview && user.permissions.has("applications:manage") && <ApplicationFormSettings forms={forms} />}

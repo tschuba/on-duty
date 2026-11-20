@@ -121,11 +121,11 @@ app.get("/", requireAuth(), (c) => {
     [["donations:read", "donations:record", "donations:issue-receipts"], "/donations"],
     [["inventory:read"], "/inventory"],
     [["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"], "/organisation"],
-    [["training:read"], "/training"],
+    [["training:read"], "/members?view=training"],
     [["applications:read"], "/members?status=requested"],
     [["system:admin"], "/admin"],
     [["import:run"], "/import"],
-    [["member-roles:read", "member-role-types:read"], "/roles"],
+    [["member-roles:read", "member-role-types:read"], "/members?view=roles"],
     [["anniversary-years:read"], "/anniversaries"],
   ];
   return c.redirect(landing.find(([ps]) => ps.some((p) => perms.has(p as never)))?.[1] ?? "/account");
