@@ -36,7 +36,7 @@ import { trainingRecords } from "../db/schema/index.js";
 
 import { ApplicationFormSettings, ApplicationLinks } from "../components/application-links.js";
 import { loadApplicationForms } from "../lib/application-forms.js";
-import { StatCard } from "../components/stat-card.js";
+import { StatCard, StatGrid } from "../components/stat-card.js";
 export const memberRoutes = new Hono<{ Variables: Variables }>();
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -193,8 +193,7 @@ export function StatsCards({ all, openRequests = null }: { all: MemberWithStatus
   const children = genderCount("children");
 
   return (
-    <div id="members-stats" class={`hidden sm:block @container mb-6${openRequests ? " pt-3" : ""}`}>
-    <div style={!openRequests ? undefined : "--stat-cols:7"} class="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-[repeat(var(--stat-cols,6),minmax(0,1fr))] gap-2 @4xl:gap-4">
+    <StatGrid id="members-stats" cols={openRequests ? 7 : 6} class={openRequests ? "pt-3" : undefined}>
       {openRequests ? <StatCard label={t("members.stats.requested")} value={openRequests} tone="text-warning font-bold" href="/members?status=requested" link="filter" highlight /> : null}
       <StatCard label={t("members.stats.active")} value={counts.active} tone="text-success" inline>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
@@ -213,8 +212,7 @@ export function StatsCards({ all, openRequests = null }: { all: MemberWithStatus
           {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="icon-[tabler--cross]" class="w-3.5 h-3.5" /></span>}
         </div>
       </StatCard>
-    </div>
-    </div>
+    </StatGrid>
   );
 }
 
