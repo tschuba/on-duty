@@ -138,7 +138,7 @@ describe("Verleih-Zähler", () => {
     const html = await renderAt("/", "lending:read", "lending:manage");
     expect(html).toMatch(/badge-error[^>]*>3</);
     expect(html).toMatch(/indicator-item badge badge-error/);
-    expect(html).toContain('data-tip="Inventar · 1 überfällig, 2 Anfragen"');
+    expect(html).toContain('data-tip="Verleih · 1 überfällig, 2 Anfragen"');
     // Punkt im eingeklappten Menü auch, wenn die Gruppe gerade aktiv ist.
     expect(await renderAt("/inventory/lending", "lending:read", "lending:manage")).toMatch(/indicator-item badge badge-error/);
     openLoanRequests = 1;

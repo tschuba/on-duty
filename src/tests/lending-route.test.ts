@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { lendingLoans } from "../db/schema/index.js";
+import { lendingLoans, lendingItems } from "../db/schema/index.js";
 import { formBody } from "./test-utils.js";
 
 process.env.CHILDREN_AGE_LIMIT = "12";
@@ -7,6 +7,7 @@ process.env.YOUTH_AGE_LIMIT = "18";
 
 let lendingItemsFindManyResult: any[] = [];
 let lendingItemsFindFirstResult: any = undefined;
+let inventoryItemsFindFirstResult: any = undefined;
 let lendingLoansFindManyResult: any[] = [];
 let lendingLoansFindFirstResult: any = undefined;
 let loanRequestsFindManyResult: any[] = [];
@@ -57,6 +58,7 @@ vi.mock("../db/index.js", () => ({
         findFirst: vi.fn(() => Promise.resolve(lendingItemsFindFirstResult)),
       },
       inventoryItems: {
+        findFirst: vi.fn(() => Promise.resolve(inventoryItemsFindFirstResult)),
         findMany: vi.fn(() => Promise.resolve([])),
       },
       lendingLoans: {
@@ -99,6 +101,7 @@ beforeEach(() => {
   deleteCalls.length = 0;
   lendingItemsFindManyResult = [];
   lendingItemsFindFirstResult = undefined;
+  inventoryItemsFindFirstResult = undefined;
   lendingLoansFindManyResult = [];
   lendingLoansFindFirstResult = undefined;
   loanRequestsFindManyResult = [];
@@ -560,15 +563,43 @@ describe("GET /inventory/lending/search-persons", () => {
 });
 
 describe("GET /inventory/lending/loans/new", () => {
-  it("lists lendable, non-retired items and preselects ?item=", async () => {
-    lendingItemsFindManyResult = [
-      makeLendingItem({ id: "li1" }),
-      makeLendingItem({ id: "li2", inventoryItem: { ...makeLendingItem().inventoryItem, name: "Ausgemustert", retiredAt: "2026-01-01" } }),
-    ];
-    const html = await (await lendingRoutes.request("/loans/new?item=li1")).text();
+  it("preselects ?item= in the picker and restores form state from the query", async () => {
+    lendingItemsFindFirstResult = makeLendingItem({ id: "li1" });
+    const html = await (await lendingRoutes.request("/loans/new?item=li1&plannedFrom=2026-02-01")).text();
+    expect(html).toContain('value="item1"');
     expect(html).toContain("Stehtisch #1");
-    expect(html).not.toContain("Ausgemustert");
-    expect(html).toMatch(/<option value="li1" selected/);
+    expect(html).toContain('value="2026-02-01"');
+  });
+
+  it("does not preselect a retired item", async () => {
+    lendingItemsFindFirstResult = makeLendingItem({ id: "li1", inventoryItem: { ...makeLendingItem().inventoryItem, retiredAt: "2026-01-01" } });
+    const html = await (await lendingRoutes.request("/loans/new?item=li1")).text();
+    expect(html).not.toContain("Stehtisch #1");
+  });
+});
+
+describe("POST /inventory/lending/loans with a not-yet-lendable inventory item", () => {
+  it("creates the lending_items row and the loan in one transaction", async () => {
+    inventoryItemsFindFirstResult = { id: "inv1", name: "Zelt", quantity: 4, retiredQuantity: 0, retiredAt: null };
+    const res = await lendingRoutes.request("/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ inventoryItemId: "inv1", publicRequestable: "1", firstName: "Er", lastName: "Extern", phone: "0171 1", quantity: "2", plannedFrom: "2026-01-05", plannedTo: "2026-01-06" }),
+    });
+    expect(res.status).toBe(302);
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "inv1", individualTracking: false, publicRequestable: true, timesRequired: false, maxRequestQuantity: 0 });
+    expect(insertCalls.find((c) => c.table === lendingLoans)?.values).toMatchObject({ lendingItemId: "new-id", quantity: 2 });
+  });
+
+  it("rejects a retired inventory item", async () => {
+    inventoryItemsFindFirstResult = { id: "inv1", name: "Zelt", quantity: 1, retiredQuantity: 0, retiredAt: "2026-01-01" };
+    const res = await lendingRoutes.request("/loans", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody({ inventoryItemId: "inv1", firstName: "Er", lastName: "Extern", plannedFrom: "2026-01-05", plannedTo: "2026-01-06" }),
+    });
+    expect(res.status).toBe(404);
+    expect(insertCalls.length).toBe(0);
   });
 });
 
@@ -729,11 +760,18 @@ describe("loan page", () => {
 
   const page = async () => (await lendingRoutes.request("/loans/loan1")).text();
 
-  it("renders the edit form and the delete action", async () => {
+  it("renders read-only with edit link and delete action", async () => {
     const html = await page();
-    expect(html).toContain('action="/inventory/lending/loans/loan1"');
+    expect(html).not.toContain('id="loan-form"');
+    expect(html).toContain("/loans/loan1/edit");
     expect(html).toContain("/loans/loan1/delete");
     expect(html).not.toContain("/loans/loan1/pickup");
+  });
+
+  it("renders the edit form on /edit", async () => {
+    const html = await (await lendingRoutes.request("/loans/loan1/edit")).text();
+    expect(html).toContain('action="/inventory/lending/loans/loan1"');
+    expect(html).toContain('data-discard="loan-form"');
   });
 
   it("links email and phone of the borrower", async () => {
@@ -751,13 +789,13 @@ describe("loan page", () => {
   it("rejects a return before pickup and redirects back to the loan page", async () => {
     const res = await post("/loans/loan1", { pickedUpAt: "2026-01-03", returnedAt: "2026-01-02" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe("/inventory/lending/loans/loan1");
+    expect(res.headers.get("location")).toBe("/inventory/lending/loans/loan1/edit");
     expect(updateCalls.length).toBe(0);
   });
 
   it("rejects a return without pickup", async () => {
     const res = await post("/loans/loan1", { returnedAt: "2026-01-02" });
-    expect(res.headers.get("location")).toBe("/inventory/lending/loans/loan1");
+    expect(res.headers.get("location")).toBe("/inventory/lending/loans/loan1/edit");
     expect(updateCalls.length).toBe(0);
   });
 
@@ -770,7 +808,7 @@ describe("loan page", () => {
 
   it("rejects a planned end before the planned start when editing", async () => {
     const res = await post("/loans/loan1", { plannedFrom: "2026-01-10", plannedTo: "2026-01-05" });
-    expect(res.headers.get("location")).toBe("/inventory/lending/loans/loan1");
+    expect(res.headers.get("location")).toBe("/inventory/lending/loans/loan1/edit");
     expect(updateCalls.length).toBe(0);
   });
 
