@@ -55,6 +55,8 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     { icon: "icon-[tabler--calendar]", label: t("common.nav.events"), items: [{ label: t("common.nav.events"), href: "/events", show: true, count: c.events }] },
     { icon: "icon-[tabler--users]", label: t("common.nav.members"), items: [
       { label: t("common.nav.members"), href: "/members", show: any("members:read", "applications:read", "training:read", "member-roles:read", "member-role-types:read"), count: has("applications:read") ? c.applications : 0 },
+    ] },
+    { icon: "icon-[tabler--cake]", label: t("common.nav.anniversaries"), items: [
       { label: t("common.nav.anniversaries"), href: "/anniversaries", show: any("members:read", "anniversary-years:read") },
     ] },
     { icon: "icon-[tabler--cash]", label: t("common.nav.donations"), items: [
