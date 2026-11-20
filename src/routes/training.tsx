@@ -1,13 +1,15 @@
 import { Hono, type Context } from "hono";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { members, persons, trainingRecords } from "../db/schema/index.js";
-import { requireAuth, type Variables } from "../middleware/auth.js";
+import { requireAuth, type AuthedUser, type Variables } from "../middleware/auth.js";
+import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
+import { HTTP_STATUS } from "../lib/constants.js";
 import { Layout } from "../components/layout.js";
 import { Section } from "../components/section.js";
 import { Field } from "../components/field.js";
 import { RowAction } from "../components/row-action.js";
-import { ActionContent, PageHeader } from "../components/page-header.js";
+import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Pager } from "../components/pager.js";
 import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { formatDate } from "../lib/format.js";
@@ -25,7 +27,6 @@ const del = requireAuth("training:delete");
 
 type Record_ = typeof trainingRecords.$inferSelect;
 const today = () => toLocalDate(new Date(), resolveTimezone());
-const UNPROCESSABLE = 422;
 
 function StatusBadge({ s }: { s: TrainingStatus | undefined }) {
   if (s === "expired") return <span class="badge badge-sm badge-error">{t("training.status.expired")}</span>;
@@ -51,19 +52,18 @@ export function TrainingBox({ memberId, rows, canWrite, canDelete, sort, dir }: 
   return (
     <div id="training-box">
       <div class="overflow-x-auto">
-        <table class="table w-full">
+        <table class="table table-cards w-full">
           <thead><tr>{th("title", t("training.form.title"))}{th("completedAt", t("training.form.completedAt"))}{th("expiresAt", t("training.form.expiresAt"))}{th("organizer", t("training.form.organizer"))}<th></th></tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colspan={5} class="text-center opacity-50 py-4">{t("training.empty")}</td></tr>}
             {rows.map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} class="cursor-pointer hover" onclick={`window.location='/training/${r.id}'`}>
                 <td>{r.title} <StatusBadge s={status.get(r.id)} /></td>
-                <td>{r.completedAt ? formatDate(r.completedAt) : "–"}</td>
-                <td>{r.expiresAt ? formatDate(r.expiresAt) : "–"}</td>
-                <td>{r.organizer}</td>
+                <td data-label={t("training.form.completedAt")}>{r.completedAt ? formatDate(r.completedAt) : "–"}</td>
+                <td data-label={t("training.form.expiresAt")}>{r.expiresAt ? formatDate(r.expiresAt) : "–"}</td>
+                <td data-label={t("training.form.organizer")} data-empty={!r.organizer || undefined}>{r.organizer}</td>
                 <td class="text-right whitespace-nowrap">
-                  {canWrite && <RowAction icon="icon-[tabler--pencil]" label={t("common.edit")} attrs={{ "hx-get": `/members/${memberId}/training/${r.id}/edit`, "hx-target": "#training-modal-body", "hx-swap": "innerHTML", "hx-on::after-request": OPEN_MODAL }} />}
-                  {canDelete && <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" attrs={{ "hx-post": `/members/${memberId}/training/${r.id}/delete`, "hx-confirm": t("training.confirmDelete"), "hx-target": "#training-box", "hx-swap": "outerHTML" }} />}
+                  {canDelete && <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick="event.stopPropagation()" attrs={{ "hx-post": `/members/${memberId}/training/${r.id}/delete`, "hx-confirm": t("training.confirmDelete"), "hx-target": "#training-box", "hx-swap": "outerHTML" }} />}
                 </td>
               </tr>
             ))}
@@ -74,44 +74,26 @@ export function TrainingBox({ memberId, rows, canWrite, canDelete, sort, dir }: 
   );
 }
 
-const OPEN_MODAL = "if(event.detail.successful){document.getElementById('training-modal').showModal()}";
-
 // Detail-Abschnitt auf /members/:id (nur mit training:read einbinden).
 export function TrainingSection({ memberId, rows, canWrite, canDelete }: { memberId: string; rows: Record_[]; canWrite: boolean; canDelete: boolean }) {
   return (
     <>
       <Section title={t("training.title")} badge={<span id="training-count">{rows.length}</span>} class="mt-6" actions={canWrite && (
-        <button type="button" class="btn btn-outline btn-primary" aria-label={t("training.add")} title={t("training.add")} onclick="event.preventDefault();event.stopPropagation()" hx-get={`/members/${memberId}/training/new`} hx-target="#training-modal-body" hx-swap="innerHTML" {...{ "hx-on::after-request": OPEN_MODAL }}>
+        <a class="btn btn-outline btn-primary" aria-label={t("training.add")} title={t("training.add")} onclick="event.stopPropagation()" href={`/training/new?memberId=${memberId}`}>
           <ActionContent icon="icon-[tabler--plus]" label={t("training.add")} />
-        </button>
+        </a>
       )}>
         <TrainingBox memberId={memberId} rows={rows} canWrite={canWrite} canDelete={canDelete} />
       </Section>
-      <dialog id="training-modal" class="modal">
-        <div class="modal-box max-w-xl" id="training-modal-body" />
-        <form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form>
-      </dialog>
-      <script dangerouslySetInnerHTML={{ __html: `
-        document.body.addEventListener('htmx:beforeSwap', function (e) {
-          var d = document.getElementById('training-modal');
-          if (e.detail.xhr.status === ${UNPROCESSABLE} && d && d.contains(e.detail.requestConfig.elt)) {
-            e.detail.shouldSwap = true; e.detail.isError = false;
-            e.detail.target = document.getElementById('training-modal-body'); e.detail.swapOverride = 'innerHTML';
-          }
-        });
-        document.body.addEventListener('training-modal', function () { document.getElementById('training-modal').close(); });
-      ` }} />
     </>
   );
 }
 
 type FormValues = { title?: string; completedAt?: string | null; expiresAt?: string | null; organizer?: string | null; notes?: string | null };
 
-function TrainingForm({ action, title, values = {}, error }: { action: string; title: string; values?: FormValues; error?: string }) {
+function TrainingFields({ values = {} }: { values?: FormValues }) {
   return (
-    <form hx-post={action} hx-target="#training-box" hx-swap="outerHTML" class="space-y-4">
-      <h3 class="font-bold text-lg">{title}</h3>
-      {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
+    <>
       <Field label={t("training.form.title")} required><input type="text" name="title" class="input w-full" required maxlength={TRAINING_TITLE_MAX} placeholder={t("training.form.title")} value={values.title ?? ""} /></Field>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("training.form.completedAt")}><input type="date" name="completedAt" class="input w-full" value={values.completedAt ?? ""} /></Field>
@@ -119,11 +101,28 @@ function TrainingForm({ action, title, values = {}, error }: { action: string; t
       </div>
       <Field label={t("training.form.organizer")}><input type="text" name="organizer" class="input w-full" placeholder={t("training.form.organizer")} value={values.organizer ?? ""} /></Field>
       <Field label={t("training.form.notes")}><textarea name="notes" rows={3} class="textarea w-full" placeholder={t("training.form.notes")}>{values.notes ?? ""}</textarea></Field>
-      <div class="modal-action">
-        <button type="button" class="btn" onclick="this.closest('dialog').close()"><ActionContent icon="icon-[tabler--x]" label={t("common.cancel")} variant="primary" /></button>
-        <button type="submit" class="btn btn-primary"><ActionContent icon="icon-[tabler--check]" label={t("common.save")} variant="primary" /></button>
+    </>
+  );
+}
+
+// Anlegen und Bearbeiten auf eigener Seite. `picker`: Anlegen mit Mitgliederauswahl (`fromMember`: vorbelegt aus der Detailseite, bestimmt das Rücksprungziel).
+function TrainingPage({ user, title, action, back, values, error, picker }: { user: AuthedUser; title: string; action: string; back: string; values?: FormValues; error?: string; picker?: { member?: { id: string; name: string }; fromMember?: boolean } }) {
+  return (
+    <Layout title={title} user={user}>
+      <div class="max-w-2xl mx-auto">
+        <PageHeader title={title} backHref={back} actions={<FormActions formId="training-form" cancelHref={back} />} />
+        <form id="training-form" method="post" action={action} class="space-y-4">
+          {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
+          {picker && (
+            <>
+              {picker.fromMember && <input type="hidden" name="fromMember" value="1" />}
+              <EntityPicker id="training-memberId" name="memberId" searchUrl="/training/search-members" selectedId={picker.member?.id} selectedName={picker.member?.name} placeholder={t("training.form.member")} required />
+            </>
+          )}
+          <TrainingFields values={values} />
+        </form>
       </div>
-    </form>
+    </Layout>
   );
 }
 
@@ -146,36 +145,66 @@ trainingRoutes.get("/members/:id/training", read, async (c) => {
   return c.html(<TrainingBox memberId={id} rows={await loadRecords(id, sort, parseDir(c.req.query("dir")))} sort={sort} dir={parseDir(c.req.query("dir"))} canWrite={p.has("training:write")} canDelete={p.has("training:delete")} />);
 });
 
-trainingRoutes.get("/members/:id/training/new", write, async (c) => {
-  const id = c.req.param("id");
-  if (!(await memberExists(id))) return c.notFound();
-  return c.html(<TrainingForm action={`/members/${id}/training`} title={t("training.titleNew")} />);
-});
+// `?from=training` (von der Detailseite): Rücksprung dorthin statt zum Mitglied.
+function editTarget(c: import("hono").Context<{ Variables: Variables }>, id: string, tid: string) {
+  const fromTraining = c.req.query("from") === "training";
+  return { action: `/members/${id}/training/${tid}${fromTraining ? "?from=training" : ""}`, back: fromTraining ? `/training/${tid}` : `/members/${id}` };
+}
 
 trainingRoutes.get("/members/:id/training/:tid/edit", write, async (c) => {
   const id = c.req.param("id");
   const r = await findRecord(id, c.req.param("tid"));
   if (!r) return c.notFound();
-  return c.html(<TrainingForm action={`/members/${id}/training/${r.id}`} title={t("training.titleEdit")} values={r} />);
+  const { action, back } = editTarget(c, id, r.id);
+  return c.html(<TrainingPage user={c.get("user")} title={t("training.titleEdit")} action={action} back={back} values={r} />);
 });
 
-async function save(c: import("hono").Context<{ Variables: Variables }>, tid?: string) {
+const LIST_URL = "/members?view=training";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function memberName(id: string) {
+  const [m] = UUID.test(id) ? await db.select({ f: persons.firstName, l: persons.lastName }).from(members).innerJoin(persons, eq(persons.id, members.personId)).where(eq(members.id, id)) : [];
+  return m ? `${m.f} ${m.l}` : undefined;
+}
+
+const formValues = (body: Record<string, unknown>): FormValues => ({ title: String(body.title ?? ""), completedAt: String(body.completedAt ?? ""), expiresAt: String(body.expiresAt ?? ""), organizer: String(body.organizer ?? ""), notes: String(body.notes ?? "") });
+
+// Bearbeiten (eigene Seite).
+async function save(c: import("hono").Context<{ Variables: Variables }>, tid: string) {
   const id = c.req.param("id")!;
-  if (!(await memberExists(id))) return c.notFound();
-  if (tid && !(await findRecord(id, tid))) return c.notFound();
+  if (!(await findRecord(id, tid))) return c.notFound();
   const body = await c.req.parseBody();
   const parsed = parseTrainingInput(body, today());
-  if ("error" in parsed) {
-    c.status(UNPROCESSABLE);
-    return c.html(<TrainingForm action={tid ? `/members/${id}/training/${tid}` : `/members/${id}/training`} title={tid ? t("training.titleEdit") : t("training.titleNew")}
-      values={{ title: String(body.title ?? ""), completedAt: String(body.completedAt ?? ""), expiresAt: String(body.expiresAt ?? ""), organizer: String(body.organizer ?? ""), notes: String(body.notes ?? "") }}
-      error={t(`training.error.${parsed.error}`)} />);
+  if (!("value" in parsed)) {
+    c.status(HTTP_STATUS.UNPROCESSABLE_ENTITY);
+    const { action, back } = editTarget(c, id, tid);
+    return c.html(<TrainingPage user={c.get("user")} title={t("training.titleEdit")} action={action} back={back} values={formValues(body)} error={t(`training.error.${parsed.error}`)} />);
   }
-  if (tid) await db.update(trainingRecords).set(parsed.value).where(eq(trainingRecords.id, tid));
-  else await db.insert(trainingRecords).values({ ...parsed.value, memberId: id });
-  c.header("HX-Trigger", JSON.stringify({ "training-modal": "close" }));
-  return c.html(await boxWithCount(c, id));
+  await db.update(trainingRecords).set(parsed.value).where(eq(trainingRecords.id, tid));
+  return c.redirect(editTarget(c, id, tid).back);
 }
+
+// Anlegen (eigene Seite): Mitglied kommt aus dem Formular.
+trainingRoutes.get("/training/new", write, async (c) => {
+  const id = c.req.query("memberId") ?? "";
+  const name = await memberName(id);
+  return c.html(<TrainingPage user={c.get("user")} title={t("training.titleNew")} action="/training" back={name ? `/members/${id}` : LIST_URL} picker={{ member: name ? { id, name } : undefined, fromMember: !!name }} />);
+});
+
+trainingRoutes.post("/training", write, async (c) => {
+  const body = await c.req.parseBody();
+  const id = String(body.memberId ?? "");
+  const fromMember = body.fromMember === "1";
+  const name = await memberName(id);
+  const parsed = parseTrainingInput(body, today());
+  const error = !name ? "member" : "error" in parsed ? parsed.error : undefined;
+  if (error || !("value" in parsed)) {
+    c.status(HTTP_STATUS.UNPROCESSABLE_ENTITY);
+    return c.html(<TrainingPage user={c.get("user")} title={t("training.titleNew")} action="/training" back={fromMember && name ? `/members/${id}` : LIST_URL} values={formValues(body)} error={t(`training.error.${error ?? "title"}`)} picker={{ member: name ? { id, name } : undefined, fromMember }} />);
+  }
+  await db.insert(trainingRecords).values({ ...parsed.value, memberId: id });
+  return c.redirect(fromMember ? `/members/${id}` : LIST_URL);
+});
 
 // Box neu laden + Badge im Section-Titel per OOB-Swap aktualisieren (liegt außerhalb von #training-box).
 async function boxWithCount(c: import("hono").Context<{ Variables: Variables }>, id: string) {
@@ -189,7 +218,46 @@ async function boxWithCount(c: import("hono").Context<{ Variables: Variables }>,
   );
 }
 
-trainingRoutes.post("/members/:id/training", write, (c) => save(c));
+// Mitgliederauswahl für die Anlegen-Seite (nur aktive Mitglieder).
+trainingRoutes.get("/training/search-members", write, async (c) => {
+  const q = (c.req.query("q") ?? "").trim();
+  if (q.length < 2) return c.html("");
+  const needle = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+  const rows = await db.select({ id: members.id, firstName: persons.firstName, lastName: persons.lastName }).from(members)
+    .innerJoin(persons, eq(persons.id, members.personId))
+    .where(and(or(ilike(persons.firstName, needle), ilike(persons.lastName, needle)), isNull(members.exitDate), isNull(members.deathDate)))
+    .orderBy(asc(persons.lastName), asc(persons.firstName)).limit(10);
+  return c.html(<PickerOptions empty={t("picker.noResults", { query: q })} options={rows.map((r) => ({ id: r.id, name: `${r.firstName} ${r.lastName}` }))} />);
+});
+// Detailseite (nur lesen).
+trainingRoutes.get("/training/:id", read, async (c) => {
+  const tid = c.req.param("id");
+  const [x] = UUID.test(tid) ? await db.select({ r: trainingRecords, firstName: persons.firstName, lastName: persons.lastName }).from(trainingRecords)
+    .innerJoin(members, eq(members.id, trainingRecords.memberId)).innerJoin(persons, eq(persons.id, members.personId)).where(eq(trainingRecords.id, tid)) : [];
+  if (!x) return c.notFound();
+  const status = trainingStatuses([x.r], today()).get(x.r.id);
+  const rows: [string, unknown][] = [
+    [t("training.col.member"), <a class="link link-hover" href={`/members/${x.r.memberId}`}>{x.lastName}, {x.firstName}</a>],
+    [t("training.form.title"), <>{x.r.title} <StatusBadge s={status} /></>],
+    [t("training.form.completedAt"), x.r.completedAt ? formatDate(x.r.completedAt) : "–"],
+    [t("training.form.expiresAt"), x.r.expiresAt ? formatDate(x.r.expiresAt) : "–"],
+    [t("training.form.organizer"), x.r.organizer || "–"],
+    [t("training.form.notes"), x.r.notes ? <span class="whitespace-pre-line">{x.r.notes}</span> : "–"],
+  ];
+  return c.html(
+    <Layout title={x.r.title} user={c.get("user")}>
+      <div class="max-w-2xl mx-auto">
+        <PageHeader title={t("training.titleView")} backHref={LIST_URL} actions={c.get("user").permissions.has("training:write") && (
+          <HeaderAction variant="primary" icon="icon-[tabler--pencil]" label={t("common.edit")} href={`/members/${x.r.memberId}/training/${x.r.id}/edit?from=training`} class="btn-primary" />
+        )} />
+        <dl class="space-y-4">
+          {rows.map(([k, v]) => <div><dt class="text-sm opacity-60">{k}</dt><dd>{v as never}</dd></div>)}
+        </dl>
+      </div>
+    </Layout>,
+  );
+});
+
 trainingRoutes.post("/members/:id/training/:tid", write, (c) => save(c, c.req.param("tid")));
 
 trainingRoutes.post("/members/:id/training/:tid/delete", del, async (c) => {
@@ -209,6 +277,21 @@ trainingRoutes.get("/training", read, (c) => {
   u.searchParams.set("view", "training");
   return c.redirect(`/members${u.search}`);
 });
+
+type ListRow = { r: Record_; firstName: string; lastName: string };
+function TrainingRow({ x, status, showMember }: { x: ListRow; status: Map<string, TrainingStatus>; showMember: boolean }) {
+  return (
+    <tr class={`cursor-pointer hover ${status.get(x.r.id) === "replaced" ? "opacity-50" : ""}`} onclick={`window.location='/training/${x.r.id}'`}>
+      {showMember && <td class="max-md:font-semibold"><a class="link link-hover" onclick="event.stopPropagation()" href={`/members/${x.r.memberId}`}>{x.lastName}, {x.firstName}</a></td>}
+      <td>{x.r.title} <StatusBadge s={status.get(x.r.id)} /></td>
+      <td data-label={t("training.form.completedAt")} data-empty={!x.r.completedAt || undefined}>{x.r.completedAt ? formatDate(x.r.completedAt) : "–"}</td>
+      <td data-label={t("training.form.expiresAt")} data-empty={!x.r.expiresAt || undefined}>{x.r.expiresAt ? formatDate(x.r.expiresAt) : "–"}</td>
+      <td data-label={t("training.form.organizer")}>{x.r.organizer}</td>
+    </tr>
+  );
+}
+
+const headCols = [["member", "training.col.member"], ["title", "training.form.title"], ["completedAt", "training.form.completedAt"], ["expiresAt", "training.form.expiresAt"], ["organizer", "training.form.organizer"]] as const;
 
 export async function renderTraining(c: Context<{ Variables: Variables }>) {
   const user = c.get("user")!;
@@ -234,16 +317,28 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
   const sort = parseTrainingSort(q.sort);
   const dir = parseDir(q.dir) ?? (sort ? defaultTrainingDir(sort) : "desc");
   const sorted = sortTrainings(rows, (x) => ({ ...recFields(x.r), member: `${x.lastName}, ${x.firstName}` }), sort, dir);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
-  const items = sorted.slice((page - 1) * pageSize, page * pageSize);
-  const cur = { view: "training", q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
+  const grouped = q.group === "member";
+  // Gruppiert wird nach Mitglied paginiert, damit keine Gruppe über Seiten zerreißt.
+  const groups = grouped
+    ? [...sorted.reduce((m, x) => m.set(x.r.memberId, [...(m.get(x.r.memberId) ?? []), x]), new Map<string, typeof sorted>()).values()].sort((a, b) => `${a[0].lastName}, ${a[0].firstName}`.localeCompare(`${b[0].lastName}, ${b[0].firstName}`, "de"))
+    : [];
+  const unit = grouped ? groups.length : sorted.length;
+  const totalPages = Math.max(1, Math.ceil(unit / pageSize));
+  const slice = <T,>(l: T[]) => l.slice((page - 1) * pageSize, page * pageSize);
+  const items = grouped ? [] : slice(sorted);
+  const pageGroups = grouped ? slice(groups) : [];
+  const cur = { view: "training", group: grouped ? "member" : undefined, q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
   const pageUrl = (p: number) => buildListUrl("/members", cur, { page: p });
 
   return c.html(
     <Layout title={t("training.pageTitle")} user={user}>
-      <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "training")} />} />
+      <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "training")} />} actions={<>
+        <HeaderAction icon="icon-[tabler--users]" label={t("training.filter.grouped")} href={buildListUrl("/members", cur, { group: grouped ? undefined : "member", page: 1 })} class={grouped ? "btn-neutral" : "btn-outline"} hideLabel="@max-4xl:hidden" />
+        {user.permissions.has("training:write") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("training.add")} href="/training/new" class="btn-primary" hideLabel="@max-2xl:hidden" />}
+      </>} />
       <form method="get" action="/members" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
         <input type="hidden" name="view" value="training" />
+        {grouped && <input type="hidden" name="group" value="member" />}
         <input type="search" name="q" class="input" placeholder={t("training.filter.search")} value={q.q ?? ""} enterkeyhint="search"
           hx-get="/members" hx-trigger="input changed delay:300ms, search" hx-include="closest form" hx-target="#training-results" hx-select="#training-results" hx-swap="outerHTML" hx-push-url="true" />
         <MultiSelectFilter
@@ -262,26 +357,49 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
         </label>
       </form>
       <div id="training-results" class="flex flex-1 flex-col">
+      {grouped ? (
+        <div class="flex flex-col gap-4">
+          {unit === 0 && <p class="text-center opacity-50 py-4">{t("training.empty")}</p>}
+          {pageGroups.map((g, i) => {
+            const counts = (["expired", "soon"] as const).map((k) => [k, g.filter((x) => status.get(x.r.id) === k).length] as const).filter(([, n]) => n > 0);
+            const accent = counts[0]?.[0] === "expired" ? "border-l-4 border-l-error" : "";
+            return (
+              <section class={`group-card rounded-box border border-base-300 ${accent} bg-base-100 overflow-hidden`}>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 bg-base-200/60">
+                  <div class="avatar avatar-placeholder"><div class="bg-primary text-primary-content w-9 rounded-full text-sm font-semibold">{g[0].firstName[0]}{g[0].lastName[0]}</div></div>
+                  <a class="link link-hover" href={`/members/${g[0].r.memberId}`}><span class="font-bold">{g[0].lastName}</span>, {g[0].firstName}</a>
+                  <span class="badge badge-sm badge-ghost">{g.length}</span>
+                  <span class="ml-auto flex flex-wrap gap-1">
+                    {counts.length === 0 && <span class="badge badge-sm badge-success badge-soft">{t("training.status.valid")}</span>}
+                    {counts.map(([k, n]) => <span class={`badge badge-sm ${k === "expired" ? "badge-error" : "badge-warning"}`}>{n} {t(`training.status.${k}`)}</span>)}
+                  </span>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="table table-cards table-fixed w-full">
+                    {i === 0 && <thead><tr>{headCols.filter(([col]) => col !== "member").map(([col, key], n) => (
+                      <th class={n === 0 ? "w-2/5" : "w-1/5"}><a href={buildListUrl("/members", cur, { sort: col, dir: nextTrainingDir(col, sort, dir), page: 1 })} class="link link-hover">{t(key)} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? dir : "desc"} /></a></th>
+                    ))}</tr></thead>}
+                    <tbody>{g.map((x) => <TrainingRow x={x} status={status} showMember={false} />)}</tbody>
+                  </table>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      ) : (
       <div class="overflow-x-auto">
-        <table class="table table-zebra w-full">
-          <thead><tr>{([["member", "training.col.member"], ["title", "training.form.title"], ["completedAt", "training.form.completedAt"], ["expiresAt", "training.form.expiresAt"], ["organizer", "training.form.organizer"]] as const).map(([col, key]) => (
+        <table class="table table-cards table-zebra w-full">
+          <thead><tr>{headCols.map(([col, key]) => (
             <th><a href={buildListUrl("/members", cur, { sort: col, dir: nextTrainingDir(col, sort, dir), page: 1 })} class="link link-hover">{t(key)} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? dir : "desc"} /></a></th>
           ))}</tr></thead>
           <tbody>
-            {items.length === 0 && <tr><td colspan={5} class="text-center opacity-50 py-4">{t("training.empty")}</td></tr>}
-            {items.map((x) => (
-              <tr key={x.r.id}>
-                <td><a class="link link-hover" href={`/members/${x.r.memberId}`}>{x.lastName}, {x.firstName}</a></td>
-                <td>{x.r.title} <StatusBadge s={status.get(x.r.id)} /></td>
-                <td>{x.r.completedAt ? formatDate(x.r.completedAt) : "–"}</td>
-                <td>{x.r.expiresAt ? formatDate(x.r.expiresAt) : "–"}</td>
-                <td>{x.r.organizer}</td>
-              </tr>
-            ))}
+            {unit === 0 && <tr><td colspan={5} class="text-center opacity-50 py-4">{t("training.empty")}</td></tr>}
+            {items.map((x) => <TrainingRow x={x} status={status} showMember />)}
           </tbody>
         </table>
       </div>
-      <Pager countLabel={t("training.count", { count: rows.length })} page={page} totalPages={totalPages} pageUrl={pageUrl} pageSize={pageSize} pageSizeOptions={PAGE_SIZE_OPTIONS} />
+      )}
+      <Pager countLabel={t(grouped ? "training.countGrouped" : "training.count", { count: unit })} page={page} totalPages={totalPages} pageUrl={pageUrl} pageSize={pageSize} pageSizeOptions={PAGE_SIZE_OPTIONS} />
       </div>
     </Layout>,
   );

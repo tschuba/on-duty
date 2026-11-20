@@ -99,7 +99,7 @@ export async function renderTemplateList(c: any) {
         <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
       </form>
       <div class="overflow-x-auto max-w-3xl">
-        <table class="table table-zebra w-full">
+        <table class="table table-zebra table-cards w-full">
           <thead>
             <tr>
               <th>{t("inventory.itemTemplates.name")}</th>
@@ -113,9 +113,9 @@ export async function renderTemplateList(c: any) {
             {rows.map((r) => (
               <tr class="cursor-pointer hover" onclick={`location.href='${BASE}/${r.id}'`}>
                 <td class="font-medium">{r.name}</td>
-                <td class="max-w-xs truncate">{r.description}</td>
-                <td>{r.enabledFields.length + r.fieldDefs.length}</td>
-                <td>{r.inspections.length}</td>
+                <td class="max-w-xs truncate" data-empty={!r.description || undefined}>{r.description}</td>
+                <td data-label={t("inventory.itemTemplates.colFields")}>{r.enabledFields.length + r.fieldDefs.length}</td>
+                <td data-label={t("inventory.itemTemplates.inspections")}>{r.inspections.length}</td>
               </tr>
             ))}
           </tbody>

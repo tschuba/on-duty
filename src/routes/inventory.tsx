@@ -894,7 +894,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
       <div id="inventory-results">
       <div class="overflow-x-auto">
-      <table class="table table-zebra w-full">
+      <table class="table table-zebra table-cards w-full">
         <thead>
           <tr>
             <th>{t("inventory.table.name")}</th>
@@ -916,20 +916,20 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
             const status = itemStatus(item, !!lending);
             return (
               <tr key={item.id} class="cursor-pointer hover" onclick={`window.location='/inventory/${item.id}'`}>
-                <td>{item.name}</td>
-                <td><div class="flex flex-wrap gap-1"><TagBadges compact tags={item.tags.map((tg) => tg.tag)} /></div></td>
-                <td class="hidden md:table-cell">
+                <td data-label={t("inventory.table.name")}>{item.name}</td>
+                <td data-label={t("inventory.table.tags")} data-empty={item.tags.length === 0 || undefined}><div class="flex flex-wrap gap-1"><TagBadges compact tags={item.tags.map((tg) => tg.tag)} /></div></td>
+                <td data-label={t("inventory.table.dueDate")} data-empty={!due || undefined} class="hidden md:table-cell">
                   {due ? <span class={due.dueDate! < today ? "text-error font-semibold" : ""}>{formatDate(due.dueDate!)} <span class="opacity-60">{due.name}</span></span> : "—"}
                   {open.length > 1 && <span class="badge badge-ghost badge-sm ml-1">+{open.length - 1}</span>}
                 </td>
-                <td class="hidden lg:table-cell">{item.locationText || "—"}</td>
-                <td>
+                <td data-label={t("inventory.table.location")} data-empty={!item.locationText || undefined} class="hidden lg:table-cell">{item.locationText || "—"}</td>
+                <td data-label={t("inventory.table.status")}>
                   {status === "retired" && <span class="badge badge-neutral badge-sm">{t("inventory.status.retired")}</span>}
                   {status === "lendable" && <span class="badge badge-info badge-sm">{t("inventory.status.lendable")}</span>}
                   {status === "active" && <span class="badge badge-success badge-sm">{t("inventory.status.active")}</span>}
                   {lending?.publicRequestable && <span class="badge badge-ghost badge-sm ml-1">{t("lend.form.publicBadge")}</span>}
                 </td>
-                <td class="hidden md:table-cell">
+                <td data-label={t("inventory.table.quantity")} class="hidden md:table-cell">
                   {lending
                     ? <span class={`badge badge-sm ${lending.available <= 0 ? "badge-warning" : "badge-outline"}`}>{t("inventory.lending.available", { count: lending.available })}</span>
                     : item.quantity > 1 && <span class="badge badge-outline badge-sm">{item.quantity - item.retiredQuantity}</span>}
@@ -1742,7 +1742,8 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
         {(range.mode !== "default" || inspectionFilter.length > 0 || status !== "all") && <a href="/inventory/inspections" class="btn btn-ghost self-end">{t("common.reset")}</a>}
       </div>
 
-      <table class="table table-zebra w-full">
+      <div class="overflow-x-auto">
+      <table class="table table-zebra table-cards w-full">
         <thead>
           <tr>
             <th>{t("inventory.inspections.table.date")}</th>
@@ -1757,20 +1758,21 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
           {rows.length === 0 && <tr><td colspan={6} class="text-center opacity-50 py-8">{t("inventory.inspections.empty")}</td></tr>}
           {rows.map((r) => (
             <tr key={r.key}>
-              <td class={r.overdue ? "text-error font-semibold" : ""}>
+              <td data-label={t("inventory.inspections.table.date")} class={r.overdue ? "text-error font-semibold" : ""}>
                 {r.record ? <a class="link" href={`/inventory/${r.itemId}/inspections/${r.record.id}`}>{formatDate(r.date)}</a> : formatDate(r.date)}
               </td>
-              <td><a class="link" href={`/inventory/${r.itemId}`}>{r.itemName}</a></td>
-              <td>{r.inspectionName}</td>
-              <td>
+              <td data-label={t("inventory.inspections.table.item")}><a class="link" href={`/inventory/${r.itemId}`}>{r.itemName}</a></td>
+              <td data-label={t("inventory.inspections.table.inspection")}>{r.inspectionName}</td>
+              <td data-label={t("inventory.inspections.table.status")}>
                 {r.record ? t("inventory.inspections.status.done") : r.overdue ? <span class="badge badge-error badge-sm">{t("inventory.inspections.overdue")}</span> : t("inventory.inspections.status.upcoming")}
               </td>
-              <td>{r.record ? <ResultDot result={r.record.result} legacy={isLegacyRecord(r.record)} /> : null}</td>
-              <td>{r.record?.inspector ? personName(r.record.inspector) : null}</td>
+              <td data-label={t("inventory.inspection.result")}>{r.record ? <ResultDot result={r.record.result} legacy={isLegacyRecord(r.record)} /> : null}</td>
+              <td data-label={t("inventory.inspection.inspector")}>{r.record?.inspector ? personName(r.record.inspector) : null}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </Layout>
   );
 });

@@ -253,7 +253,7 @@ export function MembersTable({
     <div id="members-results">
       <div>
         <ClickToEditHint />
-        <table class="table table-zebra w-full">
+        <table class="table table-zebra table-cards w-full">
           <thead>
             <tr>
               <th><a href={sortUrl("lastName")} class="link link-hover">{t("members.table.lastName")} <SortIcon col="lastName" active={sort} dir={dir} /></a></th>
@@ -266,13 +266,13 @@ export function MembersTable({
           </thead>
           <tbody>
             {page === 1 && requests.map((a) => (
-              <tr key={a.id} class="cursor-pointer hover bg-warning/10!" onclick={`window.location='/applications/${a.id}'`}>
-                <td class="font-medium border-l-4 border-l-warning">{a.person.lastName}</td>
-                <td>{a.person.firstName}</td>
-                <td class="hidden xl:table-cell">{formatDate(a.person.birthDate)}</td>
+              <tr key={a.id} class="cursor-pointer hover bg-warning/10! max-md:grid-cols-[1fr_auto] max-md:border-l-4! max-md:border-l-warning!" onclick={`window.location='/applications/${a.id}'`}>
+                <td class="font-medium border-l-4 border-l-warning max-md:col-start-1 max-md:row-start-1 max-md:font-semibold">{a.person.lastName}</td>
+                <td class="max-md:col-start-1 max-md:row-start-2">{a.person.firstName}</td>
+                <td data-label={t("members.table.birthDate")} data-empty={!a.person.birthDate || undefined} class="hidden xl:table-cell max-md:col-span-2">{formatDate(a.person.birthDate)}</td>
                 <td class="hidden lg:table-cell"></td>
                 <td class="hidden md:table-cell"></td>
-                <td><span class="badge badge-sm badge-warning badge-outline">{t("members.status.requested")}</span></td>
+                <td class="max-md:col-start-2 max-md:row-start-1"><span class="badge badge-sm badge-warning badge-outline">{t("members.status.requested")}</span></td>
               </tr>
             ))}
             {items.length === 0 && requests.length === 0 ? (
@@ -280,14 +280,14 @@ export function MembersTable({
             ) : items.map((m) => (
               <tr
                 key={m.id}
-                class="cursor-pointer hover"
+                class="cursor-pointer hover max-md:grid-cols-[1fr_auto]"
                 onclick={`window.location='/members/${m.id}'`}
               >
-                <td class="font-medium border-l-4 border-l-transparent">{m.lastName}</td>
-                <td>{m.firstName}</td>
-                <td class="hidden xl:table-cell">{formatDate(m.birthDate)}</td>
-                <td class="hidden lg:table-cell">{formatDate(m.entryDate)}</td>
-                <td class="hidden md:table-cell">
+                <td class="font-medium border-l-4 border-l-transparent max-md:col-start-1 max-md:row-start-1 max-md:font-semibold">{m.lastName}</td>
+                <td class="max-md:col-start-1 max-md:row-start-2">{m.firstName}</td>
+                <td data-label={t("members.table.birthDate")} data-empty={!m.birthDate || undefined} class="hidden xl:table-cell max-md:col-span-2">{formatDate(m.birthDate)}</td>
+                <td data-label={t("members.table.entryDate")} data-empty={!m.entryDate || undefined} class="hidden lg:table-cell max-md:col-span-2">{formatDate(m.entryDate)}</td>
+                <td data-label={t("members.table.roles")} data-empty={openRoles(m).length === 0 || undefined} class="hidden md:table-cell max-md:col-span-2">
                   {(() => {
                     const roles = openRoles(m);
                     return (
@@ -301,7 +301,7 @@ export function MembersTable({
                     );
                   })()}
                 </td>
-                <td><StatusBadge status={m.status} compact /></td>
+                <td class="max-md:col-start-2 max-md:row-start-1"><StatusBadge status={m.status} compact /></td>
               </tr>
             ))}
           </tbody>
@@ -363,9 +363,9 @@ function AssignmentRow({ r, memberId, index, readOnly }: { r: AssignmentRowData;
           )}
           {r.roleTitle}
         </td>
-        <td class="assignment-from">{r.from ? formatDate(r.from) : <FromMissingBadge />}</td>
-        <td>{r.to ? formatDate(r.to) : ""}</td>
-        <td class="whitespace-pre-line">{r.note}</td>
+        <td class="assignment-from" data-label={t("members.form.from")}>{r.from ? formatDate(r.from) : <FromMissingBadge />}</td>
+        <td data-label={t("members.form.to")} data-empty={!r.to || undefined}>{r.to ? formatDate(r.to) : ""}</td>
+        <td class="whitespace-pre-line" data-label={t("members.form.note")} data-empty={!r.note || undefined}>{r.note}</td>
         <td class="text-right whitespace-nowrap">
           {!readOnly && memberId && (
             <>
@@ -397,10 +397,10 @@ function AssignmentsBox({ rows, memberId, readOnly }: { rows: AssignmentRowData[
   return (
     <div id="assignments-box">
       <div class="overflow-x-auto">
-        <table class="table w-full">
+        <table class="table table-cards w-full">
           <thead><tr><th>{t("members.form.role")}</th><th>{t("members.form.from")}</th><th>{t("members.form.to")}</th><th>{t("members.form.note")}</th><th></th></tr></thead>
           <tbody id="role-rows" data-next-index={String(rows.length)}>
-            <tr class="assignment-empty hidden only:table-row"><td colSpan={5} class="text-center opacity-50 py-4">{t("members.assignment.empty")}</td></tr>
+            <tr class="assignment-empty not-only:hidden!"><td colSpan={5} class="text-center opacity-50 py-4">{t("members.assignment.empty")}</td></tr>
             {sortRows(rows).map((r, i) => <AssignmentRow key={r.id || i} r={r} memberId={memberId} index={r.idx ?? String(i)} readOnly={readOnly} />)}
           </tbody>
         </table>
@@ -1107,17 +1107,17 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
   return c.html(
     <Layout title={t("members.title")} user={user}>
       <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "members")} />} actions={<>
-        <label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
-          <Icon name="icon-[tabler--chart-bar]" class="w-5 h-5" />
-          <span class="@max-6xl:hidden">{t("members.stats.toggle")}</span>
-          <input type="checkbox" id="members-stats-toggle" class="toggle" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
-        </label>
         {canReview && <ApplicationLinks forms={forms} canManageForms={user.permissions.has("applications:manage")} />}
         <div class="dropdown dropdown-end ml-2">
           <div tabindex={0} role="button" class="btn btn-neutral btn-square" aria-label={t("common.moreActions")} title={t("common.moreActions")}>
             <Icon name="icon-[tabler--dots-vertical]" class="h-5 w-5" />
           </div>
-          <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-44 p-2 shadow">
+          <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow">
+            <li><label class="flex items-center gap-2 cursor-pointer" title={t("members.stats.toggle")}>
+              <Icon name="icon-[tabler--chart-bar]" class="h-5 w-5" />
+              <span class="flex-1">{t("members.stats.toggle")}</span>
+              <input type="checkbox" id="members-stats-toggle" class="toggle toggle-sm" aria-label={t("members.stats.toggle")} onchange="toggleMembersStats(this.checked)" />
+            </label></li>
             {user.permissions.has("import:run") && <li><a href="/import?kind=members"><Icon name="icon-[tabler--upload]" class="h-5 w-5" />{t("import.action")}</a></li>}
             <MembersExportButton empty={sorted.length === 0} />
           </ul>

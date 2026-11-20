@@ -329,7 +329,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         <p class="text-center opacity-50 py-8">{t("lending.overview.empty")}</p>
       ) : (
         <div class="overflow-x-auto">
-          <table class="table table-zebra w-full [&_tbody_td]:border-b-0">
+          <table class="table table-zebra table-cards w-full [&_tbody_td]:border-b-0">
             <thead>
               <tr>
                 <th class="pl-5 border-l-4 border-l-transparent">{t("lending.overview.col.start")}</th>
@@ -354,14 +354,14 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
                     return (
                       <tr
                         key={`${r.kind}-${r.id}`}
-                        class={`${clickable ? "cursor-pointer hover" : ""}${r.state === "rejected" ? " opacity-60" : ""}`}
+                        class={`max-md:grid-cols-[1fr_auto] max-md:border-l-4! ${clickable ? "cursor-pointer hover" : ""}${r.state === "rejected" ? " opacity-60" : ""} ${r.state === "overdue" ? "max-md:border-l-error!" : r.state === "requested" ? (r.conflict ? "max-md:border-l-warning!" : "max-md:border-l-primary!") : ""}`}
                         {...(clickable ? { onclick: `window.location='${r.href}'` } : {})}
                       >
-                        <td class={`whitespace-nowrap text-sm pl-5 border-l-4 ${edge}${border}`}>{formatDate(r.sortDate)}</td>
-                        <td class={border}>{r.lendingItem.inventoryItem.name}{r.quantity > 1 && ` × ${r.quantity}`}</td>
-                        <td class={border}><MemberLink memberId={r.person.member?.id} canLink={canLink}>{personName(r.person) || "—"}</MemberLink><MemberMark memberId={r.person.member?.id} canLink={canLink} /><BorrowerContact person={r.person} /></td>
-                        <td class={border}><span class={ROW_STATE_BADGE[r.state]}>{ROW_STATE_LABEL[r.state]}</span></td>
-                        <td class={`text-sm${r.state === "overdue" ? " text-error" : ""}${border}`}>
+                        <td class={`max-md:hidden! whitespace-nowrap text-sm pl-5 border-l-4 ${edge}${border}`}>{formatDate(r.sortDate)}</td>
+                        <td class={`max-md:col-start-1 max-md:row-start-1 max-md:font-semibold${border}`}>{r.lendingItem.inventoryItem.name}{r.quantity > 1 && ` × ${r.quantity}`}</td>
+                        <td class={`max-md:col-span-2${border}`}><MemberLink memberId={r.person.member?.id} canLink={canLink}>{personName(r.person) || "—"}</MemberLink><MemberMark memberId={r.person.member?.id} canLink={canLink} /><BorrowerContact person={r.person} /></td>
+                        <td class={`max-md:col-start-2 max-md:row-start-1${border}`}><span class={ROW_STATE_BADGE[r.state]}>{ROW_STATE_LABEL[r.state]}</span></td>
+                        <td class={`max-md:col-span-2 text-sm${r.state === "overdue" ? " text-error" : ""}${border}`}>
                           {r.conflict && <span class="inline-block mr-1 align-text-bottom text-warning" title={t("lending.overview.conflict")}><Icon name="icon-[tabler--alert-triangle]" class="w-4 h-4" /><span class="sr-only">{t("lending.overview.conflict")}</span></span>}
                           {formatDate(r.plannedFrom)} – {formatDate(r.plannedTo)}
                         </td>

@@ -63,25 +63,33 @@ describe("permissions", () => {
   });
   it("read-only user may not create", async () => {
     perms = new Set(["training:read"]);
-    expect((await post("/members/m1/training", { title: "x", completedAt: "2020-01-01" })).status).toBe(403);
+    expect((await post("/training", { title: "x", completedAt: "2020-01-01" })).status).toBe(403);
+    expect((await post("/members/m1/training/t1", { title: "x", completedAt: "2020-01-01" })).status).toBe(403);
   });
 });
 
 describe("create / update / delete", () => {
-  it("creates a record", async () => {
-    selectResults = [[{ id: "m1" }], [] /* reload */];
-    const res = await post("/members/m1/training", { title: " Truppmann ", completedAt: "2020-01-01" });
-    expect(res.status).toBe(200);
-    expect(inserts[0]).toMatchObject({ memberId: "m1", title: "Truppmann", completedAt: "2020-01-01" });
+  it("updates a record and redirects to the member", async () => {
+    selectResults = [[{ id: "t1" }]];
+    const res = await post("/members/m1/training/t1", { title: " Truppmann ", completedAt: "2020-01-01" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members/m1");
+    expect(updates[0]).toMatchObject({ title: "Truppmann", completedAt: "2020-01-01" });
   });
-  it("422 on invalid input, nothing written", async () => {
-    selectResults = [[{ id: "m1" }]];
-    const res = await post("/members/m1/training", { title: "", completedAt: "2020-01-01" });
+  it("422 on invalid edit, nothing written", async () => {
+    selectResults = [[{ id: "t1" }]];
+    const res = await post("/members/m1/training/t1", { title: "", completedAt: "2020-01-01" });
     expect(res.status).toBe(422);
-    expect(inserts).toHaveLength(0);
+    expect(updates).toHaveLength(0);
+  });
+  it("edit page renders for an owned record, 404 otherwise", async () => {
+    selectResults = [[{ id: "t1", title: "Truppmann", completedAt: "2020-01-01" }]];
+    expect((await trainingRoutes.request("/members/m1/training/t1/edit")).status).toBe(200);
+    selectResults = [[]];
+    expect((await trainingRoutes.request("/members/m1/training/other/edit")).status).toBe(404);
   });
   it("404 when tid belongs to another member (IDOR)", async () => {
-    selectResults = [[{ id: "m1" }], []];
+    selectResults = [[]];
     expect((await post("/members/m1/training/other", { title: "x", completedAt: "2020-01-01" })).status).toBe(404);
     selectResults = [[]];
     expect((await post("/members/m1/training/other/delete", {})).status).toBe(404);
@@ -92,6 +100,33 @@ describe("create / update / delete", () => {
     selectResults = [[{ id: "t1" }], []];
     expect((await post("/members/m1/training/t1/delete", {})).status).toBe(200);
     expect(deletes).toHaveLength(1);
+  });
+});
+
+describe("Anlegen auf eigener Seite", () => {
+  const MID = "11111111-1111-4111-8111-111111111111";
+  it("creates for the selected member and redirects to the list", async () => {
+    selectResults = [[{ f: "A", l: "B" }]];
+    const res = await post("/training", { memberId: MID, title: "Truppmann", completedAt: "2020-01-01" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/members?view=training");
+    expect(inserts[0]).toMatchObject({ memberId: MID, title: "Truppmann" });
+  });
+  it("returns to the member when started from the detail page", async () => {
+    selectResults = [[{ f: "A", l: "B" }]];
+    const res = await post("/training", { memberId: MID, fromMember: "1", title: "x", completedAt: "2020-01-01" });
+    expect(res.headers.get("location")).toBe(`/members/${MID}`);
+  });
+  it("422 without a valid member, nothing written", async () => {
+    const res = await post("/training", { memberId: "", title: "x", completedAt: "2020-01-01" });
+    expect(res.status).toBe(422);
+    expect(inserts).toHaveLength(0);
+  });
+  it("GET /training/new needs training:write", async () => {
+    selectResults = [[{ f: "A", l: "B" }]];
+    expect((await trainingRoutes.request(`/training/new?memberId=${MID}`)).status).toBe(200);
+    perms = new Set(["training:read"]);
+    expect((await trainingRoutes.request("/training/new")).status).toBe(403);
   });
 });
 

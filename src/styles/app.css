@@ -275,3 +275,28 @@ input[data-combo]::-webkit-calendar-picker-indicator { display: none !important;
 
 /* Drawer: chevron left of the badge, badge far right (badge span has order-2). */
 #nav-menu summary::after { order: 1; }
+
+/* Popups/Dropdowns klar vom Hintergrund abheben: Rahmen + kräftiger Schatten (überschreibt daisyUI's flachen Schatten) */
+.dropdown-content,
+.role-combobox-popover[popover],
+.role-popover[popover] {
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 25%, transparent);
+  box-shadow: 0 10px 30px -5px rgb(0 0 0 / 0.3), 0 4px 10px -4px rgb(0 0 0 / 0.2);
+}
+
+/* Tabellen als Karten unter md (Opt-in: `table-cards` + `data-label` je <td>). Leere Zellen entfallen. */
+@media (max-width: 47.99rem) {
+  .table-cards thead { display: none; }
+  .table-cards, .table-cards tbody { display: block; }
+  .table-cards tbody tr {
+    display: grid; gap: 0.25rem; padding: 0.75rem;
+    border: 1px solid var(--color-base-300); border-radius: var(--radius-box); margin-bottom: 0.5rem;
+  }
+  .table-cards tbody td { display: flex; justify-content: space-between; gap: 1rem; padding: 0; border: 0; }
+  .table-cards tbody td:empty, .table-cards tbody td[data-empty] { display: none; }
+  .table-cards tbody td:not([data-label]) { display: block; }
+  .table-cards tbody td[data-label]::before { content: attr(data-label); opacity: 0.6; flex-shrink: 0; }
+  .table-cards tbody tr:has(> td[colspan]) { display: block; border: 0; padding: 0; margin: 0; }
+  .table-cards tbody td[colspan] { display: block; }
+  .group-card .table-cards tbody tr { border: 0; border-top: 1px solid var(--color-base-300); border-radius: 0; margin: 0; }
+}
