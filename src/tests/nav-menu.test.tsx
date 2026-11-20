@@ -65,22 +65,21 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
   });
 
   it("shows Ausbildungen only with training:read", async () => {
-    expect(await renderAt("/", "members:read")).not.toContain('href="/training"');
-    expect(await renderAt("/", "training:read")).toContain('href="/training"');
+    expect(await renderAt("/", "members:read")).not.toContain("view=training");
+    expect(await renderAt("/", "training:read")).toContain('href="/members"');
   });
 
   it("shows Funktionen with either role or role-type permission, one entry", async () => {
     for (const p of ["member-roles:read", "member-role-types:read"]) {
       const html = await renderAt("/", p);
-      expect(html).toContain('href="/roles"');
+      expect(html).toContain('href="/members"');
       expect(html).not.toContain("/role-types");
-      expect(html).not.toContain('href="/members"');
     }
   });
 
   it("turns a menu with a single visible item into a plain link", async () => {
     const html = await renderAt("/", "member-roles:read");
-    expect(html).toContain('href="/roles"');
+    expect(html).toContain('href="/members"');
     expect(html).not.toContain("<details");
   });
 

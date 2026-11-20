@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { members, persons, trainingRecords } from "../db/schema/index.js";
@@ -15,7 +15,8 @@ import { resolveTimezone, toLocalDate } from "../lib/datetime.js";
 import { buildListUrl, PAGE_SIZE_OPTIONS, parsePagination } from "../lib/list-query.js";
 import { TRAINING_TITLE_MAX, parseTrainingInput, trainingStatuses, sortTrainings, parseTrainingSort, nextTrainingDir, defaultTrainingDir, type SortDir, type TrainingSortKey, type TrainingStatus } from "../lib/training.js";
 import { t } from "../i18n/index.js";
-import { SortIcon } from "./members.js";
+import { SortIcon, memberViews } from "./members.js";
+import { TitleSwitch } from "../components/title-switch.js";
 
 export const trainingRoutes = new Hono<{ Variables: Variables }>();
 const read = requireAuth("training:read");
@@ -202,8 +203,15 @@ trainingRoutes.post("/members/:id/training/:tid/delete", del, async (c) => {
 // ── Gesamtübersicht ─────────────────────────────────────────────────────────
 const LIST_STATUSES = ["expired", "soon", "valid", "noExpiry"] as const;
 
-trainingRoutes.get("/training", read, async (c) => {
-  const user = c.get("user");
+// Alte Links (/training?…) bleiben gültig.
+trainingRoutes.get("/training", read, (c) => {
+  const u = new URL(c.req.url);
+  u.searchParams.set("view", "training");
+  return c.redirect(`/members${u.search}`);
+});
+
+export async function renderTraining(c: Context<{ Variables: Variables }>) {
+  const user = c.get("user")!;
   const q = c.req.query();
   const search = (q.q ?? "").trim().toLowerCase();
   const statusFilter = (c.req.queries("status") ?? []).filter((s): s is (typeof LIST_STATUSES)[number] => (LIST_STATUSES as readonly string[]).includes(s));
@@ -228,15 +236,16 @@ trainingRoutes.get("/training", read, async (c) => {
   const sorted = sortTrainings(rows, (x) => ({ ...recFields(x.r), member: `${x.lastName}, ${x.firstName}` }), sort, dir);
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const items = sorted.slice((page - 1) * pageSize, page * pageSize);
-  const cur = { q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
-  const pageUrl = (p: number) => buildListUrl("/training", cur, { page: p });
+  const cur = { view: "training", q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
+  const pageUrl = (p: number) => buildListUrl("/members", cur, { page: p });
 
   return c.html(
     <Layout title={t("training.pageTitle")} user={user}>
-      <PageHeader title={t("training.pageTitle")} />
-      <form method="get" action="/training" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+      <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "training")} />} />
+      <form method="get" action="/members" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+        <input type="hidden" name="view" value="training" />
         <input type="search" name="q" class="input" placeholder={t("training.filter.search")} value={q.q ?? ""} enterkeyhint="search"
-          hx-get="/training" hx-trigger="input changed delay:300ms, search" hx-include="closest form" hx-target="#training-results" hx-select="#training-results" hx-swap="outerHTML" hx-push-url="true" />
+          hx-get="/members" hx-trigger="input changed delay:300ms, search" hx-include="closest form" hx-target="#training-results" hx-select="#training-results" hx-swap="outerHTML" hx-push-url="true" />
         <MultiSelectFilter
           param="status"
           autoApply
@@ -256,7 +265,7 @@ trainingRoutes.get("/training", read, async (c) => {
       <div class="overflow-x-auto">
         <table class="table table-zebra w-full">
           <thead><tr>{([["member", "training.col.member"], ["title", "training.form.title"], ["completedAt", "training.form.completedAt"], ["expiresAt", "training.form.expiresAt"], ["organizer", "training.form.organizer"]] as const).map(([col, key]) => (
-            <th><a href={buildListUrl("/training", cur, { sort: col, dir: nextTrainingDir(col, sort, dir), page: 1 })} class="link link-hover">{t(key)} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? dir : "desc"} /></a></th>
+            <th><a href={buildListUrl("/members", cur, { sort: col, dir: nextTrainingDir(col, sort, dir), page: 1 })} class="link link-hover">{t(key)} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? dir : "desc"} /></a></th>
           ))}</tr></thead>
           <tbody>
             {items.length === 0 && <tr><td colspan={5} class="text-center opacity-50 py-4">{t("training.empty")}</td></tr>}
@@ -276,4 +285,4 @@ trainingRoutes.get("/training", read, async (c) => {
       </div>
     </Layout>,
   );
-});
+}

@@ -15,7 +15,10 @@ import { flagAllowed, isPermutation, moveId } from "../lib/role-types.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { t } from "../i18n/index.js";
+import { TitleSwitch } from "../components/title-switch.js";
+import { memberViews } from "./members.js";
 
+const ROLES_URL = "/members?view=roles";
 export const roleRoutes = new Hono<{ Variables: Variables }>();
 const rolesRead = requireAuth("member-roles:read");
 const rolesWrite = requireAuth("member-roles:write");
@@ -89,7 +92,7 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
   );
 }
 
-const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message: string; detail?: string[]; title?: string }) => {
+export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message: string; detail?: string[]; title?: string }) => {
   const user = c.get("user");
   const activeFilter = c.req.query("active"); // "1" | "0" | undefined
 
@@ -133,14 +136,14 @@ const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message
     <Layout title={t("admin.roles.title")} user={user}>
 
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={t("admin.roles.title")} actions={<>
+      <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "roles")} />} actions={<>
         {canWriteTypes && <HeaderAction variant="secondary" icon="icon-[tabler--plus]" label={t("admin.roleTypes.new")} class="btn-outline" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
         {canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
       </>} />
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(activeFilter === "1" || activeFilter === "0" ? activeFilter : "",
           [{ value: "1", label: t("admin.roles.filterActive") }, { value: "0", label: t("admin.roles.filterPassive") }],
-          (v) => (v ? `/roles?active=${v}` : "/roles"))} />
+          (v) => (v ? `${ROLES_URL}&active=${v}` : ROLES_URL))} />
       </div>
 
       {canWrite && <ClickToEditHint />}
@@ -286,9 +289,9 @@ const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message
             <h3 class="font-bold text-lg flex items-center gap-2 text-error"><Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5 shrink-0" />{error.title ?? t("common.error")}</h3>
             <p class="py-2">{error.message}</p>
             {error.detail && error.detail.length > 0 && <ul class="list-disc ml-5 max-h-[40dvh] overflow-y-auto text-sm sm:columns-2 gap-x-6">{error.detail.map((d) => <li>{d}</li>)}</ul>}
-            <div class="modal-action"><a class="btn" href="/roles" autofocus>{t("common.close")}</a></div>
+            <div class="modal-action"><a class="btn" href={ROLES_URL} autofocus>{t("common.close")}</a></div>
           </div>
-          <a class="modal-backdrop" href="/roles" aria-label={t("common.close")} />
+          <a class="modal-backdrop" href={ROLES_URL} aria-label={t("common.close")} />
         </dialog>
       )}
       <script dangerouslySetInnerHTML={{ __html: REORDER_SCRIPT }} />
@@ -296,15 +299,20 @@ const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message
     error ? HTTP_STATUS.BAD_REQUEST : undefined
   );
 };
-roleRoutes.get("/roles", requireAuth(["member-roles:read", "member-role-types:read"]), (c) => rolesPage(c));
-roleRoutes.get("/role-types", typesRead, (c) => c.redirect("/roles"));
+// Alte Links (/roles?…) bleiben gültig.
+roleRoutes.get("/roles", requireAuth(["member-roles:read", "member-role-types:read"]), (c) => {
+  const u = new URL(c.req.url);
+  u.searchParams.set("view", "roles");
+  return c.redirect(`/members${u.search}`);
+});
+roleRoutes.get("/role-types", typesRead, (c) => c.redirect(ROLES_URL));
 
 // POST /role-types/:id/move — dir=up|down
 roleRoutes.post("/role-types/:id/move", typesWrite, async (c) => {
   const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
   const current = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
   await writeOrder(memberRoleTypes, moveId(current.map((r) => r.id), c.req.param("id"), dir));
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 
 function RoleForm({ types, role, hasAssignments, affected }: {
@@ -407,7 +415,7 @@ roleRoutes.get("/roles/:id", rolesRead, async (c) => {
   return c.html(
     <Layout title={role.title} user={user}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={<>{role.isProtected && "🔒 "}{role.title}</>} backHref="/roles" actions={<DetailActions editHref={canWrite ? `/roles/${id}/edit` : undefined} remove={remove} />} />
+      <PageHeader title={<>{role.isProtected && "🔒 "}{role.title}</>} backHref={ROLES_URL} actions={<DetailActions editHref={canWrite ? `/roles/${id}/edit` : undefined} remove={remove} />} />
       <ViewGrid>
         <ViewField label={t("admin.roles.type.label")} value={type?.name} />
         <ViewField label={t("admin.roles.table.activeStatus")} value={role.grantsActiveStatus ? t("common.yes") : t("common.no")} />
@@ -456,7 +464,7 @@ roleRoutes.post("/roles", rolesWrite, async (c) => {
 
   if (!title) {
     setFlash(c, t("admin.roles.flash.requiredTitle"), "error");
-    return c.redirect("/roles");
+    return c.redirect(ROLES_URL);
   }
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, typeId));
   if (!type) return badRequest(c, t("admin.roles.flash.unknownType"));
@@ -493,17 +501,17 @@ roleRoutes.post("/roles/:id/move", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role) return c.redirect("/roles");
+  if (!role) return c.redirect(ROLES_URL);
   const current = await db.select().from(memberRoles).where(eq(memberRoles.typeId, role.typeId)).orderBy(asc(memberRoles.sortOrder));
   await writeOrder(memberRoles, moveId(current.map((r) => r.id), id, dir));
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 
 // POST /roles/:id/active — toggle the active-status flag from the list
 roleRoutes.post("/roles/:id/active", rolesWrite, async (c) => {
   const id = c.req.param("id");
   const body = await c.req.parseBody();
-  const back = body.active === "1" || body.active === "0" ? `/roles?active=${body.active}` : "/roles";
+  const back = body.active === "1" || body.active === "0" ? `${ROLES_URL}&active=${body.active}` : ROLES_URL;
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
   if (!role || role.isProtected) return c.html("", HTTP_STATUS.NOT_FOUND);
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, role.typeId));
@@ -541,7 +549,7 @@ roleRoutes.post("/roles/:id", rolesWrite, async (c) => {
     const title = String(body.title ?? "").trim();
     if (!title) {
       setFlash(c, t("admin.roles.flash.requiredTitle"), "error");
-      return c.redirect("/roles");
+      return c.redirect(ROLES_URL);
     }
     changes.title = title;
   }
@@ -555,11 +563,11 @@ roleRoutes.post("/roles/:id", rolesWrite, async (c) => {
 roleRoutes.post("/roles/:id/delete", rolesDelete, async (c) => {
   const id = c.req.param("id");
   const [role] = await db.select().from(memberRoles).where(eq(memberRoles.id, id));
-  if (!role) return c.redirect("/roles");
+  if (!role) return c.redirect(ROLES_URL);
 
   if (role.isProtected) {
     setFlash(c, t("admin.roles.flash.protected"), "error");
-    return c.redirect("/roles");
+    return c.redirect(ROLES_URL);
   }
 
   const [{ cnt }] = await db
@@ -569,12 +577,12 @@ roleRoutes.post("/roles/:id/delete", rolesDelete, async (c) => {
 
   if (cnt > 0) {
     setFlash(c, t("admin.roles.flash.hasAssignments"), "error");
-    return c.redirect("/roles");
+    return c.redirect(ROLES_URL);
   }
 
   await db.delete(memberRoles).where(eq(memberRoles.id, id));
   setFlash(c, t("admin.roles.flash.deleted", { title: role.title }), "success");
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 
 // ── /role-types ─────────────────────────────────────────────────────────
@@ -614,12 +622,12 @@ roleRoutes.get("/role-types/:id/edit", typesRead, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.notFound();
-  if (!c.get("user").permissions.has("member-role-types:write")) return c.redirect("/roles");
+  if (!c.get("user").permissions.has("member-role-types:write")) return c.redirect(ROLES_URL);
   const [{ n: locked }] = await db.select({ n: count() }).from(memberRoles).where(and(eq(memberRoles.typeId, id), eq(memberRoles.grantsActiveStatus, true)));
   return c.html(
     <Layout title={t("admin.roleTypes.edit")} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={t("admin.roleTypes.edit")} backHref="/roles" actions={<FormActions formId="role-type-form" cancelHref="/roles" />} />
+      <PageHeader title={t("admin.roleTypes.edit")} backHref={ROLES_URL} actions={<FormActions formId="role-type-form" cancelHref={ROLES_URL} />} />
       <form id="role-type-form" method="post" action={`/role-types/${id}`} class="flex flex-col gap-3">
         <RoleTypeForm type={type} locked={type.allowsActiveStatus ? locked : 0} />
       </form>
@@ -633,7 +641,7 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
   const name = String(body.name ?? "").trim();
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/roles");
+    return c.redirect(ROLES_URL);
   }
   const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${memberRoleTypes.sortOrder}), 0)` }).from(memberRoleTypes);
   const id = crypto.randomUUID();
@@ -646,7 +654,7 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
     isProtected: false,
   });
   setFlash(c, t("admin.roleTypes.flash.created", { name }), "success");
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 
 // Titles of flagged roles that forbid removing allows_active_status (empty = allowed).
@@ -667,7 +675,7 @@ roleRoutes.post("/role-types/:id/allows-active", typesWrite, async (c) => {
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
   if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked, t("admin.roleTypes.flash.flaggedRolesTitle"));
   await db.update(memberRoleTypes).set({ allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 
 roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
@@ -679,24 +687,24 @@ roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
   const allowsActiveStatus = body.allowsActiveStatus === "1";
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/roles");
+    return c.redirect(ROLES_URL);
   }
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
   if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked, t("admin.roleTypes.flash.flaggedRolesTitle"));
   await db.update(memberRoleTypes).set({ name, allowsActiveStatus, description: String(body.description ?? "").trim().slice(0, 300) || null }).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roles.flash.saved"), "success");
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 
 roleRoutes.post("/role-types/:id/delete", typesDelete, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
-  if (!type) return c.redirect("/roles");
+  if (!type) return c.redirect(ROLES_URL);
   if (type.isProtected) return badRequest(c, t("admin.roleTypes.cannotDelete.protected"));
   const assigned = await db.select({ title: memberRoles.title }).from(memberRoles).where(eq(memberRoles.typeId, id));
   if (assigned.length > 0) return badRequest(c, t("admin.roleTypes.flash.notEmpty"), assigned.map((r) => r.title), t("admin.roleTypes.flash.notEmptyTitle"));
   await db.delete(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roleTypes.flash.deleted", { name: type.name }), "success");
-  return c.redirect("/roles");
+  return c.redirect(ROLES_URL);
 });
 

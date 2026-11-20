@@ -134,7 +134,10 @@ vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof impor
 
 vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve(backupStatus) }));
 
-const { roleRoutes } = await import("../routes/roles.js");
+const { roleRoutes, rolesPage } = await import("../routes/roles.js");
+const { Hono } = await import("hono");
+// GET /roles redirects into /members?view=roles; render the page directly.
+const rolesApp = new Hono().use(async (c, next) => { c.set("user" as never, currentUser); await next(); }).get("/roles", (c) => rolesPage(c as never));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -197,31 +200,31 @@ describe("GET /roles", () => {
   it("renders the unfiltered, active and passive views", async () => {
     rolesFixture = [makeRoleRow()];
     for (const qs of ["", "?active=1", "?active=0"]) {
-      expect((await roleRoutes.request(`/roles${qs}`)).status).toBe(200);
+      expect((await rolesApp.request(`/roles${qs}`)).status).toBe(200);
     }
   });
 
   it("locks deletion for a protected role", async () => {
     rolesFixture = [makeRoleRow({ isProtected: true })];
-    const html = await (await roleRoutes.request("/roles")).text();
+    const html = await (await rolesApp.request("/roles")).text();
     expect(html).toContain(t("admin.roles.cannotDelete.protected"));
   });
 
   it("locks deletion with a singular usage message", async () => {
     rolesFixture = [makeRoleRow({ assignmentCount: 1 })];
-    const html = await (await roleRoutes.request("/roles")).text();
+    const html = await (await rolesApp.request("/roles")).text();
     expect(html).toContain(t("admin.roles.cannotDelete.usedBySingle", { count: 1 }));
   });
 
   it("locks deletion with a plural usage message", async () => {
     rolesFixture = [makeRoleRow({ assignmentCount: 3 })];
-    const html = await (await roleRoutes.request("/roles")).text();
+    const html = await (await rolesApp.request("/roles")).text();
     expect(html).toContain(t("admin.roles.cannotDelete.usedByMultiple", { count: 3 }));
   });
 
   it("allows deletion when unused and unprotected", async () => {
     rolesFixture = [makeRoleRow({ assignmentCount: 0 })];
-    const html = await (await roleRoutes.request("/roles")).text();
+    const html = await (await rolesApp.request("/roles")).text();
     expect(html).toContain(t("admin.roles.confirmDelete.title"));
   });
 });
@@ -392,21 +395,21 @@ describe("role types (Spec 47)", () => {
   it("shows both create buttons on one page; types-only readers see types", async () => {
     typesFixture = [makeType()];
     rolesFixture = [makeRoleRow()];
-    const all = await (await roleRoutes.request("/roles")).text();
+    const all = await (await rolesApp.request("/roles")).text();
     expect(all).toContain(t("admin.roles.newRole"));
     expect(all).toContain(t("admin.roleTypes.new"));
     expect(all).not.toContain('id="title-switch"');
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-role-types:read"]) };
-    const only = await (await roleRoutes.request("/roles")).text();
+    const only = await (await rolesApp.request("/roles")).text();
     expect(only).not.toContain(t("admin.roles.newRole"));
     expect(only).toContain(t("admin.roleTypes.table.allowsActive"));
-    expect((await roleRoutes.request("/role-types")).headers.get("location")).toBe("/roles");
+    expect((await roleRoutes.request("/role-types")).headers.get("location")).toBe("/members?view=roles");
   });
 
   it("renders one collapsible section per type", async () => {
     typesFixture = [makeType(), makeType({ id: "t2", name: "Verein", sortOrder: 2 })];
     rolesFixture = [makeRoleRow()];
-    const html = await (await roleRoutes.request("/roles")).text();
+    const html = await (await rolesApp.request("/roles")).text();
     expect(html.match(/<details[^>]*data-section=/g)?.length).toBe(2);
   });
 
@@ -434,7 +437,7 @@ describe("role types (Spec 47)", () => {
   it("shows the type description as section subheading and saves it trimmed", async () => {
     typesFixture = [makeType({ description: "Rang in der Wehr" })];
     rolesFixture = [makeRoleRow()];
-    expect(await (await roleRoutes.request("/roles")).text()).toContain("Rang in der Wehr");
+    expect(await (await rolesApp.request("/roles")).text()).toContain("Rang in der Wehr");
     await post("/role-types/t1", { name: "Dienstgrad", allowsActiveStatus: "1", description: "  Neu  " });
     expect(updateCalls.some((c) => c.table === memberRoleTypes && c.set.description === "Neu")).toBe(true);
     await post("/role-types", { name: "X", description: "  " });
@@ -445,13 +448,13 @@ describe("role types (Spec 47)", () => {
     typesFixture = [makeType()];
     rolesFixture = [makeRoleRow()];
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read"]) };
-    const roles = await (await roleRoutes.request("/roles")).text();
+    const roles = await (await rolesApp.request("/roles")).text();
     expect(roles).not.toContain(t("admin.roles.newRole"));
     expect(roles).not.toContain("/roles/r1/edit");
     expect(roles).not.toContain("/roles/r1/move");
     expect(roles).not.toContain("/roles/r1/delete");
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read", "member-roles:write"]) };
-    const writer = await (await roleRoutes.request("/roles")).text();
+    const writer = await (await rolesApp.request("/roles")).text();
     expect(writer).toContain(t("admin.roles.newRole"));
     expect(writer).not.toContain("/roles/r1/delete");
   });
@@ -460,12 +463,12 @@ describe("role types (Spec 47)", () => {
   it("role types have their own permissions, independent of roles", async () => {
     typesFixture = [makeType()];
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-role-types:read"]) };
-    const ro = await (await roleRoutes.request("/roles")).text();
+    const ro = await (await rolesApp.request("/roles")).text();
     expect(ro).not.toContain(t("admin.roleTypes.new"));
     expect(ro).not.toContain("/role-types/t1/edit");
     expect(ro).not.toContain("delete-type-");
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete"]) };
-    const rw = await (await roleRoutes.request("/roles")).text();
+    const rw = await (await rolesApp.request("/roles")).text();
     expect(rw).toContain(t("admin.roleTypes.new"));
   });
 });
@@ -474,7 +477,7 @@ describe("GET /roles toggle filter", () => {
   const toggleInputs = (html: string) => html.match(/<input[^>]*class="toggle toggle-primary"[^>]*data-href[^>]*>/g) ?? [];
   it("both toggles on without a parameter, no \"Alle\" entry", async () => {
     rolesFixture = [makeRoleRow()];
-    const html = await (await roleRoutes.request("/roles")).text();
+    const html = await (await rolesApp.request("/roles")).text();
     const inputs = toggleInputs(html);
     expect(inputs).toHaveLength(2);
     expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(2);
@@ -485,7 +488,7 @@ describe("GET /roles toggle filter", () => {
   it("a single active toggle (old link) is checked; switching it off activates the other", async () => {
     rolesFixture = [makeRoleRow()];
     for (const [qs, idx] of [["?active=1", 0], ["?active=0", 1]] as const) {
-      const inputs = toggleInputs(await (await roleRoutes.request(`/roles${qs}`)).text());
+      const inputs = toggleInputs(await (await rolesApp.request(`/roles${qs}`)).text());
       expect(inputs.filter((i) => i.includes("checked"))).toHaveLength(1);
       expect(inputs[idx]).toContain("checked");
       expect(inputs[idx]).not.toContain("disabled");

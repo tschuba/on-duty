@@ -7,6 +7,7 @@ export type TitleSwitchItem = { active: boolean; href: string; label: string; co
 // inaktiv kleiner/blass; darunter: Dropdown-Button mit Haken am aktiven Eintrag. Doku: docs/style-guide.md → „Ansichten-Umschalter".
 export function TitleSwitch({ items }: { items: TitleSwitchItem[] }) {
   const current = items.find((v) => v.active) ?? items[0];
+  if (items.length < 2) return <>{current.label}</>; // nichts zum Umschalten
   return (
     <>
       <span class="hidden @2xl:inline-flex items-baseline gap-3">
