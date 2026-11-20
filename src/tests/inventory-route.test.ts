@@ -399,6 +399,27 @@ describe("lendable flag on POST /", () => {
   });
 });
 
+describe("returnTo on POST /", () => {
+  it("redirects back with the new lending item id filled in", async () => {
+    currentUser = lendingManager();
+    const res = await post("/", { name: "Helm", lendable: "1", lendableForced: "1", returnTo: "/inventory/lending/loans/new?a=1&item={id}" });
+    expect(res.headers.get("location")).toBe("/inventory/lending/loans/new?a=1&item=new-id");
+  });
+
+  it("ignores foreign returnTo targets", async () => {
+    currentUser = lendingManager();
+    const res = await post("/", { name: "Helm", returnTo: "//evil.com" });
+    expect(res.headers.get("location")).toBe("/inventory/new-id");
+  });
+
+  it("GET /new passes returnTo and forced lendable to the template links", async () => {
+    currentUser = lendingManager();
+    const res = await inventoryRoutes.request("/new?lendable=1&returnTo=%2Finventory%2Flending%2Floans%2Fnew");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/inventory/new?template=none&returnTo=%2Finventory%2Flending%2Floans%2Fnew&lendable=1");
+  });
+});
+
 describe("lendable flag on POST /:id", () => {
   const base = { name: "TSF-W", enabledFields: "quantity" };
 

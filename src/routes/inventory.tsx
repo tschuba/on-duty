@@ -18,6 +18,7 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { ChipInput } from "../components/chip-input.js";
 import { trimmed, parseTags, parseList } from "../lib/forms.js";
+import { fillReturnTo, safeReturnTo } from "../lib/return-to.js";
 import { tagVocabulary, canonicalizeTags, TAG_SUGGESTIONS_ID, tagSuggestionsJson } from "../lib/tags.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
@@ -996,6 +997,8 @@ type LendableField = {
   publicRequestable: boolean; maxRequestQuantity: number; timesRequired: boolean;
   requestLink?: string;
   errors?: { maxRequestQuantity?: string };
+  /** Verleihbarkeit fest vorgegeben (Einstieg aus dem Verleihformular); wird als lendableForced mitgeschickt. */
+  forced?: boolean;
 };
 
 function lendableField(
@@ -1007,11 +1010,12 @@ function lendableField(
     publicRequestable?: boolean; maxRequestQuantity?: number; timesRequired?: boolean;
     requestLink?: string;
     errors?: { maxRequestQuantity?: string };
+    forced?: boolean;
   } = {},
 ): LendableField | undefined {
   if (!user.permissions.has("lending:read")) return undefined;
   return {
-    checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: opts.locked ?? false, error: opts.error,
+    checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: (opts.locked ?? false) || (opts.forced ?? false), forced: opts.forced, error: opts.error,
     individualTracking: opts.individualTracking ?? false,
     publicRequestable: opts.publicRequestable ?? false,
     maxRequestQuantity: opts.maxRequestQuantity ?? 0,
@@ -1021,7 +1025,7 @@ function lendableField(
   };
 }
 
-function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable, cancelHref, canConfigure }: {
+function InventoryForm({ title, action, values, errors, formId, assignedMemberName, assignments, extraActions, lendable, cancelHref, canConfigure, returnTo }: {
   title: string;
   action: string;
   values?: Partial<InventoryFieldValues>;
@@ -1033,11 +1037,14 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
   lendable?: LendableField;
   cancelHref?: string;
   canConfigure?: boolean;
+  /** Nach dem Speichern dorthin zurück (siehe lib/return-to.ts). */
+  returnTo?: string;
 }) {
   return (
     <>
       <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FieldConfigurator formId={formId} values={values} canConfigure={canConfigure} /><FormActions formId={formId} cancelHref={cancelHref} /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
+        {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
           <fieldset class="card card-border bg-base-100 border-base-300">
@@ -1057,7 +1064,8 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
               </label>
               {/* Gesperrte Checkbox wird nicht gesendet — Hidden-Feld hält den Wert, damit "gesetzt" nicht als Abwahl gilt. */}
               {lendable.editable && lendable.locked && <input type="hidden" name="lendable" value="1" />}
-              {lendable.locked && <p class="text-sm opacity-70">{t("inventory.form.lendableLocked")}</p>}
+              {lendable.forced && <input type="hidden" name="lendableForced" value="1" />}
+              {lendable.locked && <p class="text-sm opacity-70">{t(lendable.forced ? "inventory.form.lendableForced" : "inventory.form.lendableLocked")}</p>}
               {!lendable.editable && <p class="text-sm opacity-70">{t("inventory.form.lendableReadonly")}</p>}
               {lendable.error && <p class="text-error text-sm">{lendable.error}</p>}
               {lendable.editable && (
@@ -1123,19 +1131,29 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
 inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const user = c.get("user")!;
   const templateId = c.req.query("template");
+  const returnTo = safeReturnTo(c.req.query("returnTo"));
+  const forceLendable = Boolean(returnTo) && c.req.query("lendable") === "1" && user.permissions.has("lending:manage");
+  // Auswahl-Parameter an Vorlagenwahl und Weiterleitungen durchreichen.
+  const carry = (tpl?: string) => {
+    const q = new URLSearchParams();
+    if (tpl) q.set("template", tpl);
+    if (returnTo) q.set("returnTo", returnTo);
+    if (forceLendable) q.set("lendable", "1");
+    return `/inventory/new${q.size ? `?${q}` : ""}`;
+  };
   if (!templateId) {
     type PickerTemplate = { id: string; name: string; description: string | null; enabledFields: string[]; fieldDefs: { fieldDef: { archived: boolean } }[]; inspections: unknown[] };
     const templates = ((await db.query.inventoryTemplates.findMany({
       with: { fieldDefs: { with: { fieldDef: true } }, inspections: true },
     })) as unknown as PickerTemplate[]).sort((a, b) => a.name.localeCompare(b.name, "de"));
-    if (templates.length === 0) return c.redirect("/inventory/new?template=none");
+    if (templates.length === 0) return c.redirect(carry("none"));
     const plural = (n: number, key: "fieldCount" | "inspectionCount") => t(`inventory.new.${key}.${n === 1 ? "one" : "other"}`, { count: n });
     const card = "card card-border bg-base-100 border-base-300 hover:border-primary h-full sm:min-h-28 focus-visible:outline-2 focus-visible:outline-primary";
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
-        <PageHeader title={t("inventory.newItem")} backHref="/inventory" subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="icon-[tabler--settings]" label={t("inventory.new.manageTemplates")} href="/inventory?view=templates" />} />
+        <PageHeader title={t("inventory.newItem")} backHref={returnTo ?? "/inventory"} subtitle={t("inventory.new.chooseHint")} actions={user.permissions.has("inventory:configure") && <HeaderAction icon="icon-[tabler--settings]" label={t("inventory.new.manageTemplates")} href="/inventory?view=templates" />} />
         <div id="template-choice" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 2xl:max-w-6xl">
-          <a href="/inventory/new?template=none" class={`${card} border-dashed`}>
+          <a href={carry("none")} class={`${card} border-dashed`}>
             <div class="card-body p-4 sm:p-5 lg:p-6 flex-row items-start gap-3 sm:gap-4">
               <TagAvatar fallbackIcon="icon-[tabler--file]" />
               <div class="min-w-0 space-y-1 lg:space-y-1.5">
@@ -1148,7 +1166,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
             const fields = tpl.enabledFields.filter((f) => (INVENTORY_FIELDS as readonly string[]).includes(f)).length + tpl.fieldDefs.filter((d) => !d.fieldDef.archived).length;
             const counts = [fields && plural(fields, "fieldCount"), tpl.inspections.length && plural(tpl.inspections.length, "inspectionCount")].filter(Boolean).join(" · ");
             return (
-              <a href={`/inventory/new?template=${tpl.id}`} class={card}>
+              <a href={carry(tpl.id)} class={card}>
                 <div class="card-body p-4 sm:p-5 lg:p-6 flex-row items-start gap-3 sm:gap-4">
                   <TagAvatar tag={tpl.name} />
                   <div class="min-w-0 space-y-1 lg:space-y-1.5">
@@ -1171,7 +1189,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
       where: eq(inventoryTemplates.id, templateId),
       with: { fieldDefs: { with: { fieldDef: true } }, inspections: { with: { inspectionTemplate: true } } },
     })) as unknown as { name: string; enabledFields: string[]; fieldDefs: { fieldDef: FreeDef }[]; inspections: { inspectionTemplate: { name: string; defaultIntervalMonths: number | null } }[] } | undefined;
-    if (!tpl) return c.redirect("/inventory/new");
+    if (!tpl) return c.redirect(carry());
     prefill = {
       enabledFieldsList: tpl.enabledFields.filter((f): f is InventoryField => (INVENTORY_FIELDS as readonly string[]).includes(f)),
       tagsList: [tpl.name],
@@ -1183,7 +1201,7 @@ inventoryRoutes.get("/new", requireAuth("inventory:manage"), async (c) => {
   const hasTemplates = (await db.query.inventoryTemplates.findMany({ columns: { id: true }, limit: 1 })).length > 0;
   return c.html(
     <Layout title={t("inventory.newItem")} user={user}>
-      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" cancelHref={hasTemplates ? "/inventory/new" : "/inventory"} lendable={lendableField(user, false, {})} values={await withFree(prefill)} />
+      <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" returnTo={returnTo} cancelHref={returnTo ?? (hasTemplates ? "/inventory/new" : "/inventory")} lendable={lendableField(user, forceLendable, { forced: forceLendable })} values={await withFree(prefill)} />
     </Layout>
   );
 });
@@ -1211,6 +1229,8 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   if (free.error) errors.freeFields = free.error;
   const wantsLendable = trimmed(body, "lendable") === "1";
   const canManageLending = user.permissions.has("lending:manage");
+  const returnTo = safeReturnTo(trimmed(body, "returnTo"));
+  const forced = canManageLending && wantsLendable && trimmed(body, "lendableForced") === "1";
   const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
   const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
   let maxRequestQuantity = 0;
@@ -1229,11 +1249,13 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           title={t("inventory.newItem")}
           action="/inventory"
           formId="inventory-new-form"
+          returnTo={returnTo}
+          cancelHref={returnTo}
           values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors })}
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
-          lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired, errors: { maxRequestQuantity: maxRequestQuantityError } })}
+          lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired, forced, errors: { maxRequestQuantity: maxRequestQuantityError } })}
         />
       </Layout>,
       422
@@ -1241,6 +1263,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   }
 
   let newId = "";
+  let newLendingItemId: string | undefined;
   try {
   await db.transaction(async (tx) => {
     const [item] = await tx.insert(inventoryItems).values(insertValues).returning();
@@ -1263,7 +1286,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
     if (wantsLendable && user.permissions.has("lending:manage")) {
-      await tx.insert(lendingItems).values({ inventoryItemId: item.id, individualTracking: item.quantity <= 1, publicRequestable, maxRequestQuantity, timesRequired });
+      [{ id: newLendingItemId }] = await tx.insert(lendingItems).values({ inventoryItemId: item.id, individualTracking: item.quantity <= 1, publicRequestable, maxRequestQuantity, timesRequired }).returning({ id: lendingItems.id });
     }
     if (assignments.length > 0) {
       await tx.insert(inventoryItemAssignments).values(assignments.map((a) => ({ inventoryItemId: item.id, memberId: a.memberId, quantity: a.quantity })));
@@ -1276,16 +1299,16 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
-        <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form"
+        <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" returnTo={returnTo} cancelHref={returnTo}
           values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors })} errors={errors}
-          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired })} />
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired, forced })} />
       </Layout>,
       422
     );
   }
 
   setFlash(c, t("inventory.flash.created"), "success");
-  return c.redirect(`/inventory/${newId}`);
+  return c.redirect(returnTo ? fillReturnTo(returnTo, newLendingItemId) : `/inventory/${newId}`);
 });
 
 // GET /inventory/:id/edit — also where a completed inspection is recorded (no

@@ -1,5 +1,6 @@
 import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
+import { MemberMark } from "./member-mark.js";
 import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 // Combobox-Autocomplete für Personenauswahlen (ein <input> bleibt durchgehend im DOM). Die Suchroute
@@ -85,6 +86,8 @@ export type PickerOption = {
   name: string;
   /** Zweitzeile zur Unterscheidung gleichnamiger Personen. */
   sub?: string;
+  /** Person ist Mitglied: zeigt das Mitglied-Icon hinter dem Namen. */
+  member?: boolean;
   /** Weitere Felder (camelCase) für `picker:select`, landen als data-*. */
   data?: Record<string, string | null | undefined>;
 };
@@ -101,7 +104,7 @@ export function PickerOptions({ options, empty, createLabel, heading }: { option
         return (
           <li role="option" data-id={o.id} data-name={o.name} {...data}>
             <a class="flex flex-col items-start gap-0 pointer-coarse:min-h-11">
-              <span>{o.name}</span>
+              <span>{o.name}{o.member && <MemberMark memberId="1" />}</span>
               {o.sub && <span class="block text-xs opacity-60">{o.sub}</span>}
             </a>
           </li>
