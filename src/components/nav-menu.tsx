@@ -14,10 +14,11 @@ export type NavCounts = {
   events: number;
   org: boolean;
   pendingUsers: number;
+  backupProblem: boolean;
 };
 
 type Tone = "badge-warning" | "badge-primary" | "badge-error";
-type Leaf = { label: string; href: string; show: boolean; count?: number; tip?: string; dot?: boolean; tone?: Tone; external?: boolean; children?: Leaf[] };
+type Leaf = { label: string; href: string; show: boolean; count?: number; tip?: string; dot?: boolean; tone?: Tone; alert?: boolean; external?: boolean; icon?: IconName; children?: Leaf[] };
 type Group = { icon: IconName; label: string; items: Leaf[] };
 
 export function CountBadge({ count, tone = "badge-warning" }: { count: number; tone?: Tone }) {
@@ -71,19 +72,49 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     { icon: "icon-[tabler--arrows-exchange]", label: t("inventory.tabs.lending"), items: [
       { label: t("inventory.tabs.lending"), href: "/inventory/lending", show: has("lending:read"), count: c.loans + c.loanRequests, tip: [c.loans > 0 && t("common.nav.tip.overdue", { count: c.loans }), c.loanRequests > 0 && t(c.loanRequests === 1 ? "common.nav.tip.request" : "common.nav.tip.requests", { count: c.loanRequests })].filter(Boolean).join(", "), tone: c.loans > 0 ? "badge-error" : "badge-primary" },
     ] },
+    { icon: "icon-[tabler--mail]", label: t("mailTemplates.title"), items: [{ label: t("mailTemplates.title"), href: "/mail/templates", show: true }] },
     { icon: "icon-[tabler--building]", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
     ] },
-    { icon: "icon-[tabler--mail]", label: t("mailTemplates.title"), items: [{ label: t("mailTemplates.title"), href: "/mail/templates", show: true }] },
     { icon: "icon-[tabler--download]", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
-    { icon: "icon-[tabler--settings]", label: t("common.nav.admin"), items: [
-      { label: t("admin.tabs.users"), href: "/admin/users", show: has("system:admin"), count: c.pendingUsers },
-      { label: t("admin.tabs.permissions"), href: "/admin/permissions", show: has("system:admin") },
-      { label: t("admin.tabs.config"), href: "/admin/config", show: has("system:admin") },
-      { label: t("admin.tabs.backup"), href: "/admin/backup", show: has("system:admin") },
-      { label: t("admin.tabs.errorTracker"), href: env.ERROR_TRACKER_URL ?? "", show: has("system:admin") && Boolean(env.ERROR_TRACKER_URL), external: true },
-    ] },
   ];
+}
+
+function adminItems(user: AuthedUser, c: NavCounts): Leaf[] {
+  const has = (p: string) => user.permissions.has(p as never);
+  const items: Leaf[] = [
+      { icon: "icon-[tabler--user-shield]", label: t("admin.tabs.usersPermissions"), href: "/admin/users", show: has("system:admin"), count: c.pendingUsers },
+      { icon: "icon-[tabler--adjustments]", label: t("admin.tabs.config"), href: "/admin/config", show: has("system:admin") },
+      { icon: "icon-[tabler--database-export]", label: t("admin.tabs.backup"), href: "/admin/backup", show: has("system:admin"), alert: c.backupProblem },
+      { icon: "icon-[tabler--bug]", label: t("admin.tabs.errorTracker"), href: env.ERROR_TRACKER_URL ?? "", show: has("system:admin") && Boolean(env.ERROR_TRACKER_URL), external: true },
+    ];
+  return items.filter((i) => i.show);
+}
+
+export function AdminMenu({ user, counts }: { user: AuthedUser; counts: NavCounts }) {
+  const items = adminItems(user, counts);
+  if (!items.length) return null;
+  const label = t("common.nav.admin");
+  return (
+    <div class="dropdown dropdown-end mr-1">
+      <div tabindex={0} role="button" class="btn btn-ghost btn-square btn-sm tooltip tooltip-left" data-tip={label} aria-label={label}>
+        <span class="indicator"><Icon name="icon-[tabler--settings]" class="h-5 w-5" />{(counts.backupProblem || counts.pendingUsers > 0) && <span class={`indicator-item badge badge-xs ${counts.backupProblem ? "badge-error" : "badge-warning"}`} />}</span>
+      </div>
+      <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow">
+        {items.map((i) => (
+          <li>
+            <a href={i.href} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+              {i.icon && <Icon name={i.icon} class="h-4 w-4" />}
+              {i.label}
+              {i.external && <Icon name="icon-[tabler--external-link]" class="h-4 w-4" />}
+              <CountBadge count={i.count ?? 0} tone={i.tone} />
+              {i.alert && <span class="badge badge-sm badge-error ml-1" role="img" aria-label={t("admin.backup.menuAlert")}>!</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 // Längster passender Pfad-Präfix gewinnt (/inventory/inspections vor /inventory).

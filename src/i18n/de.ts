@@ -342,11 +342,13 @@ export const de = {
   "donors.flash.saved": "Spender gespeichert.",
   // ── Admin – shared ───────────────────────────────────────────────────────────
   "admin.tabs.users": "Benutzer",
+  "admin.tabs.usersPermissions": "Benutzer & Berechtigungen",
   "admin.tabs.permissions": "Berechtigungen",
   "admin.tabs.roles": "Funktionen",
   "admin.tabs.config": "Konfiguration",
   "admin.tabs.backup": "Backup",
   "admin.tabs.errorTracker": "Fehlerberichte",
+  "admin.backup.menuAlert": "Backup-Problem",
   "admin.backup.warnDetails": "Details ansehen →",
 
   // ── Admin – Users ────────────────────────────────────────────────────────────
