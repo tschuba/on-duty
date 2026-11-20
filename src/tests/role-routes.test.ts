@@ -389,30 +389,18 @@ describe("role types (Spec 47)", () => {
     expect((await roleRoutes.request("/roles/reorder", { method: "POST", body: formBody({ id: "r1" }) })).status).toBe(400);
   });
 
-  it("shows roles or types depending on the tab", async () => {
+  it("shows both create buttons on one page; types-only readers see types", async () => {
+    typesFixture = [makeType()];
     rolesFixture = [makeRoleRow()];
-    const roles = await (await roleRoutes.request("/roles")).text();
-    expect(roles).toContain(t("admin.roles.newRole"));
-    expect(roles).not.toContain(t("admin.roleTypes.new"));
-    const types = await (await roleRoutes.request("/roles?view=types")).text();
-    expect(types).toContain(t("admin.roleTypes.new"));
-    expect(types).not.toContain(t("admin.roles.newRole"));
-  });
-
-  it("shows the view switch only for readable views", async () => {
-    const both = await (await roleRoutes.request("/roles")).text();
-    expect(both).toContain('id="title-switch"');
+    const all = await (await roleRoutes.request("/roles")).text();
+    expect(all).toContain(t("admin.roles.newRole"));
+    expect(all).toContain(t("admin.roleTypes.new"));
+    expect(all).not.toContain('id="title-switch"');
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-role-types:read"]) };
     const only = await (await roleRoutes.request("/roles")).text();
-    expect(only).not.toContain('id="title-switch"');
-    expect(only).toContain(t("admin.roleTypes.table.name"));
-    expect((await roleRoutes.request("/role-types")).headers.get("location")).toBe("/roles?view=types");
-  });
-
-  it("shows short active-allowed header with full text as title", async () => {
-    const types = await (await roleRoutes.request("/roles?view=types")).text();
-    expect(types).toContain(`title="${t("admin.roleTypes.table.allowsActiveLong")}"`);
-    expect(types).toContain(`>${t("admin.roleTypes.table.allowsActive")}</th>`);
+    expect(only).not.toContain(t("admin.roles.newRole"));
+    expect(only).toContain(t("admin.roleTypes.table.allowsActive"));
+    expect((await roleRoutes.request("/role-types")).headers.get("location")).toBe("/roles");
   });
 
   it("renders one collapsible section per type", async () => {
@@ -472,12 +460,12 @@ describe("role types (Spec 47)", () => {
   it("role types have their own permissions, independent of roles", async () => {
     typesFixture = [makeType()];
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-role-types:read"]) };
-    const ro = await (await roleRoutes.request("/roles?view=types")).text();
+    const ro = await (await roleRoutes.request("/roles")).text();
     expect(ro).not.toContain(t("admin.roleTypes.new"));
     expect(ro).not.toContain("/role-types/t1/edit");
     expect(ro).not.toContain("delete-type-");
     currentUser = { id: "u1", disabled: false, permissions: new Set(["member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete"]) };
-    const rw = await (await roleRoutes.request("/roles?view=types")).text();
+    const rw = await (await roleRoutes.request("/roles")).text();
     expect(rw).toContain(t("admin.roleTypes.new"));
   });
 });
@@ -518,17 +506,4 @@ testDetailPageContract({
   readPermissions: ["member-roles:read"],
   writePermissions: ["member-roles:read", "member-roles:write"],
   ensureRecord: () => { rolesFixture = [makeRole()]; typesFixture = [makeType()]; },
-});
-
-testDetailPageContract({
-  name: "role-types",
-  request: (path) => roleRoutes.request(path),
-  idPath: "/role-types/t1",
-  editPath: "/role-types/t1/edit",
-  editHref: "/role-types/t1/edit",
-  redirectLocation: "/role-types/t1",
-  setPermissions: (perms) => { currentUser = { id: "u1", disabled: false, permissions: new Set(perms) }; },
-  readPermissions: ["member-role-types:read"],
-  writePermissions: ["member-role-types:read", "member-role-types:write"],
-  ensureRecord: () => { typesFixture = [makeType()]; },
 });

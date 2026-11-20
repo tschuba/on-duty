@@ -6,8 +6,8 @@ import { memberRoles, memberRoleTypes, memberRoleAssignments } from "../db/schem
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
-import { TitleSwitch } from "../components/title-switch.js";
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
+import { Icon } from "../components/icon.js";
 import { RowAction } from "../components/row-action.js";
 import { DeleteDialog } from "../components/delete-dialog.js";
 import { ModalScaffold } from "./admin.js";
@@ -24,19 +24,9 @@ const typesRead = requireAuth("member-role-types:read");
 const typesWrite = requireAuth("member-role-types:write");
 const typesDelete = requireAuth("member-role-types:delete");
 
-function badRequest(c: any, message: string, detail?: string[]) {
-  return c.html(
-    <Layout title={t("admin.roles.title")} user={c.get("user")}>
-      <div class="alert alert-error max-w-2xl mx-auto mb-4" role="alert">
-        <div>
-          <p>{message}</p>
-          {detail && detail.length > 0 && <ul class="list-disc ml-5">{detail.map((d) => <li>{d}</li>)}</ul>}
-        </div>
-      </div>
-      <div class="max-w-2xl mx-auto"><a class="btn" href="/roles">{t("common.close")}</a></div>
-    </Layout>,
-    HTTP_STATUS.BAD_REQUEST,
-  );
+// Validation errors re-render the list with an error dialog on top.
+function badRequest(c: any, message: string, detail?: string[], title?: string) {
+  return rolesPage(c, { message, detail, title });
 }
 
 // Writes dense 1..n sort_order for the given ids (in order).
@@ -93,27 +83,17 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
   return (
     <form method="post" action={action} class="join" onclick="event.stopPropagation()">
       <input type="hidden" name="id" value={id} />
-      <RowAction icon="icon-[tabler--arrow-up]" label={t("admin.roles.moveUp")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "up" }} />
-      <RowAction icon="icon-[tabler--arrow-down]" label={t("admin.roles.moveDown")} class="btn-ghost join-item" type="submit" disabled={disabled} attrs={{ name: "dir", value: "down" }} />
+      <RowAction icon="icon-[tabler--arrow-up]" label={t("admin.roles.moveUp")} class="btn-ghost join-item" iconOnly type="submit" disabled={disabled} attrs={{ name: "dir", value: "up" }} />
+      <RowAction icon="icon-[tabler--arrow-down]" label={t("admin.roles.moveDown")} class="btn-ghost join-item" iconOnly type="submit" disabled={disabled} attrs={{ name: "dir", value: "down" }} />
     </form>
   );
 }
 
-const rolesPage = async (c: Context<{ Variables: Variables }>) => {
+const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message: string; detail?: string[]; title?: string }) => {
   const user = c.get("user");
-  const canViewRoles = user.permissions.has("member-roles:read");
-  const canViewTypes = user.permissions.has("member-role-types:read");
-  // Nur lesbare Ansichten; ohne Funktionen-Recht ist Typen die einzige.
-  const tab: "roles" | "types" = canViewTypes && (c.req.query("view") === "types" || !canViewRoles) ? "types" : "roles";
-  const viewUrl = (v?: string) => (v ? `/roles?view=${v}` : "/roles");
-  const views = [
-    ...(canViewRoles ? [{ active: tab === "roles", href: viewUrl(), label: t("admin.roles.title") }] : []),
-    ...(canViewTypes ? [{ active: tab === "types", href: viewUrl("types"), label: t("admin.roleTypes.title") }] : []),
-  ];
-  const title = views.length > 1 ? <TitleSwitch items={views} /> : t(tab === "types" ? "admin.roleTypes.title" : "admin.roles.title");
   const activeFilter = c.req.query("active"); // "1" | "0" | undefined
 
-  const [types, rolesWithCount] = await Promise.all([
+  const [types, allRoles] = await Promise.all([
     db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder)),
     db
       .select({
@@ -134,9 +114,15 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
       .groupBy(memberRoles.id, memberRoles.title, memberRoles.typeId, memberRoles.grantsActiveStatus, memberRoles.isProtected, memberRoles.sortOrder)
       .orderBy(asc(memberRoles.sortOrder)),
   ]);
+  // Types-only readers see the groups, but no role rows.
+  const rolesWithCount = user.permissions.has("member-roles:read") ? allRoles : [];
   const typeCounts = new Map<string, number>();
-  const allRoleRows = await db.select({ typeId: memberRoles.typeId }).from(memberRoles);
-  for (const r of allRoleRows) typeCounts.set(r.typeId, (typeCounts.get(r.typeId) ?? 0) + 1);
+  const flaggedCounts = new Map<string, number>();
+  const allRoleRows = await db.select({ typeId: memberRoles.typeId, grants: memberRoles.grantsActiveStatus }).from(memberRoles);
+  for (const r of allRoleRows) {
+    typeCounts.set(r.typeId, (typeCounts.get(r.typeId) ?? 0) + 1);
+    if (r.grants) flaggedCounts.set(r.typeId, (flaggedCounts.get(r.typeId) ?? 0) + 1);
+  }
   const canWrite = user.permissions.has("member-roles:write");
   const canDeletePerm = user.permissions.has("member-roles:delete");
   const canWriteTypes = user.permissions.has("member-role-types:write");
@@ -144,11 +130,13 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
   const canReorder = canWrite && !activeFilter;
 
   return c.html(
-    <Layout title={tab === "types" ? `${t("admin.roleTypes.title")} · ${t("admin.roles.title")}` : t("admin.roles.title")} user={user}>
+    <Layout title={t("admin.roles.title")} user={user}>
 
       <div class="max-w-4xl mx-auto">
-      {tab === "roles" && (<>
-      <PageHeader title={title} actions={canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
+      <PageHeader title={t("admin.roles.title")} actions={<>
+        {canWriteTypes && <HeaderAction variant="secondary" icon="icon-[tabler--plus]" label={t("admin.roleTypes.new")} class="btn-outline" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
+        {canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
+      </>} />
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(activeFilter === "1" || activeFilter === "0" ? activeFilter : "",
           [{ value: "1", label: t("admin.roles.filterActive") }, { value: "0", label: t("admin.roles.filterPassive") }],
@@ -158,13 +146,58 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
       {canWrite && <ClickToEditHint />}
       {types.map((ty) => {
         const typeRoles = rolesWithCount.filter((r) => r.typeId === ty.id);
+        const locked = ty.allowsActiveStatus ? flaggedCounts.get(ty.id) ?? 0 : 0;
         return (
-          <details key={ty.id} data-section={ty.id} open class="collapse collapse-arrow border border-base-300 bg-base-100 mb-3">
-            <summary class="collapse-title bg-base-300">
-              <div class="text-lg font-bold flex items-center gap-2" style="font-family: var(--font-heading)">
-                {ty.name} <span class="badge badge-ghost badge-sm">{typeRoles.length}</span>
+          <details key={ty.id} data-section={ty.id} open class="group collapse overflow-visible focus-within:z-30 border border-base-300 bg-base-100 mb-3">
+            <summary class="collapse-title bg-base-300 pe-4">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 min-w-0 text-lg font-bold flex items-center gap-2" style="font-family: var(--font-heading)">
+                  {ty.isProtected && <span title={t("admin.roles.systemRole")}>🔒</span>}
+                  <span class="truncate">{ty.name}</span> <span class="badge badge-ghost badge-sm">{typeRoles.length}</span>
+                </div>
+                <div class="flex gap-2 items-center relative z-10 ml-auto">
+                  {canWriteTypes && !locked ? (
+                    <form method="post" action={`/role-types/${ty.id}/allows-active`} class="relative z-10" onclick="event.stopPropagation()">
+                      <label class="flex items-center gap-2 text-sm font-normal cursor-pointer" title={t("admin.roleTypes.table.allowsActiveLong")}>
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-sm border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content" checked={ty.allowsActiveStatus} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActiveLong")} />
+                        <span class="max-md:hidden">{t("admin.roleTypes.table.allowsActive")}</span>
+                      </label>
+                    </form>
+                  ) : ty.allowsActiveStatus && (
+                    <>
+                      <span class="badge badge-success badge-outline badge-sm max-md:hidden" title={locked ? t("admin.roleTypes.lockedHint", { count: locked }) : t("admin.roleTypes.table.allowsActiveLong")}>{t("admin.roleTypes.table.allowsActive")}</span>
+                      <span class="badge badge-success badge-outline badge-sm md:hidden" title={locked ? t("admin.roleTypes.lockedHint", { count: locked }) : t("admin.roleTypes.table.allowsActiveLong")} aria-label={t("admin.roleTypes.table.allowsActiveLong")}><Icon name="icon-[tabler--check]" class="h-3 w-3" /></span>
+                    </>
+                  )}
+                  {canWriteTypes && <MoveButtons action={`/role-types/${ty.id}/move`} id={ty.id} />}
+                  {(() => {
+                    const delOk = canDeleteTypes && !ty.isProtected && typeRoles.length === 0;
+                    const delWhy = ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: typeCounts.get(ty.id) ?? 0 });
+                    const openDel = `event.stopPropagation(); document.getElementById('delete-type-${ty.id}').showModal()`;
+                    return (<>
+                      <div class="flex gap-2 items-center max-md:hidden">
+                        {canWriteTypes && <RowAction icon="icon-[tabler--pencil]" label={t("common.edit")} class="btn-ghost" href={`/role-types/${ty.id}/edit`} />}
+                        {delOk ? <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={openDel} />
+                          : canDeleteTypes && <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={delWhy} />}
+                      </div>
+                      {(canWriteTypes || canDeleteTypes) && (
+                        <div class="dropdown dropdown-end md:hidden">
+                          <div tabindex={0} role="button" class="btn btn-xs btn-ghost" onclick="event.preventDefault();event.stopPropagation()" aria-label={t("common.actions")}><Icon name="icon-[tabler--dots-vertical]" class="h-4 w-4" /></div>
+                          <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-20 w-48 p-2 shadow text-sm font-normal">
+                            {canWriteTypes && <li><a href={`/role-types/${ty.id}/edit`}><Icon name="icon-[tabler--pencil]" class="h-4 w-4" />{t("common.edit")}</a></li>}
+                            {canDeleteTypes && (delOk
+                              ? <li><button type="button" class="text-error" onclick={openDel}><Icon name="icon-[tabler--trash]" class="h-4 w-4" />{t("common.delete")}</button></li>
+                              : <li class="menu-disabled" title={delWhy}><span><Icon name="icon-[tabler--trash]" class="h-4 w-4" />{t("common.delete")}</span></li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {delOk && <DeleteDialog triggerless id={`type-${ty.id}`} action={`/role-types/${ty.id}/delete`} title={t("admin.roleTypes.confirmDelete.title")} body={t("admin.roleTypes.confirmDelete.body", { name: ty.name })} />}
+                    </>);
+                  })()}
+                  <Icon name="icon-[tabler--chevron-down]" class={`h-5 w-5 shrink-0 transition-transform group-open:rotate-180${ty.description ? " max-md:hidden" : ""}`} />
+                </div>
               </div>
-              {ty.description && <div class="text-sm font-normal opacity-70">{ty.description}</div>}
+              {ty.description && <div class="flex items-center gap-2 text-sm font-normal opacity-70"><span class="flex-1 min-w-0">{ty.description}</span><Icon name="icon-[tabler--chevron-down]" class="h-5 w-5 shrink-0 transition-transform group-open:rotate-180 md:hidden" /></div>}
             </summary>
             <div class="collapse-content overflow-x-auto pt-4">
               <table class="table table-zebra w-full">
@@ -244,67 +277,35 @@ const rolesPage = async (c: Context<{ Variables: Variables }>) => {
         );
       })}
 
-      </>)}
-
-      {tab === "types" && (<>
-      <PageHeader title={title} actions={canWriteTypes && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roleTypes.new")} class="btn-primary" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />} />
-      <div class="overflow-x-auto mb-10">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th>{t("admin.roleTypes.table.name")}</th>
-              <th class="w-px whitespace-nowrap text-center" title={t("admin.roleTypes.table.allowsActiveLong")}>{t("admin.roleTypes.table.allowsActive")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {types.map((ty) => {
-              const n = typeCounts.get(ty.id) ?? 0;
-              return (
-                <tr
-                  key={ty.id}
-                  data-id={ty.id}
-                  class="cursor-pointer hover"
-                  onclick={`location.href='/role-types/${ty.id}'`}
-                >
-                  <td class="font-medium">{ty.isProtected && <span class="mr-1" title={t("admin.roles.systemRole")}>🔒</span>}{ty.name}</td>
-                  <td class="w-px whitespace-nowrap text-center">
-                    <form method="post" action={`/role-types/${ty.id}/allows-active`} onclick="event.stopPropagation()">
-                      <label class="flex justify-center cursor-pointer">
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" checked={ty.allowsActiveStatus} disabled={!canWriteTypes} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActiveLong")} />
-                      </label>
-                    </form>
-                  </td>
-                  <td>
-                    <div class="flex gap-2 justify-end items-center">
-                      {canDeleteTypes && !ty.isProtected && n === 0 ? (
-                        <DeleteDialog
-                          id={`type-${ty.id}`}
-                          action={`/role-types/${ty.id}/delete`}
-                          title={t("admin.roleTypes.confirmDelete.title")}
-                          body={t("admin.roleTypes.confirmDelete.body", { name: ty.name })}
-                        />
-                      ) : canDeleteTypes && (
-                        <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-ghost text-base-content/30" disabled title={ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: n })} />
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      </>)}
       </div>
 
       <ModalScaffold />
+      {error && (
+        <dialog class="modal modal-open" role="alertdialog">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg flex items-center gap-2 text-error"><Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5 shrink-0" />{error.title ?? t("common.error")}</h3>
+            <p class="py-2">{error.message}</p>
+            {error.detail && error.detail.length > 0 && <ul class="list-disc ml-5 max-h-[40dvh] overflow-y-auto text-sm sm:columns-2 gap-x-6">{error.detail.map((d) => <li>{d}</li>)}</ul>}
+            <div class="modal-action"><a class="btn" href="/roles" autofocus>{t("common.close")}</a></div>
+          </div>
+          <a class="modal-backdrop" href="/roles" aria-label={t("common.close")} />
+        </dialog>
+      )}
       <script dangerouslySetInnerHTML={{ __html: REORDER_SCRIPT }} />
-    </Layout>
+    </Layout>,
+    error ? HTTP_STATUS.BAD_REQUEST : undefined
   );
 };
-roleRoutes.get("/roles", requireAuth(["member-roles:read", "member-role-types:read"]), rolesPage);
-roleRoutes.get("/role-types", typesRead, (c) => c.redirect("/roles?view=types"));
+roleRoutes.get("/roles", requireAuth(["member-roles:read", "member-role-types:read"]), (c) => rolesPage(c));
+roleRoutes.get("/role-types", typesRead, (c) => c.redirect("/roles"));
+
+// POST /role-types/:id/move — dir=up|down
+roleRoutes.post("/role-types/:id/move", typesWrite, async (c) => {
+  const dir = (await c.req.parseBody()).dir === "up" ? "up" : "down";
+  const current = await db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder));
+  await writeOrder(memberRoleTypes, moveId(current.map((r) => r.id), c.req.param("id"), dir));
+  return c.redirect("/roles");
+});
 
 function RoleForm({ types, role, hasAssignments, affected }: {
   types: (typeof memberRoleTypes.$inferSelect)[];
@@ -577,7 +578,7 @@ roleRoutes.post("/roles/:id/delete", rolesDelete, async (c) => {
 });
 
 // ── /role-types ─────────────────────────────────────────────────────────
-function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) {
+function RoleTypeForm({ type, locked = 0 }: { type?: typeof memberRoleTypes.$inferSelect; locked?: number }) {
   return (
     <>
       <Field label={t("admin.roleTypes.table.name")} required>
@@ -586,10 +587,13 @@ function RoleTypeForm({ type }: { type?: typeof memberRoleTypes.$inferSelect }) 
       <Field label={t("admin.roleTypes.table.description")}>
         <textarea name="description" rows={2} maxlength={300} placeholder={t("admin.roleTypes.table.description")} class="textarea w-full">{type?.description ?? ""}</textarea>
       </Field>
-      <label class="label cursor-pointer justify-start gap-3">
-        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" {...(type?.allowsActiveStatus ? { checked: true } : {})} />
+      <label class={`label justify-start gap-3 ${locked ? "cursor-not-allowed" : "cursor-pointer"}`}>
+        {/* Disabled inputs are not submitted; the hidden field keeps the value. */}
+        {locked > 0 && <input type="hidden" name="allowsActiveStatus" value="1" />}
+        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40" disabled={locked > 0} aria-describedby={locked ? "allows-active-hint" : undefined} {...(type?.allowsActiveStatus ? { checked: true } : {})} />
         <span class="text-sm">{t("admin.roleTypes.table.allowsActiveLong")}</span>
       </label>
+      {locked > 0 && <p id="allows-active-hint" class="text-xs opacity-70 -mt-2">{t("admin.roleTypes.lockedHint", { count: locked })}</p>}
     </>
   );
 }
@@ -606,42 +610,18 @@ roleRoutes.get("/role-types/new", typesWrite, (c) =>
     </>
   ));
 
-// GET /role-types/:id — read-only
-roleRoutes.get("/role-types/:id", typesRead, async (c) => {
-  const id = c.req.param("id");
-  const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
-  if (!type) return c.notFound();
-  const user = c.get("user");
-  const canWrite = user.permissions.has("member-role-types:write");
-  const canDeletePerm = user.permissions.has("member-role-types:delete");
-  const assigned = await db.select({ title: memberRoles.title }).from(memberRoles).where(eq(memberRoles.typeId, id));
-  const remove = canDeletePerm && !type.isProtected && assigned.length === 0 && (
-    <DeleteDialog id={`type-${type.id}`} action={`/role-types/${type.id}/delete`} title={t("admin.roleTypes.confirmDelete.title")} body={t("admin.roleTypes.confirmDelete.body", { name: type.name })} />
-  );
-  return c.html(
-    <Layout title={type.name} user={user}>
-      <div class="max-w-2xl mx-auto">
-      <PageHeader title={<>{type.isProtected && "🔒 "}{type.name}</>} backHref="/roles?view=types" actions={<DetailActions editHref={canWrite ? `/role-types/${id}/edit` : undefined} remove={remove} />} />
-      <ViewGrid>
-        <ViewField label={t("admin.roleTypes.table.description")} value={type.description} />
-        <ViewField label={t("admin.roleTypes.table.allowsActiveLong")} value={type.allowsActiveStatus ? t("common.yes") : t("common.no")} />
-      </ViewGrid>
-      </div>
-    </Layout>
-  );
-});
-
 roleRoutes.get("/role-types/:id/edit", typesRead, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   if (!type) return c.notFound();
-  if (!c.get("user").permissions.has("member-role-types:write")) return c.redirect(`/role-types/${id}`);
+  if (!c.get("user").permissions.has("member-role-types:write")) return c.redirect("/roles");
+  const [{ n: locked }] = await db.select({ n: count() }).from(memberRoles).where(and(eq(memberRoles.typeId, id), eq(memberRoles.grantsActiveStatus, true)));
   return c.html(
     <Layout title={t("admin.roleTypes.edit")} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={t("admin.roleTypes.edit")} backHref={`/role-types/${id}`} actions={<FormActions formId="role-type-form" cancelHref={`/role-types/${id}`} />} />
+      <PageHeader title={t("admin.roleTypes.edit")} backHref="/roles" actions={<FormActions formId="role-type-form" cancelHref="/roles" />} />
       <form id="role-type-form" method="post" action={`/role-types/${id}`} class="flex flex-col gap-3">
-        <RoleTypeForm type={type} />
+        <RoleTypeForm type={type} locked={type.allowsActiveStatus ? locked : 0} />
       </form>
       </div>
     </Layout>
@@ -653,7 +633,7 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
   const name = String(body.name ?? "").trim();
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/roles?view=types");
+    return c.redirect("/roles");
   }
   const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${memberRoleTypes.sortOrder}), 0)` }).from(memberRoleTypes);
   const id = crypto.randomUUID();
@@ -666,7 +646,7 @@ roleRoutes.post("/role-types", typesWrite, async (c) => {
     isProtected: false,
   });
   setFlash(c, t("admin.roleTypes.flash.created", { name }), "success");
-  return c.redirect(`/role-types/${id}`);
+  return c.redirect("/roles");
 });
 
 // Titles of flagged roles that forbid removing allows_active_status (empty = allowed).
@@ -685,9 +665,9 @@ roleRoutes.post("/role-types/:id/allows-active", typesWrite, async (c) => {
   if (!type) return c.html("", HTTP_STATUS.NOT_FOUND);
   const allowsActiveStatus = (await c.req.parseBody()).allowsActiveStatus === "1";
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
-  if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
+  if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked, t("admin.roleTypes.flash.flaggedRolesTitle"));
   await db.update(memberRoleTypes).set({ allowsActiveStatus }).where(eq(memberRoleTypes.id, id));
-  return c.redirect("/roles?view=types");
+  return c.redirect("/roles");
 });
 
 roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
@@ -699,24 +679,24 @@ roleRoutes.post("/role-types/:id", typesWrite, async (c) => {
   const allowsActiveStatus = body.allowsActiveStatus === "1";
   if (!name) {
     setFlash(c, t("admin.roleTypes.flash.requiredName"), "error");
-    return c.redirect("/roles?view=types");
+    return c.redirect("/roles");
   }
   const blocked = await flaggedRolesBlocking(type, allowsActiveStatus);
-  if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked);
+  if (blocked.length > 0) return badRequest(c, t("admin.roleTypes.flash.flaggedRoles"), blocked, t("admin.roleTypes.flash.flaggedRolesTitle"));
   await db.update(memberRoleTypes).set({ name, allowsActiveStatus, description: String(body.description ?? "").trim().slice(0, 300) || null }).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roles.flash.saved"), "success");
-  return c.redirect(`/role-types/${id}`);
+  return c.redirect("/roles");
 });
 
 roleRoutes.post("/role-types/:id/delete", typesDelete, async (c) => {
   const id = c.req.param("id");
   const [type] = await db.select().from(memberRoleTypes).where(eq(memberRoleTypes.id, id));
-  if (!type) return c.redirect("/roles?view=types");
+  if (!type) return c.redirect("/roles");
   if (type.isProtected) return badRequest(c, t("admin.roleTypes.cannotDelete.protected"));
   const assigned = await db.select({ title: memberRoles.title }).from(memberRoles).where(eq(memberRoles.typeId, id));
-  if (assigned.length > 0) return badRequest(c, t("admin.roleTypes.flash.notEmpty"), assigned.map((r) => r.title));
+  if (assigned.length > 0) return badRequest(c, t("admin.roleTypes.flash.notEmpty"), assigned.map((r) => r.title), t("admin.roleTypes.flash.notEmptyTitle"));
   await db.delete(memberRoleTypes).where(eq(memberRoleTypes.id, id));
   setFlash(c, t("admin.roleTypes.flash.deleted", { name: type.name }), "success");
-  return c.redirect("/roles?view=types");
+  return c.redirect("/roles");
 });
 
