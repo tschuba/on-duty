@@ -21,6 +21,7 @@ import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
+import { TitleSwitch } from "../components/title-switch.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
@@ -97,6 +98,12 @@ function UserRoleBadges({ roles }: { roles: string[] }) {
   );
 }
 
+// Benutzer ⇄ Berechtigungen als Ansichten-Umschalter (wie Spenden ⇄ Spender).
+const adminViews = (users: boolean) => [
+  { active: users, href: "/admin/users", label: t("admin.tabs.users") },
+  { active: !users, href: "/admin/permissions", label: t("admin.tabs.permissions") },
+];
+
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
 adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 
@@ -123,7 +130,7 @@ adminRoutes.get("/users", guard, async (c) => {
   return c.html(
     <Layout title={t("admin.users.title")} user={user}>
       <BackupWarnBanner {...warn} />
-      <PageHeader title={t("admin.users.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
+      <PageHeader title={<TitleSwitch items={adminViews(true)} />} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
       {pendingCount > 0 && (
         <form method="get" class="mb-2">
@@ -675,7 +682,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={t("admin.permissions.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
+      <PageHeader title={<TitleSwitch items={adminViews(false)} />} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
       <div class="filter-bar mb-3"><label class="input flex items-center gap-2 w-full max-w-xs">
         <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />

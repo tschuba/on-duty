@@ -13,7 +13,8 @@ import { countPendingUsers } from "../lib/registration.js";
 import { SOURCE_REPO_URL } from "../lib/constants.js";
 import { Icon } from "./icon.js";
 import { getContext } from "hono/context-storage";
-import { CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
+import { getBackupStatus } from "../lib/backup.js";
+import { AdminMenu, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
 
 // package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
 const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).version;
@@ -54,6 +55,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       events: await countPendingRsvps(user.id).catch(() => 0), // Badge darf die Seite nie brechen
       org,
       pendingUsers: has("system:admin") ? await countPendingUsers() : 0,
+      backupProblem: has("system:admin") ? ["failed", "stale"].includes((await getBackupStatus()).state) : false,
     };
   }
 
@@ -97,6 +99,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         </div>
         {user && (
           <div class="navbar-end w-auto">
+            {counts && <AdminMenu user={user} counts={counts} />}
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
                 <div class="avatar avatar-placeholder tooltip tooltip-left lg:hidden" data-tip={user.name}>
