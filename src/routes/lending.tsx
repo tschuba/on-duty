@@ -19,7 +19,7 @@ import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { getSettings } from "../lib/settings.js";
-import { StatCard } from "../components/stat-card.js";
+import { StatCard, StatGrid } from "../components/stat-card.js";
 import { checkAvailability as checkSharedAvailability, cleanupRejectedLoanRequests, effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
 
 export const lendingRoutes = new Hono<{ Variables: Variables }>();
@@ -137,15 +137,13 @@ function LendingStats({ loans, today, openRequests, requestsHref }: { loans: Loa
   // Leere start/end heben das Standardfenster auf, sonst weicht die Liste von der Kartenzahl ab.
   const statusHref = (st: LoanStatus) => `/inventory/lending?status=${st}&start=&end=`;
   return (
-    <div id="lending-stats" class="hidden sm:block @container mb-6">
-      <div class={`grid grid-cols-2 ${openRequests === null ? "@4xl:grid-cols-4" : "@4xl:grid-cols-5"} gap-2 @4xl:gap-4`}>
+    <StatGrid id="lending-stats" cols={openRequests === null ? 4 : 5}>
         <StatCard label={t("lending.stats.overdue")} value={overdue} tone={overdue > 0 ? "text-error" : undefined} href={statusHref("overdue")} link="filter" />
         {openRequests !== null && <StatCard label={t("lending.stats.requests")} value={openRequests} tone={openRequests > 0 ? "text-primary" : undefined} href={requestsHref} link="filter" />}
         <StatCard label={t("lending.stats.out")} value={open.filter((l) => l.pickedUpAt).length} tone="text-info" />
         <StatCard label={t("lending.stats.dueToday")} value={open.filter((l) => l.plannedTo === today).length} />
         <StatCard label={t("lending.stats.planned")} value={loans.filter((l) => loanStatus(l, today) === "planned").length} href={statusHref("planned")} link="filter" />
-      </div>
-    </div>
+      </StatGrid>
   );
 }
 

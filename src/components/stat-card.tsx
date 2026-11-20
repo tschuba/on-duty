@@ -30,3 +30,14 @@ export function StatCard({ label, value, tone, href, link, inline, highlight, ch
   // daisyUI-Aura: Wrapper mit rotierendem Lichtrand; Farbe über text-*
   return highlight ? <div class="aura aura-gold flex">{card}</div> : card;
 }
+
+/** Responsiver Raster-Wrapper: 1 Spalte → 2 → 3 → alle `cols` Karten in einer Zeile (Container-Breite). */
+export function StatGrid({ id, cols, class: cls, children }: { id: string; cols: number; class?: string; children?: Child }) {
+  return (
+    <div id={id} class={`@container mb-6${cls ? ` ${cls}` : ""}`}>
+      <div style={`--stat-cols:${cols}`} class="grid auto-rows-fr grid-cols-1 @xs:grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-[repeat(var(--stat-cols),minmax(0,1fr))] gap-2 @4xl:gap-4">
+        {children}
+      </div>
+    </div>
+  );
+}
