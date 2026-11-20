@@ -51,7 +51,7 @@ export function ApplicationLinks({ forms, canManageForms }: { forms: Forms; canM
           >
             <Icon name="icon-[tabler--link]" class="h-5 w-5" />
             <span class="@max-6xl:hidden">{t("applications.links.title")}</span>
-            <span class="flex items-center gap-2 border-l border-base-content/20 pl-2">
+            <span class="flex items-center gap-2 border-l border-base-content/20 pl-2 @max-2xl:hidden">
               {(["membership", "youth"] as const).map((type) => {
                 const status = formatFormStatusText(forms[type]);
                 return (

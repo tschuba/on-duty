@@ -1,8 +1,9 @@
 import { ToggleFilter, pairToggles } from "../components/toggle-filter.js";
+import { Icon } from "../components/icon.js";
 import { RowAction } from "../components/row-action.js";
 import { Field } from "../components/field.js";
 import { Hono, type Context } from "hono";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { anniversaryYears } from "../db/schema/index.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -36,26 +37,27 @@ export function anniversaryViews(perms: Set<string>, years: boolean) {
 // Alte Links (/anniversary-years?kind=…&sort=…) bleiben gültig.
 yearRoutes.get("/", yearsRead, (c) => c.redirect(`/anniversaries?${new URLSearchParams({ ...c.req.query(), view: "years" })}`));
 
+type YearRow = typeof anniversaryYears.$inferSelect;
+
 export async function renderYears(c: Context<{ Variables: Variables }>) {
   const user = c.get("user")!;
   const canWrite = user.permissions.has("anniversary-years:write");
   const canDelete = user.permissions.has("anniversary-years:delete");
   const kindParam = c.req.query("kind") ?? "";
   const kindFilter = isKind(kindParam) ? kindParam : null;
-  const allYears = await db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.kind), asc(anniversaryYears.year));
+  const allYears = await db.select().from(anniversaryYears).orderBy(asc(anniversaryYears.year), asc(anniversaryYears.kind));
 
-  type YearSort = "kind" | "year" | "title";
+  // Eine Zeile je Jahr; die Arten (service/membership) werden als Badges zusammengefasst.
+  type YearSort = "year" | "title";
   const sortParam = c.req.query("sort");
-  const sort: YearSort = sortParam === "year" || sortParam === "title" ? sortParam : "kind";
+  const sort: YearSort = sortParam === "title" ? "title" : "year";
   const dir = c.req.query("dir") === "desc" ? "desc" : "asc";
   const sign = dir === "desc" ? -1 : 1;
-  // Ties fall back to kind, year so the order stays stable.
-  const cmp = (a: (typeof allYears)[number], b: (typeof allYears)[number]) =>
-    (sort === "year" ? a.year - b.year
-      : sort === "title" ? (a.title ?? "").localeCompare(b.title ?? "", "de")
-      : a.kind.localeCompare(b.kind)) * sign
-    || a.kind.localeCompare(b.kind) || a.year - b.year;
-  const years = (kindFilter ? allYears.filter((y) => y.kind === kindFilter) : allYears).sort(cmp);
+  const byYear = new Map<number, YearRow[]>();
+  for (const y of kindFilter ? allYears.filter((r) => r.kind === kindFilter) : allYears) byYear.set(y.year, [...(byYear.get(y.year) ?? []), y]);
+  const firstTitle = (rows: YearRow[]) => rows.find((r) => r.title)?.title ?? "";
+  const groups = [...byYear.entries()].sort(([ya, a], [yb, b]) =>
+    (sort === "title" ? firstTitle(a).localeCompare(firstTitle(b), "de") : ya - yb) * sign || ya - yb);
   const sortUrl = (col: YearSort) => {
     const q = new URLSearchParams();
     if (kindFilter) q.set("kind", kindFilter);
@@ -63,6 +65,11 @@ export async function renderYears(c: Context<{ Variables: Variables }>) {
     q.set("dir", sort === col && dir === "asc" ? "desc" : "asc");
     return `/anniversaries?view=years&${q}`;
   };
+  const kindLabel = (k: AnniversaryKind) => t(`admin.anniversaries.kind.${k}`);
+  const titleText = (rows: YearRow[]) =>
+    rows.every((r) => r.title === rows[0].title)
+      ? rows[0].title ?? "–"
+      : rows.filter((r) => r.title).map((r) => `${kindLabel(r.kind)}: ${r.title}`).join(" · ");
 
   return c.html(
     <Layout title={t("admin.anniversaries.title")} user={user}>
@@ -71,59 +78,64 @@ export async function renderYears(c: Context<{ Variables: Variables }>) {
 
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(kindFilter ?? "",
-          [{ value: "service", label: t("admin.anniversaries.kind.service") }, { value: "membership", label: t("admin.anniversaries.kind.membership") }],
+          [{ value: "service", label: kindLabel("service") }, { value: "membership", label: kindLabel("membership") }],
           (v) => `/anniversaries?view=years&${v ? `kind=${v}&` : ""}sort=${sort}&dir=${dir}`)} />
       </div>
 
       {canWrite && <ClickToEditHint />}
+      {groups.length === 0 ? (
+        <p class="text-center opacity-50 py-8">{t("admin.anniversaries.empty")}</p>
+      ) : (
       <div class="overflow-x-auto mb-6">
         <table class="table table-zebra w-full">
           <thead>
             <tr>
-              <th><a href={sortUrl("kind")} class="link link-hover">{t("admin.anniversaries.table.kind")} <SortIcon col="kind" active={sort} dir={dir} /></a></th>
               <th><a href={sortUrl("year")} class="link link-hover">{t("admin.anniversaries.table.years")} <SortIcon col="year" active={sort} dir={dir} /></a></th>
-              <th><a href={sortUrl("title")} class="link link-hover">{t("admin.anniversaries.table.title")} <SortIcon col="title" active={sort} dir={dir} /></a></th>
-              {canDelete && <th />}
+              <th>{t("admin.anniversaries.table.kinds")}</th>
+              <th class="max-md:hidden"><a href={sortUrl("title")} class="link link-hover">{t("admin.anniversaries.table.title")} <SortIcon col="title" active={sort} dir={dir} /></a></th>
+              {(canWrite || canDelete) && <th />}
             </tr>
           </thead>
           <tbody>
-            {years.length === 0 ? (
-              <tr>
-                <td colspan={canDelete ? 4 : 3} class="text-center opacity-50 py-4">
-                  {t("admin.anniversaries.empty")}
-                </td>
-              </tr>
-            ) : (
-              years.map((y) => (
+            {groups.map(([year, rows]) => (
                 <tr
-                  key={`${y.kind}-${y.year}`}
+                  key={year}
                   {...(canWrite && {
                     class: "cursor-pointer hover",
-                    "hx-get": `/anniversary-years/${y.kind}/${y.year}/edit`,
+                    "hx-get": `/anniversary-years/${year}/edit`,
                     "hx-target": "#modal-content",
                     "hx-swap": "innerHTML",
                   })}
                 >
-                  <td>{t(`admin.anniversaries.kind.${y.kind}`)}</td>
-                  <td class="font-medium">{y.year}</td>
-                  <td class="opacity-70">{y.title ?? "–"}</td>
-                  {canDelete && (
+                  <td class="font-medium">{year}</td>
+                  <td>
+                    <div class="flex flex-wrap gap-1">
+                      {rows.map((r) => {
+                        const color = r.kind === "service" ? "badge-primary" : "badge-secondary";
+                        const label = `${kindLabel(r.kind)}, ${t(r.title ? "admin.anniversaries.badge.withTitle" : "admin.anniversaries.badge.noTitle")}`;
+                        return (
+                          <span class={`badge badge-sm ${r.title ? color : `${color} badge-outline`}`} title={label} aria-label={label}>
+                            {r.title && <Icon name="icon-[tabler--tag]" class="h-3 w-3" />}
+                            {kindLabel(r.kind)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </td>
+                  <td class="opacity-70 max-md:hidden">{titleText(rows)}</td>
+                  {(canWrite || canDelete) && (
                   <td>
                     <div class="flex gap-2 justify-end">
-                      <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-year-${y.kind}-${y.year}').showModal()`} />
+                      {canDelete && <RowAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`event.stopPropagation(); document.getElementById('delete-year-${year}').showModal()`} />}
                     </div>
-                    <dialog id={`delete-year-${y.kind}-${y.year}`} class="modal" onclick="event.stopPropagation()">
+                    {canDelete && <dialog id={`delete-year-${year}`} class="modal" onclick="event.stopPropagation()">
                       <div class="modal-box">
-                        <p>
-                          {y.title
-                            ? t("admin.anniversaries.confirmDelete.bodyWithTitle", { kind: t(`admin.anniversaries.kind.${y.kind}`), year: String(y.year), title: y.title })
-                            : t("admin.anniversaries.confirmDelete.body", { kind: t(`admin.anniversaries.kind.${y.kind}`), year: String(y.year) })}
-                        </p>
+                        <p>{t("admin.anniversaries.confirmDelete.body", { year: String(year) })}</p>
                         <div class="modal-action">
                           <form method="dialog">
                             <button class="btn">{t("common.cancel")}</button>
                           </form>
-                          <form method="post" action={`/anniversary-years/${y.kind}/${y.year}/delete`}>
+                          <form method="post" action={`/anniversary-years/${year}/delete`}>
                             <button type="submit" class="btn btn-error">
                               {t("common.delete")}
                             </button>
@@ -133,15 +145,15 @@ export async function renderYears(c: Context<{ Variables: Variables }>) {
                       <form method="dialog" class="modal-backdrop">
                         <button>{t("common.close")}</button>
                       </form>
-                    </dialog>
+                    </dialog>}
                   </td>
                   )}
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
+      )}
       </div>
 
       <ModalScaffold />
@@ -149,143 +161,110 @@ export async function renderYears(c: Context<{ Variables: Variables }>) {
   );
 }
 
-// HTMX fragment: new anniversary year modal
-yearRoutes.get("/new", yearsWrite, (c) => {
-  const kind = "service";
-  return c.html(
+// Gemeinsames Formular: Jahr + je Art ein Toggle mit eigenem Titel; mindestens ein Toggle bleibt an.
+const FORM_SCRIPT = `(function(){var f=document.currentScript.parentElement,b=[].slice.call(f.querySelectorAll('input[type=checkbox][data-kind]'));
+function sync(){b.forEach(function(x){var i=f.querySelector('input[name="title_'+x.dataset.kind+'"]');i.disabled=!x.checked;i.closest('label').parentElement.classList.toggle('hidden',!x.checked)})}
+b.forEach(function(x){x.addEventListener('change',function(){if(!b.some(function(y){return y.checked}))b.filter(function(y){return y!==x})[0].checked=true;sync()})});sync()})();`;
+
+function YearForm({ action, heading, submit, year, rows }: { action: string; heading: string; submit: string; year?: number; rows: YearRow[] }) {
+  const by = new Map(rows.map((r) => [r.kind, r]));
+  return (
     <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.create")}</h3>
-      <form method="post" action="/anniversary-years" class="flex flex-col gap-3">
-        <Field label={t("admin.anniversaries.modal.kindLabel")} required>
-          <select name="kind" class="select w-full" required>
-            {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
-          </select>
-        </Field>
+      <h3 class="font-bold text-lg mb-4">{heading}</h3>
+      <form method="post" action={action} class="flex flex-col gap-3">
         <Field label={t("admin.anniversaries.modal.yearLabel")} required>
-          <input type="number" name="year" placeholder={t("admin.anniversaries.modal.yearLabel")} min="1" max="200" class="input w-full" required />
+          <input type="number" name="year" value={year} placeholder={t("admin.anniversaries.modal.yearLabel")} min="1" max="200" class="input w-full" required />
         </Field>
-        <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
-          <input type="text" name="title" placeholder={t("admin.anniversaries.modal.titleLabel")} class="input w-full" />
-        </Field>
+        {ANNIVERSARY_KINDS.map((k) => (
+          <div class="flex flex-col gap-2">
+            <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
+              <input type="checkbox" name={k} value="1" data-kind={k} class="toggle toggle-primary" checked={rows.length === 0 || by.has(k)} />
+              <span>{t(`admin.anniversaries.kind.${k}`)}</span>
+            </label>
+            <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
+              <input type="text" name={`title_${k}`} value={by.get(k)?.title ?? ""} placeholder={t("admin.anniversaries.modal.titleLabel")} class="input w-full" />
+            </Field>
+          </div>
+        ))}
         <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.add")}
-          </button>
+          <button type="button" class="btn btn-ghost" onclick="document.getElementById('admin-modal').close()">{t("common.cancel")}</button>
+          <button type="submit" class="btn btn-primary">{submit}</button>
         </div>
+        <script dangerouslySetInnerHTML={{ __html: FORM_SCRIPT }} />
       </form>
       <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
     </>
   );
-});
+}
+
+// HTMX fragment: new anniversary year modal
+yearRoutes.get("/new", yearsWrite, (c) =>
+  c.html(<YearForm action="/anniversary-years" heading={t("admin.anniversaries.modal.create")} submit={t("common.add")} rows={[]} />));
 
 // HTMX fragment: edit anniversary year modal
-yearRoutes.get("/:kind/:year/edit", yearsWrite, async (c) => {
-  const kind = c.req.param("kind");
+yearRoutes.get("/:year/edit", yearsWrite, async (c) => {
   const year = parseInt(c.req.param("year"), 10);
-  const [y] = await db.select().from(anniversaryYears).where(and(eq(anniversaryYears.kind, kind as AnniversaryKind), eq(anniversaryYears.year, year)));
-  if (!y) return c.html("", HTTP_STATUS.NOT_FOUND);
-
-  return c.html(
-    <>
-      <h3 class="font-bold text-lg mb-4">{t("admin.anniversaries.modal.edit")}</h3>
-      <form method="post" action={`/anniversary-years/${kind}/${year}`} class="flex flex-col gap-3">
-        <Field label={t("admin.anniversaries.modal.kindLabel")} required>
-          <select name="kind" class="select w-full" required>
-            {ANNIVERSARY_KINDS.map((k) => <option value={k} selected={k === kind}>{t(`admin.anniversaries.kind.${k}`)}</option>)}
-          </select>
-        </Field>
-        <Field label={t("admin.anniversaries.modal.yearLabel")} required>
-          <input type="number" name="year" placeholder={t("admin.anniversaries.modal.yearLabel")} value={y.year} min="1" max="200" class="input w-full" required />
-        </Field>
-        <Field label={t("admin.anniversaries.modal.titleLabel")} hint={t("admin.anniversaries.modal.titlePlaceholder")}>
-          <input type="text" name="title" placeholder={t("admin.anniversaries.modal.titleLabel")} value={y.title ?? ""} class="input w-full" />
-        </Field>
-        <div class="modal-action mt-2">
-          <button
-            type="button"
-            class="btn btn-ghost"
-            onclick="document.getElementById('admin-modal').close()"
-          >
-            {t("common.cancel")}
-          </button>
-          <button type="submit" class="btn btn-primary">
-            {t("common.save")}
-          </button>
-        </div>
-      </form>
-      <script dangerouslySetInnerHTML={{ __html: "document.getElementById('admin-modal').showModal();" }} />
-    </>
-  );
+  const rows = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, year));
+  if (rows.length === 0) return c.html("", HTTP_STATUS.NOT_FOUND);
+  return c.html(<YearForm action={`/anniversary-years/${year}`} heading={t("admin.anniversaries.modal.edit")} submit={t("common.save")} year={year} rows={rows} />);
 });
+
+// Liest das Formular: Jahr + ausgewählte Arten (immer mindestens eine). null = ungültig.
+async function parseYearForm(c: Context<{ Variables: Variables }>) {
+  const body = await c.req.parseBody();
+  const year = parseInt(String(body.year ?? ""), 10);
+  const kinds = ANNIVERSARY_KINDS.filter((k) => body[k]);
+  if (!year || year < 1 || year > 200 || kinds.length === 0) return null;
+  return { year, rows: kinds.map((kind) => ({ kind, year, title: String(body[`title_${kind}`] ?? "").trim() || null })) };
+}
 
 // POST /anniversary-years — create
 yearRoutes.post("/", yearsWrite, async (c) => {
-  const body = await c.req.parseBody();
-  const year = parseInt(String(body.year ?? ""), 10);
-  const kind = String(body.kind ?? "");
-  const title = String(body.title ?? "").trim() || null;
-
-  if (!isKind(kind) || !year || year < 1 || year > 200) {
+  const form = await parseYearForm(c);
+  if (!form) {
     setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
     return c.redirect("/anniversaries?view=years");
   }
-
-  await db.insert(anniversaryYears).values({ kind, year, title }).onConflictDoNothing();
-  setFlash(c, t("admin.anniversaries.flash.added", { year }), "success");
+  const [exists] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, form.year));
+  if (exists) {
+    setFlash(c, t("admin.anniversaries.flash.yearExists", { year: form.year }), "error");
+    return c.redirect("/anniversaries?view=years");
+  }
+  await db.insert(anniversaryYears).values(form.rows);
+  setFlash(c, t("admin.anniversaries.flash.added", { year: form.year }), "success");
   return c.redirect("/anniversaries?view=years");
 });
 
-// POST /anniversary-years/:year — update
-yearRoutes.post("/:kind/:year", yearsWrite, async (c) => {
-  const oldKind = c.req.param("kind");
+// POST /anniversary-years/:year — update (ersetzt alle Arten des Jahres)
+yearRoutes.post("/:year", yearsWrite, async (c) => {
   const oldYear = parseInt(c.req.param("year"), 10);
-  if (!isKind(oldKind)) return c.html("", HTTP_STATUS.NOT_FOUND);
-  const [existing] = await db.select().from(anniversaryYears).where(and(eq(anniversaryYears.kind, oldKind), eq(anniversaryYears.year, oldYear)));
+  const [existing] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, oldYear));
   if (!existing) return c.html("", HTTP_STATUS.NOT_FOUND);
 
-  const body = await c.req.parseBody();
-  const newYear = parseInt(String(body.year ?? ""), 10);
-  const newKind = String(body.kind ?? "");
-  const title = String(body.title ?? "").trim() || null;
-
-  if (!isKind(newKind) || !newYear || newYear < 1 || newYear > 200) {
+  const form = await parseYearForm(c);
+  if (!form) {
     setFlash(c, t("admin.anniversaries.flash.invalidYear"), "error");
     return c.redirect("/anniversaries?view=years");
   }
-
-  if (newYear !== oldYear || newKind !== oldKind) {
-    const [conflict] = await db
-      .select({ year: anniversaryYears.year })
-      .from(anniversaryYears)
-      .where(and(eq(anniversaryYears.kind, newKind), eq(anniversaryYears.year, newYear)));
+  if (form.year !== oldYear) {
+    const [conflict] = await db.select().from(anniversaryYears).where(eq(anniversaryYears.year, form.year));
     if (conflict) {
-      setFlash(c, t("admin.anniversaries.flash.yearExists", { year: newYear }), "error");
+      setFlash(c, t("admin.anniversaries.flash.yearExists", { year: form.year }), "error");
       return c.redirect("/anniversaries?view=years");
     }
   }
-
-  await db
-    .update(anniversaryYears)
-    .set({ kind: newKind, year: newYear, title })
-    .where(and(eq(anniversaryYears.kind, oldKind), eq(anniversaryYears.year, oldYear)));
+  await db.transaction(async (tx) => {
+    await tx.delete(anniversaryYears).where(eq(anniversaryYears.year, oldYear));
+    await tx.insert(anniversaryYears).values(form.rows);
+  });
   setFlash(c, t("admin.anniversaries.flash.saved"), "success");
   return c.redirect("/anniversaries?view=years");
 });
 
-// POST /anniversary-years/:year/delete
-yearRoutes.post("/:kind/:year/delete", yearsDelete, async (c) => {
-  const kind = c.req.param("kind");
-  if (!isKind(kind)) return c.html("", HTTP_STATUS.NOT_FOUND);
+// POST /anniversary-years/:year/delete — löscht alle Arten des Jahres
+yearRoutes.post("/:year/delete", yearsDelete, async (c) => {
   const year = parseInt(c.req.param("year"), 10);
-  await db.delete(anniversaryYears).where(and(eq(anniversaryYears.kind, kind), eq(anniversaryYears.year, year)));
+  await db.delete(anniversaryYears).where(eq(anniversaryYears.year, year));
   setFlash(c, t("admin.anniversaries.flash.deleted", { year }), "success");
   return c.redirect("/anniversaries?view=years");
 });
-

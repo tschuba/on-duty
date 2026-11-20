@@ -161,6 +161,10 @@ Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste 
 - Keine Sortierung, keine Pagination
 - Empty State: `<tr><td colspan={N} class="text-center opacity-50 py-4">{leerer-Text}</td></tr>` (`py-4` statt `py-8`, kompakter)
 
+### Karten unter `md` (`table-cards`)
+
+Breite Tabellen (viele Spalten, kein sinnvolles Ausblenden) werden unter `md` zu Karten: `table-cards` auf `<table>`, `data-label={Spaltenname}` auf jedem `<td>` (CSS in `app.css`). `thead` entfällt, leere Zellen werden ausgeblendet, Zellen zeigen Label links und Wert rechts. Kein `overflow-x-auto` nötig. Zellen ohne Wert bekommen `data-empty` und entfallen in der Karte. Zellen ohne `data-label` (z. B. Name/Titel) erscheinen als Kartenkopf ohne Label; mit `max-md:col-start-*`/`row-start-*` ordnest du das Grid je Zeile an. Im Einsatz u. a. in Mitglieder, Ausbildung, Spenden, Leihe, Inventar (Felder, Vorlagen, Prüfungen) und Admin-Benutzer; weitere Listen werden schrittweise umgestellt. Klickbare Zeilen (`onclick`) bleiben unverändert.
+
 ### Zeilenaktionen
 
 Jede Aktion in einer Tabellenzeile (Bearbeiten, Löschen inkl. Modal-Auslöser, Kopieren, Aktivieren, ↑/↓) ist eine `RowAction` (`src/components/row-action.tsx`): `btn btn-xs` mit Icon, das Label verschwindet unter `md` (`max-md:hidden`). `aria-label` ist immer das Label, `title` standardmäßig ebenfalls; bei deaktivierten Buttons trägt `title` die Begründung. Icons: Bearbeiten `pencil`, Löschen `trash`, Kopieren `document-duplicate`, Aktivieren `check`, Ablehnen `x-mark`, Deaktivieren `no-symbol`, ↑/↓ `arrow-up`/`arrow-down`. Nicht betroffen: Buttons außerhalb von Tabellenzeilen.

@@ -136,7 +136,7 @@ adminRoutes.get("/users", guard, async (c) => {
       )}
       <ClickToEditHint />
       <div class="overflow-x-auto">
-        <table class="table table-zebra w-full">
+        <table class="table table-zebra table-cards w-full">
           <thead>
             <tr>
               <th>{t("admin.users.table.name")}</th>
@@ -156,16 +156,17 @@ adminRoutes.get("/users", guard, async (c) => {
                     class: "cursor-pointer hover",
                     onclick: `location.href='/admin/users/${u.id}'`,
                   })}
+                  class="max-md:grid-cols-[1fr_auto]"
                 >
-                  <td class="font-medium">
+                  <td class="font-medium max-md:col-start-1 max-md:row-start-1 max-md:font-semibold">
                     {isLocal && <span class="mr-1">🔒</span>}
                     {u.name}
                   </td>
-                  <td class="opacity-70">{isLocal ? "–" : u.email}</td>
-                  <td>
+                  <td class="opacity-70 max-md:col-span-2 max-md:text-sm">{isLocal ? "–" : u.email}</td>
+                  <td class="max-md:col-span-2">
                     <UserRoleBadges roles={rolesByUser.get(u.id) ?? []} />
                   </td>
-                  <td>
+                  <td class="max-md:col-start-2 max-md:row-start-1">
                     {u.disabled ? (
                       <span class="badge badge-error badge-sm">{t("admin.users.statusDisabled")}</span>
                     ) : !isLocal && !u.emailVerified ? (
@@ -178,7 +179,7 @@ adminRoutes.get("/users", guard, async (c) => {
                       <span class="badge badge-success badge-sm">{t("admin.users.statusActive")}</span>
                     )}
                   </td>
-                  <td>
+                  <td class="max-md:col-span-2">
                     {isLocal ? (
                       <span class="badge badge-neutral badge-sm">{t("admin.users.localAdminBadge")}</span>
                     ) : (

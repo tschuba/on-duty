@@ -445,12 +445,12 @@ describe("MembersTable", () => {
     const item = memberWithAssignments({}, [makeAssignment({ role: roleAktiv })]);
     const res = await renderApp(MembersTable({ ...baseProps, items: [{ ...item, status: "active" } as any] }));
     const html = await res.text();
-    const count = (c: string) => html.split(`class="${c}"`).length - 1;
+    const count = (c: string) => html.split(`class="${c}`).length - 1;
     expect(count("hidden md:table-cell")).toBe(2);
     expect(count("hidden lg:table-cell")).toBe(2);
     expect(count("hidden xl:table-cell")).toBe(2);
     // genau 6 Spalten-hidden-Vorkommen (th + td); Pager hat eigenes "hidden sm:inline"
-    expect(html.split(/class="hidden (?:md|lg|xl):table-cell"/).length - 1).toBe(6);
+    expect(html.split(/class="hidden (?:md|lg|xl):table-cell[ "]/).length - 1).toBe(6);
   });
 
   it("hides closed assignments from the open-roles display", async () => {

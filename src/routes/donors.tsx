@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { Address } from "../components/address.js";
 import { eq, or, ilike, asc, desc, and, exists, sql } from "drizzle-orm";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { db } from "../db/index.js";
@@ -294,7 +295,7 @@ donorRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "dona
         <ViewField label={t("donors.table.companyName")} value={donor.person.companyName} />
         <ViewField label={t("donors.form.lastName")} value={donor.person.lastName} />
         <ViewField label={t("donors.form.firstName")} value={donor.person.firstName} />
-        <ViewField label={t("donors.table.address")} value={formatAddress(donor.person)} />
+        <ViewField label={t("donors.table.address")} value={<Address p={donor.person} />} />
       </ViewGrid>
       <h2 class="font-semibold mt-6 mb-2">{t("donations.history")}</h2>
       <div class="overflow-x-auto max-w-xl">

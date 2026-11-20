@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { Address } from "../components/address.js";
 import { eq } from "drizzle-orm";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { toCurrency } from "n2words/de-DE";
@@ -262,7 +263,7 @@ function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnTyp
   const p = d.donor.person;
   const addressMissing = !p.street || !p.houseNumber || !p.zip || !p.city;
 
-  const row = (label: string, value: string | null | undefined, missing = false) => (
+  const row = (label: string, value: unknown, missing = false) => (
     <tr>
       <th class="font-semibold w-48">{label}</th>
       <td class={missing || !value ? "text-error" : ""}>{value || t("donations.receipt.missing")}</td>
@@ -305,7 +306,7 @@ function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnTyp
       <table class="table max-w-2xl mb-4">
         <tbody>
           {row(t("donations.receipt.previewRecipient"), recipientName(p))}
-          {row(t("donations.receipt.previewAddress"), addressMissing ? null : `${p.street} ${p.houseNumber}, ${p.zip} ${p.city}`)}
+          {row(t("donations.receipt.previewAddress"), addressMissing ? null : <Address p={p} />)}
           {row(t("donations.receipt.summaryAmount"), formatAmount(d.amount))}
           {row(t("donations.receipt.summaryDate"), formatDate(d.date))}
           {row(t("donations.receipt.previewType"), typeLabel(d.type))}
@@ -463,7 +464,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
       <ClickToEditHint />
       <div class="overflow-x-auto">
       {donorView ? (
-      <table class="table table-zebra w-full">
+      <table class="table table-zebra table-cards w-full">
         <thead>
           <tr>
             {th("donor", t("donations.table.donor"))}
@@ -478,17 +479,17 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             <tr><td colspan={5} class="text-center opacity-50 py-8">{t("donors.table.empty")}</td></tr>
           ) : pageDonorRows.map((r) => (
             <tr key={r.donor.id} class={`cursor-pointer hover${r.count === 0 ? " opacity-60" : ""}`} onclick={`window.location='/donors/${r.donor.id}'`}>
-              <td><MemberLink memberId={r.donor.person.member?.id} canLink={canLink}>{recipientName(r.donor.person)}</MemberLink><MemberMark memberId={r.donor.person.member?.id} canLink={canLink} /></td>
-              <td class="hidden md:table-cell">{[[r.donor.person.street, r.donor.person.houseNumber].filter(Boolean).join(" "), [r.donor.person.zip, r.donor.person.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"}</td>
-              <td class="text-right">{r.count}</td>
-              <td class="text-right whitespace-nowrap">{r.count ? eur(r.cents) : "–"}</td>
-              <td class="hidden sm:table-cell">{r.last ? formatDate(r.last) : "–"}</td>
+              <td class="max-md:font-semibold"><MemberLink memberId={r.donor.person.member?.id} canLink={canLink}>{recipientName(r.donor.person)}</MemberLink><MemberMark memberId={r.donor.person.member?.id} canLink={canLink} /></td>
+              <td data-label={t("donors.table.address")} data-empty={!(r.donor.person.street || r.donor.person.houseNumber || r.donor.person.zip || r.donor.person.city) || undefined} class="hidden md:table-cell"><Address p={r.donor.person} /></td>
+              <td data-label={t("donations.table.count")} class="text-right">{r.count}</td>
+              <td data-label={t("donations.table.amount")} class="text-right whitespace-nowrap">{r.count ? eur(r.cents) : "–"}</td>
+              <td data-label={t("donations.table.last")} data-empty={!r.last || undefined} class="hidden sm:table-cell">{r.last ? formatDate(r.last) : "–"}</td>
             </tr>
           ))}
         </tbody>
       </table>
       ) : (
-      <table class="table table-zebra w-full">
+      <table class="table table-zebra table-cards w-full">
         <thead>
           <tr>
             {th("date", t("donations.table.date"))}
@@ -502,12 +503,12 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
           {pageRows.length === 0 ? (
             <tr><td colspan={5} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : pageRows.map((d) => (
-            <tr key={d.id} class="cursor-pointer hover" onclick={`window.location='/donations/${d.id}'`}>
-              <td>{formatDate(d.date)}</td>
-              <td><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
-              <td class="text-right whitespace-nowrap">{formatAmount(d.amount)}</td>
-              <td>{d.purpose ?? "—"}</td>
-              <td>
+            <tr key={d.id} class="cursor-pointer hover max-md:grid-cols-[1fr_auto]" onclick={`window.location='/donations/${d.id}'`}>
+              <td class="max-md:col-start-1 max-md:row-start-2 max-md:text-sm max-md:opacity-60">{formatDate(d.date)}</td>
+              <td class="max-md:col-start-1 max-md:row-start-1 max-md:font-semibold"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
+              <td class="text-right whitespace-nowrap max-md:col-start-2 max-md:row-start-1">{formatAmount(d.amount)}</td>
+              <td data-empty={!d.purpose || undefined} class="max-md:col-span-2 max-md:row-start-3 max-md:text-sm">{d.purpose ?? "—"}</td>
+              <td class="max-md:col-start-2 max-md:row-start-2 max-md:justify-end">
                 {d.receiptStatus === "issued"
                   ? <span class="badge badge-success badge-sm">{t("donations.table.receiptIssued")}</span>
                   : d.receiptStatus === "not_required"

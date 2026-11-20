@@ -113,8 +113,10 @@ const insert = makeInsert();
 const update = makeUpdate();
 const del = makeDelete();
 
+const transaction = vi.fn(async (fn: any) => fn({ select, insert, update, delete: del }));
+
 vi.mock("../db/index.js", () => ({
-  db: { select, insert, update, delete: del },
+  db: { select, insert, update, delete: del, transaction },
 }));
 
 let currentUser: any = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
@@ -195,39 +197,45 @@ function makeYear(overrides: Record<string, unknown> = {}) {
 
 // ── Pure logic ───────────────────────────────────────────────────────────────
 
-describe("GET /anniversaries", () => {
+describe("GET /anniversaries?view=years", () => {
   it("shows the empty state", async () => {
     yearsFixture = [];
-    const html = await (await yearsList()).text();
-    expect(html).toContain(t("admin.anniversaries.empty"));
+    expect(await (await yearsList()).text()).toContain(t("admin.anniversaries.empty"));
   });
 
-  it("renders a titled year with its delete confirmation", async () => {
-    yearsFixture = [makeYear({ year: 25, title: "Silber" })];
+  it("renders one row per year with a badge per kind and its delete confirmation", async () => {
+    yearsFixture = [makeYear({ year: 25, title: "Silber" }), makeYear({ kind: "membership", year: 25, title: "Silber" })];
     const html = await (await yearsList()).text();
-    expect(html).toContain("Silber");
-    expect(html).toContain(t("admin.anniversaries.confirmDelete.bodyWithTitle", { kind: "Dienst", year: "25", title: "Silber" }));
+    expect(html.match(/<tr[^>]*hx-get="\/anniversary-years\/25\/edit"/g)).toHaveLength(1);
+    expect(html).toContain("badge-primary");
+    expect(html).toContain("badge-secondary");
+    expect(html).toContain(t("admin.anniversaries.confirmDelete.body", { year: "25" }));
   });
 
-  it("falls back to an em-dash and untitled delete text when title is null", async () => {
-    yearsFixture = [makeYear({ year: 10, title: null })];
+  it("marks kinds without a title as outline badges", async () => {
+    yearsFixture = [makeYear({ year: 25, title: "Silber" }), makeYear({ kind: "membership", year: 25, title: null })];
     const html = await (await yearsList()).text();
-    expect(html).toContain(t("admin.anniversaries.confirmDelete.body", { kind: "Dienst", year: "10" }));
+    expect(html).toContain(`Dienst, ${t("admin.anniversaries.badge.withTitle")}`);
+    expect(html).toContain(`Mitgliedschaft, ${t("admin.anniversaries.badge.noTitle")}`);
+    expect(html).toContain("badge-secondary badge-outline");
+    expect(html).not.toContain("badge-primary badge-outline");
   });
-});
 
-describe("GET /anniversaries?kind=", () => {
+  it("shows differing titles per kind", async () => {
+    yearsFixture = [makeYear({ year: 25, title: "Dienst25" }), makeYear({ kind: "membership", year: 25, title: "Mitgl25" })];
+    const html = await (await yearsList()).text();
+    expect(html).toContain("Dienst: Dienst25");
+    expect(html).toContain("Mitgliedschaft: Mitgl25");
+  });
+
   it("filters rows by kind", async () => {
     yearsFixture = [makeYear({ kind: "service", year: 25, title: "Dienst25" }), makeYear({ kind: "membership", year: 10, title: "Mitgl10" })];
     const html = await (await yearsList("kind=membership")).text();
     expect(html).toContain("Mitgl10");
     expect(html).not.toContain("Dienst25");
-    const all = await (await yearsList("kind=bogus")).text();
-    expect(all).toContain("Dienst25");
+    expect(await (await yearsList("kind=bogus")).text()).toContain("Dienst25");
   });
-});
 
-describe("GET /anniversaries?sort=", () => {
   it("sorts by year descending and ignores bogus sort values", async () => {
     yearsFixture = [makeYear({ year: 10, title: "Aa" }), makeYear({ year: 50, title: "Zz" })];
     const html = await (await yearsList("sort=year&dir=desc")).text();
@@ -237,87 +245,83 @@ describe("GET /anniversaries?sort=", () => {
   });
 });
 
-describe("GET /anniversaries/new", () => {
-  it("renders the create form", async () => {
-    expect((await yearRoutes.request("/new")).status).toBe(200);
+describe("GET /anniversary-years/new and /:year/edit", () => {
+  it("renders the create form with both toggles on", async () => {
+    const res = await yearRoutes.request("/new");
+    expect(res.status).toBe(200);
+    expect((await res.text()).match(/data-kind=[^>]*checked/g)).toHaveLength(2);
   });
-});
 
-describe("GET /anniversaries/:kind/:year/edit", () => {
   it("404s for an unknown year", async () => {
     yearsFixture = [];
-    expect((await yearRoutes.request("/service/99/edit")).status).toBe(404);
+    expect((await yearRoutes.request("/99/edit")).status).toBe(404);
   });
 
-  it("renders the edit form with existing values", async () => {
+  it("renders the edit form with only the existing kinds on", async () => {
     yearsFixture = [makeYear({ year: 25, title: "Silber" })];
-    const html = await (await yearRoutes.request("/service/25/edit")).text();
+    const html = await (await yearRoutes.request("/25/edit")).text();
     expect(html).toContain("Silber");
+    expect(html.match(/data-kind=[^>]*checked/g)).toHaveLength(1);
   });
 });
 
-describe("POST /anniversaries", () => {
+describe("POST /anniversary-years", () => {
+  const post = (b: Record<string, string>) => yearRoutes.request("/", { method: "POST", body: formBody(b) });
   it.each([0, -1, 300])("rejects an out-of-range year (%d)", async (year) => {
-    const res = await yearRoutes.request("/", { method: "POST", body: formBody({ kind: "service", year: String(year) }) });
-    expect(res.status).toBe(302);
+    expect((await post({ service: "1", year: String(year) })).status).toBe(302);
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("rejects an unknown kind", async () => {
-    const res = await yearRoutes.request("/", { method: "POST", body: formBody({ kind: "x", year: "25" }) });
-    expect(res.status).toBe(302);
+  it("rejects when no kind is selected", async () => {
+    await post({ year: "25" });
     expect(insert).not.toHaveBeenCalled();
   });
 
-  it("creates a year with a title", async () => {
-    await yearRoutes.request("/", { method: "POST", body: formBody({ kind: "service", year: "25", title: "Silber" }) });
-    expect(insertCalls.some((c) => c.table === anniversaryYears && c.values.title === "Silber")).toBe(true);
+  it("creates one row per selected kind with its own title", async () => {
+    await post({ year: "25", service: "1", membership: "1", title_service: "Silber", title_membership: "" });
+    const rows = insertCalls.find((c) => c.table === anniversaryYears)!.values;
+    expect(rows).toEqual([{ kind: "service", year: 25, title: "Silber" }, { kind: "membership", year: 25, title: null }]);
   });
 
-  it("defaults an empty title to null", async () => {
-    await yearRoutes.request("/", { method: "POST", body: formBody({ kind: "service", year: "25", title: "" }) });
-    expect(insertCalls.some((c) => c.table === anniversaryYears && c.values.title === null)).toBe(true);
+  it("rejects an already-used year", async () => {
+    yearsFixture = [makeYear({ year: 25 })];
+    await post({ year: "25", service: "1" });
+    expect(insert).not.toHaveBeenCalled();
   });
 });
 
-describe("POST /anniversaries/:kind/:year", () => {
+describe("POST /anniversary-years/:year", () => {
+  const post = (y: number, b: Record<string, string>) => yearRoutes.request(`/${y}`, { method: "POST", body: formBody(b) });
   it("404s for an unknown year", async () => {
     yearsFixture = [];
-    expect((await yearRoutes.request("/service/10", { method: "POST", body: formBody({ kind: "service", year: "10" }) })).status).toBe(404);
+    expect((await post(10, { year: "10", service: "1" })).status).toBe(404);
   });
 
-  it("rejects an out-of-range new year", async () => {
+  it("rejects an out-of-range year or empty kind selection", async () => {
     yearsFixture = [makeYear({ year: 10 })];
-    const res = await yearRoutes.request("/service/10", { method: "POST", body: formBody({ kind: "service", year: "0" }) });
-    expect(res.status).toBe(302);
-    expect(update).not.toHaveBeenCalled();
+    await post(10, { year: "0", service: "1" });
+    await post(10, { year: "10" });
+    expect(transaction).not.toHaveBeenCalled();
   });
 
-  it("updates in place when the year is unchanged", async () => {
+  it("replaces the rows of the year", async () => {
     yearsFixture = [makeYear({ year: 10 })];
-    const res = await yearRoutes.request("/service/10", { method: "POST", body: formBody({ kind: "service", year: "10", title: "Neu" }) });
+    const res = await post(10, { year: "10", membership: "1", title_membership: "Neu" });
     expect(res.status).toBe(302);
-    expect(updateCalls.some((c) => c.table === anniversaryYears && c.set.title === "Neu")).toBe(true);
+    expect(deleteCalls.some((c) => c.table === anniversaryYears)).toBe(true);
+    expect(insertCalls.find((c) => c.table === anniversaryYears)!.values).toEqual([{ kind: "membership", year: 10, title: "Neu" }]);
   });
 
   it("rejects renaming onto an already-used year", async () => {
     queue(anniversaryYears, [makeYear({ year: 10 })], [makeYear({ year: 20 })]);
-    const res = await yearRoutes.request("/service/10", { method: "POST", body: formBody({ kind: "service", year: "20" }) });
-    expect(res.status).toBe(302);
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  it("moves the year when the target is free", async () => {
-    queue(anniversaryYears, [makeYear({ year: 10 })], []);
-    const res = await yearRoutes.request("/service/10", { method: "POST", body: formBody({ kind: "service", year: "20" }) });
-    expect(res.status).toBe(302);
-    expect(updateCalls.some((c) => c.table === anniversaryYears && c.set.year === 20)).toBe(true);
+    await post(10, { year: "20", service: "1" });
+    expect(transaction).not.toHaveBeenCalled();
   });
 });
 
-describe("POST /anniversaries/:kind/:year/delete", () => {
+describe("POST /anniversary-years/:year/delete", () => {
   it("deletes the year and redirects", async () => {
-    const res = await yearRoutes.request("/service/10/delete", { method: "POST" });
+    const res = await yearRoutes.request("/10/delete", { method: "POST" });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === anniversaryYears)).toBe(true);
   });
