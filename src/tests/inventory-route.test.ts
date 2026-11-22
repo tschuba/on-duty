@@ -378,13 +378,13 @@ describe("lendable flag on POST /", () => {
     currentUser = lendingManager();
     const res = await post("/", { name: "Helm", lendable: "1" });
     expect(res.status).toBe(302);
-    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: true, publicRequestable: false, maxRequestQuantity: 0, timesRequired: false });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: true, publicRequestable: false, publicDescription: null, maxRequestQuantity: 0, timesRequired: false });
   });
 
   it("stores lending config given at creation", async () => {
     currentUser = lendingManager();
     await post("/", { name: "Helm", lendable: "1", quantity: "5", enabledFields: "quantity", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
-    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: false, publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "new-id", individualTracking: false, publicRequestable: true, publicDescription: null, maxRequestQuantity: 3, timesRequired: true });
   });
 
   it("uses batch tracking for quantity > 1", async () => {
@@ -428,7 +428,7 @@ describe("lendable flag on POST /:id", () => {
     itemsFindFirstResult = makeItem();
     const res = await post("/item1", { ...base, lendable: "1" });
     expect(res.status).toBe(302);
-    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "item1", individualTracking: true, publicRequestable: false, maxRequestQuantity: 0, timesRequired: false });
+    expect(insertCalls.find((c) => c.table === lendingItems)?.values).toEqual({ inventoryItemId: "item1", individualTracking: true, publicRequestable: false, publicDescription: null, maxRequestQuantity: 0, timesRequired: false });
   });
 
   it("refuses to make a retired item lendable", async () => {
@@ -473,7 +473,25 @@ describe("lendable flag on POST /:id", () => {
     lendingItemFindFirstResult = { id: "li1", individualTracking: false };
     const res = await post("/item1", { ...base, lendable: "1", quantity: "5", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
     expect(res.status).toBe(302);
-    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
+    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: true, publicDescription: null, maxRequestQuantity: 3, timesRequired: true });
+  });
+
+  it("sanitizes publicDescription on save", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem({ quantity: 5 });
+    lendingItemFindFirstResult = { id: "li1", individualTracking: false };
+    const res = await post("/item1", { ...base, lendable: "1", quantity: "5", publicDescription: '<p>12 €</p><script>x()</script><img src=x onerror=y()>' });
+    expect(res.status).toBe(302);
+    expect((updateCalls.find((c) => c.table === lendingItems)?.set as any).publicDescription).toBe("<p>12 €</p>");
+  });
+
+  it("rejects an overlong publicDescription", async () => {
+    currentUser = lendingManager();
+    itemsFindFirstResult = makeItem({ quantity: 5 });
+    lendingItemFindFirstResult = { id: "li1", individualTracking: false };
+    const res = await post("/item1", { ...base, lendable: "1", quantity: "5", publicDescription: `<p>${"a".repeat(5001)}</p>` });
+    expect(res.status).toBe(422);
+    expect(updateCalls.find((c) => c.table === lendingItems)).toBeUndefined();
   });
 
   it("rejects an invalid maxRequestQuantity", async () => {
@@ -492,12 +510,12 @@ describe("lendable flag on POST /:id", () => {
   it("round-trips an unchanged maxRequestQuantity through edit GET -> POST", async () => {
     currentUser = lendingManager();
     itemsFindFirstResult = makeItem({ quantity: 5 });
-    lendingItemFindFirstResult = { id: "li1", individualTracking: false, publicRequestable: true, maxRequestQuantity: 3, timesRequired: true };
+    lendingItemFindFirstResult = { id: "li1", individualTracking: false, publicRequestable: true, publicDescription: null, maxRequestQuantity: 3, timesRequired: true };
     const editHtml = await (await inventoryRoutes.request("/item1/edit")).text();
     expect(editHtml).toMatch(/name="maxRequestQuantity"[^>]*value="3"/);
     const res = await post("/item1", { ...base, lendable: "1", quantity: "5", publicRequestable: "1", maxRequestLimited: "1", maxRequestQuantity: "3", timesRequired: "1" });
     expect(res.status).toBe(302);
-    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: true, maxRequestQuantity: 3, timesRequired: true });
+    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: true, publicDescription: null, maxRequestQuantity: 3, timesRequired: true });
   });
 
   it("switches to batch tracking and enforces maxRequestQuantity when quantity grows past 1 after lending was enabled at quantity 1", async () => {
@@ -507,7 +525,7 @@ describe("lendable flag on POST /:id", () => {
     lendingLoanFindFirstResult = undefined; // no loans yet — mode may still follow quantity
     const res = await post("/item1", { ...base, lendable: "1", quantity: "5", maxRequestLimited: "1", maxRequestQuantity: "3" });
     expect(res.status).toBe(302);
-    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: false, maxRequestQuantity: 3, timesRequired: false });
+    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: false, publicDescription: null, maxRequestQuantity: 3, timesRequired: false });
   });
 
   it("keeps individualTracking fixed once a loan exists, even if quantity grows", async () => {
@@ -518,7 +536,7 @@ describe("lendable flag on POST /:id", () => {
     const res = await post("/item1", { ...base, lendable: "1", quantity: "5", maxRequestLimited: "1", maxRequestQuantity: "3" });
     expect(res.status).toBe(302);
     // individualTracking still true (fixed by existing loan) — maxRequestQuantity is ignored, not saved
-    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: false, maxRequestQuantity: 0, timesRequired: false });
+    expect(updateCalls.find((c) => c.table === lendingItems)?.set).toEqual({ publicRequestable: false, publicDescription: null, maxRequestQuantity: 0, timesRequired: false });
   });
 
   it("rejects a maxRequestQuantity above the batch quantity", async () => {
@@ -597,7 +615,7 @@ describe("GET /:id/edit lendable checkbox", () => {
   it("renders the saved maxRequestQuantity of a batch item", async () => {
     currentUser = lendingManager();
     itemsFindFirstResult = makeItem({ quantity: 5 });
-    lendingItemFindFirstResult = { id: "li1", individualTracking: false, publicRequestable: false, maxRequestQuantity: 3, timesRequired: false };
+    lendingItemFindFirstResult = { id: "li1", individualTracking: false, publicRequestable: false, publicDescription: null, maxRequestQuantity: 3, timesRequired: false };
     const html = await (await inventoryRoutes.request("/item1/edit")).text();
     expect(html).toMatch(/name="maxRequestLimited"[^>]*checked/);
     expect(html).toMatch(/name="maxRequestQuantity"[^>]*value="3"/);

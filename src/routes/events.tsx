@@ -455,7 +455,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
                   </button>
                 </div>
               ) : <p class="text-xs opacity-60">{t("events.publicSettings.hint")}</p>}
-              <ImpressumHint />
+              {publicEnabled && <ImpressumHint />}
               <div class="divider my-1" />
               <a href="/mail/templates?category=event" class="btn btn-sm btn-ghost w-full justify-start">
                 <Icon name="icon-[tabler--mail]" class="h-4 w-4" />{t("mailTemplates.settings")}

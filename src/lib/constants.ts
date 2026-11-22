@@ -19,6 +19,7 @@ export const SEARCH_DEBOUNCE_MS = 300;
 
 // Maximale Länge der Notiz einer Funktionszuweisung (inkl. Umbrüche, je 1 Zeichen).
 export const ASSIGNMENT_NOTE_MAX_LENGTH = 200;
+export const PUBLIC_DESCRIPTION_MAX_LENGTH = 5000;
 
 // AGPL source offer: forks must point this at their own repository.
 export const SOURCE_REPO_URL = "https://github.com/tschuba/on-duty";

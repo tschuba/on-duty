@@ -7,8 +7,8 @@ export async function ImpressumHint() {
   const c = await loadOrgConfig();
   if (isImpressumComplete(c)) return <></>;
   return (
-    <p class="text-xs text-warning flex items-center gap-1">
-      {t("impressum.adminHint")} <a href="/organisation#master" class="link">{t("common.nav.organisation")}</a>
-    </p>
+    <div role="alert" class="alert alert-warning alert-soft text-sm text-base-content">
+      <span>{t("impressum.adminHint")} <a href="/organisation#master" class="link font-medium whitespace-nowrap">{t("impressum.adminHintLink")}</a></span>
+    </div>
   );
 }

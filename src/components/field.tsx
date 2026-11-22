@@ -1,3 +1,4 @@
+import { raw } from "hono/html";
 import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
 
@@ -102,8 +103,14 @@ export function RichTextField({ name, value, editable }: { name: string; value: 
   );
 }
 
+// Ausgabe von bereits bereinigtem Rich-Text (sanitizeRichText beim Speichern). Leer → nichts.
+export function PublicDescription({ html, class: cls = "" }: { html?: string | null; class?: string }) {
+  return html ? <div class={`richtext-content ${cls}`}>{raw(html)}</div> : null;
+}
+
 // Read-only-Pendant zu Field: Label + Wert (leer → „—“). Einzige Definition; Layout über ViewGrid.
-export function ViewField({ label, value }: { label: string; value: unknown }) {
+export function ViewField({ label, value, hideEmpty }: { label: string; value: unknown; hideEmpty?: boolean }) {
+  if (hideEmpty && !value) return null;
   return (
     <div>
       <div class="text-sm opacity-60">{label}</div>

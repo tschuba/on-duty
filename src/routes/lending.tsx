@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { and, asc, eq, exists, ilike, isNull, or, sql } from "drizzle-orm";
-import { EmailField, Field, PhoneField, ViewField, ViewGrid } from "../components/field.js";
+import { EmailField, Field, PhoneField, PublicDescription, ViewField, ViewGrid } from "../components/field.js";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemNumbers, inventoryItemTags, lendingItems, lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
 import { DeleteDialog } from "../components/delete-dialog.js";
@@ -391,6 +391,7 @@ function LoanPage({ loan, item, editing }: { loan: LoanWithBorrower; item: Lendi
       <PageHeader title={<a href={`/inventory/${item.inventoryItem.id}`} class="link link-hover">{item.inventoryItem.name}</a>} backHref="/inventory/lending" backLabel={t("lending.loans.backToList")} actions={editing
         ? <FormActions formId="loan-form" cancelHref={base} />
         : <DetailActions editHref={`${base}/edit`} remove={<DeleteDialog header id={`loan-${loan.id}`} action={`${base}/delete`} title={t("lending.loans.actions.deleteTitle")} body={t("lending.loans.actions.deleteBody", { borrower: borrowerLabel(loan), name: item.inventoryItem.name })} />} />} />
+      <PublicDescription html={item.publicDescription} class="mb-4" />
       <div class="mb-4">
         <dl class="mt-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
           <dt class="opacity-60">{t("lending.loans.table.borrower")}</dt>
@@ -721,7 +722,7 @@ async function createLoan(c: Context<{ Variables: Variables }>) {
     const stock = inv.quantity - inv.retiredQuantity;
     pending = { id: inv.id, name: inv.name, quantity: stock };
     // Wie im Inventarformular: Einzel-Tracking aus der Menge abgeleitet und danach fix.
-    item = { id: "", inventoryItemId: inv.id, individualTracking: inv.quantity <= 1, ...lendConfig, inventoryItem: { ...inv, tags: [] } } as LendingItemWithRelations;
+    item = { id: "", inventoryItemId: inv.id, individualTracking: inv.quantity <= 1, ...lendConfig, publicDescription: null, inventoryItem: { ...inv, tags: [] } } as LendingItemWithRelations;
   }
 
   const borrowerPersonId = trimmed(body, "borrowerPersonId");

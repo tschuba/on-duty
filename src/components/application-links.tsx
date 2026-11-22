@@ -109,6 +109,7 @@ export function ApplicationFormSettings({ forms }: { forms: Forms }) {
           <dialog id={`form-settings-${type}`} class="modal" key={`form-settings-${type}`}>
             <div class="modal-box">
               <h3 class="font-bold text-lg mb-4">{t("applications.formSettings.title", { type: TYPE_LABELS[type] })}</h3>
+              <div class="mb-4 empty:hidden"><ImpressumHint /></div>
               <form method="post" action={`/applications/forms/${type}`} class="space-y-4 form-settings-form">
                 <label class="label cursor-pointer justify-start gap-3">
                   <input type="checkbox" name="status" value="active" class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content" checked={form?.isActive === true} />
@@ -124,7 +125,6 @@ export function ApplicationFormSettings({ forms }: { forms: Forms }) {
                 </div>
                 <p class="text-sm form-status-preview"></p>
                 <p class="text-xs opacity-60">{t("applications.formSettings.dateHint")}</p>
-                <ImpressumHint />
                 <div class="modal-action">
                   <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
                   <button type="submit" class="btn btn-primary">{t("applications.formSettings.save")}</button>

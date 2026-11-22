@@ -6,7 +6,7 @@ import { lendingItems, lendingLoans, loanRequests, persons } from "../db/schema/
 import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
-import { Field, EmailField, PhoneField } from "../components/field.js";
+import { Field, PublicDescription, EmailField, PhoneField } from "../components/field.js";
 import { FormCard, FormSection, SubmitButton, ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
@@ -115,6 +115,7 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
     <Layout title={t("lend.title", { name: item.inventoryItem.name })}>
       <div class="max-w-xl mx-auto">
         <PageHeader title={item.inventoryItem.name} subtitle={t("lend.form.subtitle", { org: orgName })} />
+        <PublicDescription html={item.publicDescription} class="mb-4" />
         {errors._global && <div role="alert" class="alert alert-error mb-4">{errors._global}</div>}
         {maxQuantity > 1 && !item.individualTracking && (
           <p class="text-sm opacity-70 mb-4">{t("lend.form.maxQuantityHint", { max: maxQuantity })}</p>
