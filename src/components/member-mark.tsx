@@ -2,13 +2,13 @@ import { Icon } from "./icon.js";
 import { t } from "../i18n/index.js";
 
 // "Ist Mitglied"-Markierung (nur Icon). Navigation läuft über MemberLink am Namen.
-export function MemberMark({ memberId, class: size = "w-4 h-4" }: { memberId: string | null | undefined; canLink?: boolean; class?: string }) {
+export function MemberMark({ memberId, class: size = "w-4 h-4" }: { memberId: string | null | undefined; canLink?: unknown; class?: string }) {
   if (!memberId) return null;
   return <span class="inline-block align-middle ml-1 p-1 opacity-70" title={t("common.member")} role="img" aria-label={t("common.member")}><Icon name="icon-[tabler--users]" class={`inline-block ${size} align-middle`} /></span>;
 }
 
 // Name als Link auf die Mitgliederseite, nur mit members:read.
 // stopPropagation: Klick soll nicht die Zeilennavigation (onclick am <tr>) auslösen.
-export function MemberLink({ memberId, canLink, children }: { memberId: string | null | undefined; canLink: boolean; children?: any }) {
-  return memberId && canLink ? <a href={`/members/${memberId}`} class="link link-hover" onclick="event.stopPropagation()">{children}</a> : <>{children}</>;
+export function MemberLink({ memberId, canLink, children }: { memberId: string | null | undefined; canLink: boolean | ((id: string | null | undefined) => boolean); children?: any }) {
+  return memberId && (typeof canLink === "function" ? canLink(memberId) : canLink) ? <a href={`/members/${memberId}`} class="link link-hover" onclick="event.stopPropagation()">{children}</a> : <>{children}</>;
 }

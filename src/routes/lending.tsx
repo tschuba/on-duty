@@ -7,6 +7,7 @@ import { DeleteDialog } from "../components/delete-dialog.js";
 import { Icon } from "../components/icon.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { readableMemberIds } from "../lib/member-scope.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
@@ -182,7 +183,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   const user = c.get("user")!;
   const today = new Date().toISOString().slice(0, 10);
   const canManage = user.permissions.has("lending:manage");
-  const canLink = user.permissions.has("members:read");
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
   // Anfragen sieht nur, wer verwalten darf. Standard: alles außer „Abgelehnt“.
   const allowedStates: RowState[] = canManage ? [...LOAN_STATES, "requested", "rejected"] : LOAN_STATES;
   const defaultStates = allowedStates.filter((st) => st !== "rejected");

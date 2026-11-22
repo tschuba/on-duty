@@ -15,6 +15,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { formatDate } from "../lib/format.js";
 import { env } from "../env.js";
+import { inScope } from "../lib/member-scope.js";
 import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
 import { t } from "../i18n/index.js";
 import { TitleSwitch } from "../components/title-switch.js";
@@ -227,7 +228,7 @@ anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"
     };
   });
 
-  let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
+  let events = generateEvents(membersWithStatus.filter((m) => inScope(user.memberScope?.read, m.status)), ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   events = filterEvents(events, filters);
   events = filterByYears(events, gte, mods);
 
@@ -266,6 +267,7 @@ anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"
 
 // GET /anniversaries/export — xlsx download
 anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
+  const scope = c.get("user").memberScope?.read;
   const q = c.req.query();
   const today = todayStr();
   const { start, end } = parseRange(q, today, "future", { start: today, end: addMonths(today, 12) }, env.ANNIVERSARY_CUTOFF);
@@ -287,7 +289,7 @@ anniversaryRoutes.get("/export", requireAuth("members:read"), async (c) => {
     status: deriveMemberStatus(m, memberRows[i].assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
   }));
 
-  let events = generateEvents(membersWithStatus, ayRows, env.ANNIVERSARY_CUTOFF, start, end);
+  let events = generateEvents(membersWithStatus.filter((m) => inScope(scope, m.status)), ayRows, env.ANNIVERSARY_CUTOFF, start, end);
   events = filterEvents(events, filters);
   events = filterByYears(events, gte, mods);
 

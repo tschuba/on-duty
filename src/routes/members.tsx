@@ -25,6 +25,7 @@ import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
 import { SEARCH_DEBOUNCE_MS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import { env } from "../env.js";
+import { inScope, type StatusScope } from "../lib/member-scope.js";
 import { Pager } from "../components/pager.js";
 import { t } from "../i18n/index.js";
 import { formatIban, isValidIban, normalizeIban } from "../lib/iban.js";
@@ -98,6 +99,12 @@ async function fetchMember(id: string): Promise<MemberWithStatus | null> {
     assignments: m.assignments as Assignment[],
     status: deriveMemberStatus(member, m.assignments as Assignment[], env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT),
   };
+}
+
+// Rollen-Eingrenzung (members:*): außerhalb des Bereichs → null (Aufrufer antwortet 404, verrät keine Existenz).
+async function fetchScoped(c: Context<{ Variables: Variables }>, id: string, kind: "read" | "write" | "delete"): Promise<MemberWithStatus | null> {
+  const m = await fetchMember(id);
+  return m && inScope(c.get("user").memberScope?.[kind], m.status) ? m : null;
 }
 
 // Deleting a member also erases its person record (see backlog 19_Mitglieder-loeschen.md),
@@ -936,8 +943,9 @@ const QUICK_FILTERS: { key: string; status: MemberStatus[]; age: AgeGroup[] }[] 
   { key: "former", status: ["left", "deceased"], age: [] },
 ];
 
-function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilter, hidden, canReview }: {
+function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilter, hidden, canReview, scope }: {
   canReview: boolean;
+  scope?: StatusScope;
   roles: Role[];
   activeRoleIds: Set<string>;
   statusFilter: string[];
@@ -961,12 +969,12 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
         apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults"),
       }}
       quick={[
-        ...QUICK_FILTERS.map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), values: { status: f.key === "current" && canReview ? [...f.status, "requested"] : f.status, age: f.age } })),
+        ...QUICK_FILTERS.filter((f) => f.status.some((st) => inScope(scope, st)) || (f.status.includes("active") && (["children", "youth"] as MemberStatus[]).some((x) => inScope(scope, x)))).map((f) => ({ label: t(`members.filter.preset.${f.key}` as Parameters<typeof t>[0]), values: { status: f.key === "current" && canReview ? [...f.status, "requested"] : f.status, age: f.age } })),
         ...(canReview ? [{ label: t("members.filter.preset.requested"), values: { status: ["requested"], age: [] } }] : []),
       ]}
       sections={[
-        { type: "chips", param: "status", title: t("members.table.status"), options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("icon-[tabler--cross]" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
-        { type: "chips", param: "age", title: t("members.filter.age"), options: AGE_GROUPS.map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter },
+        { type: "chips", param: "status", title: t("members.table.status"), options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.filter((s) => s !== "active" ? inScope(scope, s) : (["active", "children", "youth"] as MemberStatus[]).some((x) => inScope(scope, x))).map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("icon-[tabler--cross]" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
+        { type: "chips", param: "age", title: t("members.filter.age"), options: AGE_GROUPS.filter((g) => inScope(scope, g === "adult" || g === "senior" ? "active" : g)).map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter },
         {
           type: "list", param: "role", title: t("members.table.roles"),
           options: roles.map((r) => ({ value: r.id, label: r.title, group: r.typeName, dim: !activeRoleIds.has(r.id), unused: !activeRoleIds.has(r.id), hint: activeRoleIds.has(r.id) ? undefined : "(0)" })),
@@ -1066,7 +1074,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
   const shownStatus: string[] = membersHidden ? ["requested"] : [...statusFilter, ...(showRequests ? ["requested"] : [])];
 
   const [all, allRoles, activeRoleRows] = await Promise.all([
-    canMembers ? fetchMembersWithStatus(search || undefined) : Promise.resolve([]),
+    canMembers ? fetchMembersWithStatus(search || undefined).then((l) => l.filter((m) => inScope(user.memberScope?.read, m.status))) : Promise.resolve([]),
     fetchRoles(),
     db.selectDistinct({ id: memberRoleAssignments.memberRoleId }).from(memberRoleAssignments).where(isNull(memberRoleAssignments.to)),
   ]);
@@ -1141,7 +1149,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
             hx-vals={JSON.stringify({ sort, sort_dir: dir, status: shownStatus, role: roleFilter, age: ageFilter, page: 1, pageSize })}
           />
         </label>
-        <MembersFilter canReview={canReview} roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={shownStatus} roleFilter={roleFilter} ageFilter={ageFilter}
+        <MembersFilter scope={user.memberScope?.read} canReview={canReview} roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={shownStatus} roleFilter={roleFilter} ageFilter={ageFilter}
           hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...(search ? [["search", search] as [string, string]] : [])]} />
         {(search || roleFilter.length > 0 || ageFilter.length > 0 || (statusParams.length > 0 && [...shownStatus].sort().join() !== [...DEFAULT_STATUS, ...(canReview ? ["requested"] : [])].sort().join())) && <a href="/members" class="btn btn-ghost">{t("common.reset")}</a>}
       </div>
@@ -1202,12 +1210,12 @@ memberRoutes.get("/new", requireAuth("members:write"), async (c) => {
     const [person] = await db.select().from(persons).where(eq(persons.id, personId));
     if (person) prefill = { ...person, birthDate: person.birthDate ?? "" };
   } else if (copyFrom) {
-    const src = await fetchMember(copyFrom);
+    const src = await fetchScoped(c, copyFrom, "read");
     if (!src) return c.notFound();
     prefill = { street: src.street, houseNumber: src.houseNumber, zip: src.zip, city: src.city, companyName: src.companyName };
     copyRows = src.assignments.map((a, i) => ({ ...toRowData(a), id: "", idx: String(i) }));
   } else if (linkMemberId) {
-    const target = await fetchMember(linkMemberId);
+    const target = await fetchScoped(c, linkMemberId, "write");
     if (!target) return c.notFound();
     linkedWasArchived = !!(target.exitDate || target.deathDate);
     let contactOverride: Partial<Member> = {};
@@ -1462,6 +1470,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
   let targetPersonId: string | undefined;
   let linkedWasArchived = false;
   if (linkMemberId) {
+    if (user.memberScope && user.memberScope.write !== "all" && !(await fetchScoped(c, linkMemberId, "write"))) return c.notFound();
     const [target] = await db.select({ personId: members.personId, exitDate: members.exitDate, deathDate: members.deathDate }).from(members).where(eq(members.id, linkMemberId));
     if (!target) return c.notFound();
     targetPersonId = target.personId;
@@ -1511,6 +1520,17 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
     if (statusConflict) errors._status = statusConflict.message;
   }
 
+  // Ergebnisstatus muss im Schreibbereich liegen (Entscheidung 5).
+  if (Object.keys(errors).length === 0 && birthDate && user.memberScope && user.memberScope.write !== "all") {
+    const allRoles = await db.select().from(memberRoles);
+    const planned = assignmentRoles.flatMap((r, i) => {
+      const role = allRoles.find((x) => x.id === r);
+      return role ? [{ from: assignmentFroms[i] || null, to: assignmentTos[i] || null, role } as Assignment] : [];
+    });
+    const resulting = deriveMemberStatus({ exitDate: (body.exitDate as string) || null, deathDate: (body.deathDate as string) || null, birthDate }, planned, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT);
+    if (!inScope(user.memberScope.write, resulting)) errors._status = t("members.error.outOfScope");
+  }
+
   if (Object.keys(errors).length > 0) {
     const roles = await fetchRoles();
     const m: Partial<Member> = {
@@ -1535,6 +1555,7 @@ memberRoutes.post("/new", requireAuth("members:write"), async (c) => {
         {errors._assignments && (
           <div class="alert alert-error mb-4">{errors._assignments}</div>
         )}
+        {errors._status && !statusConflict && <div class="alert alert-error mb-4">{errors._status}</div>}
         <form id="member-form" method="post" action="/members/new" class="space-y-4 max-w-4xl">
           <NewMemberDraft ctx={draftCtx({ personId, linkMemberId, applicationId })} rerender />
           {personId && <input type="hidden" name="personId" value={personId} />}
@@ -1719,7 +1740,8 @@ memberRoutes.get("/export", requireAuth("members:read"), async (c) => {
   };
 
   const { search, sort, dir, statusFilter, roleFilter, ageFilter } = parseListQuery(q, c.req.queries("status") ?? [], c.req.queries("role") ?? [], c.req.queries("age") ?? []);
-  const exported = sortMembers(filterMembers(await fetchMembersWithStatus(search || undefined), statusFilter, roleFilter, ageFilter), sort, dir);
+  const scope = c.get("user").memberScope?.read;
+  const exported = sortMembers(filterMembers((await fetchMembersWithStatus(search || undefined)).filter((m) => inScope(scope, m.status)), statusFilter, roleFilter, ageFilter), sort, dir);
   if (exported.length === 0) {
     setFlash(c, t("common.exportEmpty"), "error");
     const back = new URLSearchParams();
@@ -1767,14 +1789,14 @@ function backHref(c: Context): string {
 
 memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
-  const m = await fetchMember(c.req.param("id"));
+  const m = await fetchScoped(c, c.req.param("id"), "read");
   if (!m) return c.notFound();
 
-  const isEditor = user.permissions.has("members:write");
+  const isEditor = user.permissions.has("members:write") && inScope(user.memberScope?.write, m.status);
   const canWriteBank = user.permissions.has("members:bank-data:write");
   const canReadBank = canWriteBank || user.permissions.has("members:bank-data:read");
 
-  const canDelete = user.permissions.has("members:delete");
+  const canDelete = user.permissions.has("members:delete") && inScope(user.memberScope?.delete, m.status);
   const blockedBy = canDelete ? await findPersonBlockingLink(m.personId) : null;
   const assignedItemsCount = canDelete ? await countAssignedInventoryItems(m.id) : 0;
 
@@ -1822,10 +1844,10 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
 memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
   const user = c.get("user");
   const id = c.req.param("id");
-  const canWriteMaster = user.permissions.has("members:write");
-  if (!canWriteMaster && !user.permissions.has("members:bank-data:write")) return c.redirect(`/members/${id}`);
-  const m = await fetchMember(id);
+  const m = await fetchScoped(c, id, "read");
   if (!m) return c.notFound();
+  const canWriteMaster = user.permissions.has("members:write") && inScope(user.memberScope?.write, m.status);
+  if (!canWriteMaster && !user.permissions.has("members:bank-data:write")) return c.redirect(`/members/${id}`);
   if (!canWriteMaster) {
     // Nur Bankdaten-Schreibrecht: Formular enthält ausschließlich die Bankdaten.
     return c.html(
@@ -1861,11 +1883,12 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
   const user = c.get("user");
   const id = c.req.param("id");
   const reactivateParam = c.req.query("reactivate");
-  const canWriteMaster = user.permissions.has("members:write");
   const canWriteBank = user.permissions.has("members:bank-data:write");
 
-  const existing = await fetchMember(id);
+  const existing = await fetchScoped(c, id, "read");
   if (!existing) return c.notFound();
+  const canWriteMaster = user.permissions.has("members:write") && inScope(user.memberScope?.write, existing.status);
+  if (!canWriteMaster && !canWriteBank) return c.notFound();
 
   const body = await c.req.parseBody({ all: true });
   const errors: Record<string, string> = {};
@@ -2013,7 +2036,9 @@ memberRoutes.post("/:id", requireAuth(["members:write", "members:bank-data:write
     await saveTopicPrefs(existing.personId, [body.topics ?? []].flat().map(String), "admin");
   }
   setFlash(c, t("members.flash.saved"), "success");
-  return c.redirect(`/members/${id}`);
+  // Fällt das Mitglied durch die Änderung aus dem Lesebereich (Austritt, Geburtsdatum), wäre das Detail ein 404.
+  const after = await fetchMember(id);
+  return c.redirect(after && inScope(user.memberScope?.read, after.status) ? `/members/${id}` : "/members");
 });
 
 // ── Funktionszuweisungen (Edit: sofort persistent) ───────────────────────────
@@ -2029,19 +2054,20 @@ const isArchived = (m: { exitDate: string | null; deathDate: string | null }) =>
 
 memberRoutes.get("/:id/assignments/new", requireAuth("members:write"), async (c) => {
   const id = c.req.param("id");
+  if (!(await fetchScoped(c, id, "write"))) return c.notFound();
   return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments`} title={t("members.assignment.titleNew")} />);
 });
 
 memberRoutes.get("/:id/assignments/:aid/edit", requireAuth("members:write"), async (c) => {
   const id = c.req.param("id");
-  const a = (await fetchMember(id))?.assignments.find((x) => x.id === c.req.param("aid"));
+  const a = (await fetchScoped(c, id, "write"))?.assignments.find((x) => x.id === c.req.param("aid"));
   if (!a) return c.notFound();
   return c.html(<AssignmentModalForm roles={await fetchRoles()} action={`/members/${id}/assignments/${a.id}`} title={t("members.assignment.titleEdit")} values={{ roleId: a.memberRoleId, from: a.from ?? undefined, to: a.to ?? "", note: a.note ?? "" }} />);
 });
 
 async function saveAssignment(c: Context<{ Variables: Variables }>, aid?: string) {
   const id = c.req.param("id")!;
-  const m = await fetchMember(id);
+  const m = await fetchScoped(c, id, "write");
   if (!m) return c.notFound();
   if (isArchived(m)) return c.body(null, 403);
   if (aid && !m.assignments.some((a) => a.id === aid)) return c.notFound();
@@ -2064,7 +2090,7 @@ memberRoutes.post("/:id/assignments/:aid", requireAuth("members:write"), (c) => 
 
 memberRoutes.post("/:id/assignments/:aid/delete", requireAuth("members:write"), async (c) => {
   const id = c.req.param("id");
-  const m = await fetchMember(id);
+  const m = await fetchScoped(c, id, "write");
   if (!m) return c.notFound();
   if (isArchived(m)) return c.body(null, 403);
   await db.delete(memberRoleAssignments).where(and(eq(memberRoleAssignments.id, c.req.param("aid")), eq(memberRoleAssignments.memberId, id)));
@@ -2078,7 +2104,7 @@ memberRoutes.post("/:id/assignments/:aid/delete", requireAuth("members:write"), 
 // to an application — see findPersonBlockingLink.
 memberRoutes.post("/:id/delete", requireAuth("members:delete"), async (c) => {
   const id = c.req.param("id");
-  const existing = await fetchMember(id);
+  const existing = await fetchScoped(c, id, "delete");
   if (!existing) return c.notFound();
 
   const blockedBy = await findPersonBlockingLink(existing.personId);

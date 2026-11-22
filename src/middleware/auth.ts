@@ -1,15 +1,17 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import { setCookie } from "hono/cookie";
 import { HTTPException } from "hono/http-exception";
 import { auth, type AppUser } from "../auth.js";
 import { db } from "../db/index.js";
-import { sessions, userAppRoles, appRolePermissions } from "../db/schema/index.js";
+import { sessions, userAppRoles, appRolePermissions, appRoleMemberScopes } from "../db/schema/index.js";
 import type { Permission } from "../lib/roles.js";
+import { unionScope, type MemberScope } from "../lib/member-scope.js";
+import type { MemberStatus } from "../lib/status.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 export type { Permission };
-export type AuthedUser = AppUser & { permissions: Set<Permission>; roleIds: Set<string> };
+export type AuthedUser = AppUser & { permissions: Set<Permission>; roleIds: Set<string>; memberScope: MemberScope };
 export type Variables = { user: AuthedUser };
 
 // allowPending: let users without any app role through (used by /pending and /account); all others are sent to /pending.
@@ -38,17 +40,23 @@ export function requireAuth(required?: Permission | Permission[], opts: { allowP
     const permissions = new Set(rows.flatMap((r) => (r.permission ? [r.permission] : [])));
     const roleIds = new Set(rows.map((r) => r.roleId));
 
+    const scopeRows = roleIds.size ? await db.select().from(appRoleMemberScopes).where(inArray(appRoleMemberScopes.roleId, [...roleIds])) : [];
+    const statusesByRole = new Map(scopeRows.map((r) => [r.roleId, r.statuses as MemberStatus[]]));
+    const scopeFor = (perm: Permission) =>
+      unionScope([...roleIds].filter((id) => rows.some((r) => r.roleId === id && r.permission === perm)).map((id) => statusesByRole.get(id)));
+    const memberScope: MemberScope = { read: scopeFor("members:read"), write: scopeFor("members:write"), delete: scopeFor("members:delete") };
+
     // Zero roles = self-registered and not yet approved. A role without the needed permission still gets the 403 below.
     // Active = verified email AND at least one role. Unverified accounts only exist via the Zitadel webhook.
     if (!opts.allowPending && (rows.length === 0 || !user.emailVerified)) return c.redirect("/pending");
 
     const requiredList = required ? ([] as Permission[]).concat(required) : [];
     if (requiredList.length > 0 && !requiredList.some((p) => permissions.has(p))) {
-      c.set("user", { ...user, permissions, roleIds }); // so the error page can render the layout
+      c.set("user", { ...user, permissions, roleIds, memberScope }); // so the error page can render the layout
       throw new HTTPException(HTTP_STATUS.FORBIDDEN);
     }
 
-    c.set("user", { ...user, permissions, roleIds });
+    c.set("user", { ...user, permissions, roleIds, memberScope });
     await next();
   });
 }

@@ -1,4 +1,6 @@
 import { t } from "../i18n/index.js";
+import { STATUS_LABELS } from "./status-badge.js";
+import type { MemberStatus } from "../lib/status.js";
 import { groupPermissionsForBadges, type Permission } from "../lib/roles.js";
 
 export const PERMISSION_LABELS: Record<Permission, string> = {
@@ -65,32 +67,56 @@ export const RESOURCE_LABELS: Record<string, string> = {
   cash: t("admin.permissions.resource.cash"),
   "member-roles": t("admin.permissions.resource.member-roles"),
   "member-role-types": t("admin.permissions.resource.member-role-types"),
+  import: t("admin.permissions.resource.import"),
+  mail: t("admin.permissions.resource.mail"),
 };
 
-export function PermissionBadges({ permissions }: { permissions: Permission[] }) {
+type BadgeGroup = ReturnType<typeof groupPermissionsForBadges>[number];
+
+function badgeLabel(g: BadgeGroup): string {
+  if (g.kind === "full") return t("admin.permissions.badge.full");
+  if (g.kind === "resource-full") return t("admin.permissions.badge.resourceFull", { resource: RESOURCE_LABELS[g.resource] ?? g.resource });
+  return PERMISSION_LABELS[g.permission];
+}
+
+// `max` kürzt auf die ersten N Badges; der Rest steht im Tooltip von „+N weitere“.
+export function PermissionBadges({ permissions, scope = [], max }: { permissions: Permission[]; scope?: MemberStatus[]; max?: number }) {
+  const all = groupPermissionsForBadges(permissions);
+  const shown = max === undefined ? all : all.slice(0, max);
+  const rest = all.slice(shown.length);
   return (
     <div class="flex flex-wrap gap-1">
-      {groupPermissionsForBadges(permissions).map((g) => {
+      {shown.map((g) => {
         if (g.kind === "full") {
           return (
-            <span key="full" class="badge badge-primary badge-sm whitespace-nowrap">
-              {t("admin.permissions.badge.full")}
+            <span key="full" class="badge badge-primary badge-sm h-auto max-w-full whitespace-normal py-0.5 text-left">
+              {badgeLabel(g)}
             </span>
           );
         }
         if (g.kind === "resource-full") {
           return (
-            <span key={g.resource} class="badge badge-outline badge-primary badge-sm whitespace-nowrap">
-              {t("admin.permissions.badge.resourceFull", { resource: RESOURCE_LABELS[g.resource] ?? g.resource })}
+            <span key={g.resource} class="badge badge-outline badge-primary badge-sm h-auto max-w-full whitespace-normal py-0.5 text-left">
+              {badgeLabel(g)}
             </span>
           );
         }
         return (
-          <span key={g.permission} class="badge badge-outline badge-sm whitespace-nowrap">
-            {PERMISSION_LABELS[g.permission]}
+          <span key={g.permission} class="badge badge-outline badge-sm h-auto max-w-full whitespace-normal py-0.5 text-left">
+            {badgeLabel(g)}
           </span>
         );
       })}
+      {rest.length > 0 && (
+        <span class="badge badge-ghost badge-sm h-auto max-w-full whitespace-normal py-0.5 text-left" title={rest.map(badgeLabel).join(", ")}>
+          {t("admin.permissions.badge.more", { count: rest.length })}
+        </span>
+      )}
+      {scope.length > 0 && permissions.some((p) => p.startsWith("members:") && !p.startsWith("members:bank")) && (
+        <span class="badge badge-warning badge-outline badge-sm h-auto max-w-full whitespace-normal py-0.5 text-left">
+          {t("admin.permissions.scope.badge", { statuses: scope.map((s) => STATUS_LABELS[s]).join(", ") })}
+        </span>
+      )}
     </div>
   );
 }
