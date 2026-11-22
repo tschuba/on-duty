@@ -242,6 +242,11 @@ details:not([open]) > summary .section-actions {
    Rahmen/Radius sitzt am Wrapper (.richtext-field), Toolbar und Editor sind darin randlos. */
 .richtext-field { border: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent); border-radius: var(--radius-field); background: var(--color-base-100); overflow: hidden; }
 .richtext-field:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+form trix-toolbar .trix-button-row { flex-wrap: wrap; column-gap: 0.5rem; justify-content: flex-start; }
+form trix-toolbar .trix-button-group { margin-left: 0 !important; }
+form trix-toolbar .trix-button-group-spacer { display: none; }
+form trix-toolbar .trix-button-group--history-tools { order: -1; }
+@media (max-width: 768px) { form trix-toolbar { padding-inline: 0.25rem; } form trix-toolbar .trix-button--icon { width: 2.5rem; max-width: none; height: 2.5rem; } }
 form trix-toolbar { background: var(--color-base-200); border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent); padding: 0.5rem 0.5rem 0; }
 form trix-toolbar .trix-button-group { border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent); border-radius: var(--radius-field); overflow: hidden; background: var(--color-base-100); }
 form trix-toolbar .trix-button { color: var(--color-base-content); border-color: color-mix(in oklab, var(--color-base-content) 20%, transparent); }

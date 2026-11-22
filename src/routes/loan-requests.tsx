@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { PublicDescription } from "../components/field.js";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
@@ -74,6 +75,7 @@ loanRequestRoutes.get("/:id", guard, async (c) => {
         backHref="/inventory/lending?status=requested"
       />
       <div class="max-w-2xl">
+        <PublicDescription html={request.lendingItem.publicDescription} class="mb-4" />
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <ReadField label={t("apply.form.firstName")} value={`${request.person.firstName} ${request.person.lastName}${request.person.companyName ? ` (${request.person.companyName})` : ""}`} />
           <ReadField label={t("lend.status.submittedAt")} value={formatDate(request.submittedAt.toISOString().slice(0, 10))} />
@@ -147,6 +149,7 @@ loanRequestRoutes.get("/:id/approve", guard, async (c) => {
     <Layout title={t("lend.requests.approveTitle")} user={user}>
       <PageHeader title={t("lend.requests.approveTitle")} backHref={`/inventory/requests/${request.id}`} />
       <form method="post" action={`/inventory/requests/${request.id}/approve`} class="max-w-xl space-y-4">
+        <PublicDescription html={request.lendingItem.publicDescription} />
         <p class="text-sm opacity-70">{t("lend.requests.requestedBy", { name: `${request.person.firstName} ${request.person.lastName}` })}</p>
         {candidates.length > 0 ? (
           <fieldset class="fieldset">

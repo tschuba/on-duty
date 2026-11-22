@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { FilterDialog } from "../components/filter-dialog.js";
-import { Field, ViewField, ViewGrid } from "../components/field.js";
+import { Field, RichTextField, ViewField, ViewGrid } from "../components/field.js";
 import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
@@ -14,6 +14,7 @@ import { DeleteDialog } from "../components/delete-dialog.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
+import { sanitizeRichText } from "../lib/sanitize.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { ChipInput } from "../components/chip-input.js";
@@ -33,7 +34,7 @@ import { env } from "../env.js";
 import { inventoryFieldRoutes, inventoryTitle, renderFieldList } from "./inventory-fields.js";
 import { inventoryInspectionTemplateRoutes, inspectionTitle, renderTemplateList } from "./inventory-inspection-templates.js";
 import { inventoryTemplateRoutes, renderTemplateList as renderItemTemplateList } from "./inventory-templates.js";
-import { SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
+import { PUBLIC_DESCRIPTION_MAX_LENGTH, SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
 
 export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 // Vor den /:id-Routen registrieren, sonst frisst /:id den Pfad.
@@ -393,6 +394,21 @@ const FORM_TOGGLE_SCRIPT = `
     });
   }
   updateInventoryFormVisibility();
+  // Zähl-Badge im Kartenkopf: erfasste Nummern (bei Menge > 1 "x/Menge"); Chips ändern das DOM, Tippen feuert input.
+  function updateCountBadges() {
+    var q = parseInt((document.getElementById('inventory-quantity') || {}).value, 10) || 1;
+    document.querySelectorAll('[data-count-badge]').forEach(function(b) {
+      var n = 0;
+      document.querySelectorAll('[data-section="' + b.dataset.countBadge + '"] input[name="' + b.dataset.countBadge + '"]:not(:disabled)').forEach(function(i) { if (i.value.trim()) n++; });
+      var txt = q > 1 ? n + '/' + q : String(n);
+      if (b.textContent !== txt) b.textContent = txt; // sonst löst der Observer sich selbst aus
+      b.classList.toggle('badge-success', q > 1 && n >= q);
+      b.classList.toggle('hidden', n === 0 && q <= 1);
+    });
+  }
+  updateCountBadges();
+  document.addEventListener('input', updateCountBadges);
+  new MutationObserver(updateCountBadges).observe(document.body, { childList: true, subtree: true });
   // Neu aktivierte Bereiche bis zum Speichern dezent markieren (kein Auto-Scroll); freie Felder werden hier ein-/ausgeblendet.
   function fieldToggled(cb) {
     updateInventoryFormVisibility();
@@ -444,14 +460,24 @@ function InspectionRowFields({ row, error }: { row: InspectionFormRow; error?: I
   );
 }
 
-function SectionCard({ field, children }: { field: InventoryField; children: unknown }) {
+const SECTION_ICONS: Record<string, `icon-[tabler--${string}]`> = {
+  inspection: "icon-[tabler--clipboard-check]", numbers: "icon-[tabler--barcode]", serials: "icon-[tabler--hash]",
+  location: "icon-[tabler--map-pin]", assignments: "icon-[tabler--user-check]",
+};
+
+// open gesetzt = einklappbar (<details>); offen, wenn befüllt oder fehlerhaft. Ohne open: feste Karte (z. B. Karte mit Leaflet-Map).
+function SectionCard({ field, children, open }: { field: InventoryField; children: unknown; open?: boolean }) {
+  const icon = SECTION_ICONS[field];
+  const title = <>{icon && <Icon name={icon} class="h-5 w-5 opacity-60" />}{t(`inventory.field.${field}`)}{(field === "numbers" || field === "serials") && <span data-count-badge={field} class="badge badge-sm badge-neutral hidden" />}</>;
   return (
-    <div data-field={field} data-section={field} class="card card-border bg-base-100 border-base-300">
-      <div class="card-body gap-4 p-4">
-        <h2 class="font-semibold">{t(`inventory.field.${field}`)}</h2>
-        {children}
-      </div>
-    </div>
+    <details data-field={field} data-section={field} class="card card-border bg-base-100 border-base-300 group" open={open ?? true}>
+      <summary class={`card-body p-4 group-open:pb-0 list-none ${open === undefined ? "pointer-events-none" : "cursor-pointer"}`}>
+        <h2 class="font-semibold flex items-center gap-2 min-h-8">{title}
+          {open !== undefined && <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4 ml-auto opacity-60 transition-transform group-open:rotate-180" />}
+        </h2>
+      </summary>
+      <div class="card-body gap-4 p-4 pt-4">{children}</div>
+    </details>
   );
 }
 
@@ -527,58 +553,51 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
   const quantity = Number(v.quantity) || 1;
   return (
     <>
-      <Field label={t("inventory.form.name")} required>
-        <input type="text" name="name" value={v.name ?? ""} class={`input w-full${errors?.name ? " input-error" : ""}`} placeholder={t("inventory.form.name")} />
-        {errors?.name && <span class="text-error text-sm mt-1">{errors.name}</span>}
-      </Field>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label={t("inventory.form.commissionedAt")}>
-          <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
-        </Field>
-        <Field label={t("inventory.form.purchasePrice")} after={<span class="block text-xs opacity-60 mt-1" data-field="quantity" data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>}>
-          <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input w-full${errors?.purchasePrice ? " input-error" : ""}`} placeholder={t("inventory.form.purchasePrice")} />
-          {errors?.purchasePrice && <span class="text-error text-sm mt-1">{errors.purchasePrice}</span>}
-        </Field>
-      </div>
-
-      <Field label={t("inventory.form.notes")}>
-        <textarea name="notes" class="textarea w-full" rows={3} placeholder={t("inventory.form.notes")}>{v.notes ?? ""}</textarea>
-      </Field>
-
-      <TagInput tags={v.tagsList} />
-
       {(errors?.enabledFields || errors?.freeFields) && <div class="text-error text-sm">{errors.enabledFields}{" "}{errors.freeFields}</div>}
 
-      <SectionCard field="inspection">
-        {errors?.inspections && <span class="text-error text-sm">{errors.inspections}</span>}
-        <datalist id="inspection-names">
-          {(v.inspectionSuggestions ?? []).map((sug) => <option value={sug.name} data-interval={sug.intervalMonths ?? ""} />)}
-        </datalist>
-        <div id="inspection-rows" class="space-y-3">
-          {(v.inspectionRows ?? []).map((r, i) => <InspectionRowFields row={r} error={v.inspectionErrors?.[i]} />)}
-        </div>
-        <template id="inspection-row-template"><InspectionRowFields row={{ id: "", name: "", interval: "", last: "", due: "" }} /></template>
-        <button type="button" class="btn btn-sm" onclick="addInspectionRow()">{t("inventory.form.addInspection")}</button>
-        <script dangerouslySetInnerHTML={{ __html: INSPECTION_ROWS_SCRIPT }} />
-      </SectionCard>
+      <div class="lg:columns-2 gap-4 [&>*]:break-inside-avoid [&>*]:mb-4">
+      <div class="card card-border bg-base-100 border-base-300">
+        <div class="card-body gap-4 p-4">
+          <h2 class="font-semibold flex items-center gap-2"><Icon name="icon-[tabler--info-circle]" class="h-5 w-5 opacity-60" />{t("inventory.section.master")}</h2>
+          <Field label={t("inventory.form.name")} required>
+            <input type="text" name="name" value={v.name ?? ""} class={`input w-full${errors?.name ? " input-error" : ""}`} placeholder={t("inventory.form.name")} />
+            {errors?.name && <span class="text-error text-sm mt-1">{errors.name}</span>}
+          </Field>
 
-      <div data-field="quantity" data-section="quantity" class="space-y-4">
-        <Field label={t("inventory.form.quantity")} class="max-w-40">
-          <input
-            type="number"
-            id="inventory-quantity"
-            name="quantity"
-            min="1"
-            value={v.quantity ?? "1"}
-            oninput="updateInventoryFormVisibility()"
-            class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("inventory.form.quantity")}
-          />
-          {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
-        </Field>
+          <div data-field="quantity" data-section="quantity">
+            <Field label={t("inventory.form.quantity")} class="max-w-40">
+              <input
+                type="number"
+                id="inventory-quantity"
+                name="quantity"
+                min="1"
+                value={v.quantity ?? "1"}
+                oninput="updateInventoryFormVisibility()"
+                class={`input w-full${errors?.quantity ? " input-error" : ""}`} placeholder={t("inventory.form.quantity")}
+              />
+              {errors?.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
+            </Field>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label={t("inventory.form.commissionedAt")}>
+              <input type="date" name="commissionedAt" value={v.commissionedAt ?? ""} class="input w-full" />
+            </Field>
+            <Field label={t("inventory.form.purchasePrice")} after={<span class="block text-xs opacity-60 mt-1" data-field="quantity" data-show-batch="true">{t("inventory.form.quantityTotalHint")}</span>}>
+              <input type="text" inputmode="decimal" name="purchasePrice" value={v.purchasePrice ?? ""} class={`input w-full${errors?.purchasePrice ? " input-error" : ""}`} placeholder={t("inventory.form.purchasePrice")} />
+              {errors?.purchasePrice && <span class="text-error text-sm mt-1">{errors.purchasePrice}</span>}
+            </Field>
+          </div>
+
+          <Field label={t("inventory.form.notes")}>
+            <textarea name="notes" class="textarea w-full" rows={3} placeholder={t("inventory.form.notes")}>{v.notes ?? ""}</textarea>
+          </Field>
+
+          <TagInput tags={v.tagsList} />
+        </div>
       </div>
 
-      <SectionCard field="numbers">
+      <SectionCard field="numbers" open={Boolean(v.numbersList?.length || errors?.numbers)}>
         <NumberListField
           name="numbers"
           label={t("inventory.form.inventoryNumbers")}
@@ -591,7 +610,7 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         />
       </SectionCard>
 
-      <SectionCard field="serials">
+      <SectionCard field="serials" open={Boolean(v.serialsList?.length || errors?.serials)}>
         <NumberListField
           name="serials"
           label={t("inventory.form.serialNumbers")}
@@ -601,21 +620,6 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
           values={v.serialsList}
           quantity={quantity}
           error={errors?.serials}
-        />
-      </SectionCard>
-
-      <SectionCard field="location">
-        <Field label={t("inventory.form.locationText")}>
-          <input type="text" name="locationText" value={v.locationText ?? ""} class="input w-full" placeholder={t("inventory.form.locationText")} />
-        </Field>
-        <LocationPicker
-          value={v.coordinates ?? ""}
-          error={errors?.coordinates}
-          labels={{
-            coordinates: t("inventory.form.coordinates"), hint: t("inventory.form.coordinatesHint"), geoError: t("inventory.form.geoError"),
-            useLocation: t("inventory.form.useLocation"), attribution: t("inventory.map.attribution"), mapAria: t("inventory.form.mapAria"),
-            apply: t("inventory.form.applyCoordinates"),
-          }}
         />
       </SectionCard>
 
@@ -641,10 +645,39 @@ export function InventoryFormFields({ values, errors, assignedMemberName, assign
         );
       })}
 
-      <SectionCard field="assignments">
+      <SectionCard field="inspection" open={Boolean(v.inspectionRows?.length || errors?.inspections)}>
+        {errors?.inspections && <span class="text-error text-sm">{errors.inspections}</span>}
+        <datalist id="inspection-names">
+          {(v.inspectionSuggestions ?? []).map((sug) => <option value={sug.name} data-interval={sug.intervalMonths ?? ""} />)}
+        </datalist>
+        <div id="inspection-rows" class="space-y-3">
+          {(v.inspectionRows ?? []).map((r, i) => <InspectionRowFields row={r} error={v.inspectionErrors?.[i]} />)}
+        </div>
+        <template id="inspection-row-template"><InspectionRowFields row={{ id: "", name: "", interval: "", last: "", due: "" }} /></template>
+        <button type="button" class="btn btn-sm" onclick="addInspectionRow()">{t("inventory.form.addInspection")}</button>
+        <script dangerouslySetInnerHTML={{ __html: INSPECTION_ROWS_SCRIPT }} />
+      </SectionCard>
+
+      <SectionCard field="location">
+        <Field label={t("inventory.form.locationText")}>
+          <input type="text" name="locationText" value={v.locationText ?? ""} class="input w-full" placeholder={t("inventory.form.locationText")} />
+        </Field>
+        <LocationPicker
+          value={v.coordinates ?? ""}
+          error={errors?.coordinates}
+          labels={{
+            coordinates: t("inventory.form.coordinates"), hint: t("inventory.form.coordinatesHint"), geoError: t("inventory.form.geoError"),
+            useLocation: t("inventory.form.useLocation"), attribution: t("inventory.map.attribution"), mapAria: t("inventory.form.mapAria"),
+            apply: t("inventory.form.applyCoordinates"),
+          }}
+        />
+      </SectionCard>
+
+      <SectionCard field="assignments" open={Boolean(v.assignedMemberId || assignments?.length)}>
         <MemberPickerFields memberId={v.assignedMemberId} memberName={assignedMemberName} />
         <BatchAssignmentFields assignments={assignments ?? []} />
       </SectionCard>
+      </div>
 
       <script dangerouslySetInnerHTML={{ __html: FORM_TOGGLE_SCRIPT }} />
     </>
@@ -994,9 +1027,9 @@ function assignmentDisplayList(item: ItemWithRelations): AssignmentInput[] {
 type LendableField = {
   checked: boolean; editable: boolean; locked: boolean; error?: string;
   individualTracking: boolean;
-  publicRequestable: boolean; maxRequestQuantity: number; timesRequired: boolean;
+  publicRequestable: boolean; publicDescription: string; maxRequestQuantity: number; timesRequired: boolean;
   requestLink?: string;
-  errors?: { maxRequestQuantity?: string };
+  errors?: { maxRequestQuantity?: string; publicDescription?: string };
   /** Verleihbarkeit fest vorgegeben (Einstieg aus dem Verleihformular); wird als lendableForced mitgeschickt. */
   forced?: boolean;
 };
@@ -1007,9 +1040,9 @@ function lendableField(
   opts: {
     editable?: boolean; locked?: boolean; error?: string;
     individualTracking?: boolean;
-    publicRequestable?: boolean; maxRequestQuantity?: number; timesRequired?: boolean;
+    publicRequestable?: boolean; publicDescription?: string | null; maxRequestQuantity?: number; timesRequired?: boolean;
     requestLink?: string;
-    errors?: { maxRequestQuantity?: string };
+    errors?: { maxRequestQuantity?: string; publicDescription?: string };
     forced?: boolean;
   } = {},
 ): LendableField | undefined {
@@ -1018,6 +1051,7 @@ function lendableField(
     checked, editable: user.permissions.has("lending:manage") && (opts.editable ?? true), locked: (opts.locked ?? false) || (opts.forced ?? false), forced: opts.forced, error: opts.error,
     individualTracking: opts.individualTracking ?? false,
     publicRequestable: opts.publicRequestable ?? false,
+    publicDescription: opts.publicDescription ?? "",
     maxRequestQuantity: opts.maxRequestQuantity ?? 0,
     timesRequired: opts.timesRequired ?? false,
     requestLink: opts.requestLink,
@@ -1043,7 +1077,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
   return (
     <>
       <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FieldConfigurator formId={formId} values={values} canConfigure={canConfigure} /><FormActions formId={formId} cancelHref={cancelHref} /></>} />
-      <form id={formId} method="post" action={action} class="space-y-4 max-w-2xl">
+      <form id={formId} method="post" action={action} class="space-y-4 max-w-5xl">
         {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
         {lendable && (
@@ -1072,25 +1106,14 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                 <div id="lendable-config" hidden={!lendable.checked}>
                 <div class="flex flex-col gap-4 border-t border-base-300 pt-4">
                   <label class="flex items-start gap-3 cursor-pointer pointer-coarse:min-h-11">
-                    <input type="checkbox" name="publicRequestable" value="1" checked={lendable.publicRequestable} class="toggle toggle-success mt-0.5" />
+                    <input type="checkbox" name="publicRequestable" value="1" checked={lendable.publicRequestable} class="toggle toggle-success mt-0.5"
+                      onchange="document.getElementById('public-description').hidden = !this.checked; document.getElementById('impressum-hint').hidden = !this.checked" />
                     <span class="flex flex-col">
                       <span class="font-medium">{t("lend.form.publicRequestable")}</span>
                       <span class="text-sm opacity-70">{t("lend.form.publicRequestableHint")}</span>
                     </span>
                   </label>
-                  {lendable.publicRequestable && <ImpressumHint />}
-                  {lendable.publicRequestable && lendable.requestLink && (
-                    <div class="flex flex-col gap-1">
-                      <span class="text-sm font-medium">{t("lend.form.requestLink")}</span>
-                      <div class="flex items-center gap-2">
-                        <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
-                        <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">
-                          <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
-                          <span class="max-sm:hidden">{t("common.copy")}</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div id="impressum-hint" hidden={!lendable.publicRequestable} class="empty:hidden"><ImpressumHint /></div>
                   {/* Server ignoriert maxRequestQuantity für individualTracking-Artikel (fix seit Anlage, siehe unten) — Feld dann gar nicht erst anzeigen. */}
                   {!lendable.individualTracking && (
                   <div data-field="quantity" data-show-batch="true">
@@ -1115,6 +1138,27 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
                       <span class="text-sm opacity-70">{t("lend.form.timesRequiredHint")}</span>
                     </span>
                   </label>
+                  {lendable.publicRequestable && lendable.requestLink && (
+                    <div class="flex flex-col gap-1">
+                      <span class="text-sm font-medium">{t("lend.form.requestLink")}</span>
+                      <div class="flex items-center gap-2">
+                        <input type="text" readonly value={lendable.requestLink} class="input input-sm flex-1" />
+                        <button type="button" class="btn min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} onclick="navigator.clipboard.writeText(this.previousElementSibling.value)">
+                          <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
+                          <span class="max-sm:hidden">{t("common.copy")}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div id="public-description" hidden={!lendable.publicRequestable && !lendable.errors?.publicDescription}>
+                    <span class="text-sm font-medium">{t("lend.form.publicDescription")}</span>
+                    <p class="text-sm opacity-70 mb-1">{t("lend.form.publicDescriptionHint")}</p>
+                    <RichTextField name="publicDescription" value={lendable.publicDescription} editable />
+                    <link rel="stylesheet" href="/css/trix.css" />
+                    <script src="/js/trix.min.js"></script>
+                    <script dangerouslySetInnerHTML={{ __html: 'document.addEventListener("trix-file-accept",function(e){e.preventDefault()})' }}></script>
+                    {lendable.errors?.publicDescription && <p class="text-error text-sm mt-1">{lendable.errors.publicDescription}</p>}
+                  </div>
                 </div>
                 </div>
               )}
@@ -1232,6 +1276,8 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
   const returnTo = safeReturnTo(trimmed(body, "returnTo"));
   const forced = canManageLending && wantsLendable && trimmed(body, "lendableForced") === "1";
   const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
+  const publicDescription = canManageLending && wantsLendable ? sanitizeRichText(trimmed(body, "publicDescription")) : "";
+  const publicDescriptionError = publicDescription.length > PUBLIC_DESCRIPTION_MAX_LENGTH ? t("lend.form.publicDescriptionTooLong") : undefined;
   const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
   let maxRequestQuantity = 0;
   let maxRequestQuantityError: string | undefined;
@@ -1241,7 +1287,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     if (limited && (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1 || maxRequestQuantity > insertValues.quantity)) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
   }
 
-  if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
+  if (Object.keys(errors).length > 0 || maxRequestQuantityError || publicDescriptionError) {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={t("inventory.newItem")} user={user}>
@@ -1255,7 +1301,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
           errors={errors}
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
-          lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired, forced, errors: { maxRequestQuantity: maxRequestQuantityError } })}
+          lendable={lendableField(user, wantsLendable, { publicRequestable, publicDescription, maxRequestQuantity, timesRequired, forced, errors: { maxRequestQuantity: maxRequestQuantityError, publicDescription: publicDescriptionError } })}
         />
       </Layout>,
       422
@@ -1286,7 +1332,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
     // Serverseitig erzwungen: ohne lending:manage wird das Flag ignoriert, egal was gesendet wird.
     // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
     if (wantsLendable && user.permissions.has("lending:manage")) {
-      [{ id: newLendingItemId }] = await tx.insert(lendingItems).values({ inventoryItemId: item.id, individualTracking: item.quantity <= 1, publicRequestable, maxRequestQuantity, timesRequired }).returning({ id: lendingItems.id });
+      [{ id: newLendingItemId }] = await tx.insert(lendingItems).values({ inventoryItemId: item.id, individualTracking: item.quantity <= 1, publicRequestable, publicDescription: publicDescription || null, maxRequestQuantity, timesRequired }).returning({ id: lendingItems.id });
     }
     if (assignments.length > 0) {
       await tx.insert(inventoryItemAssignments).values(assignments.map((a) => ({ inventoryItemId: item.id, memberId: a.memberId, quantity: a.quantity })));
@@ -1301,7 +1347,7 @@ inventoryRoutes.post("/", requireAuth("inventory:manage"), async (c) => {
       <Layout title={t("inventory.newItem")} user={user}>
         <InventoryForm canConfigure={user.permissions.has("inventory:configure")} title={t("inventory.newItem")} action="/inventory" formId="inventory-new-form" returnTo={returnTo} cancelHref={returnTo}
           values={await withFree({ ...values, tagsList: tags, numbersList: numbers, serialsList: serials, inspectionRows, inspectionErrors })} errors={errors}
-          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, maxRequestQuantity, timesRequired, forced })} />
+          assignedMemberName={assignmentNames[0]?.name} assignments={assignmentNames} lendable={lendableField(user, wantsLendable, { publicRequestable, publicDescription, maxRequestQuantity, timesRequired, forced })} />
       </Layout>,
       422
     );
@@ -1406,7 +1452,7 @@ inventoryRoutes.get("/:id/edit", requireAuth("inventory:read"), async (c) => {
           editable: Boolean(lendingItem) || !item.retiredAt, locked: hasLoans,
           // s.o. in POST /:id: Einzel-Tracking folgt der Menge, solange kein Verleihvorgang existiert.
           individualTracking: lendingItem && hasLoans ? lendingItem.individualTracking : item.quantity <= 1,
-          publicRequestable: lendingItem?.publicRequestable, maxRequestQuantity: lendingItem?.maxRequestQuantity, timesRequired: lendingItem?.timesRequired,
+          publicRequestable: lendingItem?.publicRequestable, publicDescription: lendingItem?.publicDescription, maxRequestQuantity: lendingItem?.maxRequestQuantity, timesRequired: lendingItem?.timesRequired,
           requestLink: lendingItem ? new URL(`/lend/${lendingItem.id}`, env.OIDC_APP_URL).toString() : undefined,
         })}
       />
@@ -1485,6 +1531,8 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
   // nachträgliche Mengenänderung die laufende Verleih-Historie inkonsistent machen (fix ab erstem Vorgang).
   const individualTracking = lendingItem && lendingHasLoans ? lendingItem.individualTracking : insertValues.quantity <= 1;
   const publicRequestable = canManageLending && trimmed(body, "publicRequestable") === "1";
+  const publicDescription = canManageLending && wantsLendable ? sanitizeRichText(trimmed(body, "publicDescription")) : "";
+  const publicDescriptionError = publicDescription.length > PUBLIC_DESCRIPTION_MAX_LENGTH ? t("lend.form.publicDescriptionTooLong") : undefined;
   const timesRequired = canManageLending && trimmed(body, "timesRequired") === "1";
   let maxRequestQuantity = 0;
   let maxRequestQuantityError: string | undefined;
@@ -1494,7 +1542,7 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     if (limited && (!Number.isInteger(maxRequestQuantity) || maxRequestQuantity < 1 || maxRequestQuantity > insertValues.quantity)) maxRequestQuantityError = t("lending.loans.error.invalidQuantity");
   }
 
-  if (Object.keys(errors).length > 0 || maxRequestQuantityError) {
+  if (Object.keys(errors).length > 0 || maxRequestQuantityError || publicDescriptionError) {
     const assignmentNames = await resolveAssignmentNames(assignments);
     return c.html(
       <Layout title={existing.name} user={user}>
@@ -1508,8 +1556,8 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
           assignedMemberName={assignmentNames[0]?.name}
           assignments={assignmentNames}
           lendable={lendableField(user, wantsLendable, {
-            error: lendableError, individualTracking, publicRequestable, maxRequestQuantity, timesRequired,
-            errors: { maxRequestQuantity: maxRequestQuantityError },
+            error: lendableError, individualTracking, publicRequestable, publicDescription, maxRequestQuantity, timesRequired,
+            errors: { maxRequestQuantity: maxRequestQuantityError, publicDescription: publicDescriptionError },
           })}
         />
       </Layout>,
@@ -1548,11 +1596,11 @@ inventoryRoutes.post("/:id", requireAuth("inventory:manage"), async (c) => {
     }
     if (lendingChange === "enable") {
       // ponytail: Einzel-Tracking aus quantity abgeleitet und danach fix — späteres Erhöhen der Menge ändert den Modus nicht.
-      await tx.insert(lendingItems).values({ inventoryItemId: id, individualTracking: insertValues.quantity <= 1, publicRequestable, maxRequestQuantity, timesRequired });
+      await tx.insert(lendingItems).values({ inventoryItemId: id, individualTracking: insertValues.quantity <= 1, publicRequestable, publicDescription: publicDescription || null, maxRequestQuantity, timesRequired });
     } else if (lendingChange === "disable" && lendingItem) {
       await tx.delete(lendingItems).where(eq(lendingItems.id, lendingItem.id));
     } else if (lendingItem) {
-      await tx.update(lendingItems).set({ publicRequestable, maxRequestQuantity, timesRequired }).where(eq(lendingItems.id, lendingItem.id));
+      await tx.update(lendingItems).set({ publicRequestable, publicDescription: publicDescription || null, maxRequestQuantity, timesRequired }).where(eq(lendingItems.id, lendingItem.id));
     }
   });
   } catch (err) {
@@ -1842,14 +1890,24 @@ function ResultDot({ result, legacy }: { result: "passed" | "failed" | null; leg
   );
 }
 
+function InvSection({ icon, title, children }: { icon: `icon-[tabler--${string}]`; title: string; children: unknown }) {
+  return (
+    <section class="card bg-base-100 border border-base-300 break-inside-avoid mb-6">
+      <div class="card-body gap-4">
+        <h2 class="text-lg font-semibold flex items-center gap-2"><Icon name={icon} class="h-5 w-5 opacity-60" />{title}</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">{children as never}</div>
+      </div>
+    </section>
+  );
+}
+
 function InspectionList({ item, records, canInspect, today }: { item: ItemWithRelations; records: InspectionRecordRow[]; canInspect: boolean; today: string }) {
   const rows = item.inspections.slice().sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || a.name.localeCompare(b.name, "de"));
   const history = records.slice().sort((a, b) => b.inspectedAt.localeCompare(a.inspectedAt) || +b.createdAt - +a.createdAt);
   return (
-    <div class="mt-6 max-w-4xl">
-      <div class="text-sm opacity-60">{t("inventory.field.inspection")}</div>
-      <div class="overflow-x-auto">
-      <table class="table w-full">
+    <div class="mt-6 max-w-5xl">
+      <h2 class="text-lg font-semibold flex items-center gap-2 mb-2"><Icon name="icon-[tabler--calendar-check]" class="h-5 w-5 opacity-60" />{t("inventory.field.inspection")}</h2>
+      <table class="table table-cards w-full">
         <thead>
           <tr>
             <th>{t("inventory.form.inspectionName")}</th>
@@ -1865,9 +1923,9 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
             const dialogId = `inspection-done-${r.id}`;
             return (
               <tr>
-                <td>{r.name}{r.intervalMonths ? <span class="opacity-60 text-sm"> · {t("inventory.inspection.everyMonths", { count: r.intervalMonths })}</span> : null}</td>
-                <td>{r.inspectedAt ? formatDate(r.inspectedAt) : "—"}</td>
-                <td class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
+                <td class="font-semibold">{r.name}{r.intervalMonths ? <span class="opacity-60 text-sm"> · {t("inventory.inspection.everyMonths", { count: r.intervalMonths })}</span> : null}</td>
+                <td data-label={t("inventory.form.inspectionLast")}>{r.inspectedAt ? formatDate(r.inspectedAt) : "—"}</td>
+                <td data-label={t("inventory.form.inspectionDue")} class={overdue ? "text-error font-semibold" : ""}>{r.dueDate ? formatDate(r.dueDate) : "—"}{overdue && <span class="badge badge-error badge-sm ml-1">{t("inventory.inspections.overdue")}</span>}</td>
                 {canInspect && (
                   <td class="text-right">
                     <button type="button" class="btn btn-sm btn-outline btn-primary" aria-label={t("inventory.inspection.markDone")} title={t("inventory.inspection.markDone")} onclick={`document.getElementById('${dialogId}').showModal()`}><Icon name="icon-[tabler--checkup-list]" class="h-4 w-4" /><span class="hidden md:inline">{t("inventory.inspection.markDone")}</span></button>
@@ -1912,7 +1970,6 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
           })}
         </tbody>
       </table>
-      </div>
 
       <div class="mt-8 flex items-center justify-between">
         <div class="text-sm opacity-60">{t("inventory.inspection.history")}</div>
@@ -1923,8 +1980,7 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
           </select>
         </label>
       </div>
-      <div class="overflow-x-auto">
-      <table class="table w-full">
+      <table class="table table-cards w-full">
         <thead>
           <tr>
             <th>{t("inventory.inspection.doneDate")}</th>
@@ -1939,17 +1995,16 @@ function InspectionList({ item, records, canInspect, today }: { item: ItemWithRe
           {history.length === 0 && <tr><td colspan={6} class="text-center opacity-50 py-4">{t("inventory.inspection.historyEmpty")}</td></tr>}
           {history.map((h) => (
             <tr data-history-row={h.inspectionId}>
-              <td><a class="link" href={`/inventory/${item.id}/inspections/${h.id}`}>{formatDate(h.inspectedAt)}</a></td>
-              <td>{h.inspection.name}</td>
-              <td><ResultDot result={h.result} legacy={isLegacyRecord(h)} /></td>
-              <td>{h.inspector ? personName(h.inspector) : "—"}</td>
-              <td class="whitespace-pre-line">{h.note ?? "—"}</td>
-              <td>{h.recorder?.name ?? "—"}</td>
+              <td data-label={t("inventory.inspection.doneDate")}><a class="link" href={`/inventory/${item.id}/inspections/${h.id}`}>{formatDate(h.inspectedAt)}</a></td>
+              <td data-label={t("inventory.form.inspectionName")}>{h.inspection.name}</td>
+              <td data-label={t("inventory.inspection.result")}><ResultDot result={h.result} legacy={isLegacyRecord(h)} /></td>
+              <td data-label={t("inventory.inspection.inspector")} {...(h.inspector ? {} : { "data-empty": "" })}>{h.inspector ? personName(h.inspector) : "—"}</td>
+              <td data-label={t("inventory.inspection.note")} class="whitespace-pre-line" {...(h.note ? {} : { "data-empty": "" })}>{h.note ?? "—"}</td>
+              <td data-label={t("inventory.inspection.recordedBy")}>{h.recorder?.name ?? "—"}</td>
             </tr>
           ))}
         </tbody>
       </table>
-      </div>
       <script dangerouslySetInnerHTML={{ __html: INSPECTION_DIALOG_SCRIPT }} />
     </div>
   );
@@ -2123,6 +2178,8 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
     where: inArray(inventoryInspectionRecords.inspectionId, item.inspections.map((r) => r.id)),
     with: { inspection: true, inspector: true, recorder: true },
   })) as InspectionRecordRow[]);
+  const hasMaster = !!(item.commissionedAt || price || item.quantity > 1 || (hasField(item.enabledFields, "assignments") && assigned.length > 0));
+  const cards = +hasMaster + +(item.numbers.length > 0 || item.serials.length > 0) + +(item.fieldValues ?? []).some((fv) => fv.value != null && fv.value !== "") + +(hasField(item.enabledFields, "location") || !!item.locationText || item.latitude != null || item.longitude != null);
   return c.html(
     <Layout title={item.name} user={user}>
       <PageHeader title={<>{item.name} <TagBadges tags={item.tags.map((tg) => tg.tag)} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
@@ -2131,21 +2188,54 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
         </div>
       )}
-      <ViewGrid>
-        <ViewField label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
-        <ViewField label={t("inventory.form.purchasePrice")} value={price} />
+      <div class="mb-6 flex flex-wrap items-center gap-2">
+        {(() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const due = earliestDueStatus(item.inspections.map((r) => r.dueDate), today);
+          const next = item.inspections.map((r) => r.dueDate).filter((d): d is string => !!d).sort()[0];
+          if (!hasField(item.enabledFields, "inspection") || due === "none" || item.retiredAt) return null;
+          const tone = { ok: "badge-success", soon: "badge-warning", overdue: "badge-error" }[due];
+          return <span class={`badge ${tone}`}><Icon name="icon-[tabler--calendar-check]" class="h-4 w-4" />{t("inventory.field.inspection")}: {dueText(next, today)}</span>;
+        })()}
+        {item.quantity > 1 && <span class="badge badge-outline">{t("inventory.form.quantity")}: {item.quantity}</span>}
+      </div>
+      <div class={`gap-6 max-w-5xl ${cards > 1 ? "lg:columns-2" : ""}`}>
+          {hasMaster && (
+          <InvSection icon="icon-[tabler--info-circle]" title={t("inventory.section.master")}>
+            <ViewField hideEmpty label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
+            <ViewField hideEmpty label={t("inventory.form.purchasePrice")} value={price} />
+            {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
+            {hasField(item.enabledFields, "assignments") && <ViewField hideEmpty
+              label={t("inventory.form.assignedMember")}
+              value={assigned.length > 0 ? <span class="flex flex-wrap gap-1">{assigned.map((a) => <span class="badge badge-ghost">{item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name}</span>)}</span> : null}
+            />}
+          </InvSection>
+          )}
+          {(item.numbers.length > 0 || item.serials.length > 0) && (
+            <InvSection icon="icon-[tabler--barcode]" title={t("inventory.section.identification")}>
         {item.numbers.length > 0 && (
-          <div class="sm:col-span-2">
+          <div>
             <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.inventoryNumbers" : "inventory.form.inventoryNumber")}</div>
-            <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+            <div class="flex flex-wrap gap-1 mt-1">{sortedNumbers(item).map((n) => <span class="badge badge-outline font-mono">{n}</span>)}</div>
           </div>
         )}
         {item.serials.length > 0 && (
-          <div class="sm:col-span-2">
+          <div>
             <div class="text-sm opacity-60">{t(item.quantity > 1 ? "inventory.form.serialNumbers" : "inventory.form.serialNumber")}</div>
-            <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline">{n}</span>)}</div>
+            <div class="flex flex-wrap gap-1 mt-1">{sortedSerials(item).map((n) => <span class="badge badge-outline font-mono">{n}</span>)}</div>
           </div>
         )}
+            </InvSection>
+          )}
+          {(item.fieldValues ?? []).some((fv) => fv.value != null && fv.value !== "") && (
+            <InvSection icon="icon-[tabler--list-details]" title={t("inventory.section.custom")}>
+        {(item.fieldValues ?? []).slice().sort((a, b) => a.fieldDef.name.localeCompare(b.fieldDef.name, "de")).map((fv) => (
+          <ViewField hideEmpty label={fv.fieldDef.name} value={fv.value == null ? null : fv.fieldDef.type === "boolean" ? t(fv.value === "1" ? "common.yes" : "common.no") : fv.fieldDef.type === "date" ? formatDate(fv.value) : fv.value} />
+        ))}
+            </InvSection>
+          )}
+          {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && (
+            <InvSection icon="icon-[tabler--map-pin]" title={t("inventory.section.location")}>
         {(hasField(item.enabledFields, "location") || item.locationText || item.latitude != null || item.longitude != null) && (() => {
           const hasCoords = item.latitude != null && item.longitude != null;
           const status = earliestDueStatus(item.inspections.map((r) => r.dueDate), new Date().toISOString().slice(0, 10));
@@ -2154,7 +2244,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
           const coords = hasCoords ? `${Number(item.latitude).toFixed(6)}, ${Number(item.longitude).toFixed(6)}` : null;
           return (
             <div class="sm:col-span-2 space-y-2">
-              <ViewField label={t("inventory.form.locationText")} value={item.locationText} />
+              <ViewField hideEmpty label={t("inventory.form.locationText")} value={item.locationText} />
               {hasCoords && <>
                 <link rel="stylesheet" href="/css/leaflet.css" />
                 <div id="location-view-map" role="region" aria-label={t("inventory.form.mapAria")} data-lat={item.latitude} data-lng={item.longitude} data-status={status} data-icon={pinIcon} data-attribution={t("inventory.map.attribution")} class="h-56 rounded-box border border-base-300 z-0" />
@@ -2180,33 +2270,31 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
             </div>
           );
         })()}
-        {(item.fieldValues ?? []).slice().sort((a, b) => a.fieldDef.name.localeCompare(b.fieldDef.name, "de")).map((fv) => (
-          <ViewField label={fv.fieldDef.name} value={fv.value == null ? null : fv.fieldDef.type === "boolean" ? t(fv.value === "1" ? "common.yes" : "common.no") : fv.fieldDef.type === "date" ? formatDate(fv.value) : fv.value} />
-        ))}
-        {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
-        {hasField(item.enabledFields, "assignments") && <ViewField
-          label={t("inventory.form.assignedMember")}
-          value={assigned.map((a) => (item.quantity > 1 ? `${a.name} (${a.quantity}×)` : a.name)).join(", ") || null}
-        />}
-        {lending?.publicRequestable && !item.retiredAt && (() => {
-          const href = new URL(`/lend/${lending.id}`, env.OIDC_APP_URL).toString();
-          return (
-            <div class="sm:col-span-2">
-              <div class="text-sm opacity-60">{t("lend.form.requestLink")}</div>
-              <div class="flex items-center gap-2">
-                <a href={href} target="_blank" rel="noopener" class="link link-primary break-all">{href}</a>
-                <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={href} onclick="navigator.clipboard.writeText(this.dataset.url)">
-                  <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
-                </button>
+            </InvSection>
+          )}
+      </div>
+      {lending?.publicRequestable && !item.retiredAt && (() => {
+        const href = new URL(`/lend/${lending.id}`, env.OIDC_APP_URL).toString();
+        return (
+          <div class="mt-6 max-w-2xl">
+            <InvSection icon="icon-[tabler--link]" title={t("inventory.section.lending")}>
+              <div class="sm:col-span-2 min-w-0">
+                <div class="text-sm opacity-60">{t("lend.form.requestLink")}</div>
+                <div class="flex items-center gap-2">
+                  <a href={href} target="_blank" rel="noopener" class="link link-primary break-all min-w-0">{href}</a>
+                  <button type="button" class="btn btn-ghost btn-sm min-h-11 min-w-11" aria-label={t("common.copy")} title={t("common.copy")} data-url={href} onclick="navigator.clipboard.writeText(this.dataset.url)">
+                    <Icon name="icon-[tabler--copy]" class="h-5 w-5 shrink-0" />
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })()}
-      </ViewGrid>
+            </InvSection>
+          </div>
+        );
+      })()}
       {hasField(item.enabledFields, "inspection") && item.inspections.length > 0 && (
         <InspectionList item={item} records={records} canInspect={user.permissions.has("inventory:inspect") && !item.retiredAt} today={new Date().toISOString().slice(0, 10)} />
       )}
-      {item.notes && <div class="mt-6 max-w-2xl"><ViewField label={t("inventory.form.notes")} value={item.notes} /></div>}
+      {item.notes && <div class="mt-6 max-w-5xl"><InvSection icon="icon-[tabler--notes]" title={t("inventory.form.notes")}><p class="whitespace-pre-line">{item.notes}</p></InvSection></div>}
     </Layout>
   );
 });

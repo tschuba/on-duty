@@ -113,6 +113,13 @@ describe("GET /lend/:itemId", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("Anhänger");
   });
+
+  it("shows the public description when set, nothing when empty", async () => {
+    lendingItemFixture = requestableItem({ publicDescription: "<p>12 € pro Tag</p>" });
+    expect(await (await lendRoutes.request("/item-1")).text()).toContain("<p>12 € pro Tag</p>");
+    lendingItemFixture = requestableItem({ publicDescription: null });
+    expect(await (await lendRoutes.request("/item-1")).text()).not.toContain("richtext-content");
+  });
 });
 
 describe("POST /lend/:itemId", () => {

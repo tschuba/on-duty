@@ -1,0 +1,1 @@
+ALTER TABLE "lending_items" ADD COLUMN "public_description" text;

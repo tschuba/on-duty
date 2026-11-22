@@ -18,6 +18,8 @@ export const lendingItems = pgTable("lending_items", {
   individualTracking: boolean("individual_tracking").notNull(),
   // Öffentliches Anfrageformular /lend/:id (Opt-in).
   publicRequestable: boolean("public_requestable").notNull().default(false),
+  // Bereinigtes HTML (Trix); wird öffentlich und intern angezeigt, auch wenn publicRequestable aus ist.
+  publicDescription: text("public_description"),
   maxRequestQuantity: integer("max_request_quantity").notNull().default(0),
   timesRequired: boolean("times_required").notNull().default(false),
 });
