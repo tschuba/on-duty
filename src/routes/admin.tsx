@@ -29,9 +29,9 @@ import { logger } from "../lib/logger.js";
 import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { MEMBER_STATUSES, parseStatuses } from "../lib/member-scope.js";
-import { STATUS_LABELS } from "../components/status-badge.js";
+import { STATUS_BADGE_CLASS, STATUS_LABELS, StatusBadge } from "../components/status-badge.js";
 import type { MemberStatus } from "../lib/status.js";
-import { PERMISSIONS, type Permission } from "../lib/roles.js";
+import { PERMISSIONS, PERMISSION_AREAS, type Permission } from "../lib/roles.js";
 import { formatDate } from "../lib/format.js";
 import { setFlash } from "../lib/flash.js";
 import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
@@ -788,7 +788,9 @@ function SystemRoleBadge({ class: cls = "" }: { class?: string }) {
   return <span class={`badge badge-neutral badge-sm gap-1 ${cls}`}><Icon name="icon-[tabler--lock]" class="w-3 h-3" />{t("admin.roles.systemRole")}</span>;
 }
 
-function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
+const areaOf = (resource: string) => PERMISSION_AREAS.find((a) => (a.resources as readonly string[]).includes(resource))!.key;
+
+function PermissionCheckboxes({ checked, scope = [] }: { checked: Set<Permission>; scope?: MemberStatus[] }) {
   const groups = new Map<string, Permission[]>();
   for (const p of ASSIGNABLE_PERMISSIONS) {
     const resource = p.split(":")[0];
@@ -797,24 +799,31 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
 
   return (
     <div class="flex flex-col gap-2">
-      {[...groups].map(([resource, perms]) => {
+      {[...groups].map(([resource, perms], i, all) => {
         const n = perms.filter((p) => checked.has(p)).length;
+        const area = areaOf(resource);
         return (
-          <details key={resource} class="perm-group collapse collapse-arrow border border-base-300" open={n > 0} onchange="this.querySelector('[data-n]').textContent=this.querySelectorAll('input:checked').length">
+          <>
+          {(i === 0 || areaOf(all[i - 1][0]) !== area) && <h3 class={`text-xs font-bold uppercase tracking-wide text-base-content/60 ${i > 0 ? "mt-2" : ""}`}>{t(`admin.permissions.area.${area}`)}</h3>}
+          <details key={resource} class="perm-group group collapse collapse-arrow border border-base-300" open={n > 0} onchange="this.querySelector('[data-n]').textContent=this.querySelectorAll('input[name=permissions]:checked').length">
             <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
-              {RESOURCE_LABELS[resource] ?? resource} <span class="font-normal opacity-60">(<span data-n>{n}</span>/{perms.length})</span>
+              <div class="flex items-center justify-between gap-2">
+                <span>
+                  {RESOURCE_LABELS[resource] ?? resource} <span class="font-normal opacity-60">(<span data-n>{n}</span>/{perms.length})</span>
+                </span>
+                {perms.length > 1 && (
+                    <div class="hidden group-open:flex gap-2">
+                      <button type="button" class="btn btn-outline btn-primary btn-xs" onclick="event.preventDefault();var d=this.closest('.perm-group');d.querySelectorAll('input[name=permissions]').forEach(function(cb){cb.checked=true});d.dispatchEvent(new Event('change',{bubbles:true}))">
+                        {t("admin.permissions.modal.selectAllInGroup")}
+                      </button>
+                      <button type="button" class="btn btn-outline btn-xs" onclick="event.preventDefault();var d=this.closest('.perm-group');d.querySelectorAll('input[name=permissions]').forEach(function(cb){cb.checked=false});d.dispatchEvent(new Event('change',{bubbles:true}))">
+                        {t("admin.permissions.modal.selectNoneInGroup")}
+                      </button>
+                    </div>
+                  )}
+              </div>
             </summary>
             <div class="collapse-content">
-              {perms.length > 1 && (
-                <div class="flex gap-2 mb-1">
-                  <button type="button" class="btn btn-outline btn-primary btn-xs" onclick="var d=this.closest('.perm-group');d.querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=true});d.dispatchEvent(new Event('change',{bubbles:true}))">
-                    {t("admin.permissions.modal.selectAllInGroup")}
-                  </button>
-                  <button type="button" class="btn btn-outline btn-xs" onclick="var d=this.closest('.perm-group');d.querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=false});d.dispatchEvent(new Event('change',{bubbles:true}))">
-                    {t("admin.permissions.modal.selectNoneInGroup")}
-                  </button>
-                </div>
-              )}
               <div class="grid grid-cols-1 gap-1">
                 {perms.map((p) => (
                   <label key={p} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
@@ -823,8 +832,26 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
                   </label>
                 ))}
               </div>
+              {resource === "members" && (
+                <div data-scope class="mt-3 pt-3 border-t border-base-300">
+                  <div class="flex items-center gap-2 text-sm font-semibold">
+                    <Icon name="icon-[tabler--filter]" class="w-4 h-4 opacity-60" />
+                    {t("admin.permissions.scope.legend")}
+                  </div>
+                  <p class="text-sm opacity-70 my-1">{t("admin.permissions.scope.hint")}</p>
+                  <div class="flex flex-wrap gap-2">
+                    {MEMBER_STATUSES.map((s) => (
+                      <label key={s} class="cursor-pointer pointer-coarse:py-1">
+                        <input type="checkbox" name="memberScope" value={s} class="peer sr-only" checked={scope.includes(s)} />
+                        <span class={`${(STATUS_BADGE_CLASS[s] || "badge badge-ghost opacity-60").replace(" badge-sm", "")} peer-not-checked:opacity-40 peer-checked:ring-2 peer-checked:ring-offset-1 ring-base-content/40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2`}>{STATUS_LABELS[s]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </details>
+          </>
         );
       })}
     </div>
@@ -856,21 +883,8 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
           <textarea name="description" rows={2} placeholder={t("admin.permissions.modal.descriptionLabel")} class="textarea w-full">{f.description}</textarea>
         </Field>
         <FieldGroup legend={t("admin.permissions.modal.permissionsLabel")}>
-          <PermissionCheckboxes checked={f.checked} />
+          <PermissionCheckboxes checked={f.checked} scope={f.scope} />
         </FieldGroup>
-        <div data-scope>
-        <FieldGroup legend={t("admin.permissions.scope.legend")}>
-          <p class="text-sm opacity-70 mb-1">{t("admin.permissions.scope.hint")}</p>
-          <div class="flex flex-wrap gap-x-4">
-            {MEMBER_STATUSES.map((s) => (
-              <label key={s} class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">
-                <input type="checkbox" name="memberScope" value={s} class="checkbox checkbox-sm" checked={(f.scope ?? []).includes(s)} />
-                <span class="text-sm">{STATUS_LABELS[s]}</span>
-              </label>
-            ))}
-          </div>
-        </FieldGroup>
-        </div>
         </fieldset>
       </form>
       {/* Ohne JS bleibt die Eingrenzung sichtbar; der Server verwirft sie ohne members:read/write/delete. */}
@@ -934,15 +948,15 @@ adminRoutes.get("/permissions/:id", guard, async (c) => {
             <div key={resource}>
               <div class="text-sm font-semibold mb-1">{RESOURCE_LABELS[resource] ?? resource}</div>
               <div class="flex flex-wrap gap-1">{ps.map((p) => <span key={p} class="badge badge-outline badge-sm whitespace-nowrap">{PERMISSION_LABELS[p]}</span>)}</div>
+              {resource === "members" && scope.length > 0 && hasMemberRights && (
+                <div class="mt-2 flex flex-wrap items-center gap-1">
+                  <span class="text-sm opacity-60 mr-1">{t("admin.permissions.scope.legend")}:</span>
+                  {scope.map((s) => <StatusBadge key={s} status={s} />)}
+                </div>
+              )}
             </div>
           ))}
         </div>
-        {scope.length > 0 && hasMemberRights && (
-          <div class="sm:col-span-2">
-            <div class="text-sm opacity-60">{t("admin.permissions.scope.legend")}</div>
-            <div class="font-medium">{scope.map((s) => STATUS_LABELS[s]).join(", ")}</div>
-          </div>
-        )}
       </ViewGrid>
     </Layout>
   );

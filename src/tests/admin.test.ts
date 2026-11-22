@@ -893,6 +893,15 @@ describe("GET /backup", () => {
   });
 });
 
+describe("PERMISSION_AREAS", () => {
+  it("assigns every resource to exactly one area, in PERMISSIONS order", async () => {
+    const { PERMISSIONS, PERMISSION_AREAS } = await import("../lib/roles.js");
+    const flat: string[] = PERMISSION_AREAS.flatMap((a) => [...a.resources]);
+    const used = [...new Set(PERMISSIONS.map((p) => p.split(":")[0]))];
+    expect(flat).toEqual(used);
+  });
+});
+
 describe("RESOURCE_LABELS", () => {
   it("has a label for every permission resource", async () => {
     const { PERMISSIONS } = await import("../lib/roles.js");
