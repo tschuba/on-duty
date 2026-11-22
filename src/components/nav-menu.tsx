@@ -95,30 +95,29 @@ function adminItems(user: AuthedUser, c: NavCounts): Leaf[] {
   return items.filter((i) => i.show);
 }
 
-export function AdminMenu({ user, counts }: { user: AuthedUser; counts: NavCounts }) {
+export function adminAlert(user: AuthedUser, c: NavCounts): "error" | "warning" | null {
+  if (!adminItems(user, c).length) return null;
+  return c.backupProblem ? "error" : c.pendingUsers > 0 ? "warning" : null;
+}
+
+// <li>-Einträge für das Benutzermenü (eigener Abschnitt „Administration“).
+export function AdminMenuItems({ user, counts }: { user: AuthedUser; counts: NavCounts }) {
   const items = adminItems(user, counts);
   if (!items.length) return null;
-  const label = t("common.nav.admin");
-  return (
-    <div class="dropdown dropdown-end mr-1">
-      <div tabindex={0} role="button" class="btn btn-ghost btn-square btn-sm tooltip tooltip-left" data-tip={label} aria-label={label}>
-        <span class="indicator"><Icon name="icon-[tabler--settings]" class="h-5 w-5" />{(counts.backupProblem || counts.pendingUsers > 0) && <span class={`indicator-item badge badge-xs ${counts.backupProblem ? "badge-error" : "badge-warning"}`} />}</span>
-      </div>
-      <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-56 p-2 shadow">
-        {items.map((i) => (
-          <li>
-            <a href={i.href} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
-              {i.icon && <Icon name={i.icon} class="h-4 w-4" />}
-              {i.label}
-              {i.external && <Icon name="icon-[tabler--external-link]" class="h-4 w-4" />}
-              <CountBadge count={i.count ?? 0} tone={i.tone} />
-              {i.alert && <span class="badge badge-sm badge-error ml-1" role="img" aria-label={t("admin.backup.menuAlert")}>!</span>}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return (<>
+    <li class="menu-title mt-1">{t("common.nav.admin")}</li>
+    {items.map((i) => (
+      <li>
+        <a href={i.href} {...(i.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+          {i.icon && <Icon name={i.icon} class="h-5 w-5" />}
+          <span class="flex-1">{i.label}</span>
+          {i.external && <Icon name="icon-[tabler--external-link]" class="h-4 w-4 opacity-60" />}
+          <CountBadge count={i.count ?? 0} tone={i.tone} />
+          {i.alert && <span class="badge badge-sm badge-error ml-1" role="img" aria-label={t("admin.backup.menuAlert")}>!</span>}
+        </a>
+      </li>
+    ))}
+  </>);
 }
 
 // Längster passender Pfad-Präfix gewinnt (/inventory/inspections vor /inventory).
