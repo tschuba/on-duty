@@ -18,6 +18,7 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
+import { cancelReceivable, hasCash, loanPayment, settleLoan, CashError } from "../lib/cash.js";
 import { getSettings } from "../lib/settings.js";
 import { StatCard, StatGrid } from "../components/stat-card.js";
 import { checkAvailability as checkSharedAvailability, cleanupRejectedLoanRequests, effectiveRange, rangesOverlap, loanStatus, validateLoanDates, type LoanRange, type LoanStatus } from "../lib/lending.js";
@@ -381,7 +382,39 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
 // ── Vorgangsseite (GET /loans/:loanId) ───────────────────────────────────────
 // Abholen, Zurückgeben, Bearbeiten, Löschen als einfache POST-Formulare.
 
-function LoanPage({ loan, item, editing }: { loan: LoanWithBorrower; item: LendingItemWithRelations; editing?: boolean }) {
+const eurL = (v: number | string) => `${Number(v).toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
+
+// Nur Beträge und Status des eigenen Vorgangs, keine Kasse. Abschluss (bezahlt, Kaution zurück) ab Rücknahme.
+function PaymentSection({ loanId, p, returned }: { loanId: string; p: Awaited<ReturnType<typeof loanPayment>>; returned: boolean }) {
+  const r = p.receivable;
+  return (
+    <section class="mb-6 max-w-xl">
+      <h2 class="text-lg font-semibold mb-2">{t("cash.loan.title")}</h2>
+      {!r ? <p class="opacity-60">{t("cash.loan.none")}</p> : (
+        <>
+          <ul class="mb-2">
+            {r.items.map((i) => <li>{t("cash.loan.item", { description: i.description ?? "", amount: eurL(i.amount) })}</li>)}
+          </ul>
+          <p class="mb-2"><span class={`badge badge-sm ${r.status === "open" ? "badge-warning" : "badge-ghost"}`}>{t(`cash.loan.status.${r.status as "open"}`)}</span></p>
+          {p.refunded > 0 && <p class="text-sm">{t("cash.loan.refunded", { amount: eurL(p.refunded) })}</p>}
+          {p.retained > 0 && <p class="text-sm">{t("cash.loan.retained", { amount: eurL(p.retained) })}</p>}
+          {p.refunded === 0 && returned && r.status !== "cancelled" && (
+            <form method="post" action={`/inventory/lending/loans/${loanId}/payment`} class="flex flex-col gap-3 mt-3">
+              <label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11"><input type="checkbox" name="refund" value="1" class="checkbox checkbox-sm" />{t("cash.loan.refund")}</label>
+              <Field label={t("cash.loan.retention")}><input type="text" inputmode="decimal" name="retention" class="input w-full" placeholder={t("cash.loan.retention")} /></Field>
+              <div><button type="submit" class="btn btn-primary btn-sm">{t("cash.loan.settle")}</button></div>
+            </form>
+          )}
+          {!returned && r.status === "open" && (
+            <form method="post" action={`/inventory/lending/loans/${loanId}/payment`} class="mt-3"><button type="submit" class="btn btn-outline btn-sm">{t("cash.loan.settle")}</button></form>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function LoanPage({ loan, item, editing, payment }: { loan: LoanWithBorrower; item: LendingItemWithRelations; editing?: boolean; payment?: Awaited<ReturnType<typeof loanPayment>> }) {
   const base = `/inventory/lending/loans/${loan.id}`;
   const today = new Date().toISOString().slice(0, 10);
   const state = loanStatus(loan, today);
@@ -415,6 +448,8 @@ function LoanPage({ loan, item, editing }: { loan: LoanWithBorrower; item: Lendi
           <ViewField label={t("lending.loans.form.returnedAt")} value={loan.returnedAt ? formatDate(loan.returnedAt) : ""} />
         </ViewGrid>
       )}
+
+      {!editing && payment && <PaymentSection loanId={loan.id} p={payment} returned={!!loan.returnedAt} />}
 
       {editing && <div class="space-y-4 max-w-xl">
         <form id="loan-form" method="post" action={base} class="space-y-4">
@@ -918,9 +953,10 @@ async function loadLoanWithItem(loanId: string) {
 lendingRoutes.get("/loans/:loanId", requireAuth("lending:manage"), async (c) => {
   const found = await loadLoanWithItem(c.req.param("loanId"));
   if (!found) return c.notFound();
+  const payment = hasCash(c.get("user")!.permissions, "lending") ? await loanPayment(found.loan.id) : undefined;
   return c.html(
     <Layout title={found.item.inventoryItem.name} user={c.get("user")!}>
-      <LoanPage {...found} />
+      <LoanPage {...found} payment={payment} />
     </Layout>
   );
 });
@@ -976,9 +1012,29 @@ async function saveLoan(c: Context<{ Variables: Variables }>, loanId: string) {
 
 lendingRoutes.post("/loans/:loanId", requireAuth("lending:manage"), (c) => saveLoan(c, c.req.param("loanId")));
 
+// Zahlung abwickeln: wer cash:lending hat, auch ohne Kassenzugriff. Zurückgebucht wird nur nach Rücknahme.
+lendingRoutes.post("/loans/:loanId/payment", requireAuth("lending:manage"), async (c) => {
+  const user = c.get("user")!;
+  const loanId = c.req.param("loanId");
+  const found = await loadLoanWithItem(loanId);
+  if (!found) return c.notFound();
+  if (!hasCash(user.permissions, "lending")) return c.redirect(`/inventory/lending/loans/${loanId}`);
+  const body = await c.req.parseBody();
+  const refund = body.refund === "1" && !!found.loan.returnedAt;
+  try {
+    await settleLoan(loanId, { refundDeposit: refund, retention: Number(trimmed(body, "retention").replace(",", ".")) || 0 }, { userId: user.id });
+    setFlash(c, t("cash.flash.loanSettled"), "success");
+  } catch (e) {
+    if (!(e instanceof CashError)) throw e;
+    setFlash(c, t(`cash.error.${e.code}` as never, (e.data ?? {}) as never), "error");
+  }
+  return c.redirect(`/inventory/lending/loans/${loanId}`);
+});
+
 lendingRoutes.post("/loans/:loanId/delete", requireAuth("lending:manage"), async (c) => {
   const found = await loadLoanWithItem(c.req.param("loanId"));
   if (!found) return c.notFound();
+  await cancelReceivable(found.loan.id, c.get("user")!.id);
   await db.delete(lendingLoans).where(eq(lendingLoans.id, found.loan.id));
   setFlash(c, t("lending.loans.flash.deleted"), "success");
   return c.redirect(`/inventory/lending?item=${found.item.id}&start=&end=`);

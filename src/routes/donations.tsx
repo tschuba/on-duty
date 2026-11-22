@@ -26,6 +26,7 @@ import { SortIcon } from "./members.js";
 import { nextReceiptStatus, recipientName, summarizeDonations, summarizeDonors, type DonationSummary, type DonorSortKey, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
+import { todayStr as cashToday, donationEntries, hasCash, listYears, suggestDonationDate } from "../lib/cash.js";
 import { DonorPickerFields, duplicatePersonError, getOrCreateDonor, parseDonorPersonFields } from "./donors.js";
 
 // Names the missing fields and links only to org tabs the viewer may read.
@@ -610,10 +611,31 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
   const canIssue = user.permissions.has("donations:issue-receipts");
   const showReceipt = canIssue && d.receiptStatus !== "not_required";
   const config = showReceipt ? await loadOrgConfig() : {};
+  const canCashRead = hasCash(user.permissions, "read");
+  const canCashBook = hasCash(user.permissions, "manage");
+  const cashEntryId = canCashRead || canCashBook ? (await donationEntries([d.id])).get(d.id) : undefined;
+  const cashReady = canCashBook && !cashEntryId && (await listYears()).length > 0;
+  const suggest = cashReady ? await suggestDonationDate(d.date) : undefined;
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
-      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} />} />
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<>
+        {suggest && <HeaderAction icon="icon-[tabler--wallet]" label={t("cash.donation.book")} class="btn-outline btn-primary" onclick="document.getElementById('cash-book').showModal()" />}
+        <DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} /></>} />
+      {cashEntryId && canCashRead && <p class="mb-4"><a href={`/cash?status=booked`} class="badge badge-ghost gap-1"><Icon name="icon-[tabler--wallet]" class="w-3 h-3" />{t("cash.donation.inCash")}</a></p>}
+      {suggest && (
+        <dialog id="cash-book" class="modal"><div class="modal-box">
+          <h3 class="font-bold text-lg">{t("cash.donation.title")}</h3>
+          {suggest.moved && <p class="py-2 opacity-70">{t("cash.donation.moved")}</p>}
+          <form method="post" action={`/cash/donation/${d.id}`} class="flex flex-col gap-4 mt-2">
+            <Field label={t("cash.donation.paidDate")} required><input type="date" name="paidDate" value={suggest.date} max={cashToday()} class="input w-full" /></Field>
+            <div class="modal-action">
+              <button type="button" class="btn" onclick="this.closest('dialog').close()">{t("common.cancel")}</button>
+              <button type="submit" class="btn btn-primary">{t("cash.donation.book")}</button>
+            </div>
+          </form>
+        </div><form method="dialog" class="modal-backdrop"><button>{t("common.close")}</button></form></dialog>
+      )}
       {d.receiptStatus === "issued" && !canIssue && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
       {!showReceipt && <ReceiptStatusActions d={d} canIssue={canIssue} />}
       <ViewGrid>

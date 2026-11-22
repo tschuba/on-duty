@@ -13,3 +13,4 @@ export * from "./app-settings";
 export * from "./events";
 export * from "./training";
 export * from "./mail";
+export * from "./cash";

@@ -30,6 +30,7 @@ import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { mailTemplateRoutes } from "./routes/mail-templates.js";
 import { eventRoutes } from "./routes/events.js";
 import { donationRoutes } from "./routes/donations.js";
+import { cashRoutes } from "./routes/cash.js";
 import { donorRoutes } from "./routes/donors.js";
 import { inventoryRoutes } from "./routes/inventory.js";
 import { lendingRoutes } from "./routes/lending.js";
@@ -119,6 +120,7 @@ app.get("/", requireAuth(), (c) => {
   const landing: [string[], string][] = [
     [["members:read"], "/members"],
     [["donations:read", "donations:record", "donations:issue-receipts"], "/donations"],
+    [["cash:report", "cash:read", "cash:manage"], "/cash"],
     [["inventory:read"], "/inventory"],
     [["org:read", "org:write", "org:tax-data:read", "org:tax-data:write"], "/organisation"],
     [["training:read"], "/members?view=training"],
@@ -150,6 +152,7 @@ app.route("/mail/templates", mailTemplateRoutes);
 // Donation routes
 app.route("/donations", donationRoutes);
 app.route("/donors", donorRoutes);
+app.route("/cash", cashRoutes);
 
 // Inventory routes — lending mounted first: more specific prefix before /inventory's own :id routes.
 app.route("/inventory/lending", lendingRoutes);

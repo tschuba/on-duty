@@ -11,6 +11,8 @@ import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { sanitizeRichText } from "../lib/sanitize.js";
 import { loadOrgConfig, REQUIRED_RECEIPT_FIELDS, REQUIRED_IMPRESSUM_FIELDS, ORG_TABS as TABS, TAB_FIELDS, canReadOrgTab, canWriteOrgTab, privacyMode, type OrgTab } from "../lib/org-config.js";
+import { CashSettingsForm } from "../components/cash-settings-form.js";
+import { hasCash, listYears, loadCashSettings, nextYearLabel } from "../lib/cash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 
 // Full class names so Tailwind's scanner picks them up.
@@ -137,6 +139,9 @@ organisationRoutes.get("/", guard, async (c) => {
   const tabs = TAB_ORDER.filter((tab) => canReadOrgTab(perms, tab));
   if (tabs.length === 0) return c.html("<h1>403 Zugriff verweigert</h1>", HTTP_STATUS.FORBIDDEN);
   const values = await loadOrgConfig();
+  const showCash = hasCash(perms, "read");
+  const cashYears = showCash ? await listYears() : [];
+  const cashSettings = showCash ? await loadCashSettings() : undefined;
   // A viewer only sees (and can only fix) the fields of the sections they may read.
   const anyEditable = tabs.some((tab) => canWriteOrgTab(perms, tab));
   return c.html(
@@ -147,6 +152,16 @@ organisationRoutes.get("/", guard, async (c) => {
           <OrgSection tab={tab} values={values} editable={canWriteOrgTab(perms, tab)} />
         ))}
       </form>
+      {cashSettings && (
+        <section id="cash" class="mb-8 max-w-4xl mx-auto">
+          <h2 class="text-xl font-semibold mb-4">{t("organisation.tabs.cash")}</h2>
+          <div class="card bg-base-200 shadow"><div class="card-body">
+            {/* Eigenes Formular (POST /cash/settings), daher außerhalb von #org-form. */}
+            <CashSettingsForm settings={cashSettings} back="/organisation#cash" id="org-cash-settings" editable={hasCash(perms, "manage")}
+              year={cashYears.at(-1)} next={cashYears.length ? nextYearLabel(cashSettings, cashYears.at(-1)!) : undefined} />
+          </div></div>
+        </section>
+      )}
       {tabs.includes("privacy") && (
         <>
           <link rel="stylesheet" href="/css/trix.css" />

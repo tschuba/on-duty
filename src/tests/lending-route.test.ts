@@ -92,6 +92,8 @@ vi.mock("../middleware/auth.js", () => ({
 vi.mock("../lib/settings.js", () => ({ getSettings: vi.fn(() => Promise.resolve({ loanRequestRetentionDays: "90" })) }));
 vi.mock("../lib/lending.js", async (orig) => ({ ...(await orig<typeof import("../lib/lending.js")>()), cleanupRejectedLoanRequests: vi.fn(() => Promise.resolve()) }));
 
+vi.mock("../lib/cash.js", async (orig) => ({ ...(await orig<typeof import("../lib/cash.js")>()), cancelReceivable: vi.fn(() => Promise.resolve()) }));
+
 const { lendingRoutes } = await import("../routes/lending.js");
 
 beforeEach(() => {

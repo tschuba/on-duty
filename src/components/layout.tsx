@@ -14,6 +14,7 @@ import { SOURCE_REPO_URL } from "../lib/constants.js";
 import { Icon } from "./icon.js";
 import { getContext } from "hono/context-storage";
 import { getBackupStatus } from "../lib/backup.js";
+import { countCashAttention } from "../lib/cash.js";
 import { AdminMenu, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
 
 // package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
@@ -49,6 +50,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
     counts = {
       applications: has("applications:read") ? await countOpenApplications() : 0,
       receipts: has("donations:issue-receipts") ? await countOpenReceipts() : 0,
+      cash: has("cash:manage") ? await countCashAttention().catch(() => 0) : 0,
       inspections: has("inventory:read") ? await countOverdueInspections() : 0,
       loans: has("lending:read") ? await countOverdueLoans() : 0,
       loanRequests: has("lending:manage") ? await countOpenLoanRequests() : 0,

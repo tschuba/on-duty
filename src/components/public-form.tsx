@@ -88,12 +88,12 @@ export async function PublicFooter() {
 
 // Karte um öffentliche Formulare, hebt sie vom Seitenhintergrund ab.
 export function FormCard({ children }: { children: unknown }) {
-  return <div class="card bg-base-200 border border-base-300"><div class="card-body">{children as never}</div></div>;
+  return <div class="card bg-base-200 border border-base-content/15 shadow-sm"><div class="card-body">{children as never}</div></div>;
 }
 
 // Abschnitt mit Überschrift innerhalb eines Formulars.
-export function FormSection({ title, children }: { title: string; children: unknown }) {
-  return <section class="space-y-4"><h2 class="text-lg font-semibold">{title}</h2>{children as never}</section>;
+export function FormSection({ title, action, children }: { title: string; action?: unknown; children: unknown }) {
+  return <section class="space-y-4">{action ? <div class="flex items-center justify-between gap-2"><h2 class="text-lg font-semibold">{title}</h2>{action as never}</div> : <h2 class="text-lg font-semibold">{title}</h2>}{children as never}</section>;
 }
 
 // Voll breiter Absenden-Button unter dem Formular.

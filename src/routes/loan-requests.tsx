@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { Field } from "../components/field.js";
+import { createReceivable, hasCash } from "../lib/cash.js";
 import { PublicDescription } from "../components/field.js";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -178,6 +180,15 @@ loanRequestRoutes.get("/:id/approve", guard, async (c) => {
         ) : (
           <p class="text-sm opacity-70">{t("lend.requests.createNew")}</p>
         )}
+        {hasCash(user.permissions, "lending") && (
+          <fieldset class="fieldset p-0 gap-3">
+            <legend class="fieldset-legend">{t("cash.loan.title")}</legend>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={t("cash.loan.rent")}><input type="text" inputmode="decimal" name="rent" class="input w-full" placeholder={t("cash.loan.rent")} /></Field>
+              <Field label={t("cash.loan.deposit")}><input type="text" inputmode="decimal" name="deposit" class="input w-full" placeholder={t("cash.loan.deposit")} /></Field>
+            </div>
+          </fieldset>
+        )}
         <button type="submit" class="btn btn-primary">{t("lend.requests.confirmApprove")}</button>
       </form>
     </Layout>
@@ -217,6 +228,13 @@ loanRequestRoutes.post("/:id/approve", guard, async (c) => {
     return c.redirect(`/inventory/requests/${request.id}`);
   }
 
+  const money = (k: string) => Number(trimmed(body, k).replace(",", ".")) || 0;
+  const payment = hasCash(user.permissions, "lending") ? { rent: money("rent"), deposit: money("deposit") } : null;
+  if (payment && (payment.rent < 0 || payment.deposit < 0)) {
+    setFlash(c, t("cash.error.invalidAmount"), "error");
+    return c.redirect(`/inventory/requests/${request.id}/approve`);
+  }
+
   await db.transaction(async (tx) => {
     const personId = chosenPersonId || (await tx.insert(persons).values({
       firstName: request.person.firstName, lastName: request.person.lastName,
@@ -232,6 +250,9 @@ loanRequestRoutes.post("/:id/approve", guard, async (c) => {
       plannedFromTime: request.plannedFromTime,
       plannedToTime: request.plannedToTime,
     }).returning({ id: lendingLoans.id });
+
+    // Forderung in derselben Transaktion; fehlt das Recht oder ist kein Betrag gesetzt, entsteht nichts.
+    if (payment) await createReceivable(loan.id, payment, { userId: user.id }, tx);
 
     await tx.update(loanRequests).set({
       status: "approved", loanId: loan.id, reviewedAt: new Date(), reviewedBy: user.id,
