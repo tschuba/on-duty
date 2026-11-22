@@ -679,7 +679,6 @@ function OpenCash({ settings, canManage }: { settings: CashSettings; canManage: 
         </div>
         <div class="flex flex-wrap gap-2">
           <button type="submit" class="btn btn-primary">{t("cash.open.submit")}</button>
-          <button type="submit" formaction="/cash/open-zero" class="btn btn-outline">{t("cash.open.zero")}</button>
         </div>
       </form>
     </section>
@@ -737,7 +736,7 @@ cashRoutes.get("/", report, async (c) => {
     return c.html(
       <Layout title={`${t("cash.view.report")} · ${t("cash.title")}`} user={user}>
         <PageHeader title={canRead ? title : t("cash.view.report")} actions={<>
-          <ActionMenu items={[
+          <ActionMenu hideLabel="@max-5xl:hidden" items={[
             hasCash(perms, "reopen") && rep.closed && { icon: "icon-[tabler--lock-open]", label: t("cash.report.reopen"), class: "btn-outline", onclick: "document.getElementById('cash-reopen').showModal()" },
             canRead && { icon: "icon-[tabler--download]", label: t("cash.report.csv"), href: `/cash/report.csv?year=${yid}`, class: "btn-outline" },
             canManage && !rep.closed && { icon: "icon-[tabler--printer]", label: t("cash.report.print"), class: "btn-outline", onclick: "window.print()" },
@@ -756,8 +755,8 @@ cashRoutes.get("/", report, async (c) => {
             </Field>
             {canRead && (
               <div class="ml-auto join">
-                <a title={t("cash.report.summaryOnly")} class={`btn join-item pointer-coarse:min-h-11 ${full ? "" : "btn-active btn-primary"}`} aria-current={full ? undefined : "true"} href={`?view=report&year=${yid}`}><span class="icon-[tabler--chart-pie] size-4" /><span class="max-lg:sr-only">{t("cash.report.summaryOnly")}</span></a>
-                <a title={t("cash.report.withEntries")} class={`btn join-item pointer-coarse:min-h-11 ${full ? "btn-active btn-primary" : ""}`} aria-current={full ? "true" : undefined} href={`?view=report&year=${yid}&detail=1`}><span class="icon-[tabler--list-details] size-4" /><span class="max-lg:sr-only">{t("cash.report.withEntries")}</span></a>
+                <a title={t("cash.report.summaryOnly")} class={`btn join-item pointer-coarse:min-h-11 ${full ? "" : "btn-active btn-primary"}`} aria-current={full ? undefined : "true"} href={`?view=report&year=${yid}`}><span class="icon-[tabler--chart-pie] size-4" /><span class="max-md:sr-only">{t("cash.report.summaryOnly")}</span></a>
+                <a title={t("cash.report.withEntries")} class={`btn join-item pointer-coarse:min-h-11 ${full ? "btn-active btn-primary" : ""}`} aria-current={full ? "true" : undefined} href={`?view=report&year=${yid}&detail=1`}><span class="icon-[tabler--list-details] size-4" /><span class="max-md:sr-only">{t("cash.report.withEntries")}</span></a>
               </div>
             )}
           </form>

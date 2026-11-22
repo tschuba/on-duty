@@ -2068,7 +2068,6 @@ export const de = {
   "cash.open.date": "Startdatum",
   "cash.open.amount": "Anfangsbestand (€)",
   "cash.open.submit": "Kasse eröffnen",
-  "cash.open.zero": "Mit Bestand 0 starten",
   "cash.error.invalidMode": "Ungültiger Modus.",
   "cash.error.invalidBasis": "Ungültige Basis.",
   "cash.error.invalidCutoff": "Ungültiger Stichtag (MM-TT, kein 29.02.).",

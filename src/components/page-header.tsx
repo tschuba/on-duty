@@ -46,12 +46,12 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
 type HeaderActionProps = Parameters<typeof HeaderAction>[0];
 
 // Sekundäraktionen: ab Header-Breite `@md` inline als Buttons, darunter gebündelt in einem „⋯“-Menü (Label immer sichtbar).
-export function ActionMenu({ items }: { items: (HeaderActionProps | false | null | undefined)[] }) {
+export function ActionMenu({ items, hideLabel = "@max-3xl:hidden" }: { items: (HeaderActionProps | false | null | undefined)[]; hideLabel?: string }) {
   const list = items.filter((i): i is HeaderActionProps => !!i);
   if (!list.length) return <></>;
   return (<>
     <span class="hidden @md:contents">
-      {list.map((i) => <HeaderAction {...i} hideLabel="@max-3xl:hidden" />)}
+      {list.map((i) => <HeaderAction {...i} hideLabel={hideLabel} />)}
     </span>
     <details class="dropdown dropdown-end @md:hidden">
       <summary class="btn btn-outline" aria-label={t("common.moreActions")} title={t("common.moreActions")}><Icon name="icon-[tabler--dots]" class="h-5 w-5" /></summary>

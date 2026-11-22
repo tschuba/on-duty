@@ -15,7 +15,7 @@ import { Icon } from "./icon.js";
 import { getContext } from "hono/context-storage";
 import { getBackupStatus } from "../lib/backup.js";
 import { countCashAttention } from "../lib/cash.js";
-import { AdminMenu, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
+import { AdminMenuItems, adminAlert, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
 
 // package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
 const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).version;
@@ -61,6 +61,8 @@ export const Layout = async ({ title, children, user, path }: Props) => {
     };
   }
 
+  const alert = user && counts ? adminAlert(user, counts) : null;
+  const initials = (user?.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
   const brand = user ? "on-duty" : (await loadOrgNameSafe()) || "on-duty";
 
   return (
@@ -101,19 +103,29 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         </div>
         {user && (
           <div class="navbar-end w-auto">
-            {counts && <AdminMenu user={user} counts={counts} />}
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
-                <div class="avatar avatar-placeholder tooltip tooltip-left lg:hidden" data-tip={user.name}>
-                  <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
-                    <span>{(user.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+                <span class="flex items-center gap-1.5">
+                  <div class="avatar avatar-placeholder tooltip tooltip-left lg:hidden" data-tip={user.name}>
+                    <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
+                      <span>{initials}</span>
+                    </div>
                   </div>
-                </div>
-                <span class="hidden lg:inline">{user.name}</span>
-                <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4 opacity-60" />
+                  <span class="hidden lg:inline">{user.name}</span>
+                  {alert && <span class={`badge badge-xs ${alert === "error" ? "badge-error" : "badge-warning"}`} role="img" aria-label={t("common.nav.admin")} />}
+                  <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4 opacity-60" />
+                </span>
               </div>
-              <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-48 p-2 shadow">
-                <li class="menu-title">{t("common.theme")}</li>
+              <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-[min(18rem,calc(100vw-2rem))] p-2 shadow">
+                <li class="pointer-events-none mb-1">
+                  <div class="flex w-full flex-row items-center gap-3">
+                    <div class="avatar avatar-placeholder shrink-0"><div class="bg-primary text-primary-content w-10 rounded-full"><span>{initials}</span></div></div>
+                    <div class="min-w-0 flex-1"><div class="truncate font-semibold">{user.name}</div><div class="truncate text-xs opacity-60">{user.email}</div></div>
+                  </div>
+                </li>
+                <li class="m-0 border-t border-base-content/20 p-0" aria-hidden="true" />
+                {counts && <AdminMenuItems user={user} counts={counts} />}
+                <li class="menu-title mt-1">{t("common.theme")}</li>
                 <li class="flex flex-row gap-1 hover:bg-transparent">
                   {([["light", "icon-[tabler--sun]"], ["auto", "icon-[tabler--clock]"], ["dark", "icon-[tabler--moon]"]] as const).map(([m, icon]) => (
                     <button
