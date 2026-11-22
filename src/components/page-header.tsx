@@ -5,7 +5,7 @@ import { t } from "../i18n/index.js";
 
 // Icon + Label einer Aktion; das Label verschwindet per Container-Query (der nächste @container-Vorfahr zählt).
 export function ActionContent({ icon, label, variant = "secondary", hide: hideOverride }: { icon: IconName; label: string; variant?: "primary" | "secondary"; hide?: string }) {
-  const hide = hideOverride ?? (variant === "primary" ? "@max-md:hidden" : "@max-xl:hidden");
+  const hide = hideOverride ?? (variant === "primary" ? "@max-lg:hidden" : "@max-3xl:hidden");
   return (<>
     <Icon name={icon} class="h-5 w-5 shrink-0" />
     <span class={hide}>{label}</span>
@@ -13,7 +13,7 @@ export function ActionContent({ icon, label, variant = "secondary", hide: hideOv
 }
 
 // Aktions-Button für den Seitenkopf. Label wird per Container-Query ausgeblendet:
-// Stufe 1 (schmal) Sekundär, Stufe 2 (sehr schmal) auch Primär. aria-label/title bleiben immer.
+// Stufe 1 (< @3xl) Sekundär, Stufe 2 (< @lg) auch Primär. aria-label/title bleiben immer.
 export function HeaderAction({ variant = "secondary", icon, label, href, form, type, onclick, class: cls = "btn-neutral", name, value, attrs, disabled, hideLabel }: {
   hideLabel?: string; // überschreibt die Container-Query-Klasse, die das Label ausblendet (z. B. "hidden" = immer nur Icon)
   variant?: "primary" | "secondary";
@@ -41,6 +41,27 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
   ) : (
     <button type={type ?? (form ? "submit" : "button")} form={form} name={name} value={value} onclick={onclick} class={cls2} {...attrs} aria-label={label} title={label}>{inner}</button>
   );
+}
+
+type HeaderActionProps = Parameters<typeof HeaderAction>[0];
+
+// Sekundäraktionen: ab Header-Breite `@md` inline als Buttons, darunter gebündelt in einem „⋯“-Menü (Label immer sichtbar).
+export function ActionMenu({ items }: { items: (HeaderActionProps | false | null | undefined)[] }) {
+  const list = items.filter((i): i is HeaderActionProps => !!i);
+  if (!list.length) return <></>;
+  return (<>
+    <span class="hidden @md:contents">
+      {list.map((i) => <HeaderAction {...i} hideLabel="@max-3xl:hidden" />)}
+    </span>
+    <details class="dropdown dropdown-end @md:hidden">
+      <summary class="btn btn-outline" aria-label={t("common.moreActions")} title={t("common.moreActions")}><Icon name="icon-[tabler--dots]" class="h-5 w-5" /></summary>
+      <ul class="menu dropdown-content bg-base-100 rounded-box shadow-lg border border-base-300 z-30 w-56 p-2 mt-1 text-base">
+        {list.map((i) => <li>{i.href
+          ? <a href={i.href} {...i.attrs}><Icon name={i.icon} class="h-5 w-5" />{i.label}</a>
+          : <button type="button" onclick={i.onclick} {...i.attrs} disabled={!!i.disabled} title={i.disabled}><Icon name={i.icon} class="h-5 w-5" />{i.label}</button>}</li>)}
+      </ul>
+    </details>
+  </>);
 }
 
 // Einheitlicher Seitenkopf: Titel links, Aktionen rechtsbündig (Primär zuletzt), sticky unter Hauptnav/Untermenü.

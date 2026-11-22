@@ -43,6 +43,12 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "training:read": t("admin.permissions.key.trainingRead"),
   "training:write": t("admin.permissions.key.trainingWrite"),
   "training:delete": t("admin.permissions.key.trainingDelete"),
+  "cash:report": t("admin.permissions.key.cashReport"),
+  "cash:read": t("admin.permissions.key.cashRead"),
+  "cash:manage": t("admin.permissions.key.cashManage"),
+  "cash:cancel": t("admin.permissions.key.cashCancel"),
+  "cash:lending": t("admin.permissions.key.cashLending"),
+  "cash:reopen": t("admin.permissions.key.cashReopen"),
 };
 
 export const RESOURCE_LABELS: Record<string, string> = {
@@ -56,6 +62,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
   "anniversary-years": t("admin.permissions.resource.anniversary-years"),
   events: t("admin.permissions.resource.events"),
   training: t("admin.permissions.resource.training"),
+  cash: t("admin.permissions.resource.cash"),
   "member-roles": t("admin.permissions.resource.member-roles"),
   "member-role-types": t("admin.permissions.resource.member-role-types"),
 };

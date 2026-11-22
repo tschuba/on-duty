@@ -76,7 +76,19 @@ Speichern/Abbrechen/Löschen stehen im Kopf, nicht unter dem Formular. Jedes For
 
 ### Icon-only (Container-Queries)
 
-Stufe 1 (Kopf < `@xl`): Labels der sekundären Aktionen entfallen; Stufe 2 (< `@md`): auch das Label der primären Aktion. Icon bleibt, `aria-label`/`title` tragen den Namen.
+Die Schwellen hängen von der Header-Breite (Container, nicht Viewport) und vom Platzbedarf ab: Titel bzw. `TitleSwitch` (Anzahl und Länge der Einträge) plus Anzahl und Labellänge der Buttons. Mehr Buttons oder Einträge brauchen mehr Breite, die Schwelle wandert also nach oben.
+
+- **Standard** (`HeaderAction` ohne `hideLabel`, gedacht für Titel + 1 Sekundär- + 1 Primäraktion): Stufe 1 (Kopf < `@3xl`) entfernt die Labels der sekundären Aktionen; Stufe 2 (< `@lg`) auch das der primären. Icon bleibt, `aria-label`/`title` tragen den Namen.
+- **Abweichen** per `hideLabel` (z. B. `"@max-4xl:hidden"`), wenn mehr Buttons nebeneinander stehen oder der Titel breit ist. Faustregel: Summe aus Titel/Umschalter und beschrifteten Buttons muss in die Header-Breite passen; Sekundäraktionen verlieren das Label zuerst, die primäre zuletzt. Eine Abweichung gilt für alle Buttons derselben Ansicht gleich, nie einzeln.
+- **Umschalter und Buttons gemeinsam planen:** Der `TitleSwitch` wechselt bei `@2xl` (Icon-Leiste) und `@4xl` (Text). Die Label-Schwellen der Buttons so wählen, dass nie Umschalter-Text und beschriftete Buttons gleichzeitig um den Platz konkurrieren (mehr Einträge → Umschalter bleibt länger kompakt).
+
+### Nebenfunktionen im „⋯“-Menü
+
+Sind es mehrere Sekundäraktionen (z. B. CSV, Drucken, Wiederöffnen in `/cash?view=report`), kommen sie in `ActionMenu` (`src/components/page-header.tsx`) statt als einzelne `HeaderAction`:
+- Ab Header-Breite `@md` inline als Buttons (Label erst ab `@3xl`, vorher icon-only), darunter gebündelt in einem `btn btn-outline` mit `dots`-Icon und `aria-label` „Weitere Aktionen“; im Menü steht immer Icon + Label.
+- Nur Nebenfunktionen gehören hinein. Die Hauptaktion (Primär, z. B. „Abschließen“, „Neue Buchung“) bleibt als `HeaderAction variant="primary"` immer sichtbar, auch auf dem Handy; sie steht rechts neben dem Menü.
+- Einträge sind `HeaderAction`-Props (`icon`, `label`, `href` bzw. `onclick`/`attrs`); nicht erlaubte Einträge als `false` übergeben, der Rest rückt nach; leer = kein Menü.
+- Ab drei Nebenfunktionen oder wenn der Umschalter breit ist, ist das Menü der Normalfall auf schmalen Köpfen; bei einer Nebenfunktion reicht eine icon-only `HeaderAction`.
 
 ### Sticky
 
@@ -103,7 +115,8 @@ Der `Pager` klebt unten am Viewport (`z-10`, `z-30` solange die Seitenwahl offen
 Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B. `/donations`: Zuwendungen | Spender; `/roles`: Funktionen | Funktionstypen), stehen sie als Umschalter im Seitentitel statt als eigene Menüeinträge: `TitleSwitch` (`src/components/title-switch.tsx`) als `title` des `PageHeader`.
 - Ansicht in der URL (`?view=…`), Links behalten Suche, Zeitraum und `pageSize`; Seite und Sortierung beginnen neu. Standardansicht = kein Parameter. Der Browser-Titel nennt die Ansicht („Spender · Spenden").
 - Ab Header-Breite `@2xl` (Container-Query, nicht Viewport): feste Reihenfolge, dünner Trenner (1 px, `bg-base-content/20`). Aktiv: `text-2xl` (Header-Standard), fett, Linie `border-b-2 border-gold/60`, `aria-current="page"`. Inaktiv: `text-xl`, `font-normal`, `text-base-content/50`; Hover voller Text plus 1-px-Unterstreichung.
-- Darunter: ein Button mit Rahmen (`btn btn-ghost border`) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
+- Mit `icon` je Eintrag (Tabler-Icon, `TitleSwitchItem.icon`): zwischen `@2xl` und `@4xl` zeigen inaktive Ansichten nur das Icon (Label als `sr-only`), ab `@4xl` Text. Jeder Link trägt das Label als `title` (Tooltip). Drei Stufen also: Dropdown (< `@2xl`), Icon-Leiste (`@2xl`–`@4xl`), Text (≥ `@4xl`).
+- Darunter: ein Button mit Rahmen (`btn btn-ghost border`, `text-xl`, ab `@md` `text-2xl`; Label per `truncate` gekürzt, `title` = aktive Ansicht) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
 - Ein Eintrag kann einen Zähler (`count`, `badge badge-sm badge-warning`) tragen; er erscheint nur, solange die Ansicht **nicht** aktiv ist
 - Ansichten mit eigenen Rechten (`/roles`): der Umschalter zeigt nur die lesbaren Ansichten; bleibt eine, entfällt er und es steht nur der Titel.
 - Nicht für Unterseiten mit eigenen Zählern (dort Sidebar) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.

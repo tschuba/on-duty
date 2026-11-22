@@ -305,3 +305,29 @@ input[data-combo]::-webkit-calendar-picker-indicator { display: none !important;
   .table-cards tbody td[colspan] { display: block; }
   .group-card .table-cards tbody tr { border: 0; border-top: 1px solid var(--color-base-300); border-radius: 0; margin: 0; }
 }
+
+/* Druckansicht (allgemein, Regeln nur im Wrapper `.print-page`): reiner Client-Druck per window.print().
+   Hilfsklassen: .print-only (nur im Druck, innerhalb des Wrappers), .no-print (im Druck ausgeblendet, auch neben dem Wrapper auf derselben Seite), .print-sign (Unterschriftenzeile). */
+.print-only { display: none; }
+@media print {
+  body:has(.print-page) nav.navbar,
+  body:has(.print-page) .drawer-side,
+  body:has(.print-page) footer,
+  body:has(.print-page) .page-header,
+  body:has(.print-page) .filter-bar,
+  body:has(.print-page) #toast-container,
+  body:has(.print-page) .no-print { display: none !important; }
+  body:has(.print-page) .drawer { display: block; }
+  body:has(.print-page) main { max-width: none; width: 100%; padding: 0; }
+  .print-page .print-only { display: block; }
+  .print-page { color: #000; background: #fff; font-size: 11pt; }
+  .print-page thead { display: table-header-group; }
+  .print-page tr { break-inside: avoid; }
+  .print-page .print-only.print-sign { margin-top: 3rem; display: flex; gap: 3rem; }
+  .print-page .print-sign > div { flex: 1; border-top: 1px solid #000; padding-top: 0.25rem; font-size: 9pt; }
+  @page { margin: 15mm; @bottom-right { content: "Seite " counter(page) " / " counter(pages); font-size: 9pt; } }
+}
+
+/* Kontrast im Dark Mode: base-300 ist dunkler als die Seite, daher Ränder aus base-content ableiten. */
+.input, .select, .textarea { border-color: color-mix(in oklab, var(--color-base-content) 30%, transparent); }
+.join > input.btn:not(:checked) { background-color: var(--color-base-100); border-color: color-mix(in oklab, var(--color-base-content) 30%, transparent); }

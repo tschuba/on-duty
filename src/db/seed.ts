@@ -45,14 +45,21 @@ const APP_ROLES: { id: string; name: string; description: string; isProtected: b
     name: "Vorstand",
     description: "Kann Spenden erfassen, Zuwendungsbestätigungen ausstellen und Anträge prüfen",
     isProtected: true,
-    permissions: ["members:read", "members:write", "members:delete", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage", "inventory:read", "inventory:manage", "inventory:configure", "inventory:inspect", "inventory:inspection:delete", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "member-roles:read", "member-role-types:read", "anniversary-years:read"],
+    permissions: ["members:read", "members:write", "members:delete", "donations:read", "donations:record", "donations:delete", "donations:issue-receipts", "applications:read", "applications:record", "applications:review", "applications:manage", "inventory:read", "inventory:manage", "inventory:configure", "inventory:inspect", "inventory:inspection:delete", "lending:read", "lending:manage", "org:read", "org:write", "org:tax-data:read", "member-roles:read", "member-role-types:read", "anniversary-years:read", "cash:report", "cash:reopen", "cash:lending"],
   },
   {
     id: "5d3e7f90-1b2c-4d5e-8f60-7a8b9c0d1e2f",
     name: "Finanzen",
     description: "Kann Bankdaten von Mitgliedern und Steuerdaten des Vereins pflegen",
     isProtected: true,
-    permissions: ["members:read", "members:bank-data:read", "members:bank-data:write", "org:read", "org:tax-data:read", "org:tax-data:write"],
+    permissions: ["members:read", "members:bank-data:read", "members:bank-data:write", "org:read", "org:tax-data:read", "org:tax-data:write", "cash:manage"],
+  },
+  {
+    id: "c9e5d176-577d-47cc-b9fd-97aaa87f2aff",
+    name: "Verleih",
+    description: "Kann den Verleih verwalten und Zahlungen an Verleih-Vorgängen abwickeln",
+    isProtected: true,
+    permissions: ["lending:read", "lending:manage", "cash:lending"],
   },
   {
     id: "c1d2e3f4-5a6b-4c7d-8e9f-0a1b2c3d4e5f",

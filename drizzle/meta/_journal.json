@@ -666,6 +666,41 @@
       "when": 1795350921760,
       "tag": "0094_massive_carmella_unuscione",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1795376791596,
+      "tag": "0095_cash",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795376791904,
+      "tag": "0096_cash_tags_seed",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795382890487,
+      "tag": "0097_lying_wasp",
+      "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795382905357,
+      "tag": "0098_cash_events_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1795382905735,
+      "tag": "0099_lonely_slapstick",
+      "breakpoints": true
     }
   ]
 }

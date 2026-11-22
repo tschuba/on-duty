@@ -4,7 +4,7 @@ import { t } from "../i18n/index.js";
 // values may contain commas. Script is bound once per page and works per instance
 // via [data-chip-input] (no fixed ids → several instances per page are fine).
 let instanceCount = 0;
-export function ChipInput({ name, label, placeholder, values, max, maxFrom, splitOnComma = false, caseSensitive = true, hint, suggestionsFrom, presets, presetButtons = true }: {
+export function ChipInput({ name, label, placeholder, values, max, maxFrom, splitOnComma = false, caseSensitive = true, hint, suggestionsFrom, presets, presetButtons = true, createDirectionFrom }: {
   name: string;
   label: string;
   placeholder?: string;
@@ -22,19 +22,22 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
   presets?: { key: string; label: string; badge: string }[];
   /** false: presets only map key→label, no one-click buttons. */
   presetButtons?: boolean;
+  /** CSS selector of a field holding "income"|"expense": unknown text then becomes a new chip `new:<direction>:<name>` (server creates the tag). */
+  createDirectionFrom?: string;
 }) {
   const list = values ?? [];
   const listId = `chip-list-${++instanceCount}`;
   return (
     <div class="group/chip flex flex-col relative" data-chip-input data-suggestions-from={suggestionsFrom ?? ""} data-name={name} data-split={splitOnComma ? "1" : ""} data-case={caseSensitive ? "1" : ""}
-      data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-presets={presets ? JSON.stringify(presets) : ""} data-label={label} data-placeholder={placeholder ?? ""} data-remove-label={t("common.remove")}>
+      data-max={max ?? ""} data-max-from={maxFrom ?? ""} data-hint={hint ?? ""} data-create-from={createDirectionFrom ?? ""} data-presets={presets ? JSON.stringify(presets) : ""} data-label={label} data-placeholder={placeholder ?? ""} data-remove-label={t("common.remove")}>
       <span class={`chip-label pointer-events-none absolute z-[2] start-3 -translate-y-1/2 px-1 rounded-sm bg-base-100 text-sm leading-none transition-all${placeholder ? " top-0 scale-75 -translate-x-[12.5%]" : " top-5 opacity-60"} duration-100 group-focus-within/chip:top-0 group-focus-within/chip:scale-75 group-focus-within/chip:-translate-x-[12.5%] group-focus-within/chip:opacity-100 group-has-[[data-chip]]/chip:top-0 group-has-[[data-chip]]/chip:scale-75 group-has-[[data-chip]]/chip:-translate-x-[12.5%] group-has-[[data-chip]]/chip:opacity-100`}>{label}</span>
       <div class="chip-box cursor-text input w-full h-auto min-h-10 py-1.5 flex flex-wrap items-center gap-1">
         {list.map((v) => {
           const p = presets?.find((x) => x.key === v);
+          const fresh = !p && v.startsWith("new:") ? v.split(":").slice(2).join(":") : undefined;
           return (
-          <span class={`badge gap-1 pr-1 ${p ? p.badge : "badge-outline"}`} data-chip={v} data-label={p?.label}>
-            {p ? p.label : v}
+          <span class={`badge gap-1 pr-1 ${p ? p.badge : fresh ? "badge-outline border-dashed" : "badge-outline"}`} data-chip={v} data-label={p?.label ?? fresh}>
+            {p ? p.label : fresh ?? v}
             <button type="button" class="chip-remove inline-flex items-center justify-center rounded-full h-4 w-4 ml-0.5 bg-base-300 text-xs leading-none cursor-pointer [-webkit-tap-highlight-color:transparent] hover:bg-error hover:text-error-content" aria-label={t("common.remove")}>×</button>
             <input type="hidden" name={name} value={v} />
           </span>
@@ -132,16 +135,22 @@ export function ChipInput({ name, label, placeholder, values, max, maxFrom, spli
               var known = chipVocab(root).find(function(v){ return v.toLowerCase() === value.toLowerCase(); });
               if (known) value = known;
             }
+            var fresh = null;
+            if (!preset && root.dataset.createFrom) {
+              var df = document.querySelector(root.dataset.createFrom);
+              if (df && df.value) { fresh = value; value = 'new:' + df.value + ':' + value; }
+            }
             var ci = !root.dataset.case, key = ci ? value.toLowerCase() : value;
             var exists = Array.from(root.querySelectorAll('[data-chip]')).some(function(s){
               return (ci ? s.dataset.chip.toLowerCase() : s.dataset.chip) === key;
             });
             if (exists || root.querySelectorAll('[data-chip]').length >= chipMax(root)) return;
             var chip = document.createElement('span');
-            chip.className = 'badge gap-1 pr-1 ' + (preset ? preset.badge : 'badge-outline');
+            chip.className = 'badge gap-1 pr-1 ' + (preset ? preset.badge : fresh ? 'badge-outline border-dashed' : 'badge-outline');
             chip.dataset.chip = value;
             if (preset) chip.dataset.label = preset.label;
-            chip.appendChild(document.createTextNode(preset ? preset.label : value));
+            else if (fresh) chip.dataset.label = fresh;
+            chip.appendChild(document.createTextNode(preset ? preset.label : fresh || value));
             var rm = document.createElement('button');
             rm.type = 'button'; rm.className = 'chip-remove inline-flex items-center justify-center rounded-full h-4 w-4 ml-0.5 bg-base-300 text-xs leading-none cursor-pointer [-webkit-tap-highlight-color:transparent] hover:bg-error hover:text-error-content'; rm.textContent = '×';
             rm.setAttribute('aria-label', root.dataset.removeLabel);

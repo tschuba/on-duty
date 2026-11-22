@@ -25,6 +25,7 @@ import { ImpressumHint } from "../components/impressum-hint.js";
 import { env } from "../env.js";
 import { isSmtpConfigured } from "../lib/mail.js";
 import { countRecipients, createdTargets, infoMailRecipients, sendEventInfoMail, eventChanges, eventDelivery, eventMailRecipients, mailRecipientsFor, sendChangeMails, snapshot, startEventMails, type DeliveryState, type EventMailRecipient } from "../lib/event-mail.js";
+import { detachCashEvent, eventSummary, hasCash } from "../lib/cash.js";
 import { t } from "../i18n/index.js";
 import { tagSuggestionsJson, TAG_SUGGESTIONS_ID } from "../lib/tags.js";
 import { EVENT_TAGS, eventTagDef, eventTagLabel, normalizeEventTags, sortEventTags, firstEventTagDef } from "../lib/event-tags.js";
@@ -837,6 +838,22 @@ function toEventFormValues(ev: NonNullable<Awaited<ReturnType<typeof fetchEventF
   };
 }
 
+async function EventCash({ eventId }: { eventId: string }) {
+  const s = await eventSummary(eventId);
+  if (!s.any) return <></>;
+  const eur = (v: number) => `${v.toLocaleString("de-DE", { minimumFractionDigits: 2 })} €`;
+  return (
+    <Section title={t("cash.event.title")} collapsible={false} actions={<a class="link text-sm" href={`/cash?event=${s.cashEventId}`}>{t("cash.event.link")}</a>}>
+      <dl class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div><dt class="text-sm opacity-60">{t("cash.event.income")}</dt><dd class="font-medium">{eur(s.income)}</dd></div>
+        <div><dt class="text-sm opacity-60">{t("cash.event.expense")}</dt><dd class="font-medium">{eur(s.expense)}</dd></div>
+        <div><dt class="text-sm opacity-60">{t("cash.event.result")}</dt><dd class="font-medium">{eur(s.result)}</dd></div>
+        <div><dt class="text-sm opacity-60">{t("cash.event.expected")}</dt><dd class="font-medium">{eur(s.expected)}</dd></div>
+      </dl>
+    </Section>
+  );
+}
+
 eventRoutes.get("/:id", requireAuth(), async (c) => {
   const user = c.get("user")!;
   const id = c.req.param("id");
@@ -883,6 +900,7 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
         {canManage && ev.cancelledAt && <ViewField label={t("events.cancelled")} value={t("events.cancelledAt", { date: formatDateTime(ev.cancelledAt, tz) })} />}
         <div class="sm:col-span-2"><EventTagBadges tags={ev.tags.map((x) => x.tag)} /></div>
       </ViewGrid>
+      {hasCash(user.permissions, "read") && <EventCash eventId={ev.id} />}
       {ev.rsvpEnabled && <RsvpSection ev={ev} user={user} tz={tz} />}
       {canManage && !ev.rsvpEnabled && <DeliverySection ev={ev} rows={delivery} />}
       <script dangerouslySetInnerHTML={{ __html: `document.body.addEventListener('htmx:beforeSwap', function (e) {
@@ -976,7 +994,10 @@ eventRoutes.post("/:id/delete", manage, async (c) => {
   const ev = await db.query.events.findFirst({ where: eq(events.id, id) });
   if (!ev) return c.notFound();
   if (!canDelete(ev, now())) return c.text(t("events.cannotDelete"), HTTP_STATUS.UNPROCESSABLE_ENTITY);
-  await db.delete(events).where(eq(events.id, id));
+  await db.transaction(async (tx) => {
+    await detachCashEvent(id, tx);
+    await tx.delete(events).where(eq(events.id, id));
+  });
   setFlash(c, t("events.form.deleted"), "success");
   c.header("HX-Redirect", "/events");
   return c.body(null, 204);
