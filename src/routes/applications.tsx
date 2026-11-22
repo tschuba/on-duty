@@ -1,6 +1,7 @@
 import { loadOrgConfig } from "../lib/org-config.js";
 import { Hono } from "hono";
 import { eq, and, ne, ilike, inArray } from "drizzle-orm";
+import { AddressFields } from "../components/address.js";
 import { EmailField, Field } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, members, applications, applicationGuardians } from "../db/schema/index.js";
@@ -237,20 +238,12 @@ applicationRoutes.get("/:id", guard, async (c) => {
                 <input type="tel" name="phone" value={app.person.phone ?? ""} class="input w-full" placeholder={t("apply.form.phone")} />
               </Field>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label={t("apply.form.street")} class="sm:col-span-2">
-                <input type="text" name="street" value={app.person.street ?? ""} class="input w-full" placeholder={t("apply.form.street")} />
-              </Field>
-              <Field label={t("apply.form.houseNumber")}>
-                <input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input w-full" placeholder={t("apply.form.houseNumber")} />
-              </Field>
-              <Field label={t("apply.form.zip")}>
-                <input type="text" name="zip" value={app.person.zip ?? ""} class="input w-full" placeholder={t("apply.form.zip")} />
-              </Field>
-              <Field label={t("apply.form.city")} class="sm:col-span-2">
-                <input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} />
-              </Field>
-            </div>
+            <AddressFields
+              street={<Field label={t("apply.form.street")}><input type="text" name="street" value={app.person.street ?? ""} class="input w-full" placeholder={t("apply.form.street")} /></Field>}
+              houseNumber={<Field label={t("apply.form.houseNumber")}><input type="text" name="houseNumber" value={app.person.houseNumber ?? ""} class="input w-full" placeholder={t("apply.form.houseNumber")} /></Field>}
+              zip={<Field label={t("apply.form.zip")}><input type="text" name="zip" value={app.person.zip ?? ""} class="input w-full" placeholder={t("apply.form.zip")} /></Field>}
+              city={<Field label={t("apply.form.city")}><input type="text" name="city" value={app.person.city ?? ""} class="input w-full" placeholder={t("apply.form.city")} /></Field>}
+            />
           </section>
 
           <section class={`${cardCls} card-body gap-4 lg:col-span-2`}>

@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { AddressFields } from "../components/address.js";
 import { EmailField, EmailInput, Field, PhoneField, PhoneInput } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, applications, applicationGuardians } from "../db/schema/index.js";
+import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
 import { t } from "../i18n/index.js";
@@ -12,7 +14,7 @@ import { verifyCap } from "../lib/cap.js";
 import { sendMail } from "../lib/mail.js";
 import { buildVars } from "../lib/mail-templates.js";
 import { HTTP_STATUS } from "../lib/constants.js";
-import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
+import { FormCard, FormSection, SubmitButton, ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
 
 export const applyRoutes = new Hono();
 
@@ -72,27 +74,33 @@ function textField(
 function ApplicantFormFields({ values, errors }: { values: ApplicantValues; errors: Record<string, string> }) {
   return (
     <>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {textField("lastName", t("apply.form.lastName"), values.lastName, errors.lastName, { required: true })}
-        {textField("firstName", t("apply.form.firstName"), values.firstName, errors.firstName, { required: true })}
-      </div>
-      {textField("birthDate", t("apply.form.birthDate"), values.birthDate, errors.birthDate, { type: "date", required: true })}
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {textField("street", t("apply.form.street"), values.street, errors.street, { required: true })}
-        {textField("houseNumber", t("apply.form.houseNumber"), values.houseNumber, errors.houseNumber, { required: true })}
-        {textField("zip", t("apply.form.zip"), values.zip, errors.zip, { required: true })}
-      </div>
-      {textField("city", t("apply.form.city"), values.city, errors.city, { required: true })}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {textField("email", t("apply.form.email"), values.email, errors.contact, { type: "email", hideErrorText: true })}
-        {textField("phone", t("apply.form.phone"), values.phone, errors.contact, { type: "tel", hideErrorText: true })}
-      </div>
-      {errors.contact
-        ? <p class="text-error text-sm">{errors.contact}</p>
-        : <p class="text-sm opacity-60">{t("apply.error.contactRequired")}</p>}
-      <Field label={t("apply.form.message")}>
-        <textarea name="message" class="textarea w-full" rows={3} placeholder={t("apply.form.message")}>{values.message}</textarea>
-      </Field>
+      <FormSection title={t("apply.section.person")}>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {textField("lastName", t("apply.form.lastName"), values.lastName, errors.lastName, { required: true })}
+          {textField("firstName", t("apply.form.firstName"), values.firstName, errors.firstName, { required: true })}
+        </div>
+        {textField("birthDate", t("apply.form.birthDate"), values.birthDate, errors.birthDate, { type: "date", required: true })}
+      </FormSection>
+      <FormSection title={t("apply.section.address")}>
+        <AddressFields
+          street={textField("street", t("apply.form.street"), values.street, errors.street, { required: true })}
+          houseNumber={textField("houseNumber", t("apply.form.houseNumber"), values.houseNumber, errors.houseNumber, { required: true })}
+          zip={textField("zip", t("apply.form.zip"), values.zip, errors.zip, { required: true })}
+          city={textField("city", t("apply.form.city"), values.city, errors.city, { required: true })}
+        />
+      </FormSection>
+      <FormSection title={t("apply.section.contact")}>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {textField("email", t("apply.form.email"), values.email, errors.contact, { type: "email", hideErrorText: true })}
+          {textField("phone", t("apply.form.phone"), values.phone, errors.contact, { type: "tel", hideErrorText: true })}
+        </div>
+        {errors.contact
+          ? <p class="text-error text-sm">{errors.contact}</p>
+          : <p class="text-sm opacity-70">{t("apply.error.contactRequired")}</p>}
+        <Field label={t("apply.form.message")}>
+          <textarea name="message" class="textarea w-full" rows={3} placeholder={t("apply.form.message")}>{values.message}</textarea>
+        </Field>
+      </FormSection>
     </>
   );
 }
@@ -153,6 +161,13 @@ function GuardianRow({ index, values, error }: { index: number; values?: Guardia
   );
 }
 
+// Meldungen ohne eigenes Feld (Rate-Limit, fehlende Erziehungsberechtigte).
+function FormAlerts({ errors }: { errors: Record<string, string> }) {
+  const msgs = [errors._global, errors._guardians].filter(Boolean);
+  if (!msgs.length) return <></>;
+  return <div role="alert" class="alert alert-error mb-4">{msgs.map((m) => <span>{m}</span>)}</div>;
+}
+
 // ── Pages ────────────────────────────────────────────────────────────────────────
 
 function MembershipPage({ values, errors }: { values: ApplicantValues; errors: Record<string, string> }) {
@@ -160,13 +175,16 @@ function MembershipPage({ values, errors }: { values: ApplicantValues; errors: R
     <Layout title={t("apply.title")}>
       <div class="max-w-xl mx-auto">
         <PageHeader title={t("apply.title")} subtitle={t("common.requiredLegend")} />
-        <form method="post" action="/apply" class="space-y-4">
+        <FormAlerts errors={errors} />
+        <FormCard>
+        <form method="post" action="/apply" class="space-y-6">
           <Honeypot />
           <ApplicantFormFields values={values} errors={errors} />
           <PrivacyNotice />
           <CapWidget error={errors._cap} />
-          <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
+          <SubmitButton label={t("apply.form.submit")} />
         </form>
+        </FormCard>
         <ContactFooter />
         <PublicFooter />
       </div>
@@ -188,30 +206,34 @@ function YouthPage({
     <Layout title={t("apply.youth.title")}>
       <div class="max-w-xl mx-auto">
         <PageHeader title={t("apply.youth.title")} subtitle={t("common.requiredLegend")} />
-        <form method="post" action="/apply/youth" class="space-y-4">
+        <FormAlerts errors={errors} />
+        <FormCard>
+        <form method="post" action="/apply/youth" class="space-y-6">
           <Honeypot />
           <ApplicantFormFields values={values} errors={errors} />
-          <div class="divider">{t("applications.detail.guardians")}</div>
+          <FormSection title={t("applications.detail.guardians")}>
           <div id="guardian-rows">
             {rows.map((g, i) => (
               <GuardianRow key={i} index={i} values={g} error={guardianErrors[i]} />
             ))}
           </div>
-          <button type="button" id="add-guardian" class="btn btn-ghost">{t("apply.youth.guardian.add")}</button>
+          <button type="button" id="add-guardian" class="btn btn-outline h-auto min-h-10 whitespace-normal py-2 text-center"><Icon name="icon-[tabler--plus]" class="size-4" />{t("apply.youth.guardian.add")}</button>
           <template id="guardian-template">
             <GuardianRow index={-1} />
           </template>
           <div class="flex flex-col">
             <label class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
               <input type="checkbox" name="consent" class="checkbox" />
-              <span class="text-sm">{t("apply.youth.consent")}</span>
+              <span class="text-sm whitespace-normal">{t("apply.youth.consent")}</span>
             </label>
             {consentError && <span class="text-error text-sm">{consentError}</span>}
           </div>
+          </FormSection>
           <PrivacyNotice />
           <CapWidget error={errors._cap} />
-          <button type="submit" class="btn btn-primary">{t("apply.form.submit")}</button>
+          <SubmitButton label={t("apply.form.submit")} />
         </form>
+        </FormCard>
         <ContactFooter />
         <PublicFooter />
       </div>
@@ -244,9 +266,16 @@ function InactivePage() {
 function SuccessPage() {
   return (
     <Layout title={t("apply.success.title")}>
-      <div class="max-w-xl mx-auto text-center py-12">
+      <div class="max-w-xl mx-auto">
         <PageHeader title={t("apply.success.title")} />
-        <p class="opacity-70">{t("apply.success.body")}</p>
+        <div class="card bg-base-100 border border-base-300 text-center">
+          <div class="card-body items-center gap-3">
+            <Icon name="icon-[tabler--circle-check]" class="size-16 text-success" />
+            <p>{t("apply.success.body")}</p>
+            <p class="text-sm opacity-70">{t("apply.success.next")}</p>
+          </div>
+        </div>
+        <ContactFooter hint={t("apply.success.contactHint")} />
         <PublicFooter />
       </div>
     </Layout>
@@ -327,13 +356,13 @@ applyRoutes.post("/youth", async (c) => {
   if (cap !== "ok") errors._cap = capError(cap);
   const { rows, rowErrors, hasGuardianError } = parseGuardianRows(body);
   const consentGiven = body.consent === "on";
-  if (rows.length === 0) errors._guardians = t("common.required");
+  if (rows.length === 0) errors._guardians = t("apply.youth.error.guardiansRequired");
   if (!consentGiven) errors._consent = t("apply.youth.error.consentRequired");
 
   if (Object.keys(errors).length > 0 || hasGuardianError) {
     return c.html(
       <YouthPage values={values} errors={errors} guardianRows={rows} guardianErrors={rowErrors} consentError={errors._consent} />,
-      422,
+      HTTP_STATUS.UNPROCESSABLE_ENTITY,
     );
   }
 

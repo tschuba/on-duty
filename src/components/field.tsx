@@ -10,7 +10,7 @@ export function Field({ label, required, hint, floating = true, after, class: cl
   return (
     <div class={cls}>
       {floating ? (
-        <label class="floating-label w-full">
+        <label class="floating-label w-full" {...(required ? { "data-required": "" } : {})}>
           <span>{text}</span>
           {children as never}
         </label>

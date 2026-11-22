@@ -5,9 +5,9 @@ import { db } from "../db/index.js";
 import { lendingItems, lendingLoans, loanRequests, persons } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
 import { Layout } from "../components/layout.js";
-import { PageHeader, HeaderAction } from "../components/page-header.js";
-import { Field, EmailInput, PhoneInput } from "../components/field.js";
-import { ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
+import { PageHeader } from "../components/page-header.js";
+import { Field, EmailField, PhoneField } from "../components/field.js";
+import { FormCard, FormSection, SubmitButton, ContactFooter, PublicFooter, Honeypot, PrivacyNotice, CapWidget, capError, clientIp } from "../components/public-form.js";
 import { t } from "../i18n/index.js";
 import { checkRateLimit, recordFailedAttempt } from "../lib/ratelimit.js";
 import { loadOrgConfig, notificationRecipient } from "../lib/org-config.js";
@@ -42,55 +42,64 @@ function RequestForm({ item, values, errors, maxQuantity }: {
 }) {
   if (!item) return null;
   return (
-    <form id="lend-form" method="post" class="space-y-4">
+    <form id="lend-form" method="post" class="space-y-6">
       <Honeypot />
+      <FormSection title={t("lend.section.applicant")}>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("apply.form.firstName")} required>
-          <input type="text" name="firstName" value={values.firstName} class={`input w-full${errors.firstName ? " input-error" : ""}`} />
+          <input placeholder={t("apply.form.firstName")} type="text" name="firstName" value={values.firstName} class={`input w-full${errors.firstName ? " input-error" : ""}`} />
         </Field>
         <Field label={t("apply.form.lastName")} required>
-          <input type="text" name="lastName" value={values.lastName} class={`input w-full${errors.lastName ? " input-error" : ""}`} />
+          <input placeholder={t("apply.form.lastName")} type="text" name="lastName" value={values.lastName} class={`input w-full${errors.lastName ? " input-error" : ""}`} />
         </Field>
       </div>
-      <Field label={t("lend.form.organization")} required>
-        <input type="text" id="lend-organization" name="organization" value={values.organization} class={`input w-full${errors.organization ? " input-error" : ""}`} disabled={values.isPrivate} />
+      <Field label={t("lend.form.applicantType")} floating={false}>
+        <div class="join w-full" role="radiogroup"
+          onchange="var p=this.querySelector('input:checked').value==='1',w=document.getElementById('lend-org-wrap'),o=document.getElementById('lend-organization');w.hidden=p;o.disabled=p;if(p)o.value=''">
+          <input type="radio" name="isPrivate" value="1" class="join-item btn flex-1" aria-label={t("lend.form.private")} checked={values.isPrivate} />
+          <input type="radio" name="isPrivate" value="" class="join-item btn flex-1" aria-label={t("lend.form.organizationType")} checked={!values.isPrivate} />
+        </div>
       </Field>
-      <label class="label cursor-pointer justify-start gap-2">
-        <input type="checkbox" name="isPrivate" value="1" class="checkbox" checked={values.isPrivate}
-          onchange="var o=document.getElementById('lend-organization');o.disabled=this.checked;if(this.checked)o.value=''" />
-        <span>{t("lend.form.private")}</span>
-      </label>
+      <div id="lend-org-wrap" hidden={values.isPrivate}>
+        <Field label={t("lend.form.organization")} required>
+          <input placeholder={t("lend.form.organization")} type="text" id="lend-organization" name="organization" value={values.organization} class={`input w-full${errors.organization ? " input-error" : ""}`} disabled={values.isPrivate} />
+        </Field>
+      </div>
       <p class="text-sm opacity-70">{t("lend.form.contactHint")}</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <EmailInput name="email" placeholder={t("apply.form.email")} value={values.email} error={!!errors.contact} />
-        <PhoneInput name="phone" placeholder={t("apply.form.phone")} value={values.phone} error={!!errors.contact} />
+        <EmailField label={t("apply.form.email")} name="email" value={values.email} error={!!errors.contact} />
+        <PhoneField label={t("apply.form.phone")} name="phone" value={values.phone} error={!!errors.contact} />
       </div>
       {errors.contact && <p class="text-error text-sm">{errors.contact}</p>}
+      </FormSection>
+      <FormSection title={t("lend.section.period")}>
       <div id="lend-calendar" data-item-id={item.id} data-quantity={values.quantity || "1"}></div>
       <input type="hidden" id="lend-plannedFrom" name="plannedFrom" value={values.plannedFrom} />
       <input type="hidden" id="lend-plannedTo" name="plannedTo" value={values.plannedTo} />
       {errors.dates && <p class="text-error text-sm">{errors.dates}</p>}
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label={t("lend.form.plannedFromTime")} required={item.timesRequired}>
-          <input type="time" name="plannedFromTime" value={values.plannedFromTime} class={`input w-full${errors.times ? " input-error" : ""}`} />
+          <input placeholder={t("lend.form.plannedFromTime")} type="time" name="plannedFromTime" value={values.plannedFromTime} class={`input w-full${errors.times ? " input-error" : ""}`} />
         </Field>
         <Field label={t("lend.form.plannedToTime")} required={item.timesRequired}>
-          <input type="time" name="plannedToTime" value={values.plannedToTime} class={`input w-full${errors.times ? " input-error" : ""}`} />
+          <input placeholder={t("lend.form.plannedToTime")} type="time" name="plannedToTime" value={values.plannedToTime} class={`input w-full${errors.times ? " input-error" : ""}`} />
         </Field>
       </div>
       {errors.times && <p class="text-error text-sm">{errors.times}</p>}
       <p id="lend-summary" class="text-sm font-medium" data-label={t("lend.form.summary")} hidden></p>
       {!item.individualTracking && maxQuantity > 1 && (
         <Field label={t("lending.loans.form.quantity")} class="max-w-32" required>
-          <input type="number" name="quantity" min="1" max={maxQuantity} value={values.quantity || "1"} class={`input w-full${errors.quantity ? " input-error" : ""}`} />
+          <input placeholder={t("lending.loans.form.quantity")} type="number" name="quantity" min="1" max={maxQuantity} value={values.quantity || "1"} class={`input w-full${errors.quantity ? " input-error" : ""}`} />
           {errors.quantity && <span class="text-error text-sm mt-1">{errors.quantity}</span>}
         </Field>
       )}
+      </FormSection>
       <Field label={t("lend.form.message")}>
-        <textarea name="message" class={`textarea w-full${errors.message ? " textarea-error" : ""}`} rows={3}>{values.message}</textarea>
+        <textarea placeholder={t("lend.form.message")} name="message" class={`textarea w-full${errors.message ? " textarea-error" : ""}`} rows={3}>{values.message}</textarea>
       </Field>
       <PrivacyNotice />
       <CapWidget error={errors._cap} />
+      <SubmitButton label={t("lend.form.submit")} />
     </form>
   );
 }
@@ -105,11 +114,12 @@ function RequestPage({ item, orgName, values, errors, maxQuantity }: {
   return (
     <Layout title={t("lend.title", { name: item.inventoryItem.name })}>
       <div class="max-w-xl mx-auto">
-        <PageHeader title={item.inventoryItem.name} subtitle={t("lend.form.subtitle", { org: orgName })} actions={<HeaderAction variant="primary" type="submit" form="lend-form" icon="icon-[tabler--check]" label={t("lend.form.submit")} class="btn-primary" />} />
+        <PageHeader title={item.inventoryItem.name} subtitle={t("lend.form.subtitle", { org: orgName })} />
+        {errors._global && <div role="alert" class="alert alert-error mb-4">{errors._global}</div>}
         {maxQuantity > 1 && !item.individualTracking && (
           <p class="text-sm opacity-70 mb-4">{t("lend.form.maxQuantityHint", { max: maxQuantity })}</p>
         )}
-        <RequestForm item={item} values={values} errors={errors} maxQuantity={maxQuantity} />
+        <FormCard><RequestForm item={item} values={values} errors={errors} maxQuantity={maxQuantity} /></FormCard>
         <ContactFooter />
         <PublicFooter />
       </div>

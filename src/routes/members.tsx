@@ -2,6 +2,7 @@ import { isOptedOut, saveTopicPrefs, setEventMailsEnabled, topicPrefs } from "..
 import { TopicPrefs } from "../components/topic-prefs.js";
 import { RowAction } from "../components/row-action.js";
 import type { Context } from "hono";
+import { AddressFields, AddressView } from "../components/address.js";
 import { EmailField, Field, PhoneField, ViewField, ViewGrid } from "../components/field.js";
 import { Hono } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -750,12 +751,7 @@ function MemberFormFields({
       </div>
       <Section title={t("members.contact.title")} open>
       <div class="space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div class="sm:col-span-3">{field("street", t("members.form.street"))}</div>
-        <div class="sm:col-span-1">{field("houseNumber", t("members.form.houseNumber"))}</div>
-        <div class="sm:col-span-1">{field("zip", t("members.form.zip"))}</div>
-        <div class="sm:col-span-3">{field("city", t("members.form.city"))}</div>
-      </div>
+      <AddressFields street={field("street", t("members.form.street"))} houseNumber={field("houseNumber", t("members.form.houseNumber"))} zip={field("zip", t("members.form.zip"))} city={field("city", t("members.form.city"))} />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {field("phone", t("members.form.phone"), "tel")}
         {field("mobile", t("members.form.mobile"), "tel")}
@@ -1797,9 +1793,10 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
         {m.deathDate && <ViewField label={t("members.form.deathDate")} value={formatDate(m.deathDate)} />}
       </ViewGrid>
       <Section title={t("members.contact.title")} open class="mt-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <ViewField label={t("members.view.streetNr")} value={[m.street, m.houseNumber].filter(Boolean).join(" ") || null} />
-          <ViewField label={t("members.view.zipCity")} value={[m.zip, m.city].filter(Boolean).join(" ") || null} />
+        <div class="space-y-6">
+          <AddressView p={m} />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
           <ViewField label={t("members.form.phone")} value={m.phone} />
           <ViewField label={t("members.form.mobile")} value={m.mobile} />
           <ViewField label={t("members.form.email")} value={m.email} />
