@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { Address } from "../components/address.js";
+import { Address, AddressFields, AddressView } from "../components/address.js";
 import { eq, or, ilike, asc, desc, and, exists, sql } from "drizzle-orm";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { db } from "../db/index.js";
@@ -123,12 +123,7 @@ export function DonorPersonFields({ values, errors }: { values?: PersonFieldInpu
         {personField("lastName", t("donors.form.lastName"), values, errors, true)}
         {personField("firstName", t("donors.form.firstName"), values, errors, true)}
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div class="sm:col-span-3">{personField("street", t("donors.form.street"), values, errors)}</div>
-        <div class="sm:col-span-1">{personField("houseNumber", t("donors.form.houseNumber"), values, errors)}</div>
-        <div class="sm:col-span-1">{personField("zip", t("donors.form.zip"), values, errors)}</div>
-        <div class="sm:col-span-3">{personField("city", t("donors.form.city"), values, errors)}</div>
-      </div>
+      <AddressFields street={personField("street", t("donors.form.street"), values, errors)} houseNumber={personField("houseNumber", t("donors.form.houseNumber"), values, errors)} zip={personField("zip", t("donors.form.zip"), values, errors)} city={personField("city", t("donors.form.city"), values, errors)} />
     </>
   );
 }
@@ -295,7 +290,7 @@ donorRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "dona
         <ViewField label={t("donors.table.companyName")} value={donor.person.companyName} />
         <ViewField label={t("donors.form.lastName")} value={donor.person.lastName} />
         <ViewField label={t("donors.form.firstName")} value={donor.person.firstName} />
-        <ViewField label={t("donors.table.address")} value={<Address p={donor.person} />} />
+        <AddressView p={donor.person} />
       </ViewGrid>
       <h2 class="font-semibold mt-6 mb-2">{t("donations.history")}</h2>
       <div class="overflow-x-auto max-w-xl">

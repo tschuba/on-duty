@@ -36,9 +36,10 @@ Quelle: [Tabler Icons](https://tabler.io/icons) über `@iconify/tailwind4`. Icon
 
 daisyUI v5. Die v4-Klassen `form-control`, `label-text`, `input-bordered`, `select-bordered` sind verboten (Grep-Test `daisyui-v4-classes.test.ts`).
 
-- **Text/Select/Textarea/Datum** (`date`, `datetime-local`, `month`): `Field` (`src/components/field.tsx`) mit Floating Label; `placeholder` wiederholt den Labeltext. Pflichtstern (`text-error ml-1`) sitzt in `Field`. Das native Datumsformat kollidiert nicht mit dem Floating Label (geprüft in `inventory.tsx`, leer und vorbelegt, Desktop und mobil).
+- **Text/Select/Textarea/Datum** (`date`, `datetime-local`, `month`): `Field` (`src/components/field.tsx`) mit Floating Label; `placeholder` wiederholt den Labeltext. Pflichtstern (`text-error ml-1`) sitzt in `Field`. Bei leeren, nicht fokussierten Pflichtfeldern zeigt `.req-star` (Script im Layout) den Stern hinter dem Placeholder; er greift bei `required` am Input oder `Field required` (`data-required`), auch ohne natives `required`. Das native Datumsformat kollidiert nicht mit dem Floating Label (geprüft in `inventory.tsx`, leer und vorbelegt, Desktop und mobil).
 - **Checkbox/Toggle/Radio:** `<label class="label cursor-pointer justify-start gap-2 pointer-coarse:min-h-11">` um Input + Text.
 - **Gruppen** (Radio-Liste, Von/Bis, Kategorie-/Rollen-Auswahl): `Field floating={false}` (`fieldset` + festes Label darüber) bzw. `FieldGroup`.
+- **Adressen:** immer `AddressFields` (Formular) bzw. `AddressView` (Ansicht) aus `src/components/address.tsx`: Straße (3) | Nr. (1) / PLZ (1) | Ort (3), mobil einspaltig. `Address` bleibt der Fließtext für Tabellen und Kurzanzeigen.
 - **Beispiele/Formatvorgaben:** als `hint` unter dem Feld, nicht als Placeholder.
 - **Sonderfälle:** `ChipInput` und Such-Inputs mit Icon bleiben ohne `Field`, nur v5-Klassen.
 
