@@ -805,11 +805,11 @@ function PermissionCheckboxes({ checked, scope = [] }: { checked: Set<Permission
         return (
           <>
           {(i === 0 || areaOf(all[i - 1][0]) !== area) && <h3 class={`text-xs font-bold uppercase tracking-wide text-base-content/60 ${i > 0 ? "mt-2" : ""}`}>{t(`admin.permissions.area.${area}`)}</h3>}
-          <details key={resource} class="perm-group group collapse collapse-arrow border border-base-300" open={n > 0} onchange="this.querySelector('[data-n]').textContent=this.querySelectorAll('input[name=permissions]:checked').length">
+          <details key={resource} class="perm-group group collapse collapse-arrow border border-l-4 border-base-300 border-l-base-300 bg-base-200/40 opacity-60 hover:opacity-100 open:opacity-100 has-[input[name=permissions]:checked]:opacity-100 has-[input[name=permissions]:checked]:bg-primary/5 has-[input[name=permissions]:checked]:border-primary/50 has-[input[name=permissions]:checked]:border-l-primary" open={n > 0} onchange="this.querySelector('[data-n]').textContent=this.querySelectorAll('input[name=permissions]:checked').length">
             <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
               <div class="flex items-center justify-between gap-2">
                 <span>
-                  {RESOURCE_LABELS[resource] ?? resource} <span class="font-normal opacity-60">(<span data-n>{n}</span>/{perms.length})</span>
+                  {RESOURCE_LABELS[resource] ?? resource} <span class="badge badge-sm gap-0 font-normal bg-base-300 text-base-content/60 group-has-[input[name=permissions]:checked]:bg-primary group-has-[input[name=permissions]:checked]:text-primary-content"><span data-n>{n}</span>/{perms.length}</span>
                 </span>
                 {perms.length > 1 && (
                     <div class="hidden group-open:flex gap-2">
