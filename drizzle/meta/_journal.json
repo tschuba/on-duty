@@ -701,6 +701,13 @@
       "when": 1795382905735,
       "tag": "0099_lonely_slapstick",
       "breakpoints": true
+    },
+    {
+      "idx": 100,
+      "version": "7",
+      "when": 1795385964604,
+      "tag": "0100_aspiring_steel_serpent",
+      "breakpoints": true
     }
   ]
 }

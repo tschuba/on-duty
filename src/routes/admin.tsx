@@ -12,6 +12,7 @@ import {
   anniversaryYears,
   appRoles,
   appRolePermissions,
+  appRoleMemberScopes,
   userAppRoles,
 } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
@@ -27,7 +28,10 @@ import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
 import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
-import { PERMISSIONS, type Permission } from "../lib/roles.js";
+import { MEMBER_STATUSES, parseStatuses } from "../lib/member-scope.js";
+import { STATUS_BADGE_CLASS, STATUS_LABELS, StatusBadge } from "../components/status-badge.js";
+import type { MemberStatus } from "../lib/status.js";
+import { PERMISSIONS, PERMISSION_AREAS, type Permission } from "../lib/roles.js";
 import { formatDate } from "../lib/format.js";
 import { setFlash } from "../lib/flash.js";
 import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
@@ -666,12 +670,14 @@ adminRoutes.post("/users/:id/delete", guard, async (c) => {
 adminRoutes.get("/permissions", guard, async (c) => {
   const user = c.get("user");
 
-  const [roles, permRows, assignmentCounts, warn] = await Promise.all([
+  const [roles, permRows, assignmentCounts, warn, scopeRows] = await Promise.all([
     db.select().from(appRoles).orderBy(asc(appRoles.name)),
     db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
     db.select({ roleId: userAppRoles.roleId, cnt: count() }).from(userAppRoles).groupBy(userAppRoles.roleId),
     backupWarnProps(),
+    db.select().from(appRoleMemberScopes),
   ]);
+  const scopeByRole = new Map(scopeRows.map((r) => [r.roleId, r.statuses as MemberStatus[]]));
 
   const permsByRole = new Map<string, Permission[]>();
   for (const p of permRows) permsByRole.set(p.roleId, [...(permsByRole.get(p.roleId) ?? []), p.permission]);
@@ -690,15 +696,15 @@ adminRoutes.get("/permissions", guard, async (c) => {
           type="search"
           class="grow min-w-0"
           placeholder={t("admin.permissions.searchPlaceholder")}
-          oninput="const q=this.value.toLowerCase();document.querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)})"
+          oninput="const q=this.value.toLowerCase();document.querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)});document.getElementById('perm-empty').hidden=!!document.querySelector('tbody tr[data-search]:not([hidden])')"
         />
       </label></div>
-      <ClickToEditHint />
       <div class="overflow-x-auto mb-10">
-        <table class="table table-zebra w-full">
+        <table class="table table-zebra table-cards w-full">
           <thead>
             <tr>
               <th>{t("admin.permissions.table.name")}</th>
+              <th class="text-right">{t("admin.permissions.table.people")}</th>
               <th>{t("admin.permissions.table.permissions")}</th>
               <th />
             </tr>
@@ -714,21 +720,19 @@ adminRoutes.get("/permissions", guard, async (c) => {
                   class="cursor-pointer hover"
                   onclick={`location.href='/admin/permissions/${r.id}'`}
                 >
-                  <td class="font-medium">
-                    {r.isProtected && (
-                      <span class="mr-1" title={t("admin.roles.systemRole")}>
-                        🔒
-                      </span>
-                    )}
-                    {r.name}
+                  <td class="align-top">
+                    <a href={`/admin/permissions/${r.id}`} class="link link-hover font-medium" onclick="event.stopPropagation()">{r.name}</a>
+                    {r.isProtected && <SystemRoleBadge class="ml-2" />}
+                    {r.description && <div class="text-sm opacity-60">{r.description}</div>}
                   </td>
-                  <td>
+                  <td class="align-top text-right" data-label={t("admin.permissions.table.people")}>{assignmentCount}</td>
+                  <td class="align-top md:w-56 md:max-w-56">
                     {(permsByRole.get(r.id) ?? []).length === 0 && (
                       <span class="badge badge-warning badge-sm">{t("admin.permissions.noPermissionsWarning")}</span>
                     )}
-                    <PermissionBadges permissions={permsByRole.get(r.id) ?? []} />
+                    <PermissionBadges permissions={permsByRole.get(r.id) ?? []} scope={scopeByRole.get(r.id)} max={4} />
                   </td>
-                  <td>
+                  <td class="align-top">
                     <div class="flex gap-2 justify-end">
                       <RowAction icon="icon-[tabler--copy]" label={t("common.copy")} class="btn-outline btn-primary" href={`/admin/permissions/new?copyFrom=${r.id}`} onclick="event.stopPropagation()" />
                       {canDelete ? (
@@ -770,6 +774,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
                 </tr>
               );
             })}
+            <tr id="perm-empty" hidden><td colspan={4} class="text-center opacity-60">{t("admin.permissions.noResults")}</td></tr>
           </tbody>
         </table>
       </div>
@@ -779,7 +784,13 @@ adminRoutes.get("/permissions", guard, async (c) => {
   );
 });
 
-function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
+function SystemRoleBadge({ class: cls = "" }: { class?: string }) {
+  return <span class={`badge badge-neutral badge-sm gap-1 ${cls}`}><Icon name="icon-[tabler--lock]" class="w-3 h-3" />{t("admin.roles.systemRole")}</span>;
+}
+
+const areaOf = (resource: string) => PERMISSION_AREAS.find((a) => (a.resources as readonly string[]).includes(resource))!.key;
+
+function PermissionCheckboxes({ checked, scope = [] }: { checked: Set<Permission>; scope?: MemberStatus[] }) {
   const groups = new Map<string, Permission[]>();
   for (const p of ASSIGNABLE_PERMISSIONS) {
     const resource = p.split(":")[0];
@@ -787,36 +798,67 @@ function PermissionCheckboxes({ checked }: { checked: Set<Permission> }) {
   }
 
   return (
-    <div class="flex flex-col gap-3">
-      {[...groups].map(([resource, perms]) => (
-        <div key={resource} class="perm-group">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-sm font-semibold">{RESOURCE_LABELS[resource] ?? resource}</span>
-            {perms.length > 1 && (
-              <button
-                type="button"
-                class="btn btn-outline btn-primary btn-xs"
-                onclick="this.closest('.perm-group').querySelectorAll('input[type=checkbox]').forEach(function(cb){cb.checked=true;})"
-              >
-                {t("admin.permissions.modal.selectAllInGroup")}
-              </button>
-            )}
-          </div>
-          <div class="grid grid-cols-1 gap-1">
-            {perms.map((p) => (
-              <label key={p} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
-                <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
-                <span class="text-sm">{PERMISSION_LABELS[p]}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      ))}
+    <div class="flex flex-col gap-2">
+      {[...groups].map(([resource, perms], i, all) => {
+        const n = perms.filter((p) => checked.has(p)).length;
+        const area = areaOf(resource);
+        return (
+          <>
+          {(i === 0 || areaOf(all[i - 1][0]) !== area) && <h3 class={`text-xs font-bold uppercase tracking-wide text-base-content/60 ${i > 0 ? "mt-2" : ""}`}>{t(`admin.permissions.area.${area}`)}</h3>}
+          <details key={resource} class="perm-group group collapse collapse-arrow border border-l-4 border-base-300 border-l-base-300 bg-base-200/40 opacity-60 hover:opacity-100 open:opacity-100 has-[input[name=permissions]:checked]:opacity-100 has-[input[name=permissions]:checked]:bg-primary/5 has-[input[name=permissions]:checked]:border-primary/50 has-[input[name=permissions]:checked]:border-l-primary" open={n > 0} onchange="this.querySelector('[data-n]').textContent=this.querySelectorAll('input[name=permissions]:checked').length">
+            <summary class="collapse-title text-sm font-semibold min-h-0 py-2">
+              <div class="flex items-center justify-between gap-2">
+                <span>
+                  {RESOURCE_LABELS[resource] ?? resource} <span class="badge badge-sm gap-0 font-normal bg-base-300 text-base-content/60 group-has-[input[name=permissions]:checked]:bg-primary group-has-[input[name=permissions]:checked]:text-primary-content"><span data-n>{n}</span>/{perms.length}</span>
+                </span>
+                {perms.length > 1 && (
+                    <div class="hidden group-open:flex gap-2">
+                      <button type="button" class="btn btn-outline btn-primary btn-xs" onclick="event.preventDefault();var d=this.closest('.perm-group');d.querySelectorAll('input[name=permissions]').forEach(function(cb){cb.checked=true});d.dispatchEvent(new Event('change',{bubbles:true}))">
+                        {t("admin.permissions.modal.selectAllInGroup")}
+                      </button>
+                      <button type="button" class="btn btn-outline btn-xs" onclick="event.preventDefault();var d=this.closest('.perm-group');d.querySelectorAll('input[name=permissions]').forEach(function(cb){cb.checked=false});d.dispatchEvent(new Event('change',{bubbles:true}))">
+                        {t("admin.permissions.modal.selectNoneInGroup")}
+                      </button>
+                    </div>
+                  )}
+              </div>
+            </summary>
+            <div class="collapse-content">
+              <div class="grid grid-cols-1 gap-1">
+                {perms.map((p) => (
+                  <label key={p} class="label cursor-pointer justify-start gap-3 pointer-coarse:min-h-11">
+                    <input type="checkbox" name="permissions" value={p} class="checkbox checkbox-sm" checked={checked.has(p)} />
+                    <span class="text-sm">{PERMISSION_LABELS[p]}</span>
+                  </label>
+                ))}
+              </div>
+              {resource === "members" && (
+                <div data-scope class="mt-3 pt-3 border-t border-base-300">
+                  <div class="flex items-center gap-2 text-sm font-semibold">
+                    <Icon name="icon-[tabler--filter]" class="w-4 h-4 opacity-60" />
+                    {t("admin.permissions.scope.legend")}
+                  </div>
+                  <p class="text-sm opacity-70 my-1">{t("admin.permissions.scope.hint")}</p>
+                  <div class="flex flex-wrap gap-2">
+                    {MEMBER_STATUSES.map((s) => (
+                      <label key={s} class="cursor-pointer pointer-coarse:py-1">
+                        <input type="checkbox" name="memberScope" value={s} class="peer sr-only" checked={scope.includes(s)} />
+                        <span class={`${(STATUS_BADGE_CLASS[s] || "badge badge-ghost opacity-60").replace(" badge-sm", "")} peer-not-checked:opacity-40 peer-checked:ring-2 peer-checked:ring-offset-1 ring-base-content/40 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2`}>{STATUS_LABELS[s]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
+          </>
+        );
+      })}
     </div>
   );
 }
 
-type PermFormState = { id?: string; readOnly?: boolean; name: string; nameLocked?: boolean; description: string; checked: Set<Permission>; error?: string };
+type PermFormState = { id?: string; readOnly?: boolean; name: string; nameLocked?: boolean; description: string; checked: Set<Permission>; scope?: MemberStatus[]; error?: string };
 
 async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: PermFormState, status: 200 | 422 = 200) {
   const title = t(f.id ? "admin.permissions.modal.edit" : "admin.permissions.modal.create");
@@ -841,10 +883,12 @@ async function renderPermissionForm(c: Context<{ Variables: Variables }>, f: Per
           <textarea name="description" rows={2} placeholder={t("admin.permissions.modal.descriptionLabel")} class="textarea w-full">{f.description}</textarea>
         </Field>
         <FieldGroup legend={t("admin.permissions.modal.permissionsLabel")}>
-          <PermissionCheckboxes checked={f.checked} />
+          <PermissionCheckboxes checked={f.checked} scope={f.scope} />
         </FieldGroup>
         </fieldset>
       </form>
+      {/* Ohne JS bleibt die Eingrenzung sichtbar; der Server verwirft sie ohne members:read/write/delete. */}
+      <script dangerouslySetInnerHTML={{ __html: `(function(){var f=document.getElementById('admin-permissions-form'),b=f.querySelector('[data-scope]');function u(){b.hidden=!f.querySelector('input[name=permissions]:checked:is([value="members:read"],[value="members:write"],[value="members:delete"])')}f.addEventListener('change',u);u()})()` }} />
     </Layout>,
     status
   );
@@ -856,7 +900,7 @@ adminRoutes.get("/permissions/new", guard, async (c) => {
     const [src] = await db.select().from(appRoles).where(eq(appRoles.id, copyFrom));
     if (!src) return c.notFound();
     const perms = await db.select().from(appRolePermissions).where(eq(appRolePermissions.roleId, copyFrom));
-    return renderPermissionForm(c, { name: "", description: src.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
+    return renderPermissionForm(c, { name: "", description: src.description ?? "", checked: new Set(perms.map((p) => p.permission)), scope: await loadScope(copyFrom) });
   }
   return renderPermissionForm(c, { name: "", description: "", checked: new Set() });
 });
@@ -868,6 +912,11 @@ adminRoutes.get("/permissions/:id", guard, async (c) => {
   const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
   const canDelete = !role.isProtected && cnt === 0;
+  const owned = new Set(perms.map((p) => p.permission));
+  const byResource = new Map<string, Permission[]>();
+  for (const p of PERMISSIONS.filter((x) => owned.has(x))) byResource.set(p.split(":")[0], [...(byResource.get(p.split(":")[0]) ?? []), p]);
+  const scope = await loadScope(id);
+  const hasMemberRights = ["members:read", "members:write", "members:delete"].some((p) => owned.has(p as Permission));
   const remove = canDelete && (
     <>
       <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" onclick={`document.getElementById('delete-perm-role-${id}').showModal()`} />
@@ -888,14 +937,25 @@ adminRoutes.get("/permissions/:id", guard, async (c) => {
   );
   return c.html(
     <Layout title={role.name} user={c.get("user")}>
-      <PageHeader title={<>{role.isProtected && "🔒 "}{role.name}</>} backHref="/admin/permissions" actions={<DetailActions editHref={role.isProtected ? undefined : `/admin/permissions/${id}/edit`} remove={remove} />} />
-      {role.isProtected && <div class="alert alert-info mb-4 max-w-2xl">🔒 {t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
+      <PageHeader title={<>{role.name}{role.isProtected && <SystemRoleBadge class="ml-3 align-middle" />}</>} backHref="/admin/permissions" actions={<DetailActions editHref={role.isProtected ? undefined : `/admin/permissions/${id}/edit`} remove={remove} />} />
+      {role.isProtected && <div class="alert alert-info mb-4 max-w-2xl">{t("admin.roles.systemRole")} – {t("admin.permissions.readOnlyHint")}</div>}
       <ViewGrid>
-        <ViewField label={t("admin.permissions.modal.nameLabel")} value={role.name} />
         <ViewField label={t("admin.permissions.modal.descriptionLabel")} value={role.description} />
-        <div class="sm:col-span-2">
+        <ViewField label={t("admin.permissions.view.people")} value={String(cnt)} />
+        <div class="sm:col-span-2 flex flex-col gap-3">
           <div class="text-sm opacity-60">{t("admin.permissions.modal.permissionsLabel")}</div>
-          <PermissionBadges permissions={perms.map((p) => p.permission)} />
+          {[...byResource].map(([resource, ps]) => (
+            <div key={resource}>
+              <div class="text-sm font-semibold mb-1">{RESOURCE_LABELS[resource] ?? resource}</div>
+              <div class="flex flex-wrap gap-1">{ps.map((p) => <span key={p} class="badge badge-outline badge-sm whitespace-nowrap">{PERMISSION_LABELS[p]}</span>)}</div>
+              {resource === "members" && scope.length > 0 && hasMemberRights && (
+                <div class="mt-2 flex flex-wrap items-center gap-1">
+                  <span class="text-sm opacity-60 mr-1">{t("admin.permissions.scope.legend")}:</span>
+                  {scope.map((s) => <StatusBadge key={s} status={s} />)}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </ViewGrid>
     </Layout>
@@ -909,8 +969,22 @@ adminRoutes.get("/permissions/:id/edit", guard, async (c) => {
   if (role.isProtected) return c.redirect(`/admin/permissions/${id}`); // Systemrollen sind nicht editierbar
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
   const perms = await db.select({ permission: appRolePermissions.permission }).from(appRolePermissions).where(eq(appRolePermissions.roleId, id));
-  return renderPermissionForm(c, { id, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)) });
+  return renderPermissionForm(c, { id, name: role.name, nameLocked: cnt > 0, description: role.description ?? "", checked: new Set(perms.map((p) => p.permission)), scope: await loadScope(id) });
 });
+
+async function loadScope(roleId: string): Promise<MemberStatus[]> {
+  const [r] = await db.select().from(appRoleMemberScopes).where(eq(appRoleMemberScopes.roleId, roleId));
+  return (r?.statuses ?? []) as MemberStatus[];
+}
+
+// Eine Zeile pro Rolle; leer = keine Eingrenzung (keine Zeile). Ohne members:*-Recht wird nichts gespeichert.
+async function saveScope(roleId: string, body: Record<string, unknown>, permissions: Permission[]) {
+  await db.delete(appRoleMemberScopes).where(eq(appRoleMemberScopes.roleId, roleId));
+  const statuses = parseStatuses(body.memberScope);
+  if (statuses.length && permissions.some((p) => ["members:read", "members:write", "members:delete"].includes(p))) {
+    await db.insert(appRoleMemberScopes).values({ roleId, statuses });
+  }
+}
 
 function parsePermissions(body: Record<string, unknown>): Permission[] {
   const raw = ([] as string[]).concat((body.permissions as string | string[] | undefined) ?? []);
@@ -924,7 +998,7 @@ adminRoutes.post("/permissions", guard, async (c) => {
   const description = String(body.description ?? "").trim() || null;
   const permissions = parsePermissions(body);
 
-  const form = { name, description: String(body.description ?? "").trim(), checked: new Set(permissions) };
+  const form = { name, description: String(body.description ?? "").trim(), checked: new Set(permissions), scope: parseStatuses(body.memberScope) };
   if (!name) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredName") }, 422);
   if (permissions.length === 0) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredPermission") }, 422);
 
@@ -933,6 +1007,7 @@ adminRoutes.post("/permissions", guard, async (c) => {
   if (permissions.length > 0) {
     await db.insert(appRolePermissions).values(permissions.map((permission) => ({ roleId: id, permission })));
   }
+  await saveScope(id, body, permissions);
 
   setFlash(c, t("admin.permissions.flash.created", { name }), "success");
   return c.redirect(`/admin/permissions/${id}`);
@@ -950,7 +1025,7 @@ adminRoutes.post("/permissions/:id", guard, async (c) => {
   const [{ cnt }] = await db.select({ cnt: count() }).from(userAppRoles).where(eq(userAppRoles.roleId, id));
 
   const name = cnt === 0 ? String(body.name ?? "").trim() : role.name;
-  const form = { id, name, nameLocked: cnt > 0, description: description ?? "", checked: new Set(permissions) };
+  const form = { id, name, nameLocked: cnt > 0, description: description ?? "", checked: new Set(permissions), scope: parseStatuses(body.memberScope) };
   if (!name) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredName") }, 422);
   if (permissions.length === 0) return renderPermissionForm(c, { ...form, error: t("admin.permissions.flash.requiredPermission") }, 422);
   const updates: { name?: string; description: string | null } = { description };
@@ -961,6 +1036,7 @@ adminRoutes.post("/permissions/:id", guard, async (c) => {
   if (permissions.length > 0) {
     await db.insert(appRolePermissions).values(permissions.map((permission) => ({ roleId: id, permission })));
   }
+  await saveScope(id, body, permissions);
 
   setFlash(c, t("admin.permissions.flash.saved"), "success");
   return c.redirect(`/admin/permissions/${id}`);

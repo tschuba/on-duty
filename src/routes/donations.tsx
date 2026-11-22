@@ -9,6 +9,7 @@ import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import type { IconName } from "../components/icon.js";
 import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { readableMemberIds } from "../lib/member-scope.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
 import { t } from "../i18n/index.js";
@@ -408,7 +409,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
     { active: donorView, href: viewUrl("donors"), label: t("donations.tabs.donors") },
   ];
   const presets = rangePresets(todayStr(), "past", undefined, true);
-  const canLink = user.permissions.has("members:read");
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
   const canRecord = user.permissions.has("donations:record");
 
   return c.html(
@@ -606,7 +607,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
   const user = c.get("user");
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
-  const canLink = user.permissions.has("members:read");
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
   const canRecord = user.permissions.has("donations:record");
   const canIssue = user.permissions.has("donations:issue-receipts");
   const showReceipt = canIssue && d.receiptStatus !== "not_required";
@@ -656,7 +657,7 @@ donationRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
   if (!user.permissions.has("donations:record")) return c.redirect(`/donations/${d.id}`);
-  const canLink = user.permissions.has("members:read");
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
@@ -675,7 +676,7 @@ donationRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const id = c.req.param("id");
   const d = await fetchDonation(id);
   if (!d) return c.notFound();
-  const canLink = user.permissions.has("members:read");
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
 
   const body = await c.req.parseBody();
   const { values, errors } = parseDonationFields(body);

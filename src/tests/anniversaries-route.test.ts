@@ -8,6 +8,7 @@ process.env.ORG_NAME = "Test Feuerwehr";
 
 let findManyResult: any[] = [];
 let ayFixture: any[] = [];
+let memberScope: any = undefined;
 
 vi.mock("../db/index.js", () => ({
   db: {
@@ -26,7 +27,7 @@ vi.mock("../db/index.js", () => ({
 
 vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => {
-    c.set("user", { id: "u1", permissions: new Set(["members:read"]), disabled: false });
+    c.set("user", { id: "u1", permissions: new Set(["members:read"]), disabled: false, memberScope });
     await next();
   },
 }));
@@ -37,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   findManyResult = [];
   ayFixture = [];
+  memberScope = undefined;
 });
 
 function makeMemberRow(overrides: Record<string, unknown> = {}) {
@@ -96,6 +98,16 @@ describe("GET /anniversaries/export", () => {
     const res = await anniversaryRoutes.request("/export?contact=1&addr=1");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("spreadsheetml");
+  });
+
+  it("respects the member scope: only members in the read scope are exported", async () => {
+    findManyResult = [makeMemberRow()]; // derived status: active
+    memberScope = { read: new Set(["youth"]), write: "all", delete: "all" };
+    expect((await anniversaryRoutes.request("/export")).status).toBe(302);
+    memberScope = { read: new Set(["active"]), write: "all", delete: "all" };
+    expect((await anniversaryRoutes.request("/export")).status).toBe(200);
+    memberScope = { read: new Set(["youth"]), write: "all", delete: "all" };
+    expect(await (await anniversaryRoutes.request("/")).text()).not.toContain("Bauer");
   });
 
   it("redirects with a flash and no xlsx when there are no events", async () => {

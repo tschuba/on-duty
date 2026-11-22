@@ -1325,3 +1325,57 @@ testDetailPageContract({
   writePermissions: ["members:read", "members:write"],
   ensureRecord: () => { findFirstResult = memberWithAssignments(); },
 });
+
+describe("Rollen-Eingrenzung (memberScope)", () => {
+  const scoped = (read: any, write: any = read, del: any = read) => {
+    currentUser = {
+      id: "u1", disabled: false,
+      permissions: new Set(["members:read", "members:write", "members:delete"]),
+      memberScope: { read, write, delete: del },
+    } as any;
+  };
+  const only = (...s: string[]) => new Set(s);
+
+  it("list hides members outside the read scope", async () => {
+    findManyResult = [memberWithAssignments()];
+    rolesFixture = [roleAktiv];
+    scoped(only("youth"));
+    expect(await (await memberRoutes.request("/")).text()).not.toContain("Bauer");
+    scoped(only("active"));
+    expect(await (await memberRoutes.request("/")).text()).toContain("Bauer");
+  });
+
+  it("detail/edit/delete outside scope → 404; unscoped → not 404", async () => {
+    findFirstResult = memberWithAssignments();
+    scoped(only("youth"));
+    expect((await memberRoutes.request("/m1")).status).toBe(404);
+    expect((await memberRoutes.request("/m1/edit")).status).toBe(404);
+    expect((await memberRoutes.request("/m1/delete", { method: "POST" })).status).toBe(404);
+    scoped("all");
+    expect((await memberRoutes.request("/m1")).status).toBe(200);
+  });
+
+  it("delete scope is separate from read scope", async () => {
+    findFirstResult = memberWithAssignments();
+    scoped("all", "all", only("youth"));
+    expect((await memberRoutes.request("/m1/delete", { method: "POST" })).status).toBe(404);
+  });
+
+  it("export only contains members in scope", async () => {
+    findManyResult = [memberWithAssignments()];
+    scoped(only("youth"));
+    const res = await memberRoutes.request("/export");
+    expect(res.status).toBe(302); // nothing left to export
+  });
+
+  it("creating a member whose resulting status is outside write scope is rejected", async () => {
+    scoped("all", only("youth"));
+    const res = await memberRoutes.request("/new", {
+      method: "POST",
+      body: formBody({ lastName: "Neu", firstName: "Nina", birthDate: "1990-01-01", entryDate: "2020-01-01" }),
+    });
+    expect(res.status).toBe(422);
+    expect(await res.text()).toContain(t("members.error.outOfScope"));
+    expect(insertCalls.some((c) => c.table === members)).toBe(false);
+  });
+});

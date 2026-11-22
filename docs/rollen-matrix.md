@@ -54,3 +54,11 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 - Die Rolle „Verleih“ gibt es seit der Kasse (180). Sie ist geschützt und liegt nur im Seed (`APP_ROLES`), Bestandsinstallationen bekommen sie beim nächsten Start (`src/entrypoint.ts`: Migration, dann Seed).
 - Änderungen an Standardrollen brauchen eine Migration, wenn ein Recht auf bestehende (auch selbst angelegte) Rollen kopiert werden soll; die Vergabe nur an eine Standardrolle übernimmt der Seed (Vorbild `events:manage`). Der Seed ergänzt nur fehlende Einträge, daher: der Seed nur fehlende Einträge ergänzt (zuletzt `drizzle/0026_role_permissions_backfill.sql`).
 - Neue Permission-Werte (Enum) und ihre Vergabe an Standardrollen dürfen nicht in derselben Migration stehen, und Drizzle führt alle offenen Migrationen in einer Transaktion aus (Postgres: „unsafe use of new value"). Deshalb legt eine Migration nur den Enum-Wert an, die Vergabe übernimmt `APP_ROLES` im Seed beim nächsten Start (`src/entrypoint.ts` führt Migration und Seed nacheinander aus).
+
+## Mitglieder-Eingrenzung nach Status
+
+Eine Rolle mit `members:read`/`write`/`delete` kann optional auf Status eingegrenzt werden (Kinder, Jugend, Aktiv, Passiv, Fördernd, Ausgetreten, Verstorben). Nichts angehakt = alle (wie bisher). Gilt für Liste, Detail, Bearbeiten, Löschen, Export und Jubiläen; Zugriff außerhalb → 404.
+
+- Mehrere Rollen: Sichtbereiche werden vereinigt; eine Rolle ohne Eingrenzung ergibt „alle“. Je Recht getrennt berechnet.
+- Der Status ist abgeleitet: ein Statuswechsel (z. B. Geburtstag Jugend → aktiv) verschiebt das Mitglied automatisch aus dem Bereich.
+- Nicht gescopt: Mail-/Termin-Empfängerlisten, Spenden-, Verleih-, Ausbildungs- und Importseiten; Bankdaten-Rechte wirken nur innerhalb des Bereichs.

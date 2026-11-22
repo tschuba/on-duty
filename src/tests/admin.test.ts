@@ -667,6 +667,13 @@ describe("GET /permissions/new", () => {
     expect(html).toContain(t("admin.permissions.modal.create"));
     expect(html).not.toContain(t("admin.permissions.key.systemAdmin"));
   });
+
+  it("renders every permission group as <details>", async () => {
+    const { PERMISSIONS } = await import("../lib/roles.js");
+    const html = await (await adminRoutes.request("/permissions/new")).text();
+    const groups = new Set(PERMISSIONS.filter((p) => p !== "system:admin").map((p) => p.split(":")[0]));
+    expect(html.match(/<details[^>]*perm-group/g)).toHaveLength(groups.size);
+  });
 });
 
 describe("GET /permissions/:id", () => {
@@ -883,6 +890,34 @@ describe("GET /backup", () => {
     const html = await (await adminRoutes.request("/backup")).text();
     expect(html).toContain("keine erfolgreiche Sicherung");
     expect(html).toContain("Server betreibt");
+  });
+});
+
+describe("PERMISSION_AREAS", () => {
+  it("assigns every resource to exactly one area, in PERMISSIONS order", async () => {
+    const { PERMISSIONS, PERMISSION_AREAS } = await import("../lib/roles.js");
+    const flat: string[] = PERMISSION_AREAS.flatMap((a) => [...a.resources]);
+    const used = [...new Set(PERMISSIONS.map((p) => p.split(":")[0]))];
+    expect(flat).toEqual(used);
+  });
+});
+
+describe("RESOURCE_LABELS", () => {
+  it("has a label for every permission resource", async () => {
+    const { PERMISSIONS } = await import("../lib/roles.js");
+    const { RESOURCE_LABELS } = await import("../components/permission-badges.js");
+    for (const res of new Set(PERMISSIONS.map((p) => p.split(":")[0]))) expect(RESOURCE_LABELS[res], res).toBeTruthy();
+  });
+});
+
+describe("PermissionBadges max", () => {
+  it("truncates with max, unchanged without", async () => {
+    const { PermissionBadges } = await import("../components/permission-badges.js");
+    const perms = ["members:read", "donations:read", "inventory:read", "lending:read", "org:read"] as any[];
+    const full = String(PermissionBadges({ permissions: perms }));
+    const cut = String(PermissionBadges({ permissions: perms, max: 2 }));
+    expect(full).not.toContain("weitere");
+    expect(cut).toContain("+3 weitere");
   });
 });
 

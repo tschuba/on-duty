@@ -73,6 +73,15 @@ export const appRolePermissions = pgTable(
   (t) => [uniqueIndex("app_role_permissions_role_permission_idx").on(t.roleId, t.permission)],
 );
 
+// Optional per-role restriction of members:read/write/delete to derived member statuses
+// (subset of MemberStatus in src/lib/status.ts). No row or empty array = all members.
+export const appRoleMemberScopes = pgTable("app_role_member_scopes", {
+  roleId: uuid("role_id")
+    .primaryKey()
+    .references(() => appRoles.id, { onDelete: "cascade" }),
+  statuses: text("statuses").array().notNull().default([]),
+});
+
 export const userAppRoles = pgTable(
   "user_app_roles",
   {

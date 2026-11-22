@@ -8,7 +8,7 @@ const dbDelete = vi.fn(() => ({ where: dbDeleteWhere }));
 let permissionRows: { roleId: string; permission: string | null }[] = [];
 const selectWhere = vi.fn(() => Promise.resolve(permissionRows));
 const selectLeftJoin = vi.fn(() => ({ where: selectWhere }));
-const selectFrom = vi.fn(() => ({ leftJoin: selectLeftJoin }));
+const selectFrom = vi.fn(() => ({ leftJoin: selectLeftJoin, where: () => Promise.resolve([]) }));
 const dbSelect = vi.fn(() => ({ from: selectFrom }));
 
 vi.mock("../auth.js", () => ({

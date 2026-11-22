@@ -4,6 +4,7 @@ import { eq, or, ilike, asc, desc, and, exists, sql } from "drizzle-orm";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { db } from "../db/index.js";
 import { persons, donors, donations, members } from "../db/schema/index.js";
+import { readableMemberIds } from "../lib/member-scope.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { recipientName } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
@@ -279,7 +280,7 @@ donorRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "dona
   const user = c.get("user");
   const donor = await fetchDonorWithPerson(c.req.param("id"));
   if (!donor) return c.notFound();
-  const canLink = Boolean(user.permissions.has("members:read"));
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
   const canRecord = user.permissions.has("donations:record");
   const history = await db.select().from(donations).where(eq(donations.donorId, donor.id)).orderBy(desc(donations.date));
 
@@ -319,7 +320,7 @@ donorRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record", 
   const donor = await fetchDonorWithPerson(c.req.param("id"));
   if (!donor) return c.notFound();
   if (!user.permissions.has("donations:record")) return c.redirect(`/donors/${donor.id}`);
-  const canLink = Boolean(user.permissions.has("members:read"));
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
 
   return c.html(
     <Layout title={t("donors.editDonor")} user={user}>
@@ -336,7 +337,7 @@ donorRoutes.post("/:id/edit", requireAuth("donations:record"), async (c) => {
   const id = c.req.param("id");
   const donor = await fetchDonorWithPerson(id);
   if (!donor) return c.notFound();
-  const canLink = Boolean(user.permissions.has("members:read"));
+  const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
 
   const body = await c.req.parseBody();
   const { values, errors } = parseDonorPersonFields(body);
