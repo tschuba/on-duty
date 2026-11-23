@@ -1076,7 +1076,7 @@ function InventoryForm({ title, action, values, errors, formId, assignedMemberNa
 }) {
   return (
     <>
-      <PageHeader title={title} backHref={cancelHref ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FieldConfigurator formId={formId} values={values} canConfigure={canConfigure} /><FormActions formId={formId} cancelHref={cancelHref} /></>} />
+      <PageHeader title={title} backHref={returnTo ?? "/inventory"} subtitle={t("common.requiredLegend")} actions={<>{extraActions}<FieldConfigurator formId={formId} values={values} canConfigure={canConfigure} /><FormActions formId={formId} cancelHref={cancelHref} /></>} />
       <form id={formId} method="post" action={action} class="space-y-4 max-w-5xl">
         {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
         <InventoryFormFields values={values} errors={errors} assignedMemberName={assignedMemberName} assignments={assignments} />
@@ -2113,7 +2113,7 @@ inventoryRoutes.get("/:id/inspections/:recordId/edit", requireAuth("inventory:in
   const title = t("inventory.inspection.editTitle", { name: r.inspection.name });
   return c.html(
     <Layout title={title} user={c.get("user")!}>
-      <PageHeader title={title} backHref={base} actions={<FormActions formId="inspection-record-form" cancelHref={base} />} />
+      <PageHeader title={title} backHref={`/inventory/${id}`} actions={<FormActions formId="inspection-record-form" cancelHref={base} />} />
       <form id="inspection-record-form" method="post" action={base} class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
         <ViewField label={t("inventory.inspection.doneDate")} value={formatDate(r.inspectedAt)} />
         <ViewField label={t("inventory.inspection.result")} value={<ResultDot result={r.result} legacy={false} />} />

@@ -110,7 +110,7 @@ function TrainingPage({ user, title, action, back, values, error, picker }: { us
   return (
     <Layout title={title} user={user}>
       <div class="max-w-2xl mx-auto">
-        <PageHeader title={title} backHref={back} actions={<FormActions formId="training-form" cancelHref={back} />} />
+        <PageHeader title={title} backHref={back.startsWith("/training/") ? LIST_URL : back} actions={<FormActions formId="training-form" cancelHref={back} />} />
         <form id="training-form" method="post" action={action} class="space-y-4">
           {error && <div class="alert alert-error text-sm" role="alert">{error}</div>}
           {picker && (

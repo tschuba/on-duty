@@ -1853,7 +1853,7 @@ memberRoutes.get("/:id/edit", requireAuth("members:read"), async (c) => {
     // Nur Bankdaten-Schreibrecht: Formular enthält ausschließlich die Bankdaten.
     return c.html(
       <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-        <PageHeader title={`${m.firstName} ${m.lastName}`} backHref={`/members/${id}`} actions={<FormActions formId="member-form" cancelHref={`/members/${id}`} />} />
+        <PageHeader title={`${m.firstName} ${m.lastName}`} backHref={backHref(c)} actions={<FormActions formId="member-form" cancelHref={`/members/${id}`} />} />
         <form id="member-form" method="post" action={`/members/${id}`} class="space-y-4 max-w-4xl">
           <BankDataSection m={m} editable />
         </form>

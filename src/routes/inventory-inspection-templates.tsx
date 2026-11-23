@@ -90,7 +90,7 @@ async function renderForm(c: any, opts: { id?: string; values?: Values; error?: 
   const title = t(id ? "inventory.templates.edit" : "inventory.templates.new");
   return c.html(
     <Layout title={title} user={c.get("user")!}>
-      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : LIST} actions={<FormActions formId="inspection-template-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
+      <PageHeader title={title} backHref={LIST} actions={<FormActions formId="inspection-template-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
       {opts.error && <div class="alert alert-error max-w-2xl mb-4" role="alert">{opts.error}</div>}
       <form id="inspection-template-form" method="post" action={id ? `${BASE}/${id}` : BASE} class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
         <Field label={t("inventory.form.inspectionName")} required>
