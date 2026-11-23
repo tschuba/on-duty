@@ -446,7 +446,7 @@ roleRoutes.get("/roles/:id/edit", rolesRead, async (c) => {
   return c.html(
     <Layout title={t("admin.roles.modal.edit")} user={c.get("user")}>
       <div class="max-w-2xl mx-auto">
-      <PageHeader title={t("admin.roles.modal.edit")} backHref={`/roles/${id}`} actions={<FormActions formId="role-form" cancelHref={`/roles/${id}`} />} />
+      <PageHeader title={t("admin.roles.modal.edit")} backHref={ROLES_URL} actions={<FormActions formId="role-form" cancelHref={`/roles/${id}`} />} />
       <form id="role-form" method="post" action={`/roles/${id}`} class="flex flex-col gap-3">
         <RoleForm types={types} role={role} hasAssignments={cnt > 0} affected={Number(affected)} />
       </form>

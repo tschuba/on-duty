@@ -139,7 +139,7 @@ async function renderForm(c: any, opts: { id?: string; values?: Values; error?: 
   const title = t(id ? "inventory.itemTemplates.edit" : "inventory.itemTemplates.new");
   return c.html(
     <Layout title={title} user={c.get("user")!}>
-      <PageHeader title={title} backHref={id ? `${BASE}/${id}` : LIST} actions={<FormActions formId="item-template-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
+      <PageHeader title={title} backHref={LIST} actions={<FormActions formId="item-template-form" cancelHref={id ? `${BASE}/${id}` : LIST} />} />
       {opts.error && <div class="alert alert-error max-w-2xl mb-4" role="alert">{opts.error}</div>}
       <form id="item-template-form" method="post" action={id ? `${BASE}/${id}` : BASE} class="flex flex-col gap-4 max-w-2xl">
         <TemplateFields values={values} defs={defs} inspections={inspections} />

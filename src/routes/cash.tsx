@@ -391,7 +391,7 @@ cashRoutes.get("/tags/:id/edit", manage, async (c) => {
   if (!x || x.meaning) return c.redirect(`/cash/tags/${id}`);
   return c.html(
     <Layout title={t("cash.tags.rename")} user={c.get("user")}>
-      <PageHeader title={x.name} backHref={`/cash/tags/${id}`} actions={<FormActions formId="tag-form" cancelHref={`/cash/tags/${id}`} />} />
+      <PageHeader title={x.name} backHref="/cash?view=tags" actions={<FormActions formId="tag-form" cancelHref={`/cash/tags/${id}`} />} />
       <form id="tag-form" method="post" action={`/cash/tags/${id}`} class="max-w-md">
         <Field label={t("cash.tags.name")} required><input type="text" name="name" value={x.name} required class="input w-full" /></Field>
       </form>
@@ -552,7 +552,7 @@ cashRoutes.get("/events/:id/edit", manage, async (c) => {
   if (!x || x.eventId) return c.redirect(`/cash/events/${id}`);
   return c.html(
     <Layout title={t("common.edit")} user={c.get("user")}>
-      <PageHeader title={t("cash.events.edit")} subtitle={x.name} backHref={`/cash/events/${id}`} actions={<FormActions formId="event-form" cancelHref={`/cash/events/${id}`} />} />
+      <PageHeader title={t("cash.events.edit")} subtitle={x.name} backHref="/cash?view=events" actions={<FormActions formId="event-form" cancelHref={`/cash/events/${id}`} />} />
       <EventForm id="event-form" action={`/cash/events/${id}`} x={draftOf(c.req.query()) ?? x} />
     </Layout>,
   );
