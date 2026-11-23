@@ -239,7 +239,7 @@ if (PHASE === "oidc") {
         senderName: SMTP_FROM.includes("<") ? SMTP_FROM.replace(/\s*<.*$/, "").replace(/"/g, "") : "on-duty",
         host: `${SMTP_HOST}:${SMTP_PORT || "587"}`,
         user: SMTP_USER || "",
-        tls: (SMTP_PORT || "587") !== "25",
+        tls: !["25", "1025"].includes(SMTP_PORT || "587"), // 1025 = Mailpit (kein TLS)
         description: "on-duty (managed by zitadel-init)",
         // Password must go via the Auth oneof; the legacy top-level `password` creates a provider the console can't edit
         // and whose SMTP AUTH fails (EMAIL-s9kfs).
@@ -251,13 +251,12 @@ if (PHASE === "oidc") {
       } catch (e) {
         if (!e.message.includes("-> 404")) throw e; // 404: none active yet; anything else must not create a duplicate
       }
-      let id = cfg?.smtp ? cfg.id : undefined; // no active SMTP provider: add one and activate it
-      if (id) {
-        await api("PUT", `/admin/v1/email/smtp/${id}`, body);
-      } else {
-        id = (await api("POST", "/admin/v1/email/smtp", body)).id;
-        await api("POST", `/admin/v1/email/${id}/_activate`, {});
-      }
+      // Update-by-PUT is broken in Zitadel <=4.19 (zitadel#12553: projection fails on the password column, old config stays
+      // active). So replace instead: create + activate the new provider, then delete the previous one.
+      const oldId = cfg?.smtp ? cfg.id : undefined;
+      const id = (await api("POST", "/admin/v1/email/smtp", body)).id;
+      await api("POST", `/admin/v1/email/${id}/_activate`, {});
+      if (oldId) await api("DELETE", `/admin/v1/email/${oldId}`);
       console.log("[zitadel-init] SMTP in Zitadel synchronisiert.");
     } catch (e) {
       console.warn("[zitadel-init] SMTP konnte nicht synchronisiert werden (optional):", e.message);
