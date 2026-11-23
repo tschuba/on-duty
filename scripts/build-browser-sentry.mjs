@@ -36,6 +36,14 @@ await build({
   target: "es2020",
 });
 await build({
+  entryPoints: [`${root}src/browser/busy.ts`],
+  outfile: `${root}public/js/busy.min.js`,
+  bundle: true,
+  minify: true,
+  format: "iife",
+  target: "es2020",
+});
+await build({
   entryPoints: [`${root}src/browser/sentry.ts`],
   outfile: `${root}public/js/sentry.min.js`,
   bundle: true,

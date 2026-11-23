@@ -162,7 +162,7 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
                   {canWriteTypes && !locked ? (
                     <form method="post" action={`/role-types/${ty.id}/allows-active`} class="relative z-10" onclick="event.stopPropagation()">
                       <label class="flex items-center gap-2 text-sm font-normal cursor-pointer" title={t("admin.roleTypes.table.allowsActiveLong")}>
-                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-sm border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content" checked={ty.allowsActiveStatus} onchange="this.form.submit()" aria-label={t("admin.roleTypes.table.allowsActiveLong")} />
+                        <input type="checkbox" name="allowsActiveStatus" value="1" class="toggle toggle-sm border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content" checked={ty.allowsActiveStatus} onchange="this.form.requestSubmit()" aria-label={t("admin.roleTypes.table.allowsActiveLong")} />
                         <span class="max-md:hidden">{t("admin.roleTypes.table.allowsActive")}</span>
                       </label>
                     </form>
@@ -242,7 +242,7 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
                             class="toggle border-2 border-base-content/50 text-base-content/60 hover:border-base-content checked:border-success checked:bg-success checked:text-success-content disabled:opacity-40"
                             checked={r.grantsActiveStatus}
                             disabled={r.isProtected || !canWrite}
-                            onchange="this.form.submit()"
+                            onchange="this.form.requestSubmit()"
                             aria-label={t("admin.roles.table.activeStatus")}
                           />
                         </label>

@@ -149,10 +149,10 @@ accountRoutes.get("/", guard, async (c) => {
         {eventMails !== null && (
           <form method="post" action="/account/mail-prefs" class="mb-6">
             <label class="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" name="events" class="checkbox" checked={eventMails} onchange="this.form.submit()" />
+              <input type="checkbox" name="events" class="checkbox" checked={eventMails} onchange="this.form.requestSubmit()" />
               <span>{t("mail.prefs.events")}</span>
             </label>
-            <TopicPrefs name="topics" prefs={prefs} onchange="this.form.submit()" />
+            <TopicPrefs name="topics" prefs={prefs} onchange="this.form.requestSubmit()" />
           </form>
         )}
         {accountUrl && !isLocalAdmin && (
