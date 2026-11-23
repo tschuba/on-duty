@@ -100,6 +100,21 @@ export function adminAlert(user: AuthedUser, c: NavCounts): "error" | "warning" 
   return c.backupProblem ? "error" : c.pendingUsers > 0 ? "warning" : null;
 }
 
+// Offene Punkte für das Aufgaben-Menü der Navbar (nur Einträge mit Zähler > 0; Rechte stecken schon in den Zählern).
+export function attentionItems(c: NavCounts): { icon: IconName; label: string; href: string; count: number; tone: Tone }[] {
+  const all: { icon: IconName; label: string; href: string; count: number; tone: Tone }[] = [
+    { icon: "icon-[tabler--arrows-exchange]", label: t("inventory.tabs.lending"), href: "/inventory/lending", count: c.loans + c.loanRequests, tone: c.loans > 0 ? "badge-error" : "badge-primary" },
+    { icon: "icon-[tabler--clipboard-check]", label: t("inventory.tabs.inspections"), href: "/inventory/inspections", count: c.inspections, tone: "badge-primary" },
+    { icon: "icon-[tabler--calendar]", label: t("common.nav.events"), href: "/events", count: c.events, tone: "badge-warning" },
+    { icon: "icon-[tabler--users]", label: t("common.nav.members"), href: "/members", count: c.applications, tone: "badge-warning" },
+    { icon: "icon-[tabler--cash]", label: t("donations.tabs.donations"), href: "/donations", count: c.receipts, tone: "badge-warning" },
+    { icon: "icon-[tabler--wallet]", label: t("common.nav.cash"), href: "/cash", count: c.cash, tone: "badge-warning" },
+    { icon: "icon-[tabler--user-shield]", label: t("admin.tabs.usersPermissions"), href: "/admin/users", count: c.pendingUsers, tone: "badge-warning" },
+    { icon: "icon-[tabler--database-export]", label: t("admin.tabs.backup"), href: "/admin/backup", count: c.backupProblem ? 1 : 0, tone: "badge-error" },
+  ];
+  return all.filter((i) => i.count > 0);
+}
+
 // <li>-Einträge für das Benutzermenü (eigener Abschnitt „Administration“).
 export function AdminMenuItems({ user, counts }: { user: AuthedUser; counts: NavCounts }) {
   const items = adminItems(user, counts);
@@ -112,8 +127,6 @@ export function AdminMenuItems({ user, counts }: { user: AuthedUser; counts: Nav
           {i.icon && <Icon name={i.icon} class="h-5 w-5" />}
           <span class="flex-1">{i.label}</span>
           {i.external && <Icon name="icon-[tabler--external-link]" class="h-4 w-4 opacity-60" />}
-          <CountBadge count={i.count ?? 0} tone={i.tone} />
-          {i.alert && <span class="badge badge-sm badge-error ml-1" role="img" aria-label={t("admin.backup.menuAlert")}>!</span>}
         </a>
       </li>
     ))}
