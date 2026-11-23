@@ -52,18 +52,6 @@ const renderAt = async (path: string, ...perms: string[]) => {
 };
 
 describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
-  it("hides the application count without applications:read", async () => {
-    openApplicationsFixture = [{ id: "a1" }];
-    expect(await renderAt("/", "members:read")).not.toContain('badge-warning ml-1">1<');
-  });
-
-  it("shows the open application count on Mitglieder with applications:read", async () => {
-    openApplicationsFixture = [{ id: "a1" }, { id: "a2" }, { id: "a3" }];
-    const html = await renderAt("/events", "members:read", "applications:read");
-    expect(html).not.toContain(">Anträge<");
-    expect(html).toContain('badge-warning ml-1">3<');
-  });
-
   it("shows Ausbildungen only with training:read", async () => {
     expect(await renderAt("/", "members:read")).not.toContain("view=training");
     expect(await renderAt("/", "training:read")).toContain('href="/members"');
@@ -108,7 +96,7 @@ describe("Sidebar — Aktiv-Erkennung und Zähler", () => {
     const html = await renderAt("/events", "donations:issue-receipts");
     expect(html).toContain('href="/donations"');
     expect(html).not.toContain('href="/donors"');
-    expect(html).toContain("badge-warning");
+    expect(html.slice(html.indexOf('id="nav-menu"'))).not.toContain("badge");
   });
 
   it("never queries the DB for a user without the permission", async () => {
@@ -120,27 +108,12 @@ describe("Sidebar — Aktiv-Erkennung und Zähler", () => {
 });
 
 
-describe("events count badge", () => {
-  it("shows pending rsvp count on Termine and hides it at 0", async () => {
-    pendingRsvps = 3;
-    expect(await renderAt("/", "members:read")).toMatch(/Termine[\s\S]{0,200}badge-warning[^>]*>3</);
-    pendingRsvps = 0;
-    expect(await renderAt("/", "members:read")).not.toMatch(/Termine[\s\S]{0,200}badge-warning[^>]*>\d</);
-  });
-});
-
 describe("Verleih-Zähler", () => {
-  it("sums overdue loans and open requests, red once something is overdue", async () => {
+  it("keeps the counts in the tooltip, but renders no badges in the drawer", async () => {
     openLoanRequests = 2;
-    expect(await renderAt("/", "lending:read", "lending:manage")).toMatch(/badge-primary[^>]*>2</);
     overdueLoans = 1;
     const html = await renderAt("/", "lending:read", "lending:manage");
-    expect(html).toMatch(/badge-error[^>]*>3</);
-    expect(html).toMatch(/indicator-item badge badge-error/);
     expect(html).toContain('data-tip="Verleih · 1 überfällig, 2 Anfragen"');
-    // Punkt im eingeklappten Menü auch, wenn die Gruppe gerade aktiv ist.
-    expect(await renderAt("/inventory/lending", "lending:read", "lending:manage")).toMatch(/indicator-item badge badge-error/);
-    openLoanRequests = 1;
-    expect(await renderAt("/", "lending:read", "lending:manage")).toContain("1 überfällig, 1 Anfrage\"");
+    expect(html).not.toContain("indicator-item badge badge-error badge-xs is-drawer-open:hidden");
   });
 });

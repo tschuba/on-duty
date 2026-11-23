@@ -73,6 +73,8 @@ export const de = {
   "donations.view.donations": "Zuwendungen",
   "donations.tabs.donors": "Spender",
   "common.nav.admin": "Admin",
+  "common.nav.attention": "Offene Punkte",
+  "common.nav.attentionNone": "Nichts offen",
   "common.nav.import": "Import",
   "common.nav.anniversaryYears": "Jubiläumsjahre",
   "common.nav.roles": "Funktionen",

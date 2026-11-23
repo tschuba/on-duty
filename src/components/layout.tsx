@@ -15,7 +15,7 @@ import { Icon } from "./icon.js";
 import { getContext } from "hono/context-storage";
 import { getBackupStatus } from "../lib/backup.js";
 import { countCashAttention } from "../lib/cash.js";
-import { AdminMenuItems, adminAlert, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
+import { AdminMenuItems, attentionItems, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
 
 // package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
 const APP_VERSION: string = JSON.parse(readFileSync("package.json", "utf8")).version;
@@ -65,7 +65,6 @@ export const Layout = async ({ title, children, user, path }: Props) => {
     };
   }
 
-  const alert = user && counts ? adminAlert(user, counts) : null;
   const initials = (user?.name ?? "").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
   const brand = user ? "on-duty" : (await loadOrgNameSafe()) || "on-duty";
 
@@ -97,7 +96,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       <div class="drawer lg:drawer-open">
         {user && <><input id="nav-drawer" type="checkbox" autocomplete="off" class="drawer-toggle" aria-label={t("common.nav.toggleSidebar")} /><script dangerouslySetInnerHTML={{ __html: NAV_STATE_SCRIPT }} /></>}
         <div class="drawer-content flex min-h-dvh min-w-0 flex-col">
-      <nav class="navbar bg-base-200 shadow-sm px-4 sticky top-0 z-40 border-b-[3px] border-gold">
+      <nav class="navbar bg-base-200/80 backdrop-blur shadow-sm px-4 sticky top-0 z-40 border-b border-base-300">
         <div class="navbar-start flex-1 items-center">
           {user && (
             <label for="nav-drawer" class="btn btn-ghost btn-square mr-2 lg:hidden" aria-label={t("common.nav.toggleSidebar")}>
@@ -109,17 +108,33 @@ export const Layout = async ({ title, children, user, path }: Props) => {
           </a>
         </div>
         {user && (
-          <div class="navbar-end w-auto">
+          <div class="navbar-end w-auto gap-1">
+            {counts && (() => { const items = attentionItems(counts); const total = items.reduce((n, i) => n + i.count, 0); return (
+              <div class="dropdown dropdown-end max-sm:static">
+                <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-square" aria-label={t("common.nav.attention")} title={t("common.nav.attention")}>
+                  <span class="indicator">
+                    {total > 0 && <span class={`indicator-item badge badge-xs ${items.some((i) => i.tone === "badge-error") ? "badge-error" : "badge-warning"}`}>{total}</span>}
+                    <Icon name="icon-[tabler--bell]" class="h-5 w-5" />
+                  </span>
+                </div>
+                <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-[min(18rem,calc(100vw-2rem))] p-2 shadow">
+                  <li class="menu-title">{t("common.nav.attention")}</li>
+                  {items.length === 0 && <li class="disabled"><span>{t("common.nav.attentionNone")}</span></li>}
+                  {items.map((i) => (
+                    <li><a href={i.href}><Icon name={i.icon} class="h-5 w-5" /><span class="flex-1">{i.label}</span><CountBadge count={i.count} tone={i.tone} /></a></li>
+                  ))}
+                </ul>
+              </div>
+            ); })()}
             <div class="dropdown dropdown-end">
               <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
                 <span class="flex items-center gap-1.5">
-                  <div class="avatar avatar-placeholder tooltip tooltip-left lg:hidden" data-tip={user.name}>
+                  <div class="avatar avatar-placeholder">
                     <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
                       <span>{initials}</span>
                     </div>
                   </div>
                   <span class="hidden lg:inline">{user.name}</span>
-                  {alert && <span class={`badge badge-xs ${alert === "error" ? "badge-error" : "badge-warning"}`} role="img" aria-label={t("common.nav.admin")} />}
                   <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4 opacity-60" />
                 </span>
               </div>
@@ -160,6 +175,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
             </div>
           </div>
         )}
+        <i class="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" aria-hidden="true" />
       </nav>
       <div class="relative flex-1 flex flex-col">
         <main id="busy-main" class="container mx-auto px-4 py-6 flex-1 flex flex-col">{children}</main>
