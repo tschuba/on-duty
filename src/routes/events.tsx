@@ -441,7 +441,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
               <form method="post" action="/events/public-settings">
                 <label class="label cursor-pointer justify-between gap-3">
                   <span class="text-sm">{publicEnabled ? t("events.publicSettings.on") : t("events.publicSettings.off")}</span>
-                  <input type="checkbox" name="enabled" value="1" class="toggle toggle-success" checked={publicEnabled} onchange="this.form.submit()" />
+                  <input type="checkbox" name="enabled" value="1" class="toggle toggle-success" checked={publicEnabled} onchange="this.form.requestSubmit()" />
                 </label>
               </form>
               {publicEnabled ? (

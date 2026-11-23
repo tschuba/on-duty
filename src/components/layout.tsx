@@ -36,6 +36,10 @@ export { CountBadge };
 // so this stays a self-contained addition (only queries when the viewer actually has
 // the permission) instead of threading a count prop through every route that renders
 // the nav.
+const BusyLamp = () => (
+  <span class="busy"><span class="lens"><b /><i /></span><svg viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 100L7 14Q8 6 17 5Q50 -3 83 5Q92 6 93 14L100 100Z" /></svg><span class="foot" /></span>
+);
+
 export const Layout = async ({ title, children, user, path }: Props) => {
   const has = (p: string) => Boolean(user?.permissions.has(p as never));
   let reqPath = path ?? "";
@@ -81,11 +85,14 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       <script dangerouslySetInnerHTML={{ __html: `if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("/sw.js")})` }} />
       <link rel="stylesheet" href="/css/app.css" />
       <script src="/js/htmx.min.js" />
+      <script src="/js/busy.min.js" defer />
       {user && readDsn() && <script src="/js/sentry.min.js" />}
     </head>
     <body class="bg-base-100 min-h-dvh flex flex-col">
       {/* Toast container — filled by HX-Trigger: showToast */}
       <div id="toast-container" class="toast toast-top toast-end z-50" />
+      <div id="busy-bar" hidden class="busy-bar" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+      <svg width="0" height="0" class="absolute" aria-hidden="true"><clipPath id="busy-clip" clipPathUnits="objectBoundingBox"><path d="M0 1L.07 .14Q.08 .06 .17 .05Q.5 -.03 .83 .05Q.92 .06 .93 .14L1 1Z" /></clipPath></svg>
 
       <div class="drawer lg:drawer-open">
         {user && <><input id="nav-drawer" type="checkbox" autocomplete="off" class="drawer-toggle" aria-label={t("common.nav.toggleSidebar")} /><script dangerouslySetInnerHTML={{ __html: NAV_STATE_SCRIPT }} /></>}
@@ -154,7 +161,16 @@ export const Layout = async ({ title, children, user, path }: Props) => {
           </div>
         )}
       </nav>
-      <main class="container mx-auto px-4 py-6 flex-1 flex flex-col">{children}</main>
+      <div class="relative flex-1 flex flex-col">
+        <main id="busy-main" class="container mx-auto px-4 py-6 flex-1 flex flex-col">{children}</main>
+        <div id="busy-overlay" hidden data-aborted={t("common.busy.aborted")} data-error={t("common.busy.failed")} class="busy-overlay">
+          <div class="busy-center" role="status" aria-label={t("common.busy")}>
+            <span class="hl"><BusyLamp /></span>
+            <div class="font-medium">{t("common.busy")}</div>
+            <button id="busy-cancel" type="button" hidden class="btn btn-sm btn-outline mt-3">{t("common.cancel")}</button>
+          </div>
+        </div>
+      </div>
         <footer class="sticky bottom-0 mt-auto h-6 shrink-0 px-4 flex items-center justify-center gap-3 text-xs text-base-content/40 bg-base-100 pointer-events-none"><a href={SOURCE_REPO_URL} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">{t("common.footer.source")}</a><a href={`${SOURCE_REPO_URL}/releases/tag/v${APP_VERSION}`} target="_blank" rel="noopener" class="link link-hover pointer-events-auto">v{APP_VERSION}</a></footer>
         </div>
         {user && counts && (
@@ -212,9 +228,6 @@ export const Layout = async ({ title, children, user, path }: Props) => {
           if (!a || a.search || a.origin !== location.origin || a.pathname === location.pathname || e.defaultPrevented) return;
           try { const s = sessionStorage.getItem("filter:" + a.pathname); if (s) a.search = s; } catch(e) {}
         }, true);
-        // HTMX spinner: add loading class to triggering element
-        document.body.addEventListener("htmx:beforeRequest", (e) => e.detail.elt.classList.add("loading", "loading-spinner"));
-        document.body.addEventListener("htmx:afterRequest", (e) => e.detail.elt.classList.remove("loading", "loading-spinner"));
       ` }} />
     {user && <script dangerouslySetInnerHTML={{ __html: NAV_SCRIPT }} />}
     {/* Pflichtfelder mit Floating Label: der Placeholder ist das einzige sichtbare Label; ein Overlay (unsichtbarer Placeholder-Text + roter Stern) markiert sie auch im leeren Zustand (auch nach htmx-Swaps). */}

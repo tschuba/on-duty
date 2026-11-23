@@ -102,7 +102,7 @@ mailTemplateRoutes.get("/", async (c) => {
                           </a>
                         )}
                         <button type="button" class="btn btn-ghost btn-sm btn-square" title={t("mailTemplates.quick")} aria-label={`${x.custom ? x.custom.meta.name : CATALOG[x.key].name}: ${t("mailTemplates.quick")}`}
-                          hx-get={`/mail/templates/${x.key}/quick`} hx-target="#quick-body" {...{ "hx-on::after-request": "if(event.detail.successful)document.getElementById('quick-dialog').showModal()" }} onclick="event.stopPropagation()">
+                          hx-get={`/mail/templates/${x.key}/quick`} data-no-busy hx-target="#quick-body" {...{ "hx-on::after-request": "if(event.detail.successful)document.getElementById('quick-dialog').showModal()" }} onclick="event.stopPropagation()">
                           <Icon name="icon-[tabler--search]" class="h-5 w-5" />
                         </button>
                       </td>
