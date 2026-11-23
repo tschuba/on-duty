@@ -620,6 +620,7 @@ function StatusPreview({ saved }: { saved?: MemberStatus }) {
   return (
     <div
       hx-post="/members/status-preview"
+      data-no-busy
       hx-include="closest form"
       hx-trigger="load, input from:closest form delay:300ms, change from:closest form, assignment-modal from:body delay:100ms, htmx:afterSettle from:#role-rows delay:100ms"
       hx-target="#status-preview"
