@@ -110,10 +110,12 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         {user && (
           <div class="navbar-end w-auto gap-1">
             {counts && (() => { const items = attentionItems(counts); const total = items.reduce((n, i) => n + i.count, 0); return (
-              <div class="dropdown dropdown-end">
-                <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-square indicator" aria-label={t("common.nav.attention")} title={t("common.nav.attention")}>
-                  {total > 0 && <span class={`indicator-item badge badge-xs ${items.some((i) => i.tone === "badge-error") ? "badge-error" : "badge-warning"}`}>{total}</span>}
-                  <Icon name="icon-[tabler--bell]" class="h-5 w-5" />
+              <div class="dropdown dropdown-end max-sm:static">
+                <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-square" aria-label={t("common.nav.attention")} title={t("common.nav.attention")}>
+                  <span class="indicator">
+                    {total > 0 && <span class={`indicator-item badge badge-xs ${items.some((i) => i.tone === "badge-error") ? "badge-error" : "badge-warning"}`}>{total}</span>}
+                    <Icon name="icon-[tabler--bell]" class="h-5 w-5" />
+                  </span>
                 </div>
                 <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-[min(18rem,calc(100vw-2rem))] p-2 shadow">
                   <li class="menu-title">{t("common.nav.attention")}</li>
