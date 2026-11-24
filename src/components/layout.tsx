@@ -110,7 +110,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         </div>
         {user && <div class="flex min-w-0 flex-1 justify-center px-4 max-sm:flex-none max-sm:px-0"><GlobalSearch /></div>}
         {user && (
-          <div class="navbar-end w-auto gap-1">
+          <div class="navbar-end w-auto gap-2">
             {counts && (() => { const items = attentionItems(counts); const total = items.reduce((n, i) => n + i.count, 0); return (
               <div class="dropdown dropdown-end max-sm:static">
                 <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-square" aria-label={t("common.nav.attention")} title={t("common.nav.attention")}>
@@ -129,16 +129,12 @@ export const Layout = async ({ title, children, user, path }: Props) => {
               </div>
             ); })()}
             <div class="dropdown dropdown-end">
-              <div tabindex={0} role="button" class="btn btn-ghost btn-sm gap-1" aria-label={user.name}>
-                <span class="flex items-center gap-1.5">
-                  <div class="avatar avatar-placeholder">
-                    <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
-                      <span>{initials}</span>
-                    </div>
+              <div tabindex={0} role="button" class="btn btn-ghost btn-sm btn-square" aria-label={user.name} title={user.name}>
+                <div class="avatar avatar-placeholder">
+                  <div class="bg-primary text-primary-content w-7 rounded-full text-xs">
+                    <span>{initials}</span>
                   </div>
-                  <span class="hidden lg:inline">{user.name}</span>
-                  <Icon name="icon-[tabler--chevron-down]" class="h-4 w-4 opacity-60" />
-                </span>
+                </div>
               </div>
               <ul tabindex={0} class="dropdown-content menu bg-base-200 rounded-box z-10 w-[min(18rem,calc(100vw-2rem))] p-2 shadow">
                 <li class="pointer-events-none mb-1">
