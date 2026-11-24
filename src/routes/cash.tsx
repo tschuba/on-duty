@@ -857,7 +857,7 @@ cashRoutes.get("/", report, async (c) => {
             options: (["income", "expense"] as const).map((d) => ({ value: d, label: t(`cash.direction.${d}`) })) },
           { type: "select", param: "tag", title: t("cash.filter.tag"), allLabel: t("cash.filter.allTags"), selected: q.tag ? [q.tag] : [], options: tags.map((x) => ({ value: x.id, label: x.name })) },
           { type: "select", param: "event", title: t("cash.filter.event"), allLabel: t("cash.filter.allEvents"), selected: q.event ? [q.event] : [], options: evs.map((e) => ({ value: e.id, label: e.name })) },
-          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" || (range.mode === "preset" && range.id === "all") ? [] : ["1"], node: (
             <QuickRangeFilter presets={presets} range={range} dir="past" action="/cash" names={{ start: "from", end: "to" }} bare href={(p) => buildListUrl("/cash", stateNoRange, p)} />
           ) },
           { type: "select", param: "status", title: t("cash.filter.status"), allLabel: t("cash.filter.statusAll"), selected: status ? [status] : [], options: STATUSES.map((s) => ({ value: s, label: t(`cash.status.${s}`) })) },
