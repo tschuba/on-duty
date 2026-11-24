@@ -80,6 +80,20 @@ function adminItems(user: AuthedUser, c: NavCounts): Leaf[] {
 
 const NO_COUNTS: NavCounts = { applications: 0, receipts: 0, cash: 0, inspections: 0, loans: 0, loanRequests: 0, events: 0, org: false, pendingUsers: 0, backupProblem: false };
 
+// Schnellaktionen "Anlegen" für die globale Suche, Reihenfolge wie im Drawer.
+export function createLinks(user: AuthedUser): { label: string; href: string; icon: IconName; key: string }[] {
+  const has = (p: string) => user.permissions.has(p as never);
+  const all: [boolean, string, string, IconName, string][] = [
+    [has("events:manage"), t("events.newEvent"), "/events/new", "icon-[tabler--calendar]", "events"],
+    [has("members:write"), t("members.addMember"), "/members/new", "icon-[tabler--users]", "members"],
+    [has("donations:record"), t("donors.newDonor"), "/donors/new", "icon-[tabler--cash]", "donors"],
+    [has("inventory:manage"), t("inventory.newItem"), "/inventory/new", "icon-[tabler--building-warehouse]", "inventory"],
+    [has("lending:manage"), t("lending.newLoan"), "/inventory/lending/loans/new", "icon-[tabler--arrows-exchange]", "lending"],
+    [has("system:admin") || has("mail:templates"), t("mailTemplates.new"), "/mail/templates/new", "icon-[tabler--mail]", "mail"],
+  ];
+  return all.filter((a) => a[0]).map(([, label, href, icon, key]) => ({ label, href, icon, key }));
+}
+
 // Flache Linkliste für die globale Suche; `show` hängt nur an Rechten, daher reichen Null-Zähler.
 export function menuLinks(user: AuthedUser): { label: string; href: string; parent?: string; icon: IconName; external?: boolean }[] {
   const out: ReturnType<typeof menuLinks> = [];
