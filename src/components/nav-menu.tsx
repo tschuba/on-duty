@@ -103,6 +103,25 @@ export function menuLinks(user: AuthedUser): { label: string; href: string; pare
       for (const k of i.children?.filter((x) => x.show) ?? []) out.push({ label: k.label, href: k.href, parent: g.label, icon: g.icon });
     }
   }
+  // Ansichten (TitleSwitch) einzelner Seiten; Rechte wie in den jeweiligen Routen.
+  const has = (p: string) => user.permissions.has(p as never);
+  const any = (...p: string[]) => p.some(has);
+  const donations = any("donations:read", "donations:record", "donations:issue-receipts");
+  const cashRead = any("cash:read", "cash:manage");
+  const views: [boolean, string, string, string, IconName][] = [
+    [has("training:read"), t("common.nav.training"), "/members?view=training", t("common.nav.members"), "icon-[tabler--users]"],
+    [any("member-roles:read", "member-role-types:read"), t("common.nav.roles"), "/members?view=roles", t("common.nav.members"), "icon-[tabler--users]"],
+    [has("anniversary-years:read"), t("common.nav.anniversaryYears"), "/anniversaries?view=years", t("common.nav.anniversaries"), "icon-[tabler--cake]"],
+    [donations, t("donations.tabs.donors"), "/donations?view=donors", t("common.nav.donations"), "icon-[tabler--cash]"],
+    [any("cash:report", "cash:read", "cash:manage"), t("cash.view.report"), "/cash?view=report", t("common.nav.cash"), "icon-[tabler--wallet]"],
+    [cashRead, t("cash.view.tags"), "/cash?view=tags", t("common.nav.cash"), "icon-[tabler--wallet]"],
+    [cashRead, t("cash.view.events"), "/cash?view=events", t("common.nav.cash"), "icon-[tabler--wallet]"],
+    [has("inventory:configure"), t("inventory.tabs.itemTemplates"), "/inventory?view=templates", t("common.nav.inventory"), "icon-[tabler--building-warehouse]"],
+    [has("inventory:configure"), t("inventory.tabs.fields"), "/inventory?view=fields", t("common.nav.inventory"), "icon-[tabler--building-warehouse]"],
+    [has("inventory:configure"), t("inventory.tabs.inspectionTemplates"), "/inventory/inspections?view=templates", t("inventory.tabs.inspections"), "icon-[tabler--clipboard-check]"],
+    [has("system:admin"), t("admin.tabs.permissions"), "/admin/permissions", t("common.nav.admin"), "icon-[tabler--settings]"],
+  ];
+  for (const [ok, label, href, parent, icon] of views) if (ok) out.push({ label, href, parent, icon });
   for (const i of adminItems(user, NO_COUNTS)) out.push({ label: i.label, href: i.href, parent: t("common.nav.admin"), icon: i.icon ?? "icon-[tabler--settings]", external: i.external });
   return out;
 }
