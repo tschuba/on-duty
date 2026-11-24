@@ -16,6 +16,7 @@ import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { t } from "../i18n/index.js";
 import { TitleSwitch } from "../components/title-switch.js";
+import { PageSearch } from "../components/page-search.js";
 import { memberViews } from "./members.js";
 
 const ROLES_URL = "/members?view=roles";
@@ -95,6 +96,8 @@ function MoveButtons({ action, id, disabled }: { action: string; id: string; dis
 export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { message: string; detail?: string[]; title?: string }) => {
   const user = c.get("user");
   const activeFilter = c.req.query("active"); // "1" | "0" | undefined
+  const search = (c.req.query("search") ?? "").trim();
+  const needle = search.toLowerCase();
 
   const [types, allRoles] = await Promise.all([
     db.select().from(memberRoleTypes).orderBy(asc(memberRoleTypes.sortOrder)),
@@ -118,7 +121,9 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
       .orderBy(asc(memberRoles.sortOrder)),
   ]);
   // Types-only readers see the groups, but no role rows.
-  const rolesWithCount = user.permissions.has("member-roles:read") ? allRoles : [];
+  const rolesWithCount = (user.permissions.has("member-roles:read") ? allRoles : []).filter((r) => !needle || r.title.toLowerCase().includes(needle));
+  // Suche blendet Typen ohne Treffer aus (Typname trifft nicht, Rollen auch nicht).
+  const shownTypes = needle ? types.filter((ty) => ty.name.toLowerCase().includes(needle) || rolesWithCount.some((r) => r.typeId === ty.id)) : types;
   const typeCounts = new Map<string, number>();
   const flaggedCounts = new Map<string, number>();
   const allRoleRows = await db.select({ typeId: memberRoles.typeId, grants: memberRoles.grantsActiveStatus }).from(memberRoles);
@@ -130,12 +135,13 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
   const canDeletePerm = user.permissions.has("member-roles:delete");
   const canWriteTypes = user.permissions.has("member-role-types:write");
   const canDeleteTypes = user.permissions.has("member-role-types:delete");
-  const canReorder = canWrite && !activeFilter;
+  const canReorder = canWrite && !activeFilter && !search;
 
   return c.html(
     <Layout title={t("admin.roles.title")} user={user}>
 
       <div class="max-w-4xl mx-auto">
+      <PageSearch label={t("admin.roles.title")} value={search} hidden={[["view", "roles"], ...(activeFilter ? [["active", activeFilter] as [string, string]] : [])]} />
       <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "roles")} />} actions={<>
         {canWriteTypes && <HeaderAction variant="secondary" icon="icon-[tabler--plus]" label={t("admin.roleTypes.new")} class="btn-outline" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
         {canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
@@ -143,11 +149,11 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
         <ToggleFilter items={pairToggles(activeFilter === "1" || activeFilter === "0" ? activeFilter : "",
           [{ value: "1", label: t("admin.roles.filterActive") }, { value: "0", label: t("admin.roles.filterPassive") }],
-          (v) => (v ? `${ROLES_URL}&active=${v}` : ROLES_URL))} />
+          (v) => `${ROLES_URL}${v ? `&active=${v}` : ""}${search ? `&search=${encodeURIComponent(search)}` : ""}`)} />
       </div>
 
       {canWrite && <ClickToEditHint />}
-      {types.map((ty) => {
+      {shownTypes.map((ty) => {
         const typeRoles = rolesWithCount.filter((r) => r.typeId === ty.id);
         const locked = ty.allowsActiveStatus ? flaggedCounts.get(ty.id) ?? 0 : 0;
         return (
@@ -174,7 +180,7 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
                   )}
                   {canWriteTypes && <MoveButtons action={`/role-types/${ty.id}/move`} id={ty.id} />}
                   {(() => {
-                    const delOk = canDeleteTypes && !ty.isProtected && typeRoles.length === 0;
+                    const delOk = canDeleteTypes && !ty.isProtected && (typeCounts.get(ty.id) ?? 0) === 0;
                     const delWhy = ty.isProtected ? t("admin.roleTypes.cannotDelete.protected") : t("admin.roleTypes.cannotDelete.notEmpty", { count: typeCounts.get(ty.id) ?? 0 });
                     const openDel = `event.stopPropagation(); document.getElementById('delete-type-${ty.id}').showModal()`;
                     return (<>

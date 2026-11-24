@@ -24,7 +24,7 @@ inputs.forEach(function(i){
 // Seitensuche: [data-page-search] (page-search.tsx) und Filterdialog [data-page-filter] (filter-dialog.tsx) der aktuellen Seite.
 var pc=document.querySelector("[data-page-chip]"),ps=document.querySelector("[data-page-search]"),fd=document.querySelector("[data-page-filter]"),text=inputs[0].dataset.pageText;
 var q=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
-function sync(){inputs.forEach(function(i){var c=i.closest("label").querySelector("[data-gs-chip]");if(c){c.classList.toggle("hidden",!pc);if(pc){c.href=pc.href;c.querySelector("[data-gs-chip-t]").textContent=pc.textContent}}var b=i.closest("label").querySelector("[data-gs-badge]");if(!b)return;var on=!!ps&&ps.value!==""&&i.value===ps.value;b.classList.toggle("hidden",!on);if(on)b.querySelector("[data-gs-badge-t]").textContent=ps.dataset.label})}
+function sync(){q("[data-gs-pageico]").forEach(function(e){e.classList.toggle("hidden",!ps)});q("[data-gs-globalico]").forEach(function(e){e.classList.toggle("hidden",!!ps)});inputs.forEach(function(i){var c=i.closest("label").querySelector("[data-gs-chip]");if(c){c.classList.toggle("hidden",!pc);if(pc){c.href=pc.href;c.querySelector("[data-gs-chip-t]").textContent=pc.textContent}}var b=i.closest("label").querySelector("[data-gs-pageico]");if(!b)return;var on=!!ps&&ps.value!==""&&i.value===ps.value;b.toggleAttribute("data-on",on);b.tabIndex=on?0:-1;b.title=on?b.dataset.reset:b.dataset.idle})}
 // Seiten ohne Formular (client) filtern selbst: nur ein input-Event auslösen.
 function go(v){ps.value=v;if(!ps.hasAttribute("data-client"))ps.form.requestSubmit();else{ps.dispatchEvent(new Event("input",{bubbles:true}));if(dlg.open)dlg.close();else inputs[0].blur();sync()}}
 function pre(i){i.value=ps?ps.value:"";if(i.value)i.dataset.gsPre=i.value;else delete i.dataset.gsPre}
@@ -49,7 +49,7 @@ if(fd){var n=+fd.dataset.count||0;q("[data-gs-filter]").forEach(function(b){b.cl
 document.addEventListener("click",function(e){
   var a=e.target.closest("[data-gs-page]");
   if(a&&ps){e.preventDefault();go(inputs.filter(function(x){return res(x).contains(a)})[0].value.trim());return}
-  if(ps&&e.target.closest("[data-gs-badge-x]")){e.preventDefault();inputs.forEach(function(x){x.value="";delete x.dataset.gsPre});go("");return}
+  if(ps&&e.target.closest("[data-gs-pageico][data-on]")){e.preventDefault();inputs.forEach(function(x){x.value="";delete x.dataset.gsPre});go("");return}
   if(fd&&e.target.closest("[data-gs-filter]"))fd.showModal();
 });
 var toggle=function(){
@@ -75,12 +75,6 @@ export function GlobalSearch() {
       <span data-gs-chip-t class="truncate" /><Icon name="icon-[tabler--x]" class="h-3.5 w-3.5 shrink-0" />
     </a>
   );
-  const badge = (
-    <span data-gs-badge class="badge badge-primary badge-sm hidden max-w-32 gap-1 pr-0.5">
-      <span data-gs-badge-t class="truncate" />
-      <button type="button" data-gs-badge-x class="cursor-pointer" aria-label={t("search.pageReset")} title={t("search.pageReset")}><Icon name="icon-[tabler--x]" class="h-3.5 w-3.5" /></button>
-    </span>
-  );
   const filterBtn = (cls: string, label: boolean) => (
     <button type="button" data-gs-filter class={`btn btn-ghost btn-sm hidden ${label ? "" : "indicator "}${cls}`} aria-label={t("search.filter")} title={t("search.filter")}>
       <Icon name="icon-[tabler--filter]" class="h-4 w-4 shrink-0" />
@@ -93,8 +87,9 @@ export function GlobalSearch() {
       <div class="mx-auto hidden w-full min-w-0 max-w-72 items-center gap-2 sm:flex lg:max-w-xl">
         <div class="group relative min-w-0 flex-1">
           <label class="input input-sm flex w-full items-center gap-2">
-            <Icon name="icon-[tabler--search]" class="h-4 w-4 opacity-60" />
-            {chip}{badge}
+            <span data-gs-globalico class="icon-[tabler--search] h-4 w-4 opacity-60" />
+            <button type="button" data-gs-pageico data-idle={t("search.thisPage")} data-reset={t("search.pageReset")} title={t("search.thisPage")} aria-label={t("search.thisPage")} tabIndex={-1} class="group/pi hidden [&:not(.hidden)]:inline-flex h-5 shrink-0 cursor-default items-center gap-0.5 rounded px-0.5 text-primary data-[on]:cursor-pointer data-[on]:bg-primary/15 data-[on]:hover:bg-primary/25"><Icon name="icon-[tabler--list-search]" class="h-4 w-4" /><Icon name="icon-[tabler--x]" class="hidden h-3.5 w-3.5 group-data-[on]/pi:inline-block" /></button>
+            {chip}
             <input id="gs-input" type="search" class="grow" placeholder={t("search.placeholder")} aria-label={t("search.placeholder")} autocomplete="off" data-hint={t("search.minChars")} data-page-text={t("search.thisPage")} {...hx("#gs-results")} />
             <kbd class="kbd kbd-xs max-lg:hidden">/</kbd><kbd class="kbd kbd-xs max-sm:hidden" data-gs-mod>Strg K</kbd>
           </label>
@@ -110,8 +105,9 @@ export function GlobalSearch() {
       <dialog id="gs-dialog" class="modal modal-top">
         <div class="modal-box p-2">
           <label class="input flex w-full items-center gap-2">
-            <Icon name="icon-[tabler--search]" class="h-4 w-4 opacity-60" />
-            {chip}{badge}
+            <span data-gs-globalico class="icon-[tabler--search] h-4 w-4 opacity-60" />
+            <button type="button" data-gs-pageico data-idle={t("search.thisPage")} data-reset={t("search.pageReset")} title={t("search.thisPage")} aria-label={t("search.thisPage")} tabIndex={-1} class="group/pi hidden [&:not(.hidden)]:inline-flex h-5 shrink-0 cursor-default items-center gap-0.5 rounded px-0.5 text-primary data-[on]:cursor-pointer data-[on]:bg-primary/15 data-[on]:hover:bg-primary/25"><Icon name="icon-[tabler--list-search]" class="h-4 w-4" /><Icon name="icon-[tabler--x]" class="hidden h-3.5 w-3.5 group-data-[on]/pi:inline-block" /></button>
+            {chip}
             <input id="gs-input-m" type="search" class="grow" placeholder={t("search.placeholder")} aria-label={t("search.placeholder")} autocomplete="off" data-hint={t("search.minChars")} {...hx("#gs-results-m")} />
           </label>
           <div id="gs-results-m" role="listbox" class="mt-2 max-h-[60dvh] overflow-auto" />
