@@ -2,7 +2,7 @@ import { t } from "../i18n/index.js";
 import { Icon } from "./icon.js";
 
 const hx = (target: string) => ({
-  "hx-get": "/search", "hx-trigger": "input changed delay:250ms[target.value.trim().length>=2]", "hx-sync": "this:replace", "hx-target": target, "hx-swap": "innerHTML", name: "q",
+  "hx-get": "/search", "hx-trigger": "input changed delay:250ms, focus", "hx-sync": "this:replace", "hx-target": target, "hx-swap": "innerHTML", name: "q",
 });
 
 // Kürzel (Strg/Cmd+K, /), Pfeiltasten und Enter. Unter 2 Zeichen keine Anfrage, nur Hinweis.
@@ -12,7 +12,6 @@ if(!dlg||!inputs[0])return;
 if(/Mac|iPhone|iPad/.test(navigator.platform))document.querySelectorAll("[data-gs-mod]").forEach(function(k){k.textContent="\\u2318 K"});
 var res=function(i){return document.getElementById(i.id==="gs-input"?"gs-results":"gs-results-m")};
 inputs.forEach(function(i){
-  i.addEventListener("input",function(){if(i.value.trim().length<2){var r=res(i);r.innerHTML="";if(i.value.trim().length>0){var d=document.createElement("div");d.className="px-3 py-2 text-sm opacity-60";d.textContent=i.dataset.hint;r.append(d)}}});
   i.addEventListener("keydown",function(e){
     var r=res(i),it=[].slice.call(r.querySelectorAll("[data-gs-item]")),cur=it.findIndex(function(a){return a.getAttribute("aria-selected")==="true"});
     if(e.key==="ArrowDown"||e.key==="ArrowUp"){if(!it.length)return;e.preventDefault();var n=(cur+(e.key==="ArrowDown"?1:-1)+it.length)%it.length;it.forEach(function(a,k){a.setAttribute("aria-selected",k===n?"true":"false")});it[n].scrollIntoView({block:"nearest"})}

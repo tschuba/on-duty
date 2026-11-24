@@ -3,7 +3,7 @@ import { and, asc, desc, gte, ilike, isNull, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { events, inventoryItems } from "../db/schema/index.js";
 import { Icon, type IconName } from "../components/icon.js";
-import { menuLinks } from "../components/nav-menu.js";
+import { createLinks, menuLinks } from "../components/nav-menu.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { formatDay, now, resolveTimezone } from "../lib/datetime.js";
@@ -25,6 +25,10 @@ const escapeLike = (q: string) => q.replace(/[\\%_]/g, "\\$&");
 searchRoutes.get("/", requireAuth(), async (c) => {
   const user = c.get("user");
   const q = (c.req.query("q") ?? "").trim();
+  const toHit = (l: ReturnType<typeof createLinks>[number]): Hit => ({ title: l.label, href: l.href, icon: "icon-[tabler--plus]" });
+  const creates = (needle: string) => createLinks(user).filter((l) => l.label.toLowerCase().includes(needle)).map(toHit);
+  const createGroup = (hits: Hit[]): Group => ({ label: t("search.group.create"), hits });
+  if (q.length === 0) return c.html(renderGroups([createGroup(creates(""))]));
   if (q.length < MIN_CHARS) return c.html(<div class="px-3 py-2 text-sm opacity-60">{t("search.minChars")}</div>);
 
   const has = (p: string) => user.permissions.has(p as never);
@@ -58,16 +62,27 @@ searchRoutes.get("/", requireAuth(), async (c) => {
       .then((rows) => rows.map<Hit>((e) => ({ title: e.title, href: `/events/${e.id}`, icon: "icon-[tabler--calendar]", extra: formatDay(e.startsAt, tz), cancelled: Boolean(e.cancelledAt) }))),
   ]);
 
+  const created = creates(needle);
+  // Ohne Labeltreffer steht die Aktion als erster Eintrag in der Gruppe der gefundenen Kategorie.
+  const withAction = (key: string, hits: Hit[]) => {
+    const a = createLinks(user).find((l) => l.key === key);
+    return a && hits.length > 0 && !created.some((h) => h.href === a.href) ? [toHit(a), ...hits] : hits;
+  };
   const groups: Group[] = [
+    createGroup(created),
     { label: t("search.group.menu"), hits: menu },
-    { label: t("search.group.members"), hits: members },
-    { label: t("search.group.inventory"), hits: inventory },
-    { label: t("search.group.events"), hits: evs },
+    { label: t("search.group.members"), hits: withAction("members", members) },
+    { label: t("search.group.inventory"), hits: withAction("inventory", inventory) },
+    { label: t("search.group.events"), hits: withAction("events", evs) },
   ].filter((g) => g.hits.length > 0);
 
   if (groups.length === 0) return c.html(<div class="px-3 py-2 text-sm opacity-60">{t("common.nav.noResults")}</div>);
+  return c.html(renderGroups(groups));
+});
+
+function renderGroups(groups: Group[]) {
   let first = true;
-  return c.html(
+  return (
     <>
       {groups.map((g) => (
         <div role="group" aria-label={g.label}>
@@ -88,6 +103,6 @@ searchRoutes.get("/", requireAuth(), async (c) => {
           })}
         </div>
       ))}
-    </>,
+    </>
   );
-});
+}

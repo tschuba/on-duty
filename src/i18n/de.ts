@@ -63,6 +63,8 @@ export const de = {
   "search.placeholder": "Suchen …",
   "search.open": "Suche öffnen",
   "search.minChars": "Mindestens 2 Zeichen",
+  "events.newEvent": "Neuer Termin",
+  "search.group.create": "Neu anlegen",
   "search.group.menu": "Menü",
   "search.group.members": "Mitglieder",
   "search.group.inventory": "Inventar",
