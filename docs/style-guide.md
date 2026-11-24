@@ -48,6 +48,7 @@ daisyUI v5. Die v4-Klassen `form-control`, `label-text`, `input-bordered`, `sele
 - Sidebar (`src/components/nav-menu.tsx`) statt Tab-Leisten: ab `lg` dauerhaft links (`w-64`, einklappbar auf Icon-Leiste `w-14`), darunter Drawer per Hamburger in der Navbar.
 - Untermenüs sind `<details name="nav">` (Akkordeon); die Menüstruktur steht nur in `menuDefinition()`. Neue Seiten dort eintragen, nicht pro Route.
 - Dritte Ebene: Ein Eintrag kann `children` haben (z. B. Inventar > Bestand > Prüfvorlagen/Felder). Er bleibt ein Link; die Kinder stehen als verschachteltes `<ul>` (daisyUI-`menu`) darunter und sind nur sichtbar, wenn er oder ein Kind aktiv ist. Kinder erscheinen nur bei sichtbarem Eltern-Eintrag.
+- Globale Suche (`src/components/global-search.tsx`, `src/routes/search.tsx`): ab `lg` Feld in der Navbar-Mitte, darunter Lupen-Button mit `<dialog class="modal">`. Kürzel `Strg/Cmd+K` (überall) und `/` (nicht in Eingabefeldern). Treffer gruppiert (Menü, Mitglieder, Inventar, Termine), je Zeile Icon, Titel, gedämpfter Zusatz; max. 5 je Quelle. Neue Quelle = eigener Provider in `search.tsx` mit eigener Rechteprüfung, nie Treffer über Rollengrenzen.
 - Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen, `badge-error`, sobald im Eintrag etwas überfällig ist, z. B. Verleih); Obermenü zeigt die Summe, außer es ist aktiv.
 
 ## Seiten-Layout-Struktur

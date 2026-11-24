@@ -67,7 +67,7 @@ type MemberWithStatus = Member & { assignments: Assignment[]; status: MemberStat
 // ponytail: search filters in JS, not SQL — Drizzle's relational query API can't
 // filter the base table by a `with` relation's columns, and the full list is
 // already loaded into memory for stats/sort/pagination either way.
-async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus[]> {
+export async function fetchMembersWithStatus(search?: string): Promise<MemberWithStatus[]> {
   const rows = await db.query.members.findMany({
     with: { person: true, assignments: { with: { role: true } } },
   });

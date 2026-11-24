@@ -29,6 +29,7 @@ import { organisationRoutes } from "./routes/organisation.js";
 import { anniversaryRoutes } from "./routes/anniversaries.js";
 import { mailTemplateRoutes } from "./routes/mail-templates.js";
 import { eventRoutes } from "./routes/events.js";
+import { searchRoutes } from "./routes/search.js";
 import { donationRoutes } from "./routes/donations.js";
 import { cashRoutes } from "./routes/cash.js";
 import { donorRoutes } from "./routes/donors.js";
@@ -147,6 +148,7 @@ app.route("/applications", applicationRoutes);
 // Anniversary routes
 app.route("/anniversaries", anniversaryRoutes);
 app.route("/events", eventRoutes);
+app.route("/search", searchRoutes);
 app.route("/mail/templates", mailTemplateRoutes);
 
 // Donation routes

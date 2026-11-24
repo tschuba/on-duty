@@ -15,6 +15,7 @@ import { Icon } from "./icon.js";
 import { getContext } from "hono/context-storage";
 import { getBackupStatus } from "../lib/backup.js";
 import { countCashAttention } from "../lib/cash.js";
+import { GlobalSearch, GLOBAL_SEARCH_SCRIPT } from "./global-search.js";
 import { AdminMenuItems, attentionItems, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
 
 // package.json liegt in Dev und im Docker-Image (WORKDIR /app) im cwd.
@@ -97,7 +98,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         {user && <><input id="nav-drawer" type="checkbox" autocomplete="off" class="drawer-toggle" aria-label={t("common.nav.toggleSidebar")} /><script dangerouslySetInnerHTML={{ __html: NAV_STATE_SCRIPT }} /></>}
         <div class="drawer-content flex min-h-dvh min-w-0 flex-col">
       <nav class="navbar bg-base-200/80 backdrop-blur shadow-sm px-4 sticky top-0 z-40 border-b border-base-300">
-        <div class="navbar-start flex-1 items-center">
+        <div class="navbar-start flex-1 sm:flex-none sm:w-auto items-center">
           {user && (
             <label for="nav-drawer" class="btn btn-ghost btn-square mr-2 lg:hidden" aria-label={t("common.nav.toggleSidebar")}>
               <Icon name="icon-[tabler--menu-2]" class="h-6 w-6 text-gold" />
@@ -107,6 +108,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
             {user ? <>on-<span class="text-error">duty</span></> : brand === "on-duty" ? <>on-<span class="text-error">duty</span></> : brand}
           </a>
         </div>
+        {user && <div class="flex min-w-0 flex-1 justify-center px-4 max-sm:flex-none max-sm:px-0"><GlobalSearch /></div>}
         {user && (
           <div class="navbar-end w-auto gap-1">
             {counts && (() => { const items = attentionItems(counts); const total = items.reduce((n, i) => n + i.count, 0); return (
@@ -246,6 +248,7 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         }, true);
       ` }} />
     {user && <script dangerouslySetInnerHTML={{ __html: NAV_SCRIPT }} />}
+    {user && <script dangerouslySetInnerHTML={{ __html: GLOBAL_SEARCH_SCRIPT }} />}
     {/* Pflichtfelder mit Floating Label: der Placeholder ist das einzige sichtbare Label; ein Overlay (unsichtbarer Placeholder-Text + roter Stern) markiert sie auch im leeren Zustand (auch nach htmx-Swaps). */}
     <script dangerouslySetInnerHTML={{ __html: `(function(){function f(r){r.querySelectorAll(".floating-label :is(input,textarea)[placeholder]:not([data-star])").forEach(function(e){if(!e.required&&!e.closest("[data-required]"))return;e.dataset.star="1";var s=document.createElement("b"),i=document.createElement("i");s.className="req-star";s.setAttribute("aria-hidden","true");i.textContent=e.placeholder;s.append(i,"*");e.after(s);function u(){var c=getComputedStyle(e),t=e.tagName==="TEXTAREA";s.style.font=c.font;s.style.left=e.offsetLeft+parseFloat(c.borderLeftWidth)+parseFloat(c.paddingLeft)+"px";s.style.top=e.offsetTop+(t?parseFloat(c.borderTopWidth)+parseFloat(c.paddingTop):0)+"px";s.style.height=t?"auto":e.offsetHeight+"px";s.style.alignItems=t?"flex-start":"center"}u();new ResizeObserver(u).observe(e)})}f(document);document.addEventListener("htmx:load",function(e){f(e.target)})})();` }} />
     <script dangerouslySetInnerHTML={{ __html: `(function(){var m=document.cookie.match(/(?:^|; )draft-clear=([^;]*)/);if(m){localStorage.removeItem('member-draft:'+decodeURIComponent(m[1]));document.cookie='draft-clear=; Max-Age=0; path=/';}})();` }} />
