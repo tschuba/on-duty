@@ -143,7 +143,7 @@ export const rolesPage = async (c: Context<{ Variables: Variables }>, error?: { 
       <div class="max-w-4xl mx-auto">
       <PageSearch label={t("admin.roles.title")} value={search} hidden={[["view", "roles"], ...(activeFilter ? [["active", activeFilter] as [string, string]] : [])]} />
       <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "roles")} />} actions={<>
-        {canWriteTypes && <HeaderAction variant="secondary" icon="icon-[tabler--plus]" label={t("admin.roleTypes.new")} class="btn-outline" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
+        {canWriteTypes && <HeaderAction variant="secondary" icon="icon-[tabler--category-plus]" label={t("admin.roleTypes.new")} class="btn-outline" attrs={{ "hx-get": "/role-types/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
         {canWrite && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.roles.newRole")} class="btn-primary" attrs={{ "hx-get": "/roles/new", "hx-target": "#modal-content", "hx-swap": "innerHTML" }} />}
       </>} />
       <div class="filter-bar mb-4 flex flex-wrap items-center gap-x-4">
