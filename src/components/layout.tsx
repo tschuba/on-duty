@@ -232,13 +232,8 @@ export const Layout = async ({ title, children, user, path }: Props) => {
         document.addEventListener("input", syncDiscard);
         document.addEventListener("change", syncDiscard);
         document.addEventListener("reset", (e) => toggleDiscard(e.target, false));
-        // Höhe der Filterleiste als --filter-h (Monatszeile klebt darunter); sie bricht je nach Breite/Inhalt um
-        const filterRO = new ResizeObserver(([en]) => document.documentElement.style.setProperty("--filter-h", en.target.offsetHeight + "px"));
-        const watchFilter = () => { filterRO.disconnect(); const f = document.querySelector(".filter-bar"); if (f) filterRO.observe(f); };
-        watchFilter();
-        document.body.addEventListener("htmx:afterSettle", watchFilter);
         // Listenfilter pro Pfad merken; Zurück-Links (data-keep-filter) auf die nackte Liste bekommen ihn wieder angehängt
-        const saveFilter = () => { try { if (document.querySelector(".filter-bar")) sessionStorage.setItem("filter:" + location.pathname, location.search); } catch(e) {} };
+        const saveFilter = () => { try { if (document.querySelector(".filter-bar, [data-page-search], [data-page-filter]")) sessionStorage.setItem("filter:" + location.pathname, location.search); } catch(e) {} };
         saveFilter();
         document.body.addEventListener("htmx:afterSettle", saveFilter);
         document.addEventListener("click", (e) => {

@@ -152,6 +152,17 @@ describe("GET /events", () => {
     expect(body).toContain("data-date=");
   });
 
+  it("puts the calendar switch in the header and the tag filter in the navbar dialog (no filter bar)", async () => {
+    eventsFindManyResult = [makeEvent()];
+    const body = await (await eventRoutes.request("/")).text();
+    expect(body).toContain('id="ev-switch"');
+    expect(body).not.toContain("ev-cal-toggle");
+    expect(body).toContain("data-page-filter");
+    expect(body).not.toContain(`class="filter-bar`);
+    // ein Element, nicht zwei: Mobil und Desktop teilen sich den Schalter
+    expect(body.match(/id="ev-switch"/g)).toHaveLength(1);
+  });
+
   it("returns only the rows of a month for ?rows=", async () => {
     eventsFindManyResult = [makeEvent()];
     const body = await (await eventRoutes.request("/?rows=1999-01")).text();

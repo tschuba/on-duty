@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ChipInput } from "../components/chip-input.js";
 import { tagSuggestionsJson } from "../lib/tags.js";
+import { PageSearch } from "../components/page-search.js";
 import { Layout } from "../components/layout.js";
 import { FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
@@ -74,10 +75,7 @@ mailTemplateRoutes.get("/", async (c) => {
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("mailTemplates.title")} actions={mayCreate(user) && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("mailTemplates.new")} href="/mail/templates/new" class="btn-primary" />} />
         {all.length > 0 && (
-          <form method="get" role="search" class="mb-4">
-            {cat && <input type="hidden" name="category" value={cat} />}
-            <input type="search" name="q" value={q} class="input w-full" placeholder={t("mailTemplates.searchTemplates")} aria-label={t("mailTemplates.searchTemplates")} autocomplete="off" />
-          </form>
+          <PageSearch name="q" label={t("mailTemplates.searchTemplates")} value={q} hidden={cat ? [["category", cat]] : []} />
         )}
         {!list.length && <p class="opacity-70">{t(all.length ? "mailTemplates.searchTemplates.empty" : "mailTemplates.empty")}</p>}
         {groups.map((g, i) => (

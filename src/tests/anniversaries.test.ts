@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getCeremonyYear, generateEvents, anniversaryFilterLabel, filterByYears, recurrenceDate, mergeEvents } from "../lib/anniversaries.js";
+import { getCeremonyYear, generateEvents, filterByYears, recurrenceDate, mergeEvents } from "../lib/anniversaries.js";
 
 const CUTOFF = "01-06"; // January 6
 
@@ -171,23 +171,6 @@ describe("anniversary day vs. ceremony", () => {
     // a birthday in between keeps two rows
     const between = generateEvents([{ ...a, birthDate: "1950-02-15" }], ays, CUTOFF, "2026-01-01", "2026-12-31");
     expect(mergeEvents(between).map(e => e.kind)).toEqual(["anniversary", "birthday", "anniversary"]);
-  });
-});
-
-describe("anniversaryFilterLabel", () => {
-  const ALL = ["service", "membership", "birthdays"];
-  it.each([
-    [ALL, [], 0, "Jubiläen & Geburtstage", "Alle Jubiläen und Geburtstage"],
-    [ALL, ["10"], 0, "Runde Jubiläen & Geburtstage", "Alle runden Jubiläen und Geburtstage"],
-    [["birthdays"], ["10"], 66, "Runde Geburtstage ab 66 J.", "Runde Geburtstage ab 66 Jahren"],
-    [["service", "membership"], ["5"], 64, "Halbrunde Dienst-/Mitgliedsjubiläen ab 64 J.", "Halbrunde Dienst- und Mitgliedsjubiläen ab 64 Jahren"],
-    [ALL, ["5", "10"], 64, "(Halb-)Runde Jubiläen & Geburtstage ab 64 J.", "Halbrunde und runde Jubiläen und Geburtstage ab 64 Jahren"],
-    [["service"], [], 0, "Dienstjubiläen", "Alle Dienstjubiläen"],
-    [["membership"], ["5", "10"], 0, "(Halb-)Runde Mitgliedsjubiläen", "Alle halbrunden und runden Mitgliedsjubiläen"],
-    [["service", "birthdays"], [], 20, "Dienstjubiläen & Geburtstage ab 20 J.", "Dienstjubiläen und Geburtstage ab 20 Jahren"],
-    [["membership", "birthdays"], ["5"], 0, "Halbrunde Mitgliedsjubiläen & Geburtstage", "Alle halbrunden Mitgliedsjubiläen und Geburtstage"],
-  ])("%j %j %i", (kinds, mods, gte, short, long) => {
-    expect(anniversaryFilterLabel(kinds, mods, gte)).toEqual({ short, long });
   });
 });
 

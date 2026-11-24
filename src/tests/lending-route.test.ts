@@ -259,6 +259,9 @@ describe("GET /inventory/lending", () => {
     const html = await (await lendingRoutes.request("/?item=li2&start=&end=")).text();
     expect(html).toContain("Beta");
     expect(html).not.toContain("Alpha");
+    // Der Gegenstand steht als Plakette für die Navbar bereit; ✕ führt auf die Liste ohne item.
+    expect(html).toMatch(/<a data-page-chip="true" href="\/inventory\/lending[^"]*" hidden="">/);
+    expect(html).not.toMatch(/data-page-chip href="[^"]*item=/);
   });
 
   it("filters by status", async () => {

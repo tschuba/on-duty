@@ -16,6 +16,7 @@ import {
   userAppRoles,
 } from "../db/schema/index.js";
 import { Icon } from "../components/icon.js";
+import { PageSearch } from "../components/page-search.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { PermissionBadges, PERMISSION_LABELS, RESOURCE_LABELS } from "../components/permission-badges.js";
 import { SortIcon } from "./members.js";
@@ -690,15 +691,8 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <div class="max-w-4xl mx-auto">
       <PageHeader title={<TitleSwitch items={adminViews(false)} />} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
-      <div class="filter-bar mb-3"><label class="input flex items-center gap-2 w-full max-w-xs">
-        <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
-        <input
-          type="search"
-          class="grow min-w-0"
-          placeholder={t("admin.permissions.searchPlaceholder")}
-          oninput="const q=this.value.toLowerCase();document.querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)});document.getElementById('perm-empty').hidden=!!document.querySelector('tbody tr[data-search]:not([hidden])')"
-        />
-      </label></div>
+      <PageSearch client label={t("admin.permissions.title")}
+        oninput="const q=this.value.toLowerCase();document.querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)});document.getElementById('perm-empty').hidden=!!document.querySelector('tbody tr[data-search]:not([hidden])')" />
       <div class="overflow-x-auto mb-10">
         <table class="table table-zebra table-cards w-full">
           <thead>
@@ -1098,7 +1092,7 @@ adminRoutes.get("/config", guard, async (c) => {
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
         <div class="filter-bar flex flex-wrap items-center gap-2 mb-4">
-          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" id="config-search" class="grow min-w-0" placeholder={t("admin.config.search")} /></label>
+          <PageSearch client id="config-search" label={t("admin.config.title")} />
           <label class="label cursor-pointer gap-2">
             <input type="checkbox" id="config-filter" class="toggle toggle-sm" />
             <span class="text-sm">{t("admin.config.filter.writable")}</span>

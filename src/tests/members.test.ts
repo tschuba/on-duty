@@ -576,7 +576,7 @@ describe("GET /", () => {
     findManyResult = [];
     expect(await (await memberRoutes.request("/")).text()).not.toContain('<span class="badge badge-sm">');
     const html = await (await memberRoutes.request("/?status=left&age=youth")).text();
-    expect(html).toContain('<span class="badge badge-sm">2</span>');
+    expect(html).toContain('data-count="2"');
   });
 
   it("keeps search and sorting as hidden fields of the filter form", async () => {
@@ -584,6 +584,14 @@ describe("GET /", () => {
     const html = await (await memberRoutes.request("/?search=an&sort=birthDate&sort_dir=desc")).text();
     expect(html).toContain('type="hidden" name="search" value="an"');
     expect(html).toContain('type="hidden" name="sort" value="birthDate"');
+  });
+
+  it("renders a hidden page search and a navbar-driven filter dialog instead of a filter bar", async () => {
+    findManyResult = [];
+    const html = await (await memberRoutes.request("/?search=an")).text();
+    expect(html).toContain("data-page-search");
+    expect(html).toContain("data-page-filter");
+    expect(html).not.toContain(`class="filter-bar`);
   });
 
   it("hides the add-member button for a read-only user", async () => {

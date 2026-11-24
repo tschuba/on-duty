@@ -58,7 +58,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
   return (
     <Wrap {...(bare ? {} : { method: "get", action })} id={uid} class={bare ? "contents" : "flex flex-wrap gap-2 items-center"}>
       {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
-      <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : "rel"} disabled={!showRel && !showCustom} />
+      <input type="hidden" name="range" value={range.mode === "custom" ? "custom" : range.mode === "preset" ? range.id : "rel"} disabled={!showRel && !showCustom && range.mode !== "preset"} />
       <input type="hidden" name="rel" value={`P${rel.n}${rel.unit}`} disabled={!showRel} />
       <input type="hidden" name="dir" value={rel.dir} disabled={!showRel} />
       {cutoff && <input type="hidden" name="yr" value="ceremony" disabled={!showRel || !rel.ceremony} />}
@@ -143,7 +143,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
       <script dangerouslySetInnerHTML={{ __html: `
         (function(){
           var f=document.getElementById('${uid}'), pop=document.getElementById('${id}'), ed=document.getElementById('${eid}');
-          var init=${JSON.stringify({ mode: range.mode, label, date: dateText })};
+          var init=${JSON.stringify({ mode: range.mode, label, date: dateText, id: range.mode === "preset" ? range.id : "" })};
           // Positioniert das Popup unter dem Button; der Zeiger zeigt auf die Button-Mitte.
           // sheet=true: unter sm als Bottom-Sheet per CSS, keine Positionierung.
           function place(p, sheet){
@@ -168,7 +168,7 @@ export function QuickRangeFilter({ presets, range, dir, action, hidden = [], nam
               var g=qs('[data-qrf-fields='+k+']'); g.classList.toggle('hidden',k!==m);
               g.querySelectorAll('input,select').forEach(function(i){i.disabled=k!==m;});
             });
-            var r=qs('input[name=range]'); r.disabled=m!=='rel'&&m!=='custom'; r.value=m;
+            var r=qs('input[name=range]'); r.disabled=m!=='rel'&&m!=='custom'&&m!=='preset'; r.value=m==='preset'?init.id:m;
             qs('input[name=rel]').disabled=m!=='rel'; qs('input[name=dir]').disabled=m!=='rel';
             qs('[data-qrf-label]').textContent=label;
             var d=qs('[data-qrf-date]'); d.textContent=date||''; d.classList.toggle('hidden',!date);

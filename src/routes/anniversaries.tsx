@@ -10,7 +10,8 @@ import { setFlash } from "../lib/flash.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { filterByYears, generateEvents, mergeEvents, type AnniversaryEvent } from "../lib/anniversaries.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
-import { AnniversaryFilter } from "../components/anniversary-filter.js";
+import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
+import { Field } from "../components/field.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { formatDate } from "../lib/format.js";
@@ -239,7 +240,6 @@ anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"
 
   const presets = rangePresets(today, "future", env.ANNIVERSARY_CUTOFF);
 
-  const rpHidden = Object.entries(rp).filter(([, v]) => v !== undefined) as [string, string][];
 
   return c.html(
     <Layout title={t("anniversaries.title")} user={user}>
@@ -247,15 +247,21 @@ anniversaryRoutes.get("/", requireAuth(["members:read", "anniversary-years:read"
       <div class="contents">
         <PageHeader title={<TitleSwitch items={anniversaryViews(perms, false)} />} actions={<HeaderAction icon="icon-[tabler--download]" label={t("common.export")} onclick="document.getElementById('ann-export-modal').showModal()" disabled={events.length === 0 ? t("common.exportEmpty") : undefined} />} />
 
-        {/* Controls */}
-        <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-          <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries" cutoff note={t("anniversaries.rangeHint")}
-            hidden={[...kindsParam.map((f): [string, string] => ["filter", f]), ...mods.map((m): [string, string] => ["mod", m]), ...(gte > 0 ? [["gte", String(gte)] as [string, string]] : [])]}
-            href={(p) => qs(p)} />
-
-          <AnniversaryFilter kinds={filters} mods={mods} gte={gte} action="/anniversaries" hidden={rpHidden} />
-          {(range.mode !== "default" || kindsParam.length > 0 || mods.length > 0 || gte > 0) && <a href="/anniversaries" class="btn btn-ghost self-end">{t("common.reset")}</a>}
-        </div>
+        <FilterDialog navbar id="anniversaries-filter-dialog" resetHref="/anniversaries" labels={navFilterLabels()} hidden={[]}
+          sections={[
+            { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+              <QuickRangeFilter presets={presets} range={range} dir="future" action="/anniversaries" cutoff note={t("anniversaries.rangeHint")} bare href={(p) => qs(p)} />
+            ) },
+            { type: "chips", param: "filter", title: t("anniversaries.filter.kind"), selected: filters, defaults: [...KIND_FILTERS],
+              options: KIND_FILTERS.map((k) => ({ value: k, label: t(`anniversaries.filter.${k}`) })) },
+            { type: "toggle", param: "mod", value: "5", title: t("anniversaries.filter.halfRoundYears"), selected: mods },
+            { type: "toggle", param: "mod", value: "10", title: t("anniversaries.filter.roundYears"), selected: mods },
+            { type: "custom", param: "gte", title: t("anniversaries.minYears.label"), selected: gte > 0 ? ["1"] : [], node: (
+              <Field label={t("anniversaries.minYears.label")}>
+                <input type="number" inputmode="numeric" name="gte" min="1" value={gte > 0 ? String(gte) : ""} class="input w-full" placeholder={t("anniversaries.minYears.placeholder")} />
+              </Field>
+            ) },
+          ]} />
       </div>
 
       <EventList events={events} today={today} filters={filters} />
