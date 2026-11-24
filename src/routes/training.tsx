@@ -280,11 +280,11 @@ trainingRoutes.get("/training", read, (c) => {
 });
 
 type ListRow = { r: Record_; firstName: string; lastName: string };
-function TrainingRow({ x, status, showMember }: { x: ListRow; status: Map<string, TrainingStatus>; showMember: boolean }) {
+function TrainingRow({ x, status, showMember, showTitle = true }: { x: ListRow; status: Map<string, TrainingStatus>; showMember: boolean; showTitle?: boolean }) {
   return (
     <tr class={`cursor-pointer hover ${status.get(x.r.id) === "replaced" ? "opacity-50" : ""}`} onclick={`window.location='/training/${x.r.id}'`}>
-      {showMember && <td class="max-md:font-semibold"><a class="link link-hover" onclick="event.stopPropagation()" href={`/members/${x.r.memberId}`}>{x.lastName}, {x.firstName}</a></td>}
-      <td>{x.r.title} <StatusBadge s={status.get(x.r.id)} /></td>
+      {showMember && <td class="max-md:font-semibold"><a class="link link-hover" onclick="event.stopPropagation()" href={`/members/${x.r.memberId}`}>{x.lastName}, {x.firstName}</a>{!showTitle && <> <StatusBadge s={status.get(x.r.id)} /></>}</td>}
+      {showTitle && <td>{x.r.title} <StatusBadge s={status.get(x.r.id)} /></td>}
       <td data-label={t("training.form.completedAt")} data-empty={!x.r.completedAt || undefined}>{x.r.completedAt ? formatDate(x.r.completedAt) : "–"}</td>
       <td data-label={t("training.form.expiresAt")} data-empty={!x.r.expiresAt || undefined}>{x.r.expiresAt ? formatDate(x.r.expiresAt) : "–"}</td>
       <td data-label={t("training.form.organizer")}>{x.r.organizer}</td>
@@ -318,29 +318,36 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
   const sort = parseTrainingSort(q.sort);
   const dir = parseDir(q.dir) ?? (sort ? defaultTrainingDir(sort) : "desc");
   const sorted = sortTrainings(rows, (x) => ({ ...recFields(x.r), member: `${x.lastName}, ${x.firstName}` }), sort, dir);
-  const grouped = q.group === "member";
-  // Gruppiert wird nach Mitglied paginiert, damit keine Gruppe über Seiten zerreißt.
+  const group = q.group === "member" || q.group === "title" ? q.group : undefined;
+  const grouped = !!group;
+  const byTitle = group === "title";
+  // Gruppiert wird nach Mitglied bzw. Ausbildung (Titel, ohne Groß-/Kleinschreibung) paginiert, damit keine Gruppe über Seiten zerreißt.
+  const keyOf = (x: (typeof sorted)[number]) => (byTitle ? x.r.title.trim().toLowerCase() : x.r.memberId);
+  const labelOf = (g: typeof sorted) => (byTitle ? g[0].r.title : `${g[0].lastName}, ${g[0].firstName}`);
   const groups = grouped
-    ? [...sorted.reduce((m, x) => m.set(x.r.memberId, [...(m.get(x.r.memberId) ?? []), x]), new Map<string, typeof sorted>()).values()].sort((a, b) => `${a[0].lastName}, ${a[0].firstName}`.localeCompare(`${b[0].lastName}, ${b[0].firstName}`, "de"))
+    ? [...sorted.reduce((m, x) => m.set(keyOf(x), [...(m.get(keyOf(x)) ?? []), x]), new Map<string, typeof sorted>()).values()].sort((a, b) => labelOf(a).localeCompare(labelOf(b), "de"))
     : [];
   const unit = grouped ? groups.length : sorted.length;
   const totalPages = Math.max(1, Math.ceil(unit / pageSize));
   const slice = <T,>(l: T[]) => l.slice((page - 1) * pageSize, page * pageSize);
   const items = grouped ? [] : slice(sorted);
   const pageGroups = grouped ? slice(groups) : [];
-  const cur = { view: "training", group: grouped ? "member" : undefined, q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
+  const cur = { view: "training", group, q: q.q, status: statusFilter, former: withFormer ? "1" : "", pageSize, sort, dir: sort ? dir : undefined };
   const pageUrl = (p: number) => buildListUrl("/members", cur, { page: p });
 
   return c.html(
     <Layout title={t("training.pageTitle")} user={user}>
       <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "training")} />} actions={<>
-        <HeaderAction icon="icon-[tabler--users]" label={t("training.filter.grouped")} href={buildListUrl("/members", cur, { group: grouped ? undefined : "member", page: 1 })} class={grouped ? "btn-neutral" : "btn-outline"} hideLabel="@max-4xl:hidden" />
+        <div class="join">
+          <HeaderAction icon="icon-[tabler--users]" label={t("training.filter.grouped")} href={buildListUrl("/members", cur, { group: group === "member" ? undefined : "member", page: 1 })} class={`join-item ${group === "member" ? "btn-neutral" : "btn-outline"}`} hideLabel="@max-5xl:hidden" />
+          <HeaderAction icon="icon-[tabler--certificate]" label={t("training.filter.groupedTitle")} href={buildListUrl("/members", cur, { group: byTitle ? undefined : "title", page: 1 })} class={`join-item ${byTitle ? "btn-neutral" : "btn-outline"}`} hideLabel="@max-5xl:hidden" />
+        </div>
         {user.permissions.has("training:write") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("training.add")} href="/training/new" class="btn-primary" hideLabel="@max-2xl:hidden" />}
       </>} />
       <PageSearch name="q" action="/members" label={t("training.pageTitle")} value={q.q ?? ""}
-        hidden={[["view", "training"], ...(grouped ? [["group", "member"] as [string, string]] : []), ...statusFilter.map((v): [string, string] => ["status", v]), ...(withFormer ? [["former", "1"] as [string, string]] : [])]} />
-      <FilterDialog navbar id="training-filter-dialog" resetHref={buildListUrl("/members", { view: "training", group: grouped ? "member" : undefined })} labels={navFilterLabels()}
-        hidden={[["view", "training"], ...(grouped ? [["group", "member"] as [string, string]] : []), ...(q.q ? [["q", q.q] as [string, string]] : [])]}
+        hidden={[["view", "training"], ...(group ? [["group", group] as [string, string]] : []), ...statusFilter.map((v): [string, string] => ["status", v]), ...(withFormer ? [["former", "1"] as [string, string]] : [])]} />
+      <FilterDialog navbar id="training-filter-dialog" resetHref={buildListUrl("/members", { view: "training", group })} labels={navFilterLabels()}
+        hidden={[["view", "training"], ...(group ? [["group", group] as [string, string]] : []), ...(q.q ? [["q", q.q] as [string, string]] : [])]}
         sections={[
           { type: "chips", param: "status", title: t("training.filter.statusAll"), options: LIST_STATUSES.map((s) => ({ value: s, label: t(`training.status.${s}`) })), selected: statusFilter },
           { type: "toggle", param: "former", title: t("training.filter.former"), selected: withFormer ? ["1"] : [] },
@@ -355,8 +362,13 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
             return (
               <section class={`group-card rounded-box border border-base-300 ${accent} bg-base-100 overflow-hidden`}>
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 bg-base-200/60">
-                  <div class="avatar avatar-placeholder"><div class="bg-primary text-primary-content w-9 rounded-full text-sm font-semibold">{g[0].firstName[0]}{g[0].lastName[0]}</div></div>
-                  <a class="link link-hover" href={`/members/${g[0].r.memberId}`}><span class="font-bold">{g[0].lastName}</span>, {g[0].firstName}</a>
+                  {byTitle ? (<>
+                    <div class="avatar avatar-placeholder"><div class="bg-primary text-primary-content w-9 rounded-full"><span class="icon-[tabler--certificate] size-5" aria-hidden="true" /></div></div>
+                    <span class="font-bold">{g[0].r.title}</span>
+                  </>) : (<>
+                    <div class="avatar avatar-placeholder"><div class="bg-primary text-primary-content w-9 rounded-full text-sm font-semibold">{g[0].firstName[0]}{g[0].lastName[0]}</div></div>
+                    <a class="link link-hover" href={`/members/${g[0].r.memberId}`}><span class="font-bold">{g[0].lastName}</span>, {g[0].firstName}</a>
+                  </>)}
                   <span class="badge badge-sm badge-ghost">{g.length}</span>
                   <span class="ml-auto flex flex-wrap gap-1">
                     {counts.length === 0 && <span class="badge badge-sm badge-success badge-soft">{t("training.status.valid")}</span>}
@@ -365,10 +377,10 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
                 </div>
                 <div class="overflow-x-auto">
                   <table class="table table-cards table-fixed w-full">
-                    {i === 0 && <thead><tr>{headCols.filter(([col]) => col !== "member").map(([col, key], n) => (
+                    {i === 0 && <thead><tr>{headCols.filter(([col]) => col !== (byTitle ? "title" : "member")).map(([col, key], n) => (
                       <th class={n === 0 ? "w-2/5" : "w-1/5"}><a href={buildListUrl("/members", cur, { sort: col, dir: nextTrainingDir(col, sort, dir), page: 1 })} class="link link-hover">{t(key)} <SortIcon col={col} active={sort ?? "expiresAt"} dir={sort ? dir : "desc"} /></a></th>
                     ))}</tr></thead>}
-                    <tbody>{g.map((x) => <TrainingRow x={x} status={status} showMember={false} />)}</tbody>
+                    <tbody>{g.map((x) => <TrainingRow x={x} status={status} showMember={byTitle} showTitle={!byTitle} />)}</tbody>
                   </table>
                 </div>
               </section>
@@ -388,7 +400,7 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
         </table>
       </div>
       )}
-      <Pager countLabel={t(grouped ? "training.countGrouped" : "training.count", { count: unit })} page={page} totalPages={totalPages} pageUrl={pageUrl} pageSize={pageSize} pageSizeOptions={PAGE_SIZE_OPTIONS} />
+      <Pager countLabel={t(byTitle ? "training.countGroupedTitle" : grouped ? "training.countGrouped" : "training.count", { count: unit })} page={page} totalPages={totalPages} pageUrl={pageUrl} pageSize={pageSize} pageSizeOptions={PAGE_SIZE_OPTIONS} />
       </div>
     </Layout>,
   );
