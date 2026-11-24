@@ -7,6 +7,8 @@ import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { Section } from "../components/section.js";
 import { FormCard, FormSection } from "../components/public-form.js";
 import { Icon } from "../components/icon.js";
+import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
+import { PageSearch } from "../components/page-search.js";
 import { ChipInput } from "../components/chip-input.js";
 import { CashSettingsFields, CashSettingsForm } from "../components/cash-settings-form.js";
 import { Layout } from "../components/layout.js";
@@ -417,22 +419,10 @@ function EventsView({ rows, search, status }: { rows: CashEventRow[]; search: st
   ].filter((g) => g.rows.length);
   return (
     <>
-      <div class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
-        <form method="get" class="flex gap-2 items-end">
-          {status && <input type="hidden" name="status" value={status} />}
-          <input type="hidden" name="view" value="events" />
-          <label class="input w-full md:w-64"><Icon name="icon-[tabler--search]" class="h-4 w-4 opacity-50" /><input type="search" name="search" value={search} placeholder={t("common.searchPlaceholder")} aria-label={t("common.searchPlaceholder")} /></label>
-        </form>
-        <form method="get" class="filter self-end" aria-label={t("cash.events.status.label")}>
-          <input type="hidden" name="view" value="events" />
-          {search && <input type="hidden" name="search" value={search} />}
-          <input class="btn btn-square filter-reset" type="radio" name="status" value="" aria-label={t("cash.events.status.all")} checked={status === ""} onchange="this.form.submit()" />
-          {(["upcoming", "past"] as const).map((s) => (
-            <input class="btn" type="radio" name="status" value={s} aria-label={t(`cash.events.status.${s}`)} checked={status === s} onchange="this.form.submit()" />
-          ))}
-        </form>
-        {(search || status) && <a href="/cash?view=events" class="btn btn-ghost self-end">{t("common.reset")}</a>}
-      </div>
+      <PageSearch label={t("cash.view.events")} value={search} hidden={[["view", "events"], ...(status ? [["status", status] as [string, string]] : [])]} />
+      <FilterDialog navbar id="cash-events-filter-dialog" hidden={[["view", "events"], ...(search ? [["search", search] as [string, string]] : [])]} resetHref="/cash?view=events" labels={navFilterLabels()}
+        sections={[{ type: "select", param: "status", title: t("cash.events.status.label"), allLabel: t("cash.events.status.all"), selected: status ? [status] : [],
+          options: (["upcoming", "past"] as const).map((v) => ({ value: v, label: t(`cash.events.status.${v}`) })) }]} />
       {!groups.length && <p class="text-center opacity-50 py-8">{t("cash.events.noMatch")}</p>}
       {groups.map((g) => (
         <section class="mb-6">
@@ -845,7 +835,6 @@ cashRoutes.get("/", report, async (c) => {
   const state = { pageSize: q.pageSize ? pageSize : undefined, year: yearId, direction, tag: q.tag, event: q.event, status, from: range.start, to: range.end };
   const stateNoRange = { ...state, from: undefined, to: undefined };
   const presets = rangePresets(today, "past", undefined, true);
-  const submitOnChange = "this.form.submit()";
   const daysOpen = (d: string) => Math.max(0, Math.round((Date.parse(today) - Date.parse(d)) / 86400000));
   const sign = (r: { direction: string }) => (r.direction === "income" ? 1 : -1);
 
@@ -861,39 +850,18 @@ cashRoutes.get("/", report, async (c) => {
         {canManage && <StatCard label={t("cash.stats.unbooked")} value={unbooked} tone={unbooked ? "text-warning" : undefined} href="/donations" link="view" />}
       </StatGrid>
 
-      <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
-        {q.pageSize && <input type="hidden" name="pageSize" value={pageSize} />}
-        <Field label={t("cash.filter.year")} class="w-full md:w-40">
-          <select name="year" class="select w-full" onchange={submitOnChange}>
-            <option value="">{t("cash.filter.allYears")}</option>
-            {years.map((y) => <option value={y.id} selected={y.id === yearId}>{y.label}</option>)}
-          </select>
-        </Field>
-        <QuickRangeFilter presets={presets} range={range} dir="past" action="/cash" names={{ start: "from", end: "to" }} bare href={(p) => buildListUrl("/cash", stateNoRange, p)} />
-        <Field label={t("cash.filter.direction")} class="w-full md:w-40">
-          <select name="direction" class="select w-full" onchange={submitOnChange}>
-            <option value="">{t("cash.filter.allDirections")}</option>
-            {(["income", "expense"] as const).map((d) => <option value={d} selected={d === direction}>{t(`cash.direction.${d}`)}</option>)}
-          </select>
-        </Field>
-        <Field label={t("cash.filter.tag")} class="w-full md:w-44">
-          <select name="tag" class="select w-full" onchange={submitOnChange}>
-            <option value="">{t("cash.filter.allTags")}</option>
-            {tags.map((x) => <option value={x.id} selected={x.id === q.tag}>{x.name}</option>)}
-          </select>
-        </Field>
-        <Field label={t("cash.filter.event")} class="w-full md:w-48">
-          <select name="event" class="select w-full" onchange={submitOnChange}>
-            <option value="">{t("cash.filter.allEvents")}</option>
-            {evs.map((e) => <option value={e.id} selected={e.id === q.event}>{e.name}</option>)}
-          </select>
-        </Field>
-        <div class="filter" role="group" aria-label={t("cash.filter.status")}>
-          <input class="btn btn-square filter-reset" type="radio" name="status" value="" aria-label={t("cash.filter.statusAll")} checked={!status} onchange={submitOnChange} />
-          {STATUSES.map((s) => <input class="btn" type="radio" name="status" value={s} aria-label={t(`cash.status.${s}`)} checked={status === s} onchange={submitOnChange} />)}
-        </div>
-        {(yearId || range.start || range.end || direction || q.tag || q.event || status) && <a href="/cash" class="btn btn-ghost">{t("common.reset")}</a>}
-      </form>
+      <FilterDialog navbar id="cash-filter-dialog" hidden={q.pageSize ? [["pageSize", String(pageSize)]] : []} resetHref="/cash" labels={navFilterLabels()}
+        sections={[
+          { type: "select", param: "year", title: t("cash.filter.year"), allLabel: t("cash.filter.allYears"), selected: yearId ? [yearId] : [], options: years.map((y) => ({ value: y.id, label: y.label })) },
+          { type: "select", param: "direction", title: t("cash.filter.direction"), allLabel: t("cash.filter.allDirections"), selected: direction ? [direction] : [],
+            options: (["income", "expense"] as const).map((d) => ({ value: d, label: t(`cash.direction.${d}`) })) },
+          { type: "select", param: "tag", title: t("cash.filter.tag"), allLabel: t("cash.filter.allTags"), selected: q.tag ? [q.tag] : [], options: tags.map((x) => ({ value: x.id, label: x.name })) },
+          { type: "select", param: "event", title: t("cash.filter.event"), allLabel: t("cash.filter.allEvents"), selected: q.event ? [q.event] : [], options: evs.map((e) => ({ value: e.id, label: e.name })) },
+          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+            <QuickRangeFilter presets={presets} range={range} dir="past" action="/cash" names={{ start: "from", end: "to" }} bare href={(p) => buildListUrl("/cash", stateNoRange, p)} />
+          ) },
+          { type: "select", param: "status", title: t("cash.filter.status"), allLabel: t("cash.filter.statusAll"), selected: status ? [status] : [], options: STATUSES.map((s) => ({ value: s, label: t(`cash.status.${s}`) })) },
+        ]} />
 
       {pageRows.length === 0 ? (
         <p class="text-center opacity-50 py-8">{t("cash.table.empty")}</p>

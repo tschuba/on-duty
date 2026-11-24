@@ -11,7 +11,8 @@ import { Field } from "../components/field.js";
 import { RowAction } from "../components/row-action.js";
 import { ActionContent, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { Pager } from "../components/pager.js";
-import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
+import { PageSearch } from "../components/page-search.js";
 import { formatDate } from "../lib/format.js";
 import { resolveTimezone, toLocalDate } from "../lib/datetime.js";
 import { buildListUrl, PAGE_SIZE_OPTIONS, parsePagination } from "../lib/list-query.js";
@@ -336,26 +337,14 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
         <HeaderAction icon="icon-[tabler--users]" label={t("training.filter.grouped")} href={buildListUrl("/members", cur, { group: grouped ? undefined : "member", page: 1 })} class={grouped ? "btn-neutral" : "btn-outline"} hideLabel="@max-4xl:hidden" />
         {user.permissions.has("training:write") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("training.add")} href="/training/new" class="btn-primary" hideLabel="@max-2xl:hidden" />}
       </>} />
-      <form method="get" action="/members" class="filter-bar mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
-        <input type="hidden" name="view" value="training" />
-        {grouped && <input type="hidden" name="group" value="member" />}
-        <input type="search" name="q" class="input" placeholder={t("training.filter.search")} value={q.q ?? ""} enterkeyhint="search"
-          hx-get="/members" hx-trigger="input changed delay:300ms, search" hx-include="closest form" hx-target="#training-results" hx-select="#training-results" hx-swap="outerHTML" hx-push-url="true" />
-        <MultiSelectFilter
-          param="status"
-          autoApply
-          options={LIST_STATUSES.map((s) => ({ value: s, label: t(`training.status.${s}`) }))}
-          selected={statusFilter}
-          allLabel={t("training.filter.statusAll")}
-          countLabel={(count) => t("training.filter.statusCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
-        <label class="flex items-center gap-2 min-h-11 cursor-pointer">
-          <input type="checkbox" name="former" value="1" class="toggle toggle-primary" checked={withFormer} onchange="this.form.submit()" />
-          <span class="text-sm">{t("training.filter.former")}</span>
-        </label>
-      </form>
+      <PageSearch name="q" action="/members" label={t("training.pageTitle")} value={q.q ?? ""}
+        hidden={[["view", "training"], ...(grouped ? [["group", "member"] as [string, string]] : []), ...statusFilter.map((v): [string, string] => ["status", v]), ...(withFormer ? [["former", "1"] as [string, string]] : [])]} />
+      <FilterDialog navbar id="training-filter-dialog" resetHref={buildListUrl("/members", { view: "training", group: grouped ? "member" : undefined })} labels={navFilterLabels()}
+        hidden={[["view", "training"], ...(grouped ? [["group", "member"] as [string, string]] : []), ...(q.q ? [["q", q.q] as [string, string]] : [])]}
+        sections={[
+          { type: "chips", param: "status", title: t("training.filter.statusAll"), options: LIST_STATUSES.map((s) => ({ value: s, label: t(`training.status.${s}`) })), selected: statusFilter },
+          { type: "toggle", param: "former", title: t("training.filter.former"), selected: withFormer ? ["1"] : [] },
+        ]} />
       <div id="training-results" class="flex flex-1 flex-col">
       {grouped ? (
         <div class="flex flex-col gap-4">

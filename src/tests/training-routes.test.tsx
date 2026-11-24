@@ -141,4 +141,15 @@ describe("GET /training", () => {
     expect(html).toContain("abgelaufen");
     expect(html).not.toContain("Mitglied, Ex");
   });
+
+  it("renders the search hidden and the filter in the navbar dialog, keeping state in both forms", async () => {
+    selectResults = [[]];
+    const html = await (await listApp.request("/training?q=Atem&status=expired&former=1")).text();
+    expect(html).toContain("data-page-search");
+    expect(html).toContain("data-page-filter");
+    expect(html).toContain('data-count="2"');
+    expect(html).toContain('type="hidden" name="status" value="expired"');
+    expect(html).toContain('type="hidden" name="q" value="Atem"');
+    expect(html).not.toContain(`class="filter-bar`);
+  });
 });

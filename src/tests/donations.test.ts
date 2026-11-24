@@ -205,6 +205,17 @@ describe("GET /", () => {
     expect(byReceipt).not.toContain("222,00");
   });
 
+  it("keeps search, range and receipt state in the hidden page search and the navbar filter dialog", async () => {
+    donationsFindManyResult = [makeDonation()];
+    const html = await (await donationRoutes.request("/?search=Meier&from=2026-02-03&to=2026-05-06&receipt=open")).text();
+    expect(html).toContain("data-page-search");
+    expect(html).toContain("data-page-filter");
+    expect(html).toContain('data-count="2"');
+    expect(html).toContain('type="hidden" name="receipt" value="open"');
+    expect(html).toContain('type="hidden" name="range" value="custom"');
+    expect(html).not.toContain(`class="filter-bar`);
+  });
+
   it("denies the list (and stats) without any donation permission, allows donations:read", async () => {
     donationsFindManyResult = [makeDonation()];
     currentUser = { ...currentUser, permissions: new Set(["members:read"]) };

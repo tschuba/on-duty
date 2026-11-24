@@ -269,7 +269,7 @@ describe("GET / filter dialog", () => {
     itemsFindManyResult = [makeItem()];
     const html = await (await inventoryRoutes.request("/?due=overdue&due=soon&archived=1&lendable=1")).text();
     expect(html).toContain('name="lendable" value="1" checked');
-    expect(html).toContain('<span class="badge badge-sm">3</span>');
+    expect(html).toContain('data-count="3"');
   });
 
   it("keeps q and nocoords as hidden dialog fields", async () => {
@@ -675,7 +675,7 @@ describe("GET /inspections", () => {
     const html = (await (await inventoryRoutes.request("/inspections?inspection=HU&range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
     expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
     expect(html).toMatch(/<input type="hidden" name="rel" value="P6M"(?![^>]*disabled)/);
-    expect(html).toMatch(/<input type="hidden" name="inspection" value="HU"/);
+    expect(html).toMatch(/<input type="checkbox" class="checkbox checkbox-sm" name="inspection" value="HU" checked/);
     // Preset-Link: behält den Prüfart-Filter, setzt range auf Preset-Id; rel/dir/start/end fallen weg
     const preset = html.match(/href="(\/inventory\/inspections\?[^"]*range=3m[^"]*)"/)![1];
     expect(preset).toContain("inspection=HU");

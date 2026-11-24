@@ -96,7 +96,8 @@ describe("Sidebar — Aktiv-Erkennung und Zähler", () => {
     const html = await renderAt("/events", "donations:issue-receipts");
     expect(html).toContain('href="/donations"');
     expect(html).not.toContain('href="/donors"');
-    expect(html.slice(html.indexOf('id="nav-menu"'))).not.toContain("badge");
+    const menu = html.slice(html.indexOf('id="nav-menu"'));
+    expect(menu.slice(0, menu.indexOf("<script"))).not.toContain("badge");
   });
 
   it("never queries the DB for a user without the permission", async () => {

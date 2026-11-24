@@ -14,7 +14,7 @@ import { Section } from "../components/section.js";
 import { SortIcon } from "./members.js";
 import { ChipInput } from "../components/chip-input.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
-import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
 import { addMonths, todayStr } from "../lib/quick-range.js";
 import { parseMulti } from "../lib/list-query.js";
 import { setFlash } from "../lib/flash.js";
@@ -222,21 +222,14 @@ function monthFragment(c: Context, rows: EventRow[], tz: string, canManage: bool
   return c.html(<EventCards rows={month} tz={tz} canManage={canManage} linked={linked} />);
 }
 
-function ViewSwitch() {
+// Ein Schalter im PageHeader: ab lg blendet er den Kalender neben der Liste ein/aus (gedrückt = sichtbar),
+// darunter wechselt er zwischen Liste und Kalender (Label der jeweils anderen Ansicht). Zustand setzt EVENTS_SCRIPT.
+function CalendarSwitch() {
   return (
-    <div class="lg:hidden">
-      <button type="button" data-ev-m="icon-[tabler--list]" class="btn btn-outline btn-primary gap-2 hidden"><Icon name="icon-[tabler--list]" class="h-5 w-5" />{t("events.view.list")}</button>
-      <button type="button" data-ev-m="cal" class="btn btn-outline btn-primary gap-2"><Icon name="icon-[tabler--calendar]" class="h-5 w-5" />{t("events.view.calendar")}</button>
-    </div>
-  );
-}
-
-function CalendarToggle() {
-  return (
-    <label class="hidden lg:flex items-center gap-2 cursor-pointer">
-      <input type="checkbox" id="ev-cal-toggle" class="toggle toggle-sm" checked />
-      <span>{t("events.calendar.show")}</span>
-    </label>
+    <button type="button" id="ev-switch" class="btn btn-outline btn-primary gap-2" aria-pressed="true">
+      <span data-ev-icon class="icon-[tabler--calendar] h-5 w-5" aria-hidden="true" />
+      <span data-ev-label class="@max-4xl:hidden">{t("events.view.calendar")}</span>
+    </button>
   );
 }
 
@@ -255,9 +248,8 @@ function EventsBrowser({ rows, tz, canManage, base, tagFilter, monthParam }: { r
   const data = { days, months, focus: months[fi], base, tags: tagFilter, dayColors };
   return (
     <>
-      {base !== "/events" && <div class="mb-4 flex items-center gap-3"><ViewSwitch /><CalendarToggle /></div>}
       <div id="ev-wrap" data-m="list" data-dc="1" class="group">
-        <div class="hidden group-data-[m=cal]:block lg:group-data-[dc=1]:block lg:group-data-[dc=0]:hidden lg:sticky lg:top-[calc(var(--nav-h)+var(--header-h)+var(--filter-h))] lg:z-10 bg-base-100 pb-2 mb-4">
+        <div class="hidden group-data-[m=cal]:block lg:group-data-[dc=1]:block lg:group-data-[dc=0]:hidden lg:sticky lg:top-[calc(var(--nav-h)+var(--header-h))] lg:z-10 bg-base-100 pb-2 mb-4">
           <div id="ev-calendar"></div>
         </div>
         <div class="min-w-0 group-data-[m=cal]:hidden lg:group-data-[m=cal]:block">
@@ -279,19 +271,27 @@ const EVENTS_SCRIPT = `
   const wrap = document.getElementById("ev-wrap");
   const tbody = document.getElementById("ev-rows");
   const ITEM = "[data-month]";
-  const toggle = document.getElementById("ev-cal-toggle");
+  const sw = document.getElementById("ev-switch");
   const rows = (sel) => [...tbody.querySelectorAll(sel)];
   const isDesktop = () => matchMedia("(min-width: 1024px)").matches;
   const pad = (n) => String(n).padStart(2, "0");
 
+  const LABELS = { cal: ${JSON.stringify(t("events.view.calendar"))}, list: ${JSON.stringify(t("events.view.list"))} };
   wrap.dataset.dc = localStorage.getItem("ev-cal") === "0" ? "0" : "1";
-  toggle.checked = wrap.dataset.dc === "1";
-  toggle.onchange = () => { wrap.dataset.dc = toggle.checked ? "1" : "0"; localStorage.setItem("ev-cal", wrap.dataset.dc); syncOff(); };
-  function setMobile(m) {
-    wrap.dataset.m = m;
-    document.querySelectorAll("[data-ev-m]").forEach((b) => b.classList.toggle("hidden", b.dataset.evM === m)); // nur den Button der anderen Ansicht zeigen
+  // Desktop: Kalender neben der Liste an/aus; mobil: Ansicht wechseln, beschriftet mit der anderen Ansicht.
+  function syncSwitch() {
+    const desk = isDesktop(), other = wrap.dataset.m === "cal" ? "list" : "cal", on = wrap.dataset.dc === "1";
+    sw.setAttribute("aria-pressed", String(desk ? on : false));
+    sw.classList.toggle("btn-active", desk && on);
+    sw.querySelector("[data-ev-label]").textContent = desk ? LABELS.cal : LABELS[other];
+    sw.querySelector("[data-ev-icon]").className = (desk || other === "cal" ? "icon-[tabler--calendar]" : "icon-[tabler--list]") + " h-5 w-5";
   }
-  document.querySelectorAll("[data-ev-m]").forEach((b) => { b.onclick = () => setMobile(b.dataset.evM); });
+  sw.onclick = () => {
+    if (isDesktop()) { wrap.dataset.dc = wrap.dataset.dc === "1" ? "0" : "1"; localStorage.setItem("ev-cal", wrap.dataset.dc); syncOff(); }
+    else wrap.dataset.m = wrap.dataset.m === "cal" ? "list" : "cal";
+    syncSwitch();
+  };
+  addEventListener("resize", syncSwitch);
 
   const idxOf = (m) => { const i = months.findIndex((x) => x >= m); return i < 0 ? months.length - 1 : i; };
   // Die Liste scrollt unter dem klebenden Kalender: dessen Höhe wird zum oberen Versatz für Ankerzeile und Scroll-Ziel.
@@ -300,6 +300,7 @@ const EVENTS_SCRIPT = `
   const syncOff = () => { const top = isDesktop() ? parseFloat(getComputedStyle(calEl).top) || 80 : 80; off = top + (isDesktop() && wrap.dataset.dc === "1" ? calEl.offsetHeight : 0); wrap.style.setProperty("--ev-off", off + "px"); };
   new ResizeObserver(syncOff).observe(calEl);
   addEventListener("resize", syncOff);
+  syncSwitch();
   const topRow = () => rows(ITEM).find((tr) => tr.getBoundingClientRect().bottom > off + 10) || null;
 
   // Fenster = Monate i-1..i+1; ältere/entfernte Monate fliegen raus, Scrollposition wird am obersten Eintrag festgehalten.
@@ -430,6 +431,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
     <Layout title={t("events.title")} user={user}>
       <div class="max-w-6xl mx-auto">
       <PageHeader title={t("events.title")} actions={<>
+        {rows.length > 0 && <CalendarSwitch />}
         {canManage ? (
           <div class="dropdown dropdown-end">
             <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={t("events.settings")}>
@@ -490,12 +492,8 @@ eventRoutes.get("/", requireAuth(), async (c) => {
         </dialog>
       )}
       <LocalTimes tz={tz} />
-      <div class="filter-bar mb-6 flex flex-wrap gap-3 items-end">
-        <MultiSelectFilter param="tag" autoApply searchable options={allTags.map((tag) => ({ value: tag, label: eventTagLabel(tag) }))} selected={tagFilter}
-          allLabel={t("events.filter.allTags")} countLabel={(count) => t("events.filter.tagCount", { count })}
-          applyLabel={t("common.apply")} resetLabel={t("common.reset")} searchPlaceholder={t("common.searchPlaceholder")} emptyLabel={t("events.filter.noTags")} />
-        <div class="self-center flex items-center gap-3"><ViewSwitch /><CalendarToggle /></div>
-      </div>
+      <FilterDialog navbar id="events-filter-dialog" resetHref="/events" labels={navFilterLabels()} hidden={[]}
+        sections={[{ type: "list", compact: true, param: "tag", title: t("events.filter.allTags"), options: allTags.map((tag) => ({ value: tag, label: eventTagLabel(tag) })), selected: tagFilter }]} />
 
       <EventsBrowser rows={rows} tz={tz} canManage={canManage} base="/events" tagFilter={tagFilter} monthParam={c.req.query("month")} />
       </div>
@@ -547,7 +545,7 @@ eventRoutes.get("/public", async (c) => {
   return c.html(
     <Layout title={t("events.title")}>
       <div class="max-w-6xl mx-auto">
-      <PageHeader title={t("events.title")} />
+      <PageHeader title={t("events.title")} actions={filtered.length > 0 ? <CalendarSwitch /> : undefined} />
       <LocalTimes tz={tz} />
       <EventsBrowser rows={filtered} tz={tz} canManage={false} base="/events/public" tagFilter={[]} monthParam={c.req.query("month")} />
       <PublicFooter />

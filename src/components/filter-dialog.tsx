@@ -1,3 +1,5 @@
+import type { Child } from "hono/jsx";
+import { t } from "../i18n/index.js";
 import { Icon } from "./icon.js";
 import type { FilterOption } from "./multi-select-filter.js";
 
@@ -7,7 +9,10 @@ type Base = { param: string; title: string; selected: string[]; defaults?: strin
 export type FilterSection =
   | (Base & { type: "chips"; options: FilterOption[] })
   | (Base & { type: "list"; options: FilterOption[]; compact?: boolean; unused?: { label: string; storageKey: string } })
-  | (Base & { type: "toggle"; value?: string });
+  | (Base & { type: "toggle"; value?: string })
+  // select: Einzelauswahl (Wert "" = alle); custom: eigener Inhalt (z. B. QuickRangeFilter bare), `selected` nicht leer = aktiv.
+  | (Base & { type: "select"; options: FilterOption[]; allLabel: string })
+  | (Base & { type: "custom"; node: Child });
 export type QuickFilter = { label: string; values: Record<string, string[]> };
 
 type Props = {
@@ -16,16 +21,26 @@ type Props = {
   labels: { button: string; title: string; quick?: string; apply: string; close: string; reset: string; searchPlaceholder: string; noResults: string };
   sections: FilterSection[];
   quick?: QuickFilter[];
+  // true: kein eigener Button, die Navbar (global-search.tsx) öffnet den Dialog über data-page-filter.
+  navbar?: boolean;
+  // Ziel für „Zurücksetzen“ als Link (statt Felder zurückzusetzen); nötig, sobald ein custom-Abschnitt existiert.
+  resetHref?: string;
 };
+
+// Allgemeine Beschriftungen für Dialoge, die die Navbar öffnet (ohne Schnellfilter).
+export const navFilterLabels = (): Props["labels"] => ({
+  button: t("search.filter"), title: t("search.filter"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"),
+  searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults"),
+});
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((v) => b.includes(v));
 
 // Ein Dialog statt mehrerer Dropdowns: ein GET-Formular, "Anwenden" sendet alles auf einmal; Schnellfilter setzen Werte und senden sofort.
 // Die Komponente kennt keine Fachbegriffe, Parameternamen kommen aus den Abschnitten.
-export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props) {
+export function FilterDialog({ id, hidden, labels, sections, quick = [], navbar, resetHref }: Props) {
   const active = new Set(sections.filter((s) => !sameSet(s.selected, s.defaults ?? [])).map((s) => s.param)).size;
   const formId = `${id}-form`;
-  const def = Object.fromEntries(sections.map((s) => [s.param, s.defaults ?? []]));
+  const def = Object.fromEntries(sections.filter((s) => s.type !== "custom").map((s) => [s.param, s.defaults ?? []]));
   const lists = sections.filter((s) => s.type === "list");
   const multiList = lists.length > 1;
   const unusedKeys = Object.fromEntries(lists.flatMap((s) => (s.type === "list" && s.unused ? [[s.param, s.unused.storageKey]] : [])));
@@ -69,11 +84,21 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
     </label>
   );
 
+  const select = (s: FilterSection & { type: "select" }) => (
+    <label class="flex flex-col gap-1 text-sm md:col-span-1">
+      <span class="font-semibold">{s.title}</span>
+      <select name={s.param} class="select w-full">
+        <option value="">{s.allLabel}</option>
+        {s.options.map((o) => <option value={o.value} selected={s.selected.includes(o.value)}>{o.label}</option>)}
+      </select>
+    </label>
+  );
+
   // Aufeinanderfolgende `chips` bilden eine Gruppe mit Trennlinie; direkt folgende `toggle` stehen in der Zeile der letzten Chips.
   const blocks: (FilterSection | FilterSection[])[] = [];
   for (const s of sections) {
     const last = blocks[blocks.length - 1];
-    if (s.type === "list") blocks.push(s);
+    if (s.type === "list" || s.type === "select" || s.type === "custom") blocks.push(s);
     else if (Array.isArray(last)) last.push(s);
     else blocks.push([s]);
   }
@@ -98,12 +123,12 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
 
   return (
     <>
-      <button type="button" class={`btn ${active ? "btn-primary" : ""}`} aria-label={labels.button} title={labels.button} onclick={`document.getElementById('${id}').showModal()`}>
+      {!navbar && <button type="button" class={`btn ${active ? "btn-primary" : ""}`} aria-label={labels.button} title={labels.button} onclick={`document.getElementById('${id}').showModal()`}>
         <Icon name="icon-[tabler--filter]" class="h-5 w-5 shrink-0" />
         <span class="max-md:hidden">{labels.button}</span>
         {active > 0 && <span class="badge badge-sm">{active}</span>}
-      </button>
-      <dialog id={id} class="modal">
+      </button>}
+      <dialog id={id} class="modal" data-page-filter={navbar ? "" : undefined} data-count={navbar ? active : undefined}>
         <form id={formId} method="get" class="modal-box max-w-2xl flex flex-col max-h-[90dvh]">
           {hidden.map(([k, v]) => <input type="hidden" name={k} value={v} />)}
           <h3 class="font-bold text-lg mb-4">{labels.title}</h3>
@@ -116,12 +141,18 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
               </div>
             </section>
           )}
-          {blocks.map((b) => Array.isArray(b) ? group(b) : b.type === "list" ? list(b) : null)}
+          {blocks.map((b) => Array.isArray(b) ? group(b) : b.type === "list" ? list(b) : b.type === "select" ? select(b) : b.type === "custom" ? <div class="md:col-span-2">{b.node}</div> : null)}
           </div>
           <div class="modal-action">
-            <button type="button" class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} data-fd-reset aria-label={labels.reset} title={labels.reset}>
-              <Icon name="icon-[tabler--arrow-back-up]" class="h-5 w-5 shrink-0" /><span class="max-md:hidden">{labels.reset}</span>
-            </button>
+            {resetHref ? (
+              <a href={resetHref} class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} aria-label={labels.reset} title={labels.reset}>
+                <Icon name="icon-[tabler--arrow-back-up]" class="h-5 w-5 shrink-0" /><span class="max-md:hidden">{labels.reset}</span>
+              </a>
+            ) : (
+              <button type="button" class={`btn btn-ghost mr-auto${active ? "" : " invisible"}`} data-fd-reset aria-label={labels.reset} title={labels.reset}>
+                <Icon name="icon-[tabler--arrow-back-up]" class="h-5 w-5 shrink-0" /><span class="max-md:hidden">{labels.reset}</span>
+              </button>
+            )}
             <button type="button" class="btn" onclick="this.closest('dialog').close()">{labels.close}</button>
             <button type="submit" class="btn btn-primary">{labels.apply}</button>
           </div>
@@ -133,7 +164,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
           var dlg = document.getElementById(${JSON.stringify(id)}), f = document.getElementById(${JSON.stringify(formId)});
           var def = ${JSON.stringify(def)}, keys = ${JSON.stringify(unusedKeys)};
           var q = function(s, r) { return Array.from((r || f).querySelectorAll(s)); };
-          var vals = function(n) { return q('input[name=' + n + ']').filter(function(c) { return c.checked; }).map(function(c) { return c.value; }); };
+          var vals = function(n) { return q('[name=' + n + ']').filter(function(c) { return c.tagName === 'SELECT' ? c.value !== '' : c.checked; }).map(function(c) { return c.value; }); };
           var same = function(a, b) { return a.slice().sort().join() === b.slice().sort().join(); };
           var secs = q('[data-fd-list]');
           var unusedOf = function(s) { return s.querySelector('[data-fd-unused]'); };
@@ -154,7 +185,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
           }
           function sync() {
             var dirty = Object.keys(def).some(function(n) { return !same(vals(n), def[n]); });
-            f.querySelector('[data-fd-reset]').classList.toggle('invisible', !dirty);
+            var rb = f.querySelector('[data-fd-reset]'); if (rb) rb.classList.toggle('invisible', !dirty);
             secs.forEach(function(s) {
               var n = vals(s.dataset.fdList).length, c = s.querySelector('[data-fd-count]');
               c.textContent = n; c.hidden = n === 0;
@@ -164,7 +195,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [] }: Props
               b.classList.toggle('btn-primary', Object.keys(v).every(function(n) { return same(vals(n), v[n]); }));
             });
           }
-          function set(n, v) { q('input[name=' + n + ']').forEach(function(c) { c.checked = v.indexOf(c.value) >= 0; }); }
+          function set(n, v) { q('[name=' + n + ']').forEach(function(c) { if (c.tagName === 'SELECT') c.value = v[0] || ''; else c.checked = v.indexOf(c.value) >= 0; }); }
           f.addEventListener('click', function(e) {
             var r = e.target.closest('[data-fd-reset]'), b = e.target.closest('[data-fd-quick]');
             if (r) { Object.keys(def).forEach(function(n) { set(n, def[n]); }); sync(); }

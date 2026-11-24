@@ -81,7 +81,7 @@ describe("GET /anniversaries range persistence", () => {
   it("keeps range/rel/dir on preset links and the filter popup form", async () => {
     findManyResult = [makeMemberRow()];
     const html = (await (await anniversaryRoutes.request("/?range=rel&rel=P6M&dir=future")).text()).replace(/&amp;/g, "&");
-    expect(html).toMatch(/<form[^>]*id="af"[^>]*>\s*<input type="hidden" name="range" value="rel"/);
+    expect(html).toMatch(/<input type="hidden" name="range" value="rel"(?![^>]*disabled)/);
     expect(html).toContain("'range','rel','dir','ref','yr','start','end'");
   });
 
@@ -173,17 +173,12 @@ describe("GET /anniversaries filters", () => {
     expect(html).toContain("Mitglied15");
   });
 
-  it("renders the reset button disabled at the default and enabled with an active filter", async () => {
+  it("counts the active filter sections in the navbar dialog", async () => {
     setup();
-    const btn = async (q: string) => (await (await anniversaryRoutes.request(`/?${q}`)).text()).match(/<button[^>]*data-reset[^>]*>/)![0];
-    expect(await btn("start=2025-01-01&end=2025-12-31")).toContain("disabled");
-    expect(await btn("start=2025-01-01&end=2025-12-31&mod=10")).not.toContain("disabled");
-  });
-
-  it("shows the filter label in the popup button", async () => {
-    setup();
-    const html = await (await anniversaryRoutes.request("/?filter=birthdays&mod=10&gte=66")).text();
-    expect(html).toContain("Runde Geburtstage ab 66 J.");
+    const count = async (q: string) => (await (await anniversaryRoutes.request(`/?${q}`)).text()).match(/data-page-filter[^>]*data-count="(\d+)"/)![1];
+    expect(await count("")).toBe("0");
+    expect(await count("mod=10")).toBe("1");
+    expect(await count("filter=birthdays&mod=10&gte=66")).toBe("3");
   });
 
   it("merges identical service and membership rows", async () => {

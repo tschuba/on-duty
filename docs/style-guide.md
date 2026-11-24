@@ -49,6 +49,7 @@ daisyUI v5. Die v4-Klassen `form-control`, `label-text`, `input-bordered`, `sele
 - Untermenüs sind `<details name="nav">` (Akkordeon); die Menüstruktur steht nur in `menuDefinition()`. Neue Seiten dort eintragen, nicht pro Route.
 - Dritte Ebene: Ein Eintrag kann `children` haben (z. B. Inventar > Bestand > Prüfvorlagen/Felder). Er bleibt ein Link; die Kinder stehen als verschachteltes `<ul>` (daisyUI-`menu`) darunter und sind nur sichtbar, wenn er oder ein Kind aktiv ist. Kinder erscheinen nur bei sichtbarem Eltern-Eintrag.
 - Globale Suche (`src/components/global-search.tsx`, `src/routes/search.tsx`): ab `lg` Feld in der Navbar-Mitte, darunter Lupen-Button mit `<dialog class="modal">`. Kürzel `Strg/Cmd+K` (überall) und `/` (nicht in Eingabefeldern). Treffer gruppiert (Menü, Mitglieder, Inventar, Termine), je Zeile Icon, Titel, gedämpfter Zusatz; max. 5 je Quelle. Neue Quelle = eigener Provider in `search.tsx` mit eigener Rechteprüfung, nie Treffer über Rollengrenzen.
+- Suche und Filter der Seite laufen über dieselbe Navbar (siehe „Such- und Filterbedienung“): erster Eintrag „Auf dieser Seite suchen“ ab 1 Zeichen, Filter-Button rechts vom Feld.
 - Aktive Unterseite `menu-active`, Obermenü der aktiven Seite fett und offen. Zähler `badge badge-sm badge-warning` (`badge-primary` für Fristen, `badge-error`, sobald im Eintrag etwas überfällig ist, z. B. Verleih); Obermenü zeigt die Summe, außer es ist aktiv.
 
 ## Seiten-Layout-Struktur
@@ -59,17 +60,26 @@ Jede Seite wird über `Layout` (`src/components/layout.tsx`) gerendert: `<main c
 
 `PageHeader` (`title`, `backHref?`/`backLabel?`, `subtitle?`, `actions?`) — Titel links, Aktionen rechtsbündig (Primär zuletzt). Detail- und Formularseiten setzen `backHref` auf die Liste. Aktionen sind `HeaderAction` (`variant`, `icon`, `label`; setzt `aria-label` + `title`) bzw. `FormActions` (Abbrechen / Speichern & Neu / Speichern).
 
-### Such-/Filterleiste
+### Such- und Filterbedienung
 
-Listenseiten mit Suche/Filtern setzen die Klasse `filter-bar` (`src/styles/app.css`) auf den Wrapper der Leiste. Sticky-Verhalten siehe „Sticky“.
+Listenseiten haben **keine eigene Such-/Filterleiste**. Die Navbar (`global-search.tsx`) bedient beides:
+
+- **Suche:** Die Seite rendert `PageSearch` (`src/components/page-search.tsx`), ein unsichtbares GET-Formular mit `<input data-page-search data-label="…">` (Parameter `name`, Standard `search`). `hidden` trägt Sortierung, View und aktive Filter mit. In der Navbar erscheint ab 1 Zeichen als erster Treffer „Auf dieser Seite suchen: «q»“. Keine Live-Filterung; erst Klick oder Enter sendet das Formular (Vollreload, kein htmx). Der aktive Begriff steht danach im Navbar-Feld hinter einem Badge mit Seitenname und ✕ (setzt nur die Seitensuche zurück); auf Mobil zeigt ein Punkt an der Lupe die aktive Suche.
+- **Client-Suche:** `PageSearch client` rendert nur das Feld (ohne Formular, Marker `data-client`); die Navbar löst dann ein `input`-Event aus und die Seite filtert selbst (`/admin`). Der Begriff steht nicht in der URL.
+- **Einschränkung ohne Eingabe:** `PageSearch chip={{ label, href }}` zeigt eine Plakette im Navbar-Feld, ✕ folgt `href` (Beispiel: Gegenstand im Verleih).
+- **Filter:** `FilterDialog` mit `navbar` (`src/components/filter-dialog.tsx`) rendert nur den Dialog (`data-page-filter`, `data-count`); der Button sitzt rechts vom Suchfeld, auf Mobil neben der Lupe, mit Badge für aktive Filter, und ist nur sichtbar, wenn die Seite einen Dialog hat. Pro Seite und aktiver View höchstens ein Dialog. Abschnittstypen: `chips`, `list`, `toggle`, `select` (Einzelauswahl, „alle“ = leer), `custom` (eigener Inhalt, z. B. `QuickRangeFilter bare`). Beschriftungen: `navFilterLabels()`. Mit einem `custom`-Abschnitt wird „Zurücksetzen“ ein Link (`resetHref`).
+- **Zwei Formulare:** Suche und Filterdialog sind getrennte GET-Formulare. Jedes trägt den Zustand des anderen als Hidden-Felder mit, sonst geht er beim Absenden verloren.
+- Änderungen im Dialog wirken erst mit „Anwenden“ (kein Sofort-Anwenden).
+
+⚠️ Abweichung im Code: `roles`, `anniversary-years` (Aktiv/Passiv- bzw. Art-Pillen als `ToggleFilter`), `import` (Zusammenfassung mit Aktionen) und `admin` (Konfiguration: Schalter „nur schreibbare“) behalten die Klasse `filter-bar` (`src/styles/app.css`); Sticky-Verhalten siehe „Sticky“. Neue Seiten nutzen sie nicht.
 
 ### Zeitraum-Filter
 
-Seiten mit Von/Bis-Filter nutzen `QuickRangeFilter` (`src/components/quick-range-filter.tsx`) und lösen die URL über `parseRange` (`src/lib/quick-range.ts`) auf. Das Dropdown bietet Presets, „Relativ" und „Benutzerdefiniert"; Datumsfelder erscheinen nur bei „Benutzerdefiniert". URL: `range=<preset-id>|rel|custom`; bei `rel` zusätzlich `rel=P<n><D|W|M|Y>` und `dir=past|future|both`. Angewendet wird mit dem gemeinsamen `ApplyButton` (unter `sm` nur Icon). Links, die den Bereich erhalten sollen, übernehmen `rangeParams(range)`.
+Seiten mit Von/Bis-Filter nutzen `QuickRangeFilter` (`src/components/quick-range-filter.tsx`) und lösen die URL über `parseRange` (`src/lib/quick-range.ts`) auf. Er steht als `custom`-Abschnitt (`bare`) im `FilterDialog`. Das Popover bietet Presets, „Relativ" und „Benutzerdefiniert"; Datumsfelder erscheinen nur bei „Benutzerdefiniert". URL: `range=<preset-id>|rel|custom`; bei `rel` zusätzlich `rel=P<n><D|W|M|Y>` und `dir=past|future|both`. Angewendet wird mit dem gemeinsamen `ApplyButton` (unter `sm` nur Icon). Links, die den Bereich erhalten sollen, übernehmen `rangeParams(range)`.
 
 ### Status-Filter
 
-Wenige feste Zustände (z. B. Alle/Anstehend/Erledigt) als daisyUI-`filter`: eigenes `<form method="get" class="filter">` in der `filter-bar` mit Radios `btn name="status"`, Reset-Radio `btn btn-square filter-reset` (Wert leer = „Alle", Standard) und `onchange="this.form.submit()"`. Zeitraum- und weitere Filter-Parameter als Hidden-Felder mitführen. Muster: `/inventory/inspections`.
+Wenige feste Zustände (z. B. Alle/Anstehend/Erledigt) sind ein `select`-Abschnitt im `FilterDialog` (Einzelauswahl, leer = „Alle“, Standard); mehrere gleichzeitige Werte sind `chips`. Beispiele: `/cash` (Status), `/inventory/inspections`.
 
 ### Formulare im Seitenkopf
 
@@ -99,17 +109,17 @@ Gestapelt von oben nach unten, jede Ebene klebt direkt unter der vorigen:
 |---|---|---|---|
 | 1 | Hauptnav | 40 | immer |
 | 2 | `PageHeader` | 20 | immer |
-| 3 | Such-/Filterleiste (`.filter-bar`) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
+| 3 | `.filter-bar` (nur die Sonderfälle oben) | 15 | ab `md` (darunter `static`, da mehrzeilig zu hoch) |
 
 Der `Pager` klebt unten am Viewport (`z-10`, `z-30` solange die Seitenwahl offen ist) und ist immer sichtbar; Details siehe „Haupt-Listen-Tabellen“.
 
-- Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--header-h`, `--filter-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
+- Offsets laufen über CSS-Variablen in `app.css` (`--nav-h`, `--header-h`); nie feste Pixel/rem-Werte inline. Neue sticky Ebene = neue Variable + Eintrag in dieser Tabelle.
 - Sticky-Elemente brauchen einen deckenden Hintergrund (`bg-base-100`/`bg-base-300`).
-- Popover/Dropdowns (`MultiSelectFilter`, `TitleSwitch`, Pager-Seitenwahl) liegen über allen sticky Ebenen (`z-20` bis `z-50` bzw. Top Layer); neue sticky Ebenen bleiben unter 20.
-- Kein Vorfahr darf `overflow` ≠ `visible` haben, sonst bricht Sticky. Deshalb stehen Pager und Leiste **außerhalb** von `overflow-x-auto`-Wrappern.
-- Sticky gilt nur innerhalb des Eltern-Elements: Leiste und Liste/Tabelle müssen im selben Container liegen, ohne Zwischen-Wrapper mit kurzer Höhe. Fehlerbild: Leiste scrollt nach kurzer Strecke weg (so zuvor in `/anniversaries`).
+- Popover/Dropdowns (`QuickRangeFilter`, `TitleSwitch`, Pager-Seitenwahl) liegen über allen sticky Ebenen (`z-20` bis `z-50` bzw. Top Layer); neue sticky Ebenen bleiben unter 20.
+- Kein Vorfahr darf `overflow` ≠ `visible` haben, sonst bricht Sticky. Deshalb stehen Pager und `.filter-bar` **außerhalb** von `overflow-x-auto`-Wrappern.
+- Sticky gilt nur innerhalb des Eltern-Elements: `.filter-bar` und Liste/Tabelle müssen im selben Container liegen, ohne Zwischen-Wrapper mit kurzer Höhe. Fehlerbild: Die Leiste scrollt nach kurzer Strecke weg (so zuvor in `/anniversaries`).
 - `display: contents` am Sticky-Element selbst ist wirkungslos; Klasse an das umgebende `<div>` setzen.
-- `--header-h` ist geschätzt (4rem); `--filter-h` wird im Layout gemessen. Ändert sich die Höhe des `PageHeader`, muss der Wert mit.
+- `--header-h` ist geschätzt (4rem). Ändert sich die Höhe des `PageHeader`, muss der Wert mit.
 
 ## Ansichten-Umschalter
 
@@ -120,7 +130,7 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - Darunter: ein Button mit Rahmen (`btn btn-ghost border`, `text-xl`, ab `@md` `text-2xl`; Label per `truncate` gekürzt, `title` = aktive Ansicht) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
 - Ein Eintrag kann einen Zähler (`count`, `badge badge-sm badge-warning`) tragen; er erscheint nur, solange die Ansicht **nicht** aktiv ist
 - Ansichten mit eigenen Rechten (`/roles`): der Umschalter zeigt nur die lesbaren Ansichten; bleibt eine, entfällt er und es steht nur der Titel.
-- Nicht für Unterseiten mit eigenen Zählern (dort Sidebar) und nicht für Filter (dort `filter`/`ToggleFilter`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
+- Nicht für Unterseiten mit eigenen Zählern (dort Sidebar) und nicht für Filter (dort `FilterDialog`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
 
 ## Statistikkarten
 
@@ -167,7 +177,7 @@ Zwei Kategorien. Entscheidend ist nur, ob die Tabelle die **primäre Datenliste 
 - `class="table table-zebra w-full"`
 - Sortierbare Spalten, wo fachlich sinnvoll (Klick auf Spaltenkopf, `SortIcon` als Indikator).
 - Pagination bei potenziell langen Listen: `Pager` (`src/components/pager.tsx`, gekürztes Fenster: erste/letzte Seite, aktuelle ±1, „…“; ab 8 Seiten Sprechblase zur Seitenwahl) mit `sticky bottom-6 z-10 bg-base-100 border-t` (`bottom-6` = Höhe des fixen Versions-Footers). Der Pager steht **außerhalb** des `overflow-x-auto`-Wrappers (siehe Sticky-Regeln). Unter `md` bricht er nie um: Zähler, Seitengrößen-Select (nur `aria-label`) und aktuelle Seite; die Seitenwahl läuft immer über die Sprechblase, auch bei ≤ 7 Seiten.
-- Empty State: Ist die Liste leer, entfällt die Tabelle samt Kopf. Stattdessen steht `<p class="text-center opacity-50 py-8">{leerer-Text}</p>`, der erklärt, warum nichts angezeigt wird (z. B. Filter, Zeitraum). Filterleiste und Pager bleiben sichtbar. ⚠️ Abweichung im Code: Die übrigen Haupt-Listen (members, donors, donations, applications, anniversaries, `admin.tsx`) zeigen noch eine Leerzeile `<tr><td colspan={N} class="text-center opacity-50 py-8">` in der Tabelle; Umstellung in einem eigenen Task.
+- Empty State: Ist die Liste leer, entfällt die Tabelle samt Kopf. Stattdessen steht `<p class="text-center opacity-50 py-8">{leerer-Text}</p>`, der erklärt, warum nichts angezeigt wird (z. B. Filter, Zeitraum). Pager (und Navbar-Filter) bleiben sichtbar. ⚠️ Abweichung im Code: Die übrigen Haupt-Listen (members, donors, donations, applications, anniversaries, `admin.tsx`) zeigen noch eine Leerzeile `<tr><td colspan={N} class="text-center opacity-50 py-8">` in der Tabelle; Umstellung in einem eigenen Task.
 
 ### Kleine Inline-Sub-Tabellen
 (alle Tabellen, die nicht die primäre Datenliste sind, z. B. Rollen-/Berechtigungs-Listen in `admin.tsx`, Zuweisungen in `members.tsx`, Teilnehmer-/Prüfungs-Tabellen in `events`, `training`, `inventory`, `import`)
@@ -234,7 +244,7 @@ Jede Detailseite im Umfang (members, inventory, events, roles, role-types, donor
 
 ## Responsive Schwellen
 
-- **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische Filterleiste. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.
+- **Mobil = `md` (768 px / `48rem`).** Darunter: Burger-Menü, kompakter Pager, icon-only Zeilenaktionen, statische `.filter-bar`. Neue Mobil-Umschaltungen nutzen `md`, nicht `sm`.
 - **Ausnahmen:** `sm:` für Formular-Grids (`sm:grid-cols-`, `sm:col-span-`) und das Label des `ApplyButton`; Spalten-Ausblendung (`md:`/`lg:`/`xl:table-cell`); Container-Queries im Seitenkopf (`HeaderAction`) und in der Kategorie-Auswahl des Inventar-Formulars (`@container`: `<select>` unter `@sm`, nur Icons bis `@xl`, darüber Icon + Text; Radios bleiben die einzige submittete Quelle, das `<select>` hat keinen `name`); PageHeader und Monatszeilen der Jubiläumsliste bleiben auch unter `md` sticky.
 
 ## Touch-Ziele

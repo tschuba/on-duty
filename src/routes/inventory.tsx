@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { FilterDialog } from "../components/filter-dialog.js";
+import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
+import { PageSearch } from "../components/page-search.js";
 import { Field, RichTextField, ViewField, ViewGrid } from "../components/field.js";
 import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
@@ -25,7 +26,6 @@ import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "..
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { addMonths, parseRange, rangeParams, rangePresets } from "../lib/quick-range.js";
 import { Pager } from "../components/pager.js";
-import { MultiSelectFilter } from "../components/multi-select-filter.js";
 import { matchesTagFilter, splitByCoordinates, earliestDueStatus, dueText, type DueStatus, dueSoonEnd, generateInspectionDueItems, isIsoDate, isUniqueViolation, isInspectionNameViolation, renamedInspectionIds, nextDueDate, parseInspectionRows, diffInspections, INSPECTION_NAME_MAX, type InspectionFormRow, type InspectionRowError, INVENTORY_FIELDS, type InventoryField, hasField, isFieldEmpty, parseCoordinates, normalizeFieldValue, type FieldDefType } from "../lib/inventory.js";
 import { inventoryFieldDefs, inventoryFieldValues } from "../db/schema/index.js";
 import { availableQuantity, itemStatus } from "../lib/lending.js";
@@ -34,7 +34,7 @@ import { env } from "../env.js";
 import { inventoryFieldRoutes, inventoryTitle, renderFieldList } from "./inventory-fields.js";
 import { inventoryInspectionTemplateRoutes, inspectionTitle, renderTemplateList } from "./inventory-inspection-templates.js";
 import { inventoryTemplateRoutes, renderTemplateList as renderItemTemplateList } from "./inventory-templates.js";
-import { PUBLIC_DESCRIPTION_MAX_LENGTH, SEARCH_DEBOUNCE_MS } from "../lib/constants.js";
+import { PUBLIC_DESCRIPTION_MAX_LENGTH } from "../lib/constants.js";
 
 export const inventoryRoutes = new Hono<{ Variables: Variables }>();
 // Vor den /:id-Routen registrieren, sonst frisst /:id den Pfad.
@@ -862,48 +862,24 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 
-      <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
-        <form method="get" action="/inventory" class="contents">
-          <label class="input flex items-center gap-2 w-72">
-            <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
-            <input
-              type="search"
-              name="q"
-              value={search}
-              autocomplete="off"
-              placeholder={t("inventory.search.placeholder")}
-              class="grow min-w-0"
-              hx-get="/inventory"
-              hx-include="closest form"
-              hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-              hx-target="#inventory-results"
-              hx-select="#inventory-results"
-              hx-swap="outerHTML"
-              hx-push-url="true"
-            />
-          </label>
-          {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
-          {inspectionFilter.map((v) => <input type="hidden" name="inspection" value={v} />)}
-          {dueFilter.map((v) => <input type="hidden" name="due" value={v} />)}
-          {showArchived && <input type="hidden" name="archived" value="1" />}
-          {lendableOnly && <input type="hidden" name="lendable" value="1" />}
-          {noCoordsOnly && <input type="hidden" name="nocoords" value="1" />}
-        </form>
-        <FilterDialog
-          id="inventory-filter-dialog"
-          hidden={[...(search ? [["q", search] as [string, string]] : []), ...(noCoordsOnly ? [["nocoords", "1"] as [string, string]] : [])]}
-          labels={{ button: t("inventory.filter.button"), title: t("inventory.filter.title"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults") }}
-          sections={[
-            { type: "toggle", param: "due", value: "overdue", title: t("inventory.filter.dueOverdue"), selected: dueFilter },
-            { type: "toggle", param: "due", value: "soon", title: t("inventory.filter.dueSoon"), selected: dueFilter },
-            { type: "toggle", param: "archived", title: t("inventory.filter.showArchived"), selected: showArchived ? ["1"] : [] },
-            ...(canSeeLending ? [{ type: "toggle" as const, param: "lendable", title: t("inventory.filter.lendable"), selected: lendableOnly ? ["1"] : [] }] : []),
-            { type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
-            { type: "list", param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
-          ]}
-        />
-        {(search || tagFilter.length > 0 || inspectionFilter.length > 0 || dueFilter.length > 0 || showArchived || lendableOnly || noCoordsOnly) && <a href="/inventory" class="btn btn-ghost">{t("common.reset")}</a>}
-      </div>
+      <PageSearch name="q" action="/inventory" label={t("inventory.tabs.stock")} value={search}
+        hidden={[...tagFilter.map((v): [string, string] => ["tag", v]), ...inspectionFilter.map((v): [string, string] => ["inspection", v]), ...dueFilter.map((v): [string, string] => ["due", v]),
+          ...(showArchived ? [["archived", "1"] as [string, string]] : []), ...(lendableOnly ? [["lendable", "1"] as [string, string]] : []), ...(noCoordsOnly ? [["nocoords", "1"] as [string, string]] : [])]} />
+      <FilterDialog
+        navbar
+        resetHref="/inventory"
+        id="inventory-filter-dialog"
+        hidden={[...(search ? [["q", search] as [string, string]] : []), ...(noCoordsOnly ? [["nocoords", "1"] as [string, string]] : [])]}
+        labels={{ button: t("inventory.filter.button"), title: t("inventory.filter.title"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults") }}
+        sections={[
+          { type: "toggle", param: "due", value: "overdue", title: t("inventory.filter.dueOverdue"), selected: dueFilter },
+          { type: "toggle", param: "due", value: "soon", title: t("inventory.filter.dueSoon"), selected: dueFilter },
+          { type: "toggle", param: "archived", title: t("inventory.filter.showArchived"), selected: showArchived ? ["1"] : [] },
+          ...(canSeeLending ? [{ type: "toggle" as const, param: "lendable", title: t("inventory.filter.lendable"), selected: lendableOnly ? ["1"] : [] }] : []),
+          { type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
+          { type: "list", param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
+        ]}
+      />
 
       {(() => {
         const cur = { q: search, tag: tagFilter, inspection: inspectionFilter, due: dueFilter, archived: showArchived ? "1" : undefined, lendable: lendableOnly ? "1" : undefined, nocoords: noCoordsOnly ? "1" : undefined, pageSize };
@@ -1694,18 +1670,9 @@ inventoryRoutes.get("/map", requireAuth("inventory:read"), async (c) => {
   return c.html(
     <Layout title={t("inventory.map.title")} user={user}>
       <PageHeader title={t("inventory.map.title")} actions={<HeaderAction icon="icon-[tabler--clipboard-list]" label={t("inventory.map.toList")} href={buildListUrl("/inventory", { tag: tagFilter })} />} />
-      <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
-        <MultiSelectFilter
-          param="tag"
-          autoApply
-          searchable
-          options={allTags.map((tag) => ({ value: tag, label: tag }))}
-          selected={tagFilter}
-          allLabel={t("inventory.filter.allTags")}
-          countLabel={(count) => t("inventory.filter.tagCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />
+      <FilterDialog navbar id="inventory-map-filter-dialog" resetHref="/inventory/map" labels={navFilterLabels()} hidden={[]}
+        sections={[{ type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter }]} />
+      <div class="flex flex-wrap items-center gap-3 mb-4">
         <div class="flex flex-wrap items-center gap-2 text-sm" aria-label={t("inventory.map.legend")}>
           {legend.map(([s, cls]) => <span class={`badge ${cls}`}>{t(`inventory.map.legend.${s}`)}</span>)}
         </div>
@@ -1764,31 +1731,15 @@ inventoryRoutes.get("/inspections", requireAuth("inventory:read"), async (c) => 
     <Layout title={t("inventory.inspections.title")} user={user}>
       <PageHeader title={inspectionTitle("inspections", canConfigure)} />
 
-      <div class="filter-bar flex flex-wrap items-center gap-3 mb-4">
-        <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/inspections"
-          hidden={[...inspectionFilter.map((n): [string, string] => ["inspection", n]), ...(status === "all" ? [] : [["status", status] as [string, string]])]} href={(p) => qs(p)} />
-        <div class="self-end">
-          <MultiSelectFilter
-            param="inspection"
-            autoApply
-            options={inspectionNames.map((n) => ({ value: n, label: n }))}
-            selected={inspectionFilter}
-            allLabel={t("inventory.filter.allInspections")}
-            countLabel={(count) => t("inventory.filter.inspectionCount", { count })}
-            applyLabel={t("common.apply")}
-            resetLabel={t("common.reset")}
-          />
-        </div>
-        <form method="get" action="/inventory/inspections" class="filter self-end" aria-label={t("inventory.inspections.table.status")}>
-          {Object.entries(rangeParams(range)).filter(([, v]) => v !== undefined).map(([k, v]) => <input type="hidden" name={k} value={v} />)}
-          {inspectionFilter.map((n) => <input type="hidden" name="inspection" value={n} />)}
-          <input class="btn btn-square filter-reset" type="radio" name="status" value="" aria-label={t("inventory.inspections.status.all")} checked={status === "all"} onchange="this.form.submit()" />
-          {(["upcoming", "done"] as const).map((s) => (
-            <input class="btn" type="radio" name="status" value={s} aria-label={t(`inventory.inspections.status.${s}`)} checked={status === s} onchange="this.form.submit()" />
-          ))}
-        </form>
-        {(range.mode !== "default" || inspectionFilter.length > 0 || status !== "all") && <a href="/inventory/inspections" class="btn btn-ghost self-end">{t("common.reset")}</a>}
-      </div>
+      <FilterDialog navbar id="inspections-filter-dialog" resetHref="/inventory/inspections" labels={navFilterLabels()} hidden={[]}
+        sections={[
+          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+            <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/inspections" bare href={(p) => qs(p)} />
+          ) },
+          { type: "list", compact: true, param: "inspection", title: t("inventory.filter.inspection"), options: inspectionNames.map((n) => ({ value: n, label: n })), selected: inspectionFilter },
+          { type: "select", param: "status", title: t("inventory.inspections.table.status"), allLabel: t("inventory.inspections.status.all"), selected: status === "all" ? [] : [status],
+            options: (["upcoming", "done"] as const).map((v) => ({ value: v, label: t(`inventory.inspections.status.${v}`) })) },
+        ]} />
 
       <div class="overflow-x-auto">
       <table class="table table-zebra table-cards w-full">

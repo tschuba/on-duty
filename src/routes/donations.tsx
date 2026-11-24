@@ -17,12 +17,13 @@ import { setFlash } from "../lib/flash.js";
 import { loadOrgConfig, isOrgConfigCompleteForReceipts, missingReceiptFields, canReadOrgTab, ORG_TABS, type OrgTab } from "../lib/org-config.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { QuickRangeFilter } from "../components/quick-range-filter.js";
-import { parseRange, rangePresets, todayStr } from "../lib/quick-range.js";
+import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { StatCard, StatGrid } from "../components/stat-card.js";
 import { TitleSwitch } from "../components/title-switch.js";
 import { Pager } from "../components/pager.js";
-import { MultiSelectFilter } from "../components/multi-select-filter.js";
+import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
+import { PageSearch } from "../components/page-search.js";
 import { SortIcon } from "./members.js";
 import { nextReceiptStatus, recipientName, summarizeDonations, summarizeDonors, type DonationSummary, type DonorSortKey, type ReceiptAction } from "../lib/donations.js";
 import { formatDate } from "../lib/format.js";
@@ -409,6 +410,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
     { active: donorView, href: viewUrl("donors"), label: t("donations.tabs.donors") },
   ];
   const presets = rangePresets(todayStr(), "past", undefined, true);
+  // Seitensuche und Filterdialog sind getrennte GET-Formulare: jedes trägt den Zustand des anderen als Hidden-Felder mit.
+  const keep: [string, string][] = [...(donorView ? [["view", "donors"] as [string, string]] : []), ...(q.pageSize ? [["pageSize", String(pageSize)] as [string, string]] : []), ...(q.sort ? [["sort", sort], ["sort_dir", dir]] as [string, string][] : [])];
+  const rangeHidden = Object.entries(rangeParams(range, { start: "from", end: "to" })).filter((e): e is [string, string] => !!e[1]);
   const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
   const canRecord = user.permissions.has("donations:record");
 
@@ -439,29 +443,18 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
         })();
       ` }} />}
 
-      <form method="get" class="filter-bar flex flex-wrap gap-3 mb-4 items-end">
-        {donorView && <input type="hidden" name="view" value="donors" />}
-        {q.pageSize && <input type="hidden" name="pageSize" value={pageSize} />}
-        <div class="flex flex-col w-full md:w-auto">
-          <label class="input flex items-center gap-2 w-full md:w-64"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" name="search" placeholder={t("common.searchPlaceholder")} value={search} class="grow min-w-0" /></label>
-        </div>
-        {q.sort && <input type="hidden" name="sort" value={sort} />}
-        {q.sort && <input type="hidden" name="sort_dir" value={dir} />}
-        {receipt.map((r) => <input type="hidden" name="receipt" value={r} />)}
-        <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
-          href={(p) => buildListUrl("/donations", { view: state.view, pageSize: state.pageSize, search, sort: state.sort, sort_dir: state.sort_dir, receipt }, p)} />
-        {!donorView && <MultiSelectFilter
-          param="receipt"
-          autoApply
-          options={RECEIPT_STATUSES.map((v) => ({ value: v, label: t(`donations.table.${v === "open" ? "receiptOpen" : v === "issued" ? "receiptIssued" : "receiptNotRequired"}`) }))}
-          selected={receipt}
-          allLabel={t("donations.filter.allReceipts")}
-          countLabel={(count) => t("donations.filter.receiptCount", { count })}
-          applyLabel={t("common.apply")}
-          resetLabel={t("common.reset")}
-        />}
-        {(search || from || to || receipt.length > 0) && <a href={donorView ? "/donations?view=donors" : "/donations"} class="btn btn-ghost">{t("common.reset")}</a>}
-      </form>
+      <PageSearch label={t("donations.title")} value={search} hidden={[...keep, ...rangeHidden, ...receipt.map((r): [string, string] => ["receipt", r])]} />
+      <FilterDialog navbar id="donations-filter-dialog" hidden={[...keep, ...(search ? [["search", search] as [string, string]] : [])]}
+        resetHref={donorView ? "/donations?view=donors" : "/donations"}
+        labels={navFilterLabels()}
+        sections={[
+          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+            <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
+              href={(p) => buildListUrl("/donations", { view: state.view, pageSize: state.pageSize, search, sort: state.sort, sort_dir: state.sort_dir, receipt }, p)} />
+          ) },
+          ...(donorView ? [] : [{ type: "chips" as const, param: "receipt", title: t("donations.filter.allReceipts"), selected: receipt,
+            options: RECEIPT_STATUSES.map((v) => ({ value: v, label: t(`donations.table.${v === "open" ? "receiptOpen" : v === "issued" ? "receiptIssued" : "receiptNotRequired"}`) })) }]),
+        ]} />
 
       <ClickToEditHint />
       <div class="overflow-x-auto">

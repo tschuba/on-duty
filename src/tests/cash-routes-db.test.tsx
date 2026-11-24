@@ -113,6 +113,10 @@ describe.skipIf(!url)("cash routes (real DB)", () => {
     // Übersicht, Bericht, Abschluss
     await ok("GET", "/");
     await ok("GET", `/?q=a&direction=income&status=open&tag=${inTag}`);
+    const list = await (await ok("GET", `/?direction=income&status=open&tag=${inTag}`)).text();
+    expect(list).toContain("data-page-filter");
+    expect(list).toContain('data-count="3"');
+    expect(list).not.toContain(`class="filter-bar`);
     await ok("GET", "/?view=report");
     const [y] = await c.listYears();
     await ok("GET", `/?view=report&year=${y.id}`);

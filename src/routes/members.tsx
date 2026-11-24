@@ -20,10 +20,11 @@ import { RolePopover } from "../components/role-popover.js";
 import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { FilterDialog } from "../components/filter-dialog.js";
+import { PageSearch } from "../components/page-search.js";
 import { parsePagination, buildListUrl, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { formatDate } from "../lib/format.js";
 import { trimmed } from "../lib/forms.js";
-import { SEARCH_DEBOUNCE_MS, ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
+import { ASSIGNMENT_NOTE_MAX_LENGTH } from "../lib/constants.js";
 import { env } from "../env.js";
 import { inScope, type StatusScope } from "../lib/member-scope.js";
 import { Pager } from "../components/pager.js";
@@ -963,6 +964,7 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
   };
   return (
     <FilterDialog
+      navbar
       id="members-filter-dialog"
       hidden={hidden}
       labels={{
@@ -1133,27 +1135,10 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
       {canReview && user.permissions.has("applications:manage") && <ApplicationFormSettings forms={forms} />}
       {canMembers && <StatsCards all={all} openRequests={canReview ? await countOpenRequests() : null} />}
 
-      {/* Toolbar */}
-      <div class="filter-bar flex flex-wrap gap-3 mb-4 items-center">
-        <label class="input flex items-center gap-2 w-64">
-          <Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" />
-          <input
-            type="search"
-            name="search"
-            placeholder={t("common.searchPlaceholder")}
-            value={search}
-            class="grow min-w-0"
-            hx-get="/members"
-            hx-trigger={`input changed delay:${SEARCH_DEBOUNCE_MS}ms`}
-            hx-target="#members-results"
-            hx-include="[name='search']"
-            hx-vals={JSON.stringify({ sort, sort_dir: dir, status: shownStatus, role: roleFilter, age: ageFilter, page: 1, pageSize })}
-          />
-        </label>
-        <MembersFilter scope={user.memberScope?.read} canReview={canReview} roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={shownStatus} roleFilter={roleFilter} ageFilter={ageFilter}
-          hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...(search ? [["search", search] as [string, string]] : [])]} />
-        {(search || roleFilter.length > 0 || ageFilter.length > 0 || (statusParams.length > 0 && [...shownStatus].sort().join() !== [...DEFAULT_STATUS, ...(canReview ? ["requested"] : [])].sort().join())) && <a href="/members" class="btn btn-ghost">{t("common.reset")}</a>}
-      </div>
+      <PageSearch label={t("members.title")} value={search}
+        hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...shownStatus.map((v) => ["status", v] as [string, string]), ...roleFilter.map((v) => ["role", v] as [string, string]), ...ageFilter.map((v) => ["age", v] as [string, string])]} />
+      <MembersFilter scope={user.memberScope?.read} canReview={canReview} roles={allRoles} activeRoleIds={activeRoleIds} statusFilter={shownStatus} roleFilter={roleFilter} ageFilter={ageFilter}
+        hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...(search ? [["search", search] as [string, string]] : [])]} />
 
       {tableEl}
 

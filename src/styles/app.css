@@ -179,7 +179,6 @@
 :root {
   --nav-h: 4rem;
   --header-h: 4rem;
-  --filter-h: 4rem; /* Fallback; das Layout überschreibt es mit der gemessenen Höhe von .filter-bar */
 }
 .page-header {
   top: var(--nav-h);
@@ -198,16 +197,11 @@ main > * {
   background: var(--color-base-100);
   padding-block: 1rem 0.5rem; /* oben Platz für hochgeschobene Floating Labels */
 }
-/* Monatszeile der Jubiläumsliste klebt unter dem PageHeader; ab md zusätzlich unter der Filterleiste (--filter-h wird im Layout gemessen). */
+/* Monatszeile der Jubiläumsliste klebt unter dem PageHeader (die Seite hat keine Filterleiste mehr). */
 .month-row td {
   position: sticky;
   z-index: 10;
   top: calc(var(--nav-h) + var(--header-h));
-}
-@media (min-width: 48rem) {
-  .month-row td {
-    top: calc(var(--nav-h) + var(--header-h) + var(--filter-h));
-  }
 }
 @media (max-width: 47.99rem) {
   .filter-bar {

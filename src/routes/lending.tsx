@@ -14,6 +14,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { MemberMark, MemberLink } from "../components/member-mark.js";
 import { FilterDialog } from "../components/filter-dialog.js";
+import { PageSearch } from "../components/page-search.js";
 import { buildListUrl, parseMulti } from "../lib/list-query.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
@@ -268,7 +269,6 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
   }
 
   const presets = rangePresets(today, "future");
-  const hasFilter = Boolean(itemFilter || search || !statusIsDefault || tagFilter.length || member || start !== addDays(today, -14) || end !== addDays(today, 30));
 
   return c.html(
     <Layout title={t("lending.title")} user={user}>
@@ -295,23 +295,16 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
         })();
       ` }} />
 
-      <div class="filter-bar flex gap-2 items-center flex-wrap mb-4">
-      <form method="get" action="/inventory/lending" class="contents">
-        <label class="input flex items-center gap-2 w-56"><Icon name="icon-[tabler--search]" class="w-4 h-4 opacity-60" /><input type="search" name="q" value={search} placeholder={t("lending.filter.searchPlaceholder")} class="grow min-w-0" /></label>
-        {statusParam?.map((v) => <input type="hidden" name="status" value={v} />)}
-        {tagFilter.map((v) => <input type="hidden" name="tag" value={v} />)}
-        {member && <input type="hidden" name="member" value={member} />}
-        <input type="hidden" name="item" value={itemFilter} />
-        {itemFilter && <a href={buildListUrl("/inventory/lending", { q: search, status: statusParam, tag: tagFilter, member, ...rp })} class="badge badge-neutral gap-1">{rows.find((r) => r.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?"} ✕</a>}
-        <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
-          href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusParam, tag: tagFilter, member }, p)} />
-      </form>
+      <PageSearch name="q" action="/inventory/lending" label={t("inventory.tabs.lending")} value={search}
+        hidden={[...(statusParam ?? []).map((v): [string, string] => ["status", v]), ...tagFilter.map((v): [string, string] => ["tag", v]), ...(member ? [["member", member] as [string, string]] : []), ...(itemFilter ? [["item", itemFilter] as [string, string]] : []), ...Object.entries(rp).flatMap(([k, v]) => (v ? [[k, v] as [string, string]] : []))]}
+        chip={itemFilter ? { label: rows.find((r) => r.lendingItem.id === itemFilter)?.lendingItem.inventoryItem.name ?? "?", href: buildListUrl("/inventory/lending", { q: search, status: statusParam, tag: tagFilter, member, ...rp }) } : undefined} />
       <FilterDialog
+        navbar
         id="lending-filter-dialog"
+        resetHref="/inventory/lending"
         hidden={[
           ...(search ? [["q", search] as [string, string]] : []),
           ...(itemFilter ? [["item", itemFilter] as [string, string]] : []),
-          ...Object.entries(rp).flatMap(([k, v]) => (v ? [[k, v] as [string, string]] : [])),
         ]}
         labels={{ button: t("lending.filter.button"), title: t("lending.filter.title"), quick: t("lending.filter.quick"), apply: t("common.apply"), close: t("common.cancel"), reset: t("common.reset"), searchPlaceholder: t("common.searchPlaceholder"), noResults: t("common.nav.noResults") }}
         quick={[
@@ -319,13 +312,15 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
           { label: ROW_STATE_LABEL.overdue, values: { status: ["overdue"] } },
         ]}
         sections={[
+          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+            <QuickRangeFilter presets={presets} range={range} dir="future" action="/inventory/lending" bare
+              href={(p) => buildListUrl("/inventory/lending", { item: itemFilter, q: search, status: statusParam, tag: tagFilter, member }, p)} />
+          ) },
           { type: "chips", param: "status", title: t("lending.loans.table.status"), options: allowedStates.map((st) => ({ value: st, label: ROW_STATE_LABEL[st] })), selected: statusFilter, defaults: defaultStates },
           { type: "chips", param: "member", title: t("lending.filter.borrower"), options: [{ value: "yes", label: t("common.filter.members") }, { value: "no", label: t("common.filter.external") }], selected: member ? [member] : [] },
           { type: "list", compact: true, param: "tag", title: t("inventory.table.tags"), options: allTags.map((tag) => ({ value: tag, label: tag })), selected: tagFilter },
         ]}
       />
-        {hasFilter && <a href="/inventory/lending" class="btn btn-ghost">{t("lending.overview.rangeReset")}</a>}
-      </div>
 
       {sorted.length === 0 ? (
         <p class="text-center opacity-50 py-8">{t("lending.overview.empty")}</p>
