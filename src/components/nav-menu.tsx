@@ -78,6 +78,21 @@ function adminItems(user: AuthedUser, c: NavCounts): Leaf[] {
   return items.filter((i) => i.show);
 }
 
+const NO_COUNTS: NavCounts = { applications: 0, receipts: 0, cash: 0, inspections: 0, loans: 0, loanRequests: 0, events: 0, org: false, pendingUsers: 0, backupProblem: false };
+
+// Flache Linkliste für die globale Suche; `show` hängt nur an Rechten, daher reichen Null-Zähler.
+export function menuLinks(user: AuthedUser): { label: string; href: string; parent?: string; icon: IconName; external?: boolean }[] {
+  const out: ReturnType<typeof menuLinks> = [];
+  for (const g of menuDefinition(user, NO_COUNTS)) {
+    for (const i of g.items.filter((x) => x.show)) {
+      out.push({ label: i.label, href: i.href, parent: i.label === g.label ? undefined : g.label, icon: g.icon, external: i.external });
+      for (const k of i.children?.filter((x) => x.show) ?? []) out.push({ label: k.label, href: k.href, parent: g.label, icon: g.icon });
+    }
+  }
+  for (const i of adminItems(user, NO_COUNTS)) out.push({ label: i.label, href: i.href, parent: t("common.nav.admin"), icon: i.icon ?? "icon-[tabler--settings]", external: i.external });
+  return out;
+}
+
 export function adminAlert(user: AuthedUser, c: NavCounts): "error" | "warning" | null {
   if (!adminItems(user, c).length) return null;
   return c.backupProblem ? "error" : c.pendingUsers > 0 ? "warning" : null;
@@ -127,34 +142,14 @@ export function findActiveHref(hrefs: string[], path: string): string | null {
 export const NAV_STATE_SCRIPT = `(function(){var c=document.getElementById("nav-drawer");if(!c)return;var lg=matchMedia("(min-width: 1024px)");try{c.checked=lg.matches&&localStorage.getItem("nav-collapsed")!=="1"}catch(e){c.checked=lg.matches}c.addEventListener("change",function(){if(!c.checked)document.querySelectorAll("#nav-menu details[open]").forEach(function(d){d.removeAttribute("open")});if(lg.matches)try{localStorage.setItem("nav-collapsed",c.checked?"0":"1")}catch(e){}})})();`;
 
 export const NAV_SCRIPT = `(function(){
-var c=document.getElementById("nav-drawer"),nav=document.getElementById("nav-menu"),q=document.getElementById("nav-search"),none=document.getElementById("nav-none");
+var c=document.getElementById("nav-drawer"),nav=document.getElementById("nav-menu");
 if(!c||!nav)return;
 var lg=matchMedia("(min-width: 1024px)");
-var expand=function(){c.checked=true;c.dispatchEvent(new Event("change"))};
 nav.addEventListener("click",function(e){
   if(lg.matches&&!c.checked){
     var s=e.target.closest("summary");
-    if(s){e.preventDefault();expand();s.parentNode.open=true}
-    else if(e.target.closest("[data-nav-search]")){expand();q.focus()}
+    if(s){e.preventDefault();c.checked=true;c.dispatchEvent(new Event("change"));s.parentNode.open=true}
   }
-});
-var groups=nav.querySelectorAll("details[data-nav]");
-q.addEventListener("input",function(){
-  var v=q.value.trim().toLowerCase(),hits=0;
-  groups.forEach(function(d){if(v)d.removeAttribute("name");else d.setAttribute("name","nav")});
-  nav.querySelectorAll("[data-nav-top]").forEach(function(top){
-    var d=top.querySelector("details[data-nav]"),leaves=top.querySelectorAll("[data-label]"),show=!v;
-    if(v){
-      var own=top.getAttribute("data-label").indexOf(v)>-1;
-      leaves.forEach(function(l){var m=own||l.getAttribute("data-label").indexOf(v)>-1;l.hidden=!m;if(m)show=true});
-      if(d)d.open=show;
-    }else{
-      leaves.forEach(function(l){l.hidden=false});
-      if(d)d.open=d.hasAttribute("data-active");
-    }
-    top.hidden=!show;if(show)hits++;
-  });
-  none.hidden=!v||hits>0;
 });
 })();`;
 
@@ -173,17 +168,6 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
           <Icon name="icon-[tabler--layout-sidebar-left-collapse]" class="h-5 w-5 text-gold is-drawer-close:hidden" />
           <Icon name="icon-[tabler--layout-sidebar-left-expand]" class="h-5 w-5 text-gold hidden is-drawer-close:block" />
         </label>
-      </li>
-      <li class="is-drawer-close:hidden">
-        <label class="input input-sm flex items-center gap-2">
-          <Icon name="icon-[tabler--search]" class="h-4 w-4 opacity-60" />
-          <input id="nav-search" type="search" class="grow" placeholder={t("common.nav.search")} aria-label={t("common.nav.search")} autocomplete="off" />
-        </label>
-      </li>
-      <li class="hidden is-drawer-close:block">
-        <button type="button" data-nav-search class="is-drawer-close:tooltip is-drawer-close:tooltip-right" data-tip={t("common.nav.search")} aria-label={t("common.nav.search")}>
-          <Icon name="icon-[tabler--search]" class="h-5 w-5" />
-        </button>
       </li>
       {groups.map((g) => {
         const label = <span class="is-drawer-close:hidden">{g.label}</span>;
@@ -231,7 +215,6 @@ export function NavMenu({ user, counts, path }: { user: AuthedUser; counts: NavC
           </li>
         );
       })}
-      <li id="nav-none" hidden class="px-3 py-2 text-sm opacity-60 is-drawer-close:hidden">{t("common.nav.noResults")}</li>
     </ul>
   );
 }
