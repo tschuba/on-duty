@@ -5,7 +5,8 @@ import { t } from "../i18n/index.js";
 
 // Icon + Label einer Aktion; das Label verschwindet per Container-Query (der nächste @container-Vorfahr zählt).
 export function ActionContent({ icon, label, variant = "secondary", hide: hideOverride }: { icon: IconName; label: string; variant?: "primary" | "secondary"; hide?: string }) {
-  const hide = hideOverride ?? (variant === "primary" ? "@max-lg:hidden" : "@max-3xl:hidden");
+  // Hauptaktion behält ihr Label eine Stufe länger (bis @xl), Nebenfunktionen verlieren es unter @2xl.
+  const hide = hideOverride ?? (variant === "primary" ? "@max-xl:hidden" : "@max-2xl:hidden");
   return (<>
     <Icon name={icon} class="h-5 w-5 shrink-0" />
     <span class={hide}>{label}</span>
@@ -13,7 +14,7 @@ export function ActionContent({ icon, label, variant = "secondary", hide: hideOv
 }
 
 // Aktions-Button für den Seitenkopf. Label wird per Container-Query ausgeblendet:
-// Stufe 1 (< @3xl) Sekundär, Stufe 2 (< @lg) auch Primär. aria-label/title bleiben immer.
+// Alle Labels erst ab @2xl (672 px Header-Breite), darunter nur Icon. aria-label/title bleiben immer.
 export function HeaderAction({ variant = "secondary", icon, label, href, form, type, onclick, class: cls = "btn-neutral", name, value, attrs, disabled, hideLabel }: {
   hideLabel?: string; // überschreibt die Container-Query-Klasse, die das Label ausblendet (z. B. "hidden" = immer nur Icon)
   variant?: "primary" | "secondary";
@@ -46,7 +47,7 @@ export function HeaderAction({ variant = "secondary", icon, label, href, form, t
 type HeaderActionProps = Parameters<typeof HeaderAction>[0];
 
 // Sekundäraktionen: ab Header-Breite `@md` inline als Buttons, darunter gebündelt in einem „⋯“-Menü (Label immer sichtbar).
-export function ActionMenu({ items, hideLabel = "@max-3xl:hidden" }: { items: (HeaderActionProps | false | null | undefined)[]; hideLabel?: string }) {
+export function ActionMenu({ items, hideLabel = "@max-2xl:hidden" }: { items: (HeaderActionProps | false | null | undefined)[]; hideLabel?: string }) {
   const list = items.filter((i): i is HeaderActionProps => !!i);
   if (!list.length) return <></>;
   return (<>

@@ -168,10 +168,10 @@ applicationRoutes.get("/:id", guard, async (c) => {
     <>
       {canDecide && (
         <div class="flex items-center gap-2 mr-3">
-        <HeaderAction icon="icon-[tabler--user-x]" label={t("applications.actions.reject")} hideLabel="@max-3xl:hidden" class="btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()" />
+        <HeaderAction icon="icon-[tabler--user-x]" label={t("applications.actions.reject")} class="btn-outline btn-error" onclick="document.getElementById('reject-modal').showModal()" />
         {memberMatch
-          ? <HeaderAction icon="icon-[tabler--user-check]" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" class="btn-success" attrs={{ id: "create-member-btn" }} onclick="document.getElementById('approve-modal').showModal()" />
-          : <HeaderAction icon="icon-[tabler--user-check]" label={t("applications.actions.approve")} hideLabel="@max-3xl:hidden" form="application-approve-form" class="btn-success" attrs={{ id: "create-member-btn" }} />}
+          ? <HeaderAction icon="icon-[tabler--user-check]" label={t("applications.actions.approve")} class="btn-success" attrs={{ id: "create-member-btn" }} onclick="document.getElementById('approve-modal').showModal()" />
+          : <HeaderAction icon="icon-[tabler--user-check]" label={t("applications.actions.approve")} form="application-approve-form" class="btn-success" attrs={{ id: "create-member-btn" }} />}
         </div>
       )}
       {showSave && <HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("applications.actions.save")} form="application-edit-form" class="btn-primary" />}

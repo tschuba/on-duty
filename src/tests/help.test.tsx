@@ -79,3 +79,25 @@ describe("Hilfe", () => {
     expect(html.match(/<details/g)?.length).toBe(7);
   });
 });
+
+describe("Hilfe: Rücksprung (?from=)", () => {
+  it("helpFrom lässt nur interne Pfade außerhalb der Hilfe zu", async () => {
+    const { helpFrom } = await import("../routes/help.js");
+    expect(helpFrom("/members?status=active")).toBe("/members?status=active");
+    for (const bad of ["//evil.com", "/\\evil.com", "https://evil.com", "/help/tips", "", undefined]) expect(helpFrom(bad)).toBeUndefined();
+  });
+  it("Zurück-Link und Weitergabe auf den Karten", async () => {
+    const from = encodeURIComponent("/members?status=active");
+    const sub = await (await app.request(`/help/tips?from=${from}`)).text();
+    expect(sub).toContain('href="/members?status=active"');
+    expect(sub).toContain("← Zurück");
+    expect(await (await app.request(`/help?from=${from}`)).text()).toContain(`/help/tips?from=${from}`);
+    expect(await (await app.request("/help/tips?from=//evil.com")).text()).not.toContain("evil.com");
+  });
+});
+
+it("Unterseite mit from verlinkt weiter auf die Hilfe-Übersicht", async () => {
+  const from = encodeURIComponent("/members");
+  expect(await (await app.request(`/help/rights?from=${from}`)).text()).toContain(`href="/help?from=${from}"`);
+  expect(await (await app.request("/help/rights")).text()).not.toContain('href="/help?from=');
+});

@@ -339,10 +339,10 @@ export async function renderTraining(c: Context<{ Variables: Variables }>) {
     <Layout title={t("training.pageTitle")} user={user}>
       <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "training")} />} actions={<>
         <div class="join">
-          <HeaderAction icon="icon-[tabler--users]" label={t("training.filter.grouped")} href={buildListUrl("/members", cur, { group: group === "member" ? undefined : "member", page: 1 })} class={`join-item ${group === "member" ? "btn-neutral" : "btn-outline"}`} hideLabel="@max-5xl:hidden" />
-          <HeaderAction icon="icon-[tabler--certificate]" label={t("training.filter.groupedTitle")} href={buildListUrl("/members", cur, { group: byTitle ? undefined : "title", page: 1 })} class={`join-item ${byTitle ? "btn-neutral" : "btn-outline"}`} hideLabel="@max-5xl:hidden" />
+          <HeaderAction icon="icon-[tabler--users]" label={t("training.filter.grouped")} href={buildListUrl("/members", cur, { group: group === "member" ? undefined : "member", page: 1 })} class={`join-item ${group === "member" ? "btn-neutral" : "btn-outline"}`} hideLabel="@max-[1090px]:hidden" />
+          <HeaderAction icon="icon-[tabler--certificate]" label={t("training.filter.groupedTitle")} href={buildListUrl("/members", cur, { group: byTitle ? undefined : "title", page: 1 })} class={`join-item ${byTitle ? "btn-neutral" : "btn-outline"}`} hideLabel="@max-[1090px]:hidden" />
         </div>
-        {user.permissions.has("training:write") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("training.add")} href="/training/new" class="btn-primary" hideLabel="@max-2xl:hidden" />}
+        {user.permissions.has("training:write") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("training.add")} href="/training/new" class="btn-primary" />}
       </>} />
       <PageSearch name="q" action="/members" label={t("training.pageTitle")} value={q.q ?? ""}
         hidden={[["view", "training"], ...(group ? [["group", group] as [string, string]] : []), ...statusFilter.map((v): [string, string] => ["status", v]), ...(withFormer ? [["former", "1"] as [string, string]] : [])]} />

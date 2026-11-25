@@ -17,8 +17,9 @@ describe("PageHeader", () => {
     const pri = await render(<HeaderAction variant="primary" icon="icon-[tabler--check]" label="Ok" form="f" />);
     expect(sec).toContain('aria-label="Weg"');
     expect(sec).toContain('title="Weg"');
-    expect(sec).toContain("@max-3xl:hidden");
-    expect(pri).toContain("@max-lg:hidden");
+    expect(sec).toContain("@max-2xl:hidden");
+    expect(pri).toContain("@max-xl:hidden");
+    expect(pri).not.toContain("@max-2xl:hidden");
   });
 });
 
