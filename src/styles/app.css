@@ -145,12 +145,22 @@
 }
 
 /* Hover-Popover "N Rollen" (components/role-popover.tsx): Top Layer, am Badge verankert. */
-.role-popover[popover] {
+.role-popover[popover],
+.status-reason-popover[popover] {
   position: fixed;
   position-area: block-end span-inline-start;
   position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
   width: max-content;
+  max-width: min(20rem, 90vw);
   margin-top: 0.25rem;
+}
+
+/* Hover-Brücke über den margin-Spalt, damit der Pointer das Popover erreicht (auch bei flip). */
+.status-reason-popover[popover]::before {
+  content: "";
+  position: absolute;
+  inset: -0.25rem;
+  z-index: -1; /* hinter dem Inhalt, sonst deckt es den Link ab */
 }
 
 .role-combobox-list {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ageGroupOf, deriveMemberStatus } from "../lib/status.js";
+import { ageGroupOf, deriveMemberStatus, explainMemberStatus, ageLimitDate } from "../lib/status.js";
 
 const YOUTH_LIMIT = 18;
 const CHILDREN_LIMIT = 12;
@@ -116,5 +116,34 @@ describe("age boundaries stay in sync (deriveMemberStatus vs ageGroupOf)", () =>
   ] as const)("age %i → group %s, status %s", (years, group, status) => {
     expect(ageGroupOf(born(years), 12, 18, 65, today)).toBe(group);
     expect(deriveMemberStatus(member({ birthDate: born(years) }), role, 12, 18, 65, today)).toBe(status);
+  });
+});
+
+describe("explainMemberStatus", () => {
+  const ex = (m: ReturnType<typeof member>, a: ReturnType<typeof assignment>[], limit = 65) => explainMemberStatus(m, a, CHILDREN_LIMIT, YOUTH_LIMIT, limit);
+
+  it("deceased vor left, mit Datum", () => {
+    expect(ex(member({ deathDate: "2023-02-02", exitDate: "2023-01-01" }), []).reason).toEqual({ kind: "deceased", date: "2023-02-02" });
+    expect(ex(member({ exitDate: "2023-01-01" }), []).reason).toEqual({ kind: "left", date: "2023-01-01" });
+  });
+  it("runningRole nennt Funktion und Alter", () => {
+    expect(ex(member({ birthDate: age(15) }), [assignment(activeRole)])).toEqual({ status: "youth", reason: { kind: "runningRole", roleTitle: "Aktives Mitglied", age: 15 } });
+  });
+  it("noOpenRole / openRoleNotActive", () => {
+    expect(ex(member(), []).reason).toEqual({ kind: "noOpenRole" });
+    expect(ex(member(), [assignment(activeRole, "2021-01-01")]).reason).toEqual({ kind: "noOpenRole" });
+    expect(ex(member(), [assignment(passiveRole)]).reason).toEqual({ kind: "openRoleNotActive", roleTitle: "Passives Mitglied" });
+  });
+  it("passiveAtCutoff / noRoleAtCutoff mit Stichtag", () => {
+    const birthDate = age(70);
+    const cutoff = ageLimitDate(birthDate, 65);
+    expect(ex(member({ birthDate }), [assignment(activeRole)]).reason).toEqual({ kind: "passiveAtCutoff", roleTitle: "Aktives Mitglied", age: 70, cutoff, limit: 65 });
+    expect(ex(member({ birthDate }), []).reason).toEqual({ kind: "noRoleAtCutoff", cutoff, limit: 65 });
+  });
+  it("Status stimmt immer mit deriveMemberStatus überein", () => {
+    for (const y of [5, 14, 30, 64, 65, 80]) for (const a of [[], [assignment(activeRole)], [assignment(passiveRole)], [assignment(activeRole, "2021-01-01")]]) {
+      const m = member({ birthDate: age(y) });
+      expect(ex(m, a).status).toBe(deriveMemberStatus(m, a, CHILDREN_LIMIT, YOUTH_LIMIT, 65));
+    }
   });
 });
