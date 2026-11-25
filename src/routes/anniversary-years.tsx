@@ -30,7 +30,7 @@ const isKind = (k: string): k is AnniversaryKind => (ANNIVERSARY_KINDS as readon
 export function anniversaryViews(perms: Set<string>, years: boolean): TitleSwitchItem[] {
   return [
     ...(perms.has("members:read") ? [{ active: !years, href: "/anniversaries", label: t("anniversaries.title"), icon: "icon-[tabler--cake]" as const }] : []),
-    ...(perms.has("anniversary-years:read") ? [{ active: years, href: "/anniversaries?view=years", label: t("common.nav.anniversaryYears"), icon: "icon-[tabler--calendar-stats]" as const }] : []),
+    ...(perms.has("anniversary-years:read") ? [{ active: years, href: "/anniversaries?view=years", label: t("common.nav.anniversaryYears"), icon: "icon-[tabler--calendar-star]" as const }] : []),
   ];
 }
 

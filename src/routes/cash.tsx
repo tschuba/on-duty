@@ -691,10 +691,10 @@ cashRoutes.get("/", report, async (c) => {
   const reportView = view === "report";
 
   const views: TitleSwitchItem[] = [
-    { active: view === "entries", href: "/cash", label: t("cash.view.entries"), icon: "icon-[tabler--list]" },
-    { active: reportView, href: "/cash?view=report", label: t("cash.view.report"), icon: "icon-[tabler--report]" },
+    { active: view === "entries", href: "/cash", label: t("cash.view.entries"), icon: "icon-[tabler--cash-register]" },
+    { active: reportView, href: "/cash?view=report", label: t("cash.view.report"), icon: "icon-[tabler--report-money]" },
     { active: tagsView, href: "/cash?view=tags", label: t("cash.view.tags"), icon: "icon-[tabler--tags]" },
-    { active: eventsView, href: "/cash?view=events", label: t("cash.view.events"), icon: "icon-[tabler--calendar-event]" },
+    { active: eventsView, href: "/cash?view=events", label: t("cash.view.events"), icon: "icon-[tabler--calendar-dollar]" },
   ];
   const title = <TitleSwitch items={canRead ? views : views.slice(1, 2)} />;
   const settingsDialog = canManage && (
