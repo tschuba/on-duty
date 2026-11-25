@@ -1136,7 +1136,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
 
   return c.html(
     <Layout title={t("members.title")} user={user}>
-      <PageHeader title={<><TitleSwitch items={memberViews(user.permissions as Set<string>, "members")} /><a href="/help/members#status" class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100" aria-label={t("help.members.aria.context")} title={t("help.members.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} actions={<>
+      <PageHeader title={<><TitleSwitch items={memberViews(user.permissions as Set<string>, "members")} /><a href="/help/members#status" class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100 [[data-mode=icons]+&]:ml-4 [[data-mode=icons]+&]:border [[data-mode=icons]+&]:border-info/50 [[data-mode=icons]+&]:text-info [[data-mode=icons]+&]:opacity-100" aria-label={t("help.members.aria.context")} title={t("help.members.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} actions={<>
         {canReview && <ApplicationLinks forms={forms} canManageForms={user.permissions.has("applications:manage")} />}
         <div class="dropdown dropdown-end ml-2">
           <div tabindex={0} role="button" class="btn btn-neutral btn-square" aria-label={t("common.moreActions")} title={t("common.moreActions")}>
