@@ -26,10 +26,10 @@ describe("mail templates", () => {
   const EXISTING = ["application-submitted", "application-approved", "application-rejected", "lend-notify", "lend-submitted", "lend-approved", "lend-rejected", "registration-pending"];
   const simple = { applicantName: "Anna B", rejoin: true, itemName: "Zelt", requestUrl: "https://portal.test/r/1", statusUrl: "https://portal.test/s/1", userName: "Anna B", userEmail: "a@x.de" };
   it.each(seeded.filter((s) => EXISTING.includes(s.key)))("renders existing mail $key", ({ key, subject, body }) => {
-    expect(validateTemplate(key, { prefix: "[{{org.name}}|{{type}}]", subject, body })).toEqual([]);
+    expect(validateTemplate(key, { prefix: "[{{org.name}}]", subject, body })).toEqual([]);
     const vars = buildVars(key, simple, [anna]);
-    const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, vars);
-    expect(out.subject).toMatch(/^\[Feuerwehr Test\|(Mitgliedsantrag|Verleih|Registrierung)\] \S/);
+    const out = renderMail({ prefix: "[{{org.name}}]", subject, body }, vars);
+    expect(out.subject).toMatch(/^\[Feuerwehr Test\] \S/);
     expect(out.text).not.toMatch(/\{\{|undefined/);
     expect(out).toMatchSnapshot();
     if (CATALOG[key].audience === "applicant") expect(out.text).toContain("Hallo Anna,");
@@ -48,10 +48,10 @@ describe("mail templates", () => {
   });
 
   it.each(seeded.filter((s) => !EXISTING.includes(s.key)))("renders $key from its seeded text", ({ key, subject, body }) => {
-    expect(validateTemplate(key, { prefix: "[{{org.name}}|{{type}}]", subject, body })).toEqual([]);
-    const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, buildVars(key, { ...record, changes: "Ort: A → B" }, [anna, ben]));
+    expect(validateTemplate(key, { prefix: "[{{org.name}}]", subject, body })).toEqual([]);
+    const out = renderMail({ prefix: "[{{org.name}}]", subject, body }, buildVars(key, { ...record, changes: "Ort: A → B" }, [anna, ben]));
     if (key === "member-settings-link") return;
-    expect(out.subject).toMatch(/^\[Feuerwehr Test\|Termin\] /);
+    expect(out.subject).toMatch(/^\[Feuerwehr Test\] /);
     expect(out.text).not.toMatch(/\{\{|undefined/);
     expect(out.text).toContain("https://o/2");
     expect(out.text).toContain(key === "event-cancelled" || key === "event-mail-info" ? "Keine Termin-Mails" : "https://y/1");
@@ -64,8 +64,8 @@ describe("mail templates", () => {
 
   it("member-settings-link renders and requires settingsUrl", () => {
     const { subject, body } = seeded.find((s) => s.key === "member-settings-link")!;
-    const out = renderMail({ prefix: "[{{org.name}}|{{type}}]", subject, body }, buildVars("member-settings-link", { settingsUrl: "https://s/1", validMinutes: 30 }, []));
-    expect(out.subject).toBe("[Feuerwehr Test|Mitglied] Deine Einstellungen bei Feuerwehr Test");
+    const out = renderMail({ prefix: "[{{org.name}}]", subject, body }, buildVars("member-settings-link", { settingsUrl: "https://s/1", validMinutes: 30 }, []));
+    expect(out.subject).toBe("[Feuerwehr Test] Deine Einstellungen bei Feuerwehr Test");
     expect(out.text).toContain("https://s/1");
     expect(out.text).not.toMatch(/\{\{|undefined/);
     expect(validateTemplate("member-settings-link", { subject: "x", body: "hi" })[0]).toMatch(/Pflichtplatzhalter/);
@@ -105,7 +105,7 @@ describe("mail templates", () => {
   });
 
   describe("resolveTemplate", () => {
-    const sys = { locale: "de", variant: "system", category: "event", audience: "member", topic: "events", prefix: "[{{org.name}}|{{type}}]", headersMode: "fixed", extraHeaders: null, ...seeded[0] };
+    const sys = { locale: "de", variant: "system", category: "event", audience: "member", topic: "events", prefix: "[{{org.name}}]", headersMode: "fixed", extraHeaders: null, ...seeded[0] };
     const ov = (o: object) => ({ key: "event-created", locale: "de", variant: "override", subject: "S", body: "{{#recipients}}{{optOutUrl}}{{/recipients}}", ...o });
     beforeEach(() => select.mockClear());
 

@@ -4,7 +4,7 @@
 
 ## Schema
 
-**Betreff:** `[<Org-Name>|<Typ>] <Betreff>`
+**Betreff:** `[<Org-Name>] <Betreff>` (Zitadel-Mails: `[<Org-Name>|Benutzerkonto] …`)
 
 `<Org-Name>` ist `ORG_NAME` aus der Umgebung; `|`, `[`, `]` und Zeilenumbrüche werden durch Leerzeichen ersetzt, ohne Wert gilt `on-duty`. **Wer den Namen ändert, muss seine Filter anpassen.** Die Beispiele unten zeigen `on-duty` als Platzhalter.
 
@@ -22,8 +22,11 @@ Enthält `ORG_NAME` eines dieser Zeichen, meldet der App-Start das: eine Warnung
 
 Bei allen on-duty-Mails (Texte stehen als Vorlagen in der DB; die Betreffs in den Tabellen sind nur der Ausgangswert) lassen sich Betreff und Text im Editor ändern; das Präfix nur bei freien Vorlagen. Betreff-Filter sind daher nur eingeschränkt stabil, verlässlich sind nur die Header `X-On-Duty-*`. Für Zitadel-Mails („Benutzerkonto“, keine eigenen Header möglich) bleibt das Label fest und ist der einzige Filteranker. Variablen der Vorlagen: [mail-variables.md](mail-variables.md).
 
+**Umstellung:** Der Typ (`|Termin` usw.) steht nicht mehr im Betreff, er steckt in `X-On-Duty-Category`. Filter auf `|Typ]` greifen nicht mehr und müssen auf `X-On-Duty-*` umgestellt werden. Zitadel-Mails behalten `[Org|Benutzerkonto]`.
+
 **Header** (nur on-duty-Mails; Zitadel kann keine eigenen Header setzen):
 
+- `X-On-Duty-Org`: bereinigter Org-Name (wie im Betreffpräfix)
 - `X-On-Duty-Category`: `membership` | `lend` | `registration` | `event` | `member` | `custom`
 - `X-On-Duty-Event`: siehe Tabelle unten (stabil, nicht lokalisiert)
 - `X-On-Duty-Audience`: `staff` (Verwaltung) | `applicant` (Antragsteller/Betroffene) | `member` (Mitglieder)
@@ -36,14 +39,14 @@ Bei allen on-duty-Mails (Texte stehen als Vorlagen in der DB; die Betreffs in de
 
 | Auslöser | Empfänger | Betreff | Event | Audience |
 |---|---|---|---|---|
-| Mitgliedsantrag eingegangen | Benachrichtigungsadresse¹ | `[on-duty\|Mitgliedsantrag] Neuer Antrag eingegangen: <Name>` | `application-submitted` | `staff` |
-| Mitgliedsantrag angenommen | Antragsteller | `[on-duty\|Mitgliedsantrag] Dein Antrag wurde angenommen` | `application-approved` | `applicant` |
-| Mitgliedsantrag abgelehnt | Antragsteller | `[on-duty\|Mitgliedsantrag] Dein Antrag wurde abgelehnt` | `application-rejected` | `applicant` |
-| Verleih-Anfrage eingegangen | Benachrichtigungsadresse¹ | `[on-duty\|Verleih] Neue Verleih-Anfrage: <Gegenstand>` | `lend-notify` | `staff` |
-| Verleih-Anfrage: Eingangsbestätigung | Antragsteller (falls E-Mail) | `[on-duty\|Verleih] Deine Verleih-Anfrage ist eingegangen` | `lend-submitted` | `applicant` |
-| Verleih-Anfrage genehmigt | Antragsteller | `[on-duty\|Verleih] Deine Verleih-Anfrage wurde genehmigt` | `lend-approved` | `applicant` |
-| Verleih-Anfrage abgelehnt | Antragsteller | `[on-duty\|Verleih] Deine Verleih-Anfrage wurde abgelehnt` | `lend-rejected` | `applicant` |
-| Neue Registrierung wartet auf Freigabe | alle Admins (Rollen mit Rechten) | `[on-duty\|Registrierung] Neue Registrierung wartet auf Freigabe` | `registration-pending` | `staff` |
+| Mitgliedsantrag eingegangen | Benachrichtigungsadresse¹ | `[on-duty] Neuer Antrag eingegangen: <Name>` | `application-submitted` | `staff` |
+| Mitgliedsantrag angenommen | Antragsteller | `[on-duty] Dein Antrag wurde angenommen` | `application-approved` | `applicant` |
+| Mitgliedsantrag abgelehnt | Antragsteller | `[on-duty] Dein Antrag wurde abgelehnt` | `application-rejected` | `applicant` |
+| Verleih-Anfrage eingegangen | Benachrichtigungsadresse¹ | `[on-duty] Neue Verleih-Anfrage: <Gegenstand>` | `lend-notify` | `staff` |
+| Verleih-Anfrage: Eingangsbestätigung | Antragsteller (falls E-Mail) | `[on-duty] Deine Verleih-Anfrage ist eingegangen` | `lend-submitted` | `applicant` |
+| Verleih-Anfrage genehmigt | Antragsteller | `[on-duty] Deine Verleih-Anfrage wurde genehmigt` | `lend-approved` | `applicant` |
+| Verleih-Anfrage abgelehnt | Antragsteller | `[on-duty] Deine Verleih-Anfrage wurde abgelehnt` | `lend-rejected` | `applicant` |
+| Neue Registrierung wartet auf Freigabe | alle Admins (Rollen mit Rechten) | `[on-duty] Neue Registrierung wartet auf Freigabe` | `registration-pending` | `staff` |
 
 ¹ Org-Einstellung `notificationEmail`, sonst `orgContactEmail`; beides leer → keine Mail.
 
@@ -51,17 +54,17 @@ Termin-Mails (Vorlagen in der DB, Standardtexte „du“):
 
 | Auslöser | Betreff (Standard) | Event | Audience |
 |---|---|---|---|
-| Neuer Termin | `[on-duty\|Termin] Neuer Termin: <Titel>, <Datum>` | `event-created` | `member` |
-| Termin geändert | `[on-duty\|Termin] Termin geändert: …` | `event-updated` | `member` |
-| Termin abgesagt | `[on-duty\|Termin] Termin abgesagt: …` | `event-cancelled` | `member` |
-| Absage zurückgenommen | `[on-duty\|Termin] Termin findet statt: …` | `event-uncancelled` | `member` |
-| Info-Mail „Künftig Termine per Mail“ (Button im Zahnrad-Dropdown auf `/events`, erreicht nur Mitglieder ohne bereits versendete Info-Mail) | `[on-duty\|Termin] Künftig Termine per Mail` | `event-mail-info` | `member` |
+| Neuer Termin | `[on-duty] Neuer Termin: <Titel>, <Datum>` | `event-created` | `member` |
+| Termin geändert | `[on-duty] Termin geändert: …` | `event-updated` | `member` |
+| Termin abgesagt | `[on-duty] Termin abgesagt: …` | `event-cancelled` | `member` |
+| Absage zurückgenommen | `[on-duty] Termin findet statt: …` | `event-uncancelled` | `member` |
+| Info-Mail „Künftig Termine per Mail“ (Button im Zahnrad-Dropdown auf `/events`, erreicht nur Mitglieder ohne bereits versendete Info-Mail) | `[on-duty] Künftig Termine per Mail` | `event-mail-info` | `member` |
 
 Einstellungslink (Transaktionsmail, kein Opt-Out-Thema):
 
 | Auslöser | Betreff (Standard) | Event | Audience |
 |---|---|---|---|
-| Anfrage auf `/me` mit bekannter Adresse | `[on-duty\|Mitglied] Deine Einstellungen bei <Org>` | `member-settings-link` | `member` |
+| Anfrage auf `/me` mit bekannter Adresse | `[on-duty] Deine Einstellungen bei <Org>` | `member-settings-link` | `member` |
 
 Der Link (`/link/<Token>`, 30 Minuten gültig) öffnet die Einstellungsseite für alle aktiven Personen mit dieser Adresse; Versand wird in `mail_log` protokolliert, Änderungen setzen `source = settings`.
 
@@ -79,8 +82,9 @@ Außerhalb des Schemas: Bugsink (nur Standalone-Stack) versendet bei gesetztem `
 
 ## Filter-Rezepte
 
-- Alles von on-duty und Zitadel: Betreff beginnt mit `[<Org-Name>|`
-- Eine Kategorie: Betreff beginnt mit `[on-duty|Verleih]` (bzw. `Mitgliedsantrag`, `Registrierung`, `Benutzerkonto`)
+- Alles von on-duty und Zitadel: Betreff beginnt mit `[<Org-Name>`
+- Eine Kategorie: Header `X-On-Duty-Category: lend` (bzw. `membership`, `registration`, `event`, `member`, `custom`)
+- Nur on-duty-Mails: Header `X-On-Duty-Org: <Org-Name>`
 - Verwaltung (eine Weiterleitungsregel): Header `X-On-Duty-Audience: staff`
 - Genau ein Ereignis: Header `X-On-Duty-Event: lend-notify`
 - Zitadel-Mails (nur per Betreff möglich): `[on-duty|Benutzerkonto]`
