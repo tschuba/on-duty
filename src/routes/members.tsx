@@ -976,7 +976,7 @@ function MembersFilter({ roles, activeRoleIds, statusFilter, roleFilter, ageFilt
         ...(canReview ? [{ label: t("members.filter.preset.requested"), values: { status: ["requested"], age: [] } }] : []),
       ]}
       sections={[
-        { type: "chips", param: "status", title: t("members.table.status"), options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.filter((s) => s !== "active" ? inScope(scope, s) : (["active", "children", "youth"] as MemberStatus[]).some((x) => inScope(scope, x))).map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("icon-[tabler--cross]" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
+        { type: "chips", param: "status", title: t("members.table.status"), help: { href: "/help/members#status", label: t("help.members.aria.context") }, options: [...(canReview ? [{ value: "requested", label: t("members.status.requested"), icon: undefined }] : []), ...STATUS_ORDER.filter((s) => s !== "active" ? inScope(scope, s) : (["active", "children", "youth"] as MemberStatus[]).some((x) => inScope(scope, x))).map((s) => ({ value: s as string, label: STATUS_LABELS[s], icon: s === "deceased" ? ("icon-[tabler--cross]" as const) : undefined }))], selected: statusFilter, defaults: canReview ? [...DEFAULT_STATUS, "requested"] : DEFAULT_STATUS },
         { type: "chips", param: "age", title: t("members.filter.age"), options: AGE_GROUPS.filter((g) => inScope(scope, g === "adult" || g === "senior" ? "active" : g)).map((g) => ({ value: g, label: ageLabels[g] })), selected: ageFilter },
         {
           type: "list", param: "role", title: t("members.table.roles"),
@@ -1113,7 +1113,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
 
   return c.html(
     <Layout title={t("members.title")} user={user}>
-      <PageHeader title={<TitleSwitch items={memberViews(user.permissions as Set<string>, "members")} />} actions={<>
+      <PageHeader title={<><TitleSwitch items={memberViews(user.permissions as Set<string>, "members")} /><a href="/help/members#status" class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100" aria-label={t("help.members.aria.context")} title={t("help.members.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} actions={<>
         {canReview && <ApplicationLinks forms={forms} canManageForms={user.permissions.has("applications:manage")} />}
         <div class="dropdown dropdown-end ml-2">
           <div tabindex={0} role="button" class="btn btn-neutral btn-square" aria-label={t("common.moreActions")} title={t("common.moreActions")}>
@@ -1305,6 +1305,7 @@ function StartStatusSelect({ value }: { value: StartStatus | "" }) {
   return (
     <fieldset class="space-y-2">
       <legend class="sr-only">{t("members.form.startStatus")}</legend>
+      <a href="/help/members#status" class="link link-hover text-sm inline-flex items-center gap-1" target="_blank" rel="noopener"><Icon name="icon-[tabler--help]" class="h-4 w-4" />{t("help.members.aria.context")}</a>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {(["active", "passive", "supporting"] as const).map((s) => (
           <label class="card bg-base-200 border-2 border-transparent cursor-pointer has-[:checked]:border-primary">
@@ -1789,7 +1790,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const openRoles = m.assignments.filter((a) => !a.to);
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /> <a href="/help/members#matrix" class="align-middle opacity-60 hover:opacity-100" aria-label={t("help.members.aria.context")} title={t("help.members.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
       <ViewGrid>
         <ViewField label={t("members.form.lastName")} value={m.lastName} />
         <ViewField label={t("members.form.firstName")} value={m.firstName} />

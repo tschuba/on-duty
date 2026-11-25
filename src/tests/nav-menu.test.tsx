@@ -65,6 +65,10 @@ describe("Sidebar — Sichtbarkeit je Berechtigung", () => {
     }
   });
 
+  it("shows Hilfe to every user", async () => {
+    expect(await renderAt("/")).toContain('href="/help"');
+  });
+
   it("turns a menu with a single visible item into a plain link", async () => {
     const html = await renderAt("/", "member-roles:read");
     expect(html).toContain('href="/members"');

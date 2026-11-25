@@ -19,6 +19,7 @@ import { linkRoutes } from "./routes/links.js";
 import { meRoutes } from "./routes/me.js";
 import { impressumRoutes } from "./routes/impressum.js";
 import { datenschutzRoutes } from "./routes/datenschutz.js";
+import { helpRoutes } from "./routes/help.js";
 import { memberRoutes } from "./routes/members.js";
 import { applicationRoutes } from "./routes/applications.js";
 import { adminRoutes } from "./routes/admin.js";
@@ -137,6 +138,7 @@ app.get("/", requireAuth(), (c) => {
 // Self-registration: waiting screen + account deletion
 app.route("/pending", pendingRoutes);
 app.route("/account", accountRoutes);
+app.route("/help", helpRoutes);
 
 // Member routes
 app.route("/", trainingRoutes);

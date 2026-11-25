@@ -7,7 +7,7 @@ type Base = { param: string; title: string; selected: string[]; defaults?: strin
 // chips: Checkbox-Buttons (daisyUI `filter`); list: durchsuchbare Mehrfachliste; toggle: einzelnes Flag (Wert `value`, Standard "1");
 // mehrere toggles mit gleichem `param` bilden zusammen eine Gruppe (je mit der vollen `selected`-Liste).
 export type FilterSection =
-  | (Base & { type: "chips"; options: FilterOption[] })
+  | (Base & { type: "chips"; options: FilterOption[]; help?: { href: string; label: string } })
   | (Base & { type: "list"; options: FilterOption[]; compact?: boolean; unused?: { label: string; storageKey: string } })
   | (Base & { type: "toggle"; value?: string })
   // select: Einzelauswahl (Wert "" = alle); custom: eigener Inhalt (z. B. QuickRangeFilter bare), `selected` nicht leer = aktiv.
@@ -51,6 +51,7 @@ export function FilterDialog({ id, hidden, labels, sections, quick = [], navbar,
       <div class="filter gap-y-1">
         {s.options.map((o) => <input class="btn btn-sm" type="checkbox" name={s.param} value={o.value} aria-label={o.label} checked={s.selected.includes(o.value)} />)}
       </div>
+      {s.help && <a href={s.help.href} class="link link-hover text-xs opacity-70 inline-flex items-center gap-1 mt-1"><Icon name="icon-[tabler--help]" class="w-4 h-4" />{s.help.label}</a>}
     </fieldset>
   );
   const list = (s: FilterSection & { type: "list" }) => (
