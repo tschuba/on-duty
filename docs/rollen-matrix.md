@@ -50,6 +50,8 @@ Diese Matrix bei jeder Änderung dort mitpflegen. Aufgeführt sind die Werte aus
 
 ## Hinweis
 
+- Die Hilfeseite `/help/rights` zeigt dem Benutzer seine tatsächlichen Rechte aus `PERMISSIONS`/`PERMISSION_AREAS`. Neue Rechte erscheinen dort automatisch, nur das Label in `PERMISSION_LABELS` pflegen.
+
 - `cash:manage` schließt `cash:read`, `cash:report`, `cash:cancel` und `cash:lending` ein (Auswertung in `hasCash`, `src/lib/cash.ts`), `cash:read` schließt `cash:report` ein. `cash:reopen` ist bewusst nicht eingeschlossen (Vier-Augen-Hürde). Die Spalten zeigen nur die Seed-Vergabe, nicht die eingeschlossenen Rechte.
 - Die Rolle „Verleih“ gibt es seit der Kasse (180). Sie ist geschützt und liegt nur im Seed (`APP_ROLES`), Bestandsinstallationen bekommen sie beim nächsten Start (`src/entrypoint.ts`: Migration, dann Seed).
 - Änderungen an Standardrollen brauchen eine Migration, wenn ein Recht auf bestehende (auch selbst angelegte) Rollen kopiert werden soll; die Vergabe nur an eine Standardrolle übernimmt der Seed (Vorbild `events:manage`). Der Seed ergänzt nur fehlende Einträge, daher: der Seed nur fehlende Einträge ergänzt (zuletzt `drizzle/0026_role_permissions_backfill.sql`).

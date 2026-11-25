@@ -9,6 +9,12 @@ import { env } from "../env.js";
 import { t } from "../i18n/index.js";
 import { deriveMemberStatus, type MemberStatus } from "../lib/status.js";
 import { visibleTips, type Tip } from "../lib/help-tips.js";
+import { inArray, asc } from "drizzle-orm";
+import { db } from "../db/index.js";
+import { appRoles } from "../db/schema/index.js";
+import { PERMISSIONS, PERMISSION_AREAS, type Permission } from "../lib/roles.js";
+import { PERMISSION_LABELS } from "../components/permission-badges.js";
+import { MEMBER_STATUSES, type StatusScope } from "../lib/member-scope.js";
 
 export const helpRoutes = new Hono<{ Variables: Variables }>();
 
@@ -27,6 +33,19 @@ export function statusMatrix(l: Limits, today = new Date()): { from: number; to:
     deriveMemberStatus({ birthDate: birth(age), exitDate: null, deathDate: null }, withRole ? role : [], l.children, l.youth, l.active, today);
   const bands: [number, number | null][] = [[0, l.children], [l.children, l.youth], [l.youth, l.active], [l.active, null]];
   return bands.map(([from, to]) => ({ from, to, withRole: derive(from, true), without: derive(from, false) }));
+}
+
+// Direkt vergebene Rechte je Bereich, in der Reihenfolge von PERMISSIONS; leere Bereiche entfallen.
+export function rightsByArea(perms: ReadonlySet<string>): { area: string; perms: Permission[] }[] {
+  return PERMISSION_AREAS.map((a) => ({
+    area: a.key,
+    perms: PERMISSIONS.filter((p) => perms.has(p) && (a.resources as readonly string[]).includes(p.split(":")[0])),
+  })).filter((a) => a.perms.length > 0);
+}
+
+function ScopeBadges({ scope }: { scope: StatusScope }) {
+  if (scope === "all" || scope.size === 0) return <span>{t("help.rights.scope.all")}</span>;
+  return <span class="flex flex-wrap gap-1">{MEMBER_STATUSES.filter((x) => scope.has(x)).map((x) => <StatusBadge status={x} />)}</span>;
 }
 
 function TipCards({ tips }: { tips: Tip[] }) {
@@ -51,6 +70,7 @@ helpRoutes.get("/", requireAuth(), (c) => {
   const user = c.get("user");
   const topics = [
     { href: "/help/members", icon: "icon-[tabler--users]" as const, title: t("help.members.title"), text: t("help.members.card") },
+    { href: "/help/rights", icon: "icon-[tabler--shield-lock]" as const, title: t("help.rights.title"), text: t("help.rights.card") },
     { href: "/help/tips", icon: "icon-[tabler--bulb]" as const, title: t("help.tips.title"), text: t("help.tips.card") },
   ];
   return c.html(
@@ -163,6 +183,75 @@ helpRoutes.get("/members", requireAuth(), (c) => {
         <Section id="tips" title={t("help.members.tips")} collapsible={false}>
           <TipCards tips={visibleTips(user.permissions, ["members"])} />
         </Section>
+      </div>
+    </Layout>
+  );
+});
+
+helpRoutes.get("/rights", requireAuth(), async (c) => {
+  const user = c.get("user");
+  const ids = [...user.roleIds];
+  const roles = ids.length ? await db.select({ name: appRoles.name }).from(appRoles).where(inArray(appRoles.id, ids)).orderBy(asc(appRoles.name)) : [];
+  const areas = rightsByArea(user.permissions);
+  const scopes = (["read", "write", "delete"] as const).filter((k) => user.permissions.has(`members:${k}` as Permission));
+  const cases = [1, 2, 3, 4, 5, 6, 7] as const;
+  const caseKey = (n: number, k: "title" | "cause" | "fix") => `help.rights.case.${n}.${k}` as Parameters<typeof t>[0];
+  const isAdmin = user.permissions.has("system:admin");
+  return c.html(
+    <Layout title={t("help.rights.title")} user={user}>
+      <div class="max-w-4xl mx-auto">
+        <PageHeader title={t("help.rights.title")} backHref="/help" backLabel={t("help.title")} subtitle={t("help.rights.hero")} />
+
+        <Section id="begriffe" title={t("help.rights.terms")} collapsible={false}>
+          <dl class="space-y-3">
+            {(["right", "role", "function", "scope"] as const).map((k) => (
+              <div><dt class="font-semibold">{t(`help.rights.term.${k}.title`)}</dt><dd>{t(`help.rights.term.${k}.text`)}</dd></div>
+            ))}
+          </dl>
+        </Section>
+
+        <Section id="meine" title={t("help.rights.mine")} collapsible={false}>
+          <h3 class="font-semibold mb-2">{t("help.rights.myRoles")}</h3>
+          {roles.length
+            ? <div class="flex flex-wrap gap-2 mb-4">{roles.map((r) => <span class="badge badge-primary">{r.name}</span>)}</div>
+            : <p class="opacity-70 mb-4">{t("help.rights.noRoles")}</p>}
+          <h3 class="font-semibold mb-2">{t("help.rights.myRights")}</h3>
+          {areas.length
+            ? areas.map((a) => (
+              <div class="mb-3">
+                <div class="text-xs font-bold uppercase tracking-wide text-base-content/60 mb-1">{t(`admin.permissions.area.${a.area}` as Parameters<typeof t>[0])}</div>
+                <div class="flex flex-wrap gap-1">{a.perms.map((x) => <span class="badge badge-outline badge-sm h-auto whitespace-normal py-0.5 text-left">{PERMISSION_LABELS[x]}</span>)}</div>
+              </div>
+            ))
+            : <p class="opacity-70">{t("help.rights.noRights")}</p>}
+          <p class="text-sm opacity-70 mt-2">{t("help.rights.impliedHint")}</p>
+          {scopes.length > 0 && (
+            <>
+              <h3 class="font-semibold mt-4 mb-2">{t("help.rights.myScope")}</h3>
+              <ul class="space-y-2">
+                {scopes.map((k) => <li class="flex flex-wrap items-center gap-2"><span class="font-medium">{t(`help.rights.scope.${k}`)}:</span><ScopeBadges scope={user.memberScope[k]} /></li>)}
+              </ul>
+              <p class="text-sm opacity-70 mt-2">{t("help.rights.scopeHint")}</p>
+            </>
+          )}
+        </Section>
+
+        <Section id="fragen" title={t("help.rights.trouble")} collapsible={false}>
+          <div class="space-y-2">
+            {cases.map((n) => (
+              <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
+                <summary class="collapse-title font-semibold">{t(caseKey(n, "title"))}</summary>
+                <div class="collapse-content space-y-2">
+                  <p><span class="font-semibold">{t("help.members.cause")}:</span> {t(caseKey(n, "cause"))}</p>
+                  <p><span class="font-semibold">{t("help.members.fix")}:</span> {t(caseKey(n, "fix"))} {isAdmin ? <a class="link" href="/admin/permissions">{t("help.rights.adminLink")}</a> : t("help.rights.askAdmin")}</p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </Section>
+
+        <script dangerouslySetInnerHTML={{ __html: `
+(function(){var o=function(){var e=location.hash&&document.querySelector('details'+location.hash.replace(/[^#\\w-]/g,''));if(e){e.open=true;e.scrollIntoView();}};o();addEventListener('hashchange',o);})();` }} />
       </div>
     </Layout>
   );
