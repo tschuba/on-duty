@@ -63,8 +63,8 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     { icon: "icon-[tabler--building]", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
     ] },
-    { icon: "icon-[tabler--help]", label: t("common.nav.help"), items: [{ label: t("common.nav.help"), href: "/help", show: true }] },
     { icon: "icon-[tabler--download]", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
+    { icon: "icon-[tabler--help]", label: t("common.nav.help"), items: [{ label: t("common.nav.help"), href: "/help", show: true }] },
   ];
 }
 
@@ -115,10 +115,10 @@ export function menuLinks(user: AuthedUser): { label: string; href: string; pare
     [has("anniversary-years:read"), t("common.nav.anniversaryYears"), "/anniversaries?view=years", t("common.nav.anniversaries"), "icon-[tabler--calendar-stats]"],
     [donations, t("donations.view.donations"), "/donations", t("common.nav.donations"), "icon-[tabler--cash]"],
     [donations, t("donations.tabs.donors"), "/donations?view=donors", t("common.nav.donations"), "icon-[tabler--heart-handshake]"],
-    [cashRead, t("cash.view.entries"), "/cash", t("common.nav.cash"), "icon-[tabler--list]"],
-    [any("cash:report", "cash:read", "cash:manage"), t("cash.view.report"), "/cash?view=report", t("common.nav.cash"), "icon-[tabler--report]"],
+    [cashRead, t("cash.view.entries"), "/cash", t("common.nav.cash"), "icon-[tabler--cash-register]"],
+    [any("cash:report", "cash:read", "cash:manage"), t("cash.view.report"), "/cash?view=report", t("common.nav.cash"), "icon-[tabler--report-money]"],
     [cashRead, t("cash.view.tags"), "/cash?view=tags", t("common.nav.cash"), "icon-[tabler--tags]"],
-    [cashRead, t("cash.view.events"), "/cash?view=events", t("common.nav.cash"), "icon-[tabler--calendar-event]"],
+    [cashRead, t("cash.view.events"), "/cash?view=events", t("common.nav.cash"), "icon-[tabler--calendar-dollar]"],
     [has("inventory:read"), t("inventory.tabs.stock"), "/inventory", t("common.nav.inventory"), "icon-[tabler--building-warehouse]"],
     [has("inventory:configure"), t("inventory.tabs.itemTemplates"), "/inventory?view=templates", t("common.nav.inventory"), "icon-[tabler--template]"],
     [has("inventory:configure"), t("inventory.tabs.fields"), "/inventory?view=fields", t("common.nav.inventory"), "icon-[tabler--forms]"],

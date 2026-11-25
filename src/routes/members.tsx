@@ -229,14 +229,14 @@ export function StatsCards({ all, openRequests = null, current }: { all: MemberW
       <StatCard label={t("members.stats.active")} value={counts.active} tone="text-success" inline hint={t("members.stats.activeFrom", { age: env.YOUTH_AGE_LIMIT })} {...link("status=active&age=adult&age=senior", counts.active)} {...sx("active")}>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
       </StatCard>
-      <StatCard label={t("members.stats.passive")} value={counts.passive} {...link("status=passive", counts.passive)} {...sx("passive")} />
-      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-primary" {...link("status=supporting", counts.supporting)} {...sx("supporting")} />
       <StatCard label={t("members.stats.youth")} value={counts.youth} tone="text-secondary" inline {...link("status=active&age=youth", counts.youth)} {...sx("youth")}>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(youth)}</div>
       </StatCard>
       <StatCard label={t("members.stats.children")} value={counts.children} tone="text-info" inline {...link("status=active&age=children", counts.children)} {...sx("children")}>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(children)}</div>
       </StatCard>
+      <StatCard label={t("members.stats.passive")} value={counts.passive} {...link("status=passive", counts.passive)} {...sx("passive")} />
+      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-primary" {...link("status=supporting", counts.supporting)} {...sx("supporting")} />
       <StatCard label={t("members.stats.former")} value={counts.left + counts.deceased} tone="text-base-content/40" inline {...link("status=left&status=deceased", counts.left + counts.deceased)} {...sx("former")}>
         <div class="stat-desc text-sm flex gap-x-2">
           {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="icon-[tabler--logout]" class="w-3.5 h-3.5" /></span>}
