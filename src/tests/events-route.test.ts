@@ -169,6 +169,21 @@ describe("GET /events", () => {
     expect(body).not.toContain("<tr");
   });
 
+  it("does not rewrite the URL on initial load, only after scrolling", async () => {
+    eventsFindManyResult = [makeEvent()];
+    const body = await (await eventRoutes.request("/")).text();
+    expect(body).toContain("jump(cfg.focus, true)");
+    expect(body).toContain("if (!initial) setUrl()");
+  });
+
+  it("grows the month window while the page is not scrollable", async () => {
+    eventsFindManyResult = [makeEvent()];
+    const body = await (await eventRoutes.request("/")).text();
+    expect(body).toContain("async function ensureWindow(i, extra = 0)");
+    expect(body).toContain("const fill = (i, extra)");
+    expect(body).toContain("months.slice(Math.max(0, i - 1), i + 3 + extra)"); // Vorlauf: Fenster springt am Ende nicht
+  });
+
   it("hides the create action without events:manage", async () => {
     currentUser = { ...currentUser, permissions: new Set() };
     const body = await (await eventRoutes.request("/")).text();
