@@ -22,4 +22,6 @@ Die App läuft lokal (`pnpm dev`, Port 3000, erreichbar als `https://app.localho
 2. Danach dem Agenten Bescheid geben. Der Agent wechselt mit `BrowserSwitchMode` auf `persistent` (headless) und öffnet die Seite mit `BrowserNewPage`.
 3. Die Session liegt im Profil `~/.pi/browser-profile`. Zeigt die Seite wieder den Login, mit Schritt 1 neu anmelden.
 
-Hinweise: Seiten mit `BrowserTakeScreenshot` (Viewport, ggf. vorher per `BrowserEvaluateScript` scrollen) und `BrowserEvaluateScript` (DOM, Links) prüfen. Nach Codeänderungen lädt der Dev-Server neu; die Seite kurz danach neu laden, sonst erscheint noch der alte Stand.
+Login-Ablauf: `BrowserSetup` blockiert (wartet, bis das Fenster geschlossen wird) und ist hier nicht brauchbar; Modus „existing“ scheitert ohne Remote-Debugging in Chrome. Stattdessen `BrowserSwitchMode` mit `persistent` und `headed: true`, Seite öffnen, den Nutzer im sichtbaren Fenster anmelden lassen, dann im selben Profil weiterarbeiten. Nicht jeder Nutzer hat alle Rechte (z. B. liefert `/cash` ein 403); erreichbare Seiten vorher per `fetch` im Seitenkontext prüfen.
+
+Hinweise: Breitenabhängiges Verhalten (z. B. `TitleSwitch`) lässt sich per `BrowserEvaluateScript` mit einem `iframe` variabler Breite prüfen, ohne das Fenster zu ändern. Seiten mit `BrowserTakeScreenshot` (Viewport, ggf. vorher per `BrowserEvaluateScript` scrollen) und `BrowserEvaluateScript` (DOM, Links) prüfen. Nach Codeänderungen lädt der Dev-Server neu; die Seite kurz danach neu laden, sonst erscheint noch der alte Stand.

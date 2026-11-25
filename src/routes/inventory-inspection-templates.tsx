@@ -35,8 +35,8 @@ export const LIST = "/inventory/inspections?view=templates";
 export function inspectionTitle(active: "inspections" | "templates", canConfigure: boolean) {
   if (!canConfigure) return t("inventory.inspections.title");
   return <TitleSwitch items={[
-    { active: active === "inspections", href: "/inventory/inspections", label: t("inventory.inspections.title") },
-    { active: active === "templates", href: LIST, label: t("inventory.tabs.inspectionTemplates") },
+    { active: active === "inspections", href: "/inventory/inspections", label: t("inventory.inspections.title"), icon: "icon-[tabler--clipboard-check]" },
+    { active: active === "templates", href: LIST, label: t("inventory.tabs.inspectionTemplates"), icon: "icon-[tabler--clipboard-list]" },
   ]} />;
 }
 

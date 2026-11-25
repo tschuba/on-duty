@@ -23,7 +23,7 @@ import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
-import { TitleSwitch } from "../components/title-switch.js";
+import { TitleSwitch, type TitleSwitchItem } from "../components/title-switch.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
@@ -104,9 +104,9 @@ function UserRoleBadges({ roles }: { roles: string[] }) {
 }
 
 // Benutzer ⇄ Berechtigungen als Ansichten-Umschalter (wie Spenden ⇄ Spender).
-const adminViews = (users: boolean) => [
-  { active: users, href: "/admin/users", label: t("admin.tabs.users") },
-  { active: !users, href: "/admin/permissions", label: t("admin.tabs.permissions") },
+const adminViews = (users: boolean): TitleSwitchItem[] => [
+  { active: users, href: "/admin/users", label: t("admin.tabs.users"), icon: "icon-[tabler--users]" },
+  { active: !users, href: "/admin/permissions", label: t("admin.tabs.permissions"), icon: "icon-[tabler--shield-lock]" },
 ];
 
 // ── /admin → /admin/users ─────────────────────────────────────────────────────
@@ -689,7 +689,7 @@ adminRoutes.get("/permissions", guard, async (c) => {
       <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
-      <PageHeader title={<><TitleSwitch items={adminViews(false)} /><a href="/help/rights" class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100" aria-label={t("help.rights.aria.context")} title={t("help.rights.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
+      <PageHeader title={<><TitleSwitch items={adminViews(false)} /><a href="/help/rights" class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100 [[data-mode=icons]+&]:ml-4 [[data-mode=icons]+&]:border [[data-mode=icons]+&]:border-info/50 [[data-mode=icons]+&]:text-info [[data-mode=icons]+&]:opacity-100" aria-label={t("help.rights.aria.context")} title={t("help.rights.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
 
       <PageSearch client label={t("admin.permissions.title")}
         oninput="const q=this.value.toLowerCase();document.querySelectorAll('tbody tr[data-search]').forEach(function(el){el.hidden=!el.dataset.search.includes(q)});document.getElementById('perm-empty').hidden=!!document.querySelector('tbody tr[data-search]:not([hidden])')" />

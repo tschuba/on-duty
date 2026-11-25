@@ -40,7 +40,7 @@ searchRoutes.get("/", requireAuth(), async (c) => {
 
   const [menu, members, inventory, evs] = await Promise.all([
     Promise.resolve(
-      menuLinks(user).filter((l) => l.label.toLowerCase().includes(needle)).slice(0, LIMIT)
+      menuLinks(user).filter((l) => `${l.label} ${l.parent ?? ""}`.toLowerCase().includes(needle)).slice(0, 12)
         .map<Hit>((l) => ({ title: l.label, href: l.href, icon: l.icon, extra: l.parent, external: l.external })),
     ),
     has("members:read")
