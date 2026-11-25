@@ -76,10 +76,15 @@ export function GlobalSearch() {
     </a>
   );
   const filterBtn = (cls: string, label: boolean) => (
-    <button type="button" data-gs-filter class={`btn btn-ghost btn-sm hidden ${label ? "" : "indicator "}${cls}`} aria-label={t("search.filter")} title={t("search.filter")}>
-      <Icon name="icon-[tabler--filter]" class="h-4 w-4 shrink-0" />
+    <button type="button" data-gs-filter class={`btn btn-ghost btn-sm hidden ${cls}`} aria-label={t("search.filter")} title={t("search.filter")}>
+      {label ? <Icon name="icon-[tabler--filter]" class="h-4 w-4 shrink-0" /> : (
+        <span class="indicator">
+          <span data-gs-fcount class="indicator-item badge badge-primary badge-xs hidden" />
+          <Icon name="icon-[tabler--filter]" class="h-5 w-5" />
+        </span>
+      )}
       {label && <span class="max-lg:hidden">{t("search.filter")}</span>}
-      <span data-gs-fcount class={`badge badge-primary badge-xs hidden ${label ? "" : "indicator-item"}`} />
+      {label && <span data-gs-fcount class="badge badge-primary badge-xs hidden" />}
     </button>
   );
   return (

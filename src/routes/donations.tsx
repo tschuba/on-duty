@@ -448,7 +448,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
         resetHref={donorView ? "/donations?view=donors" : "/donations"}
         labels={navFilterLabels()}
         sections={[
-          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" ? [] : ["1"], node: (
+          { type: "custom", param: "range", title: t("filter.quick.label"), selected: range.mode === "default" || (range.mode === "preset" && range.id === "all") ? [] : ["1"], node: (
             <QuickRangeFilter presets={presets} range={range} dir="past" action="/donations" names={{ start: "from", end: "to" }} bare
               href={(p) => buildListUrl("/donations", { view: state.view, pageSize: state.pageSize, search, sort: state.sort, sort_dir: state.sort_dir, receipt }, p)} />
           ) },
