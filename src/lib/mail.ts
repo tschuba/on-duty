@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "../env.js";
 import { logger } from "./logger.js";
+import { mailLabel } from "./mail-label.js";
 import { checkHeader } from "./mail-headers.js";
 import { renderMail, resolveTemplate, type MailVars, type ResolvedTemplate } from "./mail-templates.js";
 
@@ -37,7 +38,7 @@ function extraHeaders(tpl: ResolvedTemplate): Record<string, string> {
   }
 }
 
-// Einheitliches Schema (docs/mails.md): Betreff "[<ORG_NAME>|<Typ>] …" plus X-On-Duty-Category/-Event/-Audience.
+// Einheitliches Schema (docs/mails.md): Betreff "[<ORG_NAME>] …" plus X-On-Duty-Org/-Category/-Event/-Audience.
 // Texte, Präfix und Header kommen aus mail_templates.
 // Log-and-skip by design (see backlog "Digitale Anträge"): the submit/approve/reject
 // workflow must never fail just because notifications aren't configured or the SMTP
@@ -47,7 +48,7 @@ export async function sendMail(opts: TemplateMailOptions): Promise<{ sent: boole
   const tpl = opts.template ?? (await resolveTemplate(opts.key));
   if (!tpl) return { sent: false };
   const { subject, text } = renderMail(tpl, opts.vars);
-  const headers = { ...extraHeaders(tpl), "X-On-Duty-Category": tpl.category, "X-On-Duty-Event": tpl.key, "X-On-Duty-Audience": tpl.audience, ...opts.headers };
+  const headers = { ...extraHeaders(tpl), "X-On-Duty-Org": mailLabel(env.ORG_NAME), "X-On-Duty-Category": tpl.category, "X-On-Duty-Event": tpl.key, "X-On-Duty-Audience": tpl.audience, ...opts.headers };
   if (!isSmtpConfigured()) {
     logger.warn({ subject }, "[mail] SMTP not configured, email not sent");
     return { sent: false };
