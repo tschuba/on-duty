@@ -140,6 +140,7 @@ export const de = {
   "pager.goToPage": "Gehe zu Seite",
   "members.table.pageSize": "Einträge pro Seite:",
   "members.stats.active": "Aktiv",
+  "members.stats.activeFrom": "ab {age} Jahren",
   "members.stats.passive": "Passiv",
   "members.stats.supporting": "Fördernd",
   "members.stats.youth": "Jugend",
