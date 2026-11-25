@@ -11,6 +11,7 @@ export function forbiddenPage(c: Context, user?: AuthedUser) {
         <h1 class="text-3xl font-bold">{t("error.forbidden.heading")}</h1>
         <p class="mt-4 opacity-70">{t("error.forbidden.text")}</p>
         <a href="/" class="btn btn-primary mt-6">{t("error.toHome")}</a>
+        <a href="/help/rights#case-7" class="btn btn-ghost mt-6 ml-2">{t("error.forbidden.help")}</a>
       </div>
     </Layout>,
     403

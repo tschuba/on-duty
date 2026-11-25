@@ -1,13 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 
-vi.mock("../db/index.js", () => ({ db: {} }));
+vi.mock("../db/index.js", () => ({ db: { select: () => ({ from: () => ({ where: () => ({ orderBy: async () => [{ name: "Bearbeiter" }] }) }) }) } }));
+vi.mock("../lib/registration.js", () => ({ countPendingUsers: async () => 0 }));
 let perms = new Set<string>(["members:read"]);
+let memberScope: any = { read: "all", write: "all", delete: "all" };
 vi.mock("../middleware/auth.js", () => ({
-  requireAuth: () => async (c: any, next: any) => { c.set("user", { id: "u1", name: "T", permissions: perms, disabled: false }); await next(); },
+  requireAuth: () => async (c: any, next: any) => { c.set("user", { id: "u1", name: "T", permissions: perms, roleIds: new Set(["r1"]), memberScope, disabled: false }); await next(); },
 }));
 
-const { helpRoutes, statusMatrix } = await import("../routes/help.js");
+const { helpRoutes, statusMatrix, rightsByArea } = await import("../routes/help.js");
 const { visibleTips } = await import("../lib/help-tips.js");
 const app = new Hono().route("/help", helpRoutes);
 
@@ -50,5 +52,30 @@ describe("Hilfe", () => {
     expect(html.match(/<details/g)?.length).toBe(7);
     expect(html).not.toContain("Platzhalter in Mail-Vorlagen");
     expect(await (await app.request("/help/tips")).text()).toContain("Platzhalter in Mail-Vorlagen");
+  });
+
+  it("rightsByArea gruppiert, ignoriert Unbekanntes", () => {
+    expect(rightsByArea(new Set())).toEqual([]);
+    expect(rightsByArea(new Set(["members:read", "donations:read", "foo:bar"]))).toEqual([
+      { area: "members", perms: ["members:read"] }, { area: "finance", perms: ["donations:read"] },
+    ]);
+  });
+
+  it("/help/rights zeigt genau die Rechte und Eingrenzung des Benutzers", async () => {
+    perms = new Set(["members:read", "system:admin"]);
+    memberScope = { read: new Set(["active"]), write: "all", delete: "all" };
+    let html = await (await app.request("/help/rights")).text();
+    expect(html).toContain("Bearbeiter");
+    expect(html).toContain(">Mitglieder ansehen</span>");
+    expect(html).not.toContain("Spenden einsehen");
+    expect(html).toContain("Ansehen:");
+    expect(html).not.toContain("Bearbeiten:"); // kein members:write
+    expect(html).toContain("/admin/permissions");
+    perms = new Set(["donations:read"]);
+    html = await (await app.request("/help/rights")).text();
+    expect(html).toContain("Spenden einsehen");
+    expect(html).not.toContain(">Mitglieder ansehen</span>");
+    expect(html).not.toContain("Mitglieder-Eingrenzung</h3>");
+    expect(html.match(/<details/g)?.length).toBe(7);
   });
 });
