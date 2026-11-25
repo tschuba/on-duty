@@ -2129,11 +2129,11 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
     where: inArray(inventoryInspectionRecords.inspectionId, item.inspections.map((r) => r.id)),
     with: { inspection: true, inspector: true, recorder: true },
   })) as InspectionRecordRow[]);
-  const hasMaster = !!(item.commissionedAt || price || item.quantity > 1 || (hasField(item.enabledFields, "assignments") && assigned.length > 0));
+  const hasMaster = !!(item.tags.length > 0 || item.commissionedAt || price || item.quantity > 1 || (hasField(item.enabledFields, "assignments") && assigned.length > 0));
   const cards = +hasMaster + +(item.numbers.length > 0 || item.serials.length > 0) + +(item.fieldValues ?? []).some((fv) => fv.value != null && fv.value !== "") + +(hasField(item.enabledFields, "location") || !!item.locationText || item.latitude != null || item.longitude != null);
   return c.html(
     <Layout title={item.name} user={user}>
-      <PageHeader title={<>{item.name} <TagBadges tags={item.tags.map((tg) => tg.tag)} /> <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
+      <PageHeader title={<>{item.name} <span class={`badge badge-sm ${status === "retired" ? "badge-neutral" : status === "lendable" ? "badge-info" : "badge-success"}`}>{t(`inventory.status.${status}`)}</span></>} backHref="/inventory" actions={<DetailActions editHref={canManage ? `/inventory/${item.id}/edit` : undefined} remove={retireAction} />} />
       {item.retiredAt && (
         <div class="alert alert-warning max-w-2xl mb-4">
           {t("inventory.retire.retiredNotice", { date: formatDate(item.retiredAt) })}{item.retiredReason ? ` — ${item.retiredReason}` : ""}
@@ -2153,6 +2153,7 @@ inventoryRoutes.get("/:id", requireAuth("inventory:read"), async (c) => {
       <div class={`gap-6 max-w-5xl ${cards > 1 ? "lg:columns-2" : ""}`}>
           {hasMaster && (
           <InvSection icon="icon-[tabler--info-circle]" title={t("inventory.section.master")}>
+            <div class="sm:col-span-2"><ViewField hideEmpty label={t("inventory.form.tags")} value={item.tags.length > 0 ? <span class="flex flex-wrap gap-1 [&_.badge]:h-auto [&_.badge]:min-h-5 [&_.badge]:py-0.5"><TagBadges tags={item.tags.map((tg) => tg.tag)} /></span> : null} /></div>
             <ViewField hideEmpty label={t("inventory.form.commissionedAt")} value={item.commissionedAt ? formatDate(item.commissionedAt) : null} />
             <ViewField hideEmpty label={t("inventory.form.purchasePrice")} value={price} />
             {item.quantity > 1 && <ViewField label={t("inventory.form.quantity")} value={String(item.quantity)} />}
