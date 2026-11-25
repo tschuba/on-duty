@@ -228,7 +228,7 @@ function CalendarSwitch() {
   return (
     <button type="button" id="ev-switch" class="btn btn-outline btn-primary gap-2" aria-pressed="true">
       <span data-ev-icon class="icon-[tabler--calendar] h-5 w-5" aria-hidden="true" />
-      <span data-ev-label class="@max-4xl:hidden">{t("events.view.calendar")}</span>
+      <span data-ev-label class="@max-xl:hidden">{t("events.view.calendar")}</span>
     </button>
   );
 }
@@ -439,7 +439,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
           <div class="dropdown dropdown-end">
             <div tabindex={0} role="button" class="btn btn-ghost gap-2" aria-label={t("events.settings")}>
               <Icon name="icon-[tabler--settings]" class="h-5 w-5" />
-              <span class="hidden sm:inline">{t("events.settings")}</span>
+              <span class="@max-2xl:hidden">{t("events.settings")}</span>
             </div>
             <div tabindex={0} class="dropdown-content bg-base-200 rounded-box z-10 w-72 p-3 shadow space-y-2">
               <h3 class="text-xs font-semibold uppercase opacity-60">{t("events.publicLink")}</h3>
@@ -478,7 +478,7 @@ eventRoutes.get("/", requireAuth(), async (c) => {
             </div>
           </div>
         ) : publicEnabled && <HeaderAction icon="icon-[tabler--external-link]" label={t("events.publicLink")} href="/events/public" attrs={{ target: "_blank", rel: "noopener" }} />}
-        {canManage && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("common.create")} href="/events/new" class="btn-primary" />}
+        {canManage && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("events.newEvent")} href="/events/new" class="btn-primary" />}
       </>} />
       {infoMail && (
         <dialog id="info-mail-dialog" class="modal">
@@ -873,8 +873,8 @@ eventRoutes.get("/:id", requireAuth(), async (c) => {
   const askMail = smtp && ev.endsAt > now(); // Rückfrage nur sinnvoll, wenn Mails überhaupt rausgehen können
   const cancelAction = canManage && (ev.cancelledAt
     ? <HeaderAction icon="icon-[tabler--arrow-back-up]" label={t("events.uncancel")} class="btn-outline" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/uncancel`, "hx-swap": "none" } })} />
-    : <HeaderAction icon="icon-[tabler--ban]" label={t("events.cancel")} class="btn-outline btn-warning" hideLabel="@max-2xl:hidden" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
-  const deleteAction = canManage && <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" hideLabel="@max-2xl:hidden" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
+    : <HeaderAction icon="icon-[tabler--ban]" label={t("events.cancel")} class="btn-outline btn-warning" {...(askMail ? { onclick: "document.getElementById('cancel-dialog').showModal()" } : { attrs: { "hx-post": `/events/${ev.id}/cancel`, "hx-confirm": t("events.confirmCancel", { title: ev.title }), "hx-swap": "none" } })} />);
+  const deleteAction = canManage && <HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} class="btn-outline btn-error" disabled={deletable ? undefined : t("events.deleteHint")} attrs={{ "hx-post": `/events/${ev.id}/delete`, "hx-confirm": confirmDelete, "hx-swap": "none" }} />;
   const notify = canManage && smtp && c.req.query("notify") === "created" && !ev.cancelledAt ? await createdTargets(ev) : null;
   const cancelRecipients = canManage && askMail ? await eventMailRecipients(ev) : [];
   const delivery = canManage ? await eventDelivery(ev) : [];

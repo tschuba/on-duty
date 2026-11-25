@@ -237,6 +237,13 @@ export const Layout = async ({ title, children, user, path }: Props) => {
           if (!a || a.search || a.origin !== location.origin || a.pathname === location.pathname || e.defaultPrevented) return;
           try { const s = sessionStorage.getItem("filter:" + a.pathname); if (s) a.search = s; } catch(e) {}
         }, true);
+        // Hilfe-Links merken die Ursprungsseite (?from=), damit die Hilfe dorthin zurückführen kann (PWA ohne Browser-Zurück)
+        document.addEventListener("click", (e) => {
+          const a = e.target.closest && e.target.closest('a[href^="/help/"]');
+          if (!a || a.origin !== location.origin || location.pathname.startsWith("/help") || e.defaultPrevented) return;
+          const q = new URLSearchParams(a.search); if (q.has("from")) return;
+          q.set("from", location.pathname + location.search); a.search = q.toString();
+        }, true);
       ` }} />
     {user && <script dangerouslySetInnerHTML={{ __html: NAV_SCRIPT }} />}
     {user && <script dangerouslySetInnerHTML={{ __html: GLOBAL_SEARCH_SCRIPT }} />}

@@ -43,6 +43,13 @@ export function rightsByArea(perms: ReadonlySet<string>): { area: string; perms:
   })).filter((a) => a.perms.length > 0);
 }
 
+// Ursprungsseite (?from=) nur als interner Pfad; sonst Open-Redirect bzw. Schleife in die Hilfe.
+export const helpFrom = (v: string | undefined) => (v && /^\/(?![/\\])/.test(v) && !v.startsWith("/help") ? v : undefined);
+const backProps = (from?: string) => (from ? { backHref: from, backLabel: t("help.backToOrigin") } : { backHref: "/help", backLabel: t("help.title") });
+// Mit Ursprung ist der Zurück-Link belegt; die Hilfe-Übersicht bleibt als zweiter Link erreichbar.
+const HelpLink = (from?: string) => (from ? <> · <a href={withFrom("/help", from)} class="link link-hover">{t("help.title")}</a></> : null);
+const withFrom = (href: string, from?: string) => (from ? `${href}?from=${encodeURIComponent(from)}` : href);
+
 function ScopeBadges({ scope }: { scope: StatusScope }) {
   if (scope === "all" || scope.size === 0) return <span>{t("help.rights.scope.all")}</span>;
   return <span class="flex flex-wrap gap-1">{MEMBER_STATUSES.filter((x) => scope.has(x)).map((x) => <StatusBadge status={x} />)}</span>;
@@ -68,6 +75,7 @@ function TipCards({ tips }: { tips: Tip[] }) {
 
 helpRoutes.get("/", requireAuth(), (c) => {
   const user = c.get("user");
+  const from = helpFrom(c.req.query("from"));
   const topics = [
     { href: "/help/members", icon: "icon-[tabler--users]" as const, title: t("help.members.title"), text: t("help.members.card") },
     { href: "/help/rights", icon: "icon-[tabler--shield-lock]" as const, title: t("help.rights.title"), text: t("help.rights.card") },
@@ -76,10 +84,10 @@ helpRoutes.get("/", requireAuth(), (c) => {
   return c.html(
     <Layout title={t("help.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-        <PageHeader title={t("help.title")} subtitle={t("help.intro")} />
+        <PageHeader title={t("help.title")} subtitle={t("help.intro")} {...(from ? { backHref: from, backLabel: t("help.backToOrigin") } : {})} />
         <div class="grid gap-4 sm:grid-cols-2">
           {topics.map((x) => (
-            <a href={x.href} class="card card-border bg-base-100 border-base-300 hover:border-primary focus-visible:outline-2">
+            <a href={withFrom(x.href, from)} class="card card-border bg-base-100 border-base-300 hover:border-primary focus-visible:outline-2">
               <div class="card-body gap-2">
                 <h2 class="card-title"><Icon name={x.icon} class="h-6 w-6 text-primary" />{x.title}</h2>
                 <p>{x.text}</p>
@@ -97,7 +105,7 @@ helpRoutes.get("/tips", requireAuth(), (c) => {
   return c.html(
     <Layout title={t("help.tips.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-        <PageHeader title={t("help.tips.title")} backHref="/help" backLabel={t("help.title")} subtitle={t("help.tips.hero")} />
+        <PageHeader title={t("help.tips.title")} {...backProps(helpFrom(c.req.query("from")))} subtitle={<>{t("help.tips.hero")}{HelpLink(helpFrom(c.req.query("from")))}</>} />
         <TipCards tips={visibleTips(user.permissions)} />
       </div>
     </Layout>
@@ -121,7 +129,7 @@ helpRoutes.get("/members", requireAuth(), (c) => {
   return c.html(
     <Layout title={t("help.members.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-        <PageHeader title={t("help.members.title")} backHref="/help" backLabel={t("help.title")} subtitle={t("help.members.hero")} />
+        <PageHeader title={t("help.members.title")} {...backProps(helpFrom(c.req.query("from")))} subtitle={<>{t("help.members.hero")}{HelpLink(helpFrom(c.req.query("from")))}</>} />
 
         <Section id="status" title={t("help.members.steps")} collapsible={false}>
           <p class="mb-4 opacity-70">{t("help.members.stepsHint")}</p>
@@ -200,7 +208,7 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
   return c.html(
     <Layout title={t("help.rights.title")} user={user}>
       <div class="max-w-4xl mx-auto">
-        <PageHeader title={t("help.rights.title")} backHref="/help" backLabel={t("help.title")} subtitle={t("help.rights.hero")} />
+        <PageHeader title={t("help.rights.title")} {...backProps(helpFrom(c.req.query("from")))} subtitle={<>{t("help.rights.hero")}{HelpLink(helpFrom(c.req.query("from")))}</>} />
 
         <Section id="begriffe" title={t("help.rights.terms")} collapsible={false}>
           <dl class="space-y-3">

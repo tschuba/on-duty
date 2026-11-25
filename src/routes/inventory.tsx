@@ -857,8 +857,8 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
       <PageHeader title={inventoryTitle("stock", canConfigure)} actions={<>
-        <HeaderAction icon="icon-[tabler--map-2]" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} hideLabel="@max-4xl:hidden" />
-        {user.permissions.has("import:run") && <HeaderAction icon="icon-[tabler--upload]" label={t("import.action")} href="/import?kind=inventory" hideLabel="@max-4xl:hidden" />}
+        <HeaderAction icon="icon-[tabler--map-2]" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} />
+        {user.permissions.has("import:run") && <HeaderAction icon="icon-[tabler--upload]" label={t("import.action")} href="/import?kind=inventory" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}
       </>} />
 

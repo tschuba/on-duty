@@ -726,12 +726,12 @@ cashRoutes.get("/", report, async (c) => {
     return c.html(
       <Layout title={`${t("cash.view.report")} · ${t("cash.title")}`} user={user}>
         <PageHeader title={canRead ? title : t("cash.view.report")} actions={<>
-          <ActionMenu hideLabel="@max-5xl:hidden" items={[
+          <ActionMenu items={[
             hasCash(perms, "reopen") && rep.closed && { icon: "icon-[tabler--lock-open]", label: t("cash.report.reopen"), class: "btn-outline", onclick: "document.getElementById('cash-reopen').showModal()" },
             canRead && { icon: "icon-[tabler--download]", label: t("cash.report.csv"), href: `/cash/report.csv?year=${yid}`, class: "btn-outline", attrs: { "data-no-busy": "" } },
             canManage && !rep.closed && { icon: "icon-[tabler--printer]", label: t("cash.report.print"), class: "btn-outline", onclick: "window.print()" },
             canManage && { icon: "icon-[tabler--adjustments-horizontal]", label: t("cash.settingsAction"), class: "btn-outline", onclick: "document.getElementById('cash-settings-dialog').showModal()" },
-          ]} />
+          ]} hideLabel="@max-[1090px]:hidden" />
           {!(canManage && !rep.closed) && <HeaderAction variant="primary" class="btn-primary" icon="icon-[tabler--printer]" label={t("cash.report.print")} onclick="window.print()" />}
           {canManage && !rep.closed && <HeaderAction variant="primary" icon="icon-[tabler--lock]" label={t("cash.report.close")} class="btn-primary" onclick="document.getElementById('cash-close').showModal()" />}
         </>} />
