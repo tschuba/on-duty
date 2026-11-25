@@ -20,7 +20,7 @@ import { QuickRangeFilter } from "../components/quick-range-filter.js";
 import { parseRange, rangeParams, rangePresets, todayStr } from "../lib/quick-range.js";
 import { buildListUrl, parseMulti, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
 import { StatCard, StatGrid } from "../components/stat-card.js";
-import { TitleSwitch } from "../components/title-switch.js";
+import { TitleSwitch, type TitleSwitchItem } from "../components/title-switch.js";
 import { Pager } from "../components/pager.js";
 import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
 import { PageSearch } from "../components/page-search.js";
@@ -405,9 +405,9 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const sortUrl = (col: string) => buildListUrl("/donations", state, { sort: col, sort_dir: sort === col ? (dir === "asc" ? "desc" : "asc") : col === "donor" ? "asc" : "desc" });
   const th = (col: string, label: string, cls = "") => <th class={cls}><a href={sortUrl(col)} class="link link-hover">{label} <SortIcon col={col} active={sort} dir={dir} /></a></th>;
   const viewUrl = (view?: string) => buildListUrl("/donations", { view, search, from, to, pageSize: state.pageSize });
-  const views = [
-    { active: !donorView, href: viewUrl(), label: t("donations.view.donations") },
-    { active: donorView, href: viewUrl("donors"), label: t("donations.tabs.donors") },
+  const views: TitleSwitchItem[] = [
+    { active: !donorView, href: viewUrl(), label: t("donations.view.donations"), icon: "icon-[tabler--cash]" },
+    { active: donorView, href: viewUrl("donors"), label: t("donations.tabs.donors"), icon: "icon-[tabler--heart-handshake]" },
   ];
   const presets = rangePresets(todayStr(), "past", undefined, true);
   // Seitensuche und Filterdialog sind getrennte GET-Formulare: jedes trägt den Zustand des anderen als Hidden-Felder mit.

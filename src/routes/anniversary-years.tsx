@@ -14,7 +14,7 @@ import { SortIcon } from "./members.js";
 import { setFlash } from "../lib/flash.js";
 import { HTTP_STATUS } from "../lib/constants.js";
 import { t } from "../i18n/index.js";
-import { TitleSwitch } from "../components/title-switch.js";
+import { TitleSwitch, type TitleSwitchItem } from "../components/title-switch.js";
 
 export const yearRoutes = new Hono<{ Variables: Variables }>();
 const yearsRead = requireAuth("anniversary-years:read");
@@ -27,10 +27,10 @@ const isKind = (k: string): k is AnniversaryKind => (ANNIVERSARY_KINDS as readon
 
 // ── /anniversary-years ──────────────────────────────────────────────────────
 // Ansichten-Umschalter für die gemeinsame Seite /anniversaries (Jubiläen | Jubiläumsjahre); nur erlaubte Ansichten.
-export function anniversaryViews(perms: Set<string>, years: boolean) {
+export function anniversaryViews(perms: Set<string>, years: boolean): TitleSwitchItem[] {
   return [
-    ...(perms.has("members:read") ? [{ active: !years, href: "/anniversaries", label: t("anniversaries.title") }] : []),
-    ...(perms.has("anniversary-years:read") ? [{ active: years, href: "/anniversaries?view=years", label: t("common.nav.anniversaryYears") }] : []),
+    ...(perms.has("members:read") ? [{ active: !years, href: "/anniversaries", label: t("anniversaries.title"), icon: "icon-[tabler--cake]" as const }] : []),
+    ...(perms.has("anniversary-years:read") ? [{ active: years, href: "/anniversaries?view=years", label: t("common.nav.anniversaryYears"), icon: "icon-[tabler--calendar-stats]" as const }] : []),
   ];
 }
 

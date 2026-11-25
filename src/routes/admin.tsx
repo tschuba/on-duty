@@ -23,7 +23,7 @@ import { SortIcon } from "./members.js";
 import { RolePopover } from "../components/role-popover.js";
 import { requireAuth, type Variables } from "../middleware/auth.js";
 import { ClickToEditHint, Layout } from "../components/layout.js";
-import { TitleSwitch } from "../components/title-switch.js";
+import { TitleSwitch, type TitleSwitchItem } from "../components/title-switch.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
@@ -104,9 +104,9 @@ function UserRoleBadges({ roles }: { roles: string[] }) {
 }
 
 // Benutzer ⇄ Berechtigungen als Ansichten-Umschalter (wie Spenden ⇄ Spender).
-const adminViews = (users: boolean) => [
-  { active: users, href: "/admin/users", label: t("admin.tabs.users") },
-  { active: !users, href: "/admin/permissions", label: t("admin.tabs.permissions") },
+const adminViews = (users: boolean): TitleSwitchItem[] => [
+  { active: users, href: "/admin/users", label: t("admin.tabs.users"), icon: "icon-[tabler--users]" },
+  { active: !users, href: "/admin/permissions", label: t("admin.tabs.permissions"), icon: "icon-[tabler--shield-lock]" },
 ];
 
 // ── /admin → /admin/users ─────────────────────────────────────────────────────

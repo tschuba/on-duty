@@ -1066,9 +1066,10 @@ const allowedMemberViews = (p: Set<string>): MemberView[] => [
 ];
 export function memberViews(perms: Set<string>, active: MemberView) {
   const label = { members: t("members.title"), training: t("common.nav.training"), roles: t("common.nav.roles") };
+  const icon = { members: "icon-[tabler--users]", training: "icon-[tabler--school]", roles: "icon-[tabler--badge]" } as const;
   const href = { members: "/members", training: "/members?view=training", roles: "/members?view=roles" };
   const vs = allowedMemberViews(perms);
-  return (vs.length ? vs : ["members" as const]).map((v) => ({ active: v === active, href: href[v], label: label[v] }));
+  return (vs.length ? vs : ["members" as const]).map((v) => ({ active: v === active, href: href[v], label: label[v], icon: icon[v] }));
 }
 
 // GET /members — list (+ views training/roles)

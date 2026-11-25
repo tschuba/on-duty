@@ -23,9 +23,9 @@ export const LIST = "/inventory?view=fields";
 export function inventoryTitle(active: "stock" | "fields" | "templates", canConfigure: boolean) {
   if (!canConfigure) return t("inventory.title");
   return <TitleSwitch items={[
-    { active: active === "stock", href: "/inventory", label: t("inventory.tabs.stock") },
-    { active: active === "templates", href: "/inventory?view=templates", label: t("inventory.tabs.itemTemplates") },
-    { active: active === "fields", href: LIST, label: t("inventory.tabs.fields") },
+    { active: active === "stock", href: "/inventory", label: t("inventory.tabs.stock"), icon: "icon-[tabler--building-warehouse]" },
+    { active: active === "templates", href: "/inventory?view=templates", label: t("inventory.tabs.itemTemplates"), icon: "icon-[tabler--template]" },
+    { active: active === "fields", href: LIST, label: t("inventory.tabs.fields"), icon: "icon-[tabler--forms]" },
   ]} />;
 }
 
