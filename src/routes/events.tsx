@@ -303,13 +303,13 @@ const EVENTS_SCRIPT = `
   syncSwitch();
   const topRow = () => rows(ITEM).find((tr) => tr.getBoundingClientRect().bottom > off + 10) || null;
 
-  // Fenster = Monate i-1..i+1; ältere/entfernte Monate fliegen raus, Scrollposition wird am obersten Eintrag festgehalten.
-  async function ensureWindow(i) {
-    const want = months.slice(Math.max(0, i - 1), i + 2);
+  // Fenster = Monate i-1..i+2 (ein Monat Vorlauf, damit das Seitenende nie erst nach dem Kürzen nachwächst und springt); ältere/entfernte Monate fliegen raus, Scrollposition wird am obersten Eintrag festgehalten.
+  async function ensureWindow(i, extra = 0) {
+    const want = months.slice(Math.max(0, i - 1), i + 3 + extra);
     const have = new Set(rows(ITEM).map((tr) => tr.dataset.month));
     const need = want.filter((m) => !have.has(m));
     const drop = [...have].filter((m) => !want.includes(m));
-    if (!need.length && !drop.length) return;
+    if (!need.length && !drop.length) return fill(i, extra);
     const qs = cfg.tags.map((t) => "&tag=" + encodeURIComponent(t)).join("");
     const parts = await Promise.all(need.map(async (m) => {
       const res = await fetch(cfg.base + "?rows=" + m + qs);
@@ -325,9 +325,12 @@ const EVENTS_SCRIPT = `
     }
     if (anchor && anchor.isConnected) scrollBy(0, anchor.getBoundingClientRect().top - before);
     if (window.localTimes) window.localTimes(tbody);
+    return fill(i, extra);
   }
+  // Passt die Liste in den Viewport, löst Scrollen nie das Nachladen aus: Fenster so lange vergrößern, bis die Seite scrollbar ist.
+  const fill = (i, extra) => (document.documentElement.scrollHeight - innerHeight < off + 50 && i + 3 + extra < months.length ? ensureWindow(i, extra + 1) : undefined);
   let chain = Promise.resolve();
-  const ensure = (i) => (chain = chain.then(() => ensureWindow(i)));
+  const ensure = (i, extra = 0) => (chain = chain.then(() => ensureWindow(i, extra)));
 
   let lock = 0, markedDate = "", shownYm = cfg.focus, curMonth = "";
   function setUrl() {
@@ -348,13 +351,13 @@ const EVENTS_SCRIPT = `
     });
   }
   // target: "YYYY-MM-DD" (erster Eintrag des Tages) oder "YYYY-MM" (erster Eintrag ab diesem Monat)
-  async function jump(target) {
+  async function jump(target, initial) {
     lock = Infinity;
     await ensure(idxOf(target.slice(0, 7)));
     const tr = target.length > 7 ? rows('[data-date="' + target + '"]')[0] : rows(ITEM).find((r) => r.dataset.month >= target);
     if (tr) {
       tr.scrollIntoView();
-      curMonth = tr.dataset.month; setUrl();
+      curMonth = tr.dataset.month; if (!initial) setUrl(); // beim ersten Laden die URL nicht umschreiben
       if (target.length > 7) flash(target);
     }
     lock = Date.now() + 250;
@@ -405,7 +408,7 @@ const EVENTS_SCRIPT = `
   }, { passive: true });
 
   curMonth = cfg.focus;
-  jump(cfg.focus);
+  jump(cfg.focus, true);
 `;
 
 // ── /events ──────────────────────────────────────────────────────────────────
