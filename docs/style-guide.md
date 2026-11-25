@@ -130,6 +130,7 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - Darunter: ein Button mit Rahmen (`btn btn-ghost border`, `text-xl`, ab `@md` `text-2xl`; Label per `truncate` gekürzt, `title` = aktive Ansicht) zeigt die aktive Ansicht plus Chevron; das Menü zeigt alle Ansichten, Haken am aktiven, Klick daneben schließt.
 - Ein Eintrag kann einen Zähler (`count`, `badge badge-sm badge-warning`) tragen; er erscheint nur, solange die Ansicht **nicht** aktiv ist
 - Ansichten mit eigenen Rechten (`/roles`): der Umschalter zeigt nur die lesbaren Ansichten; bleibt eine, entfällt er und es steht nur der Titel.
+- Hilfe-Link: Verweist die Seite auf eine Hilfeseite (z. B. `/help/members`), steht er als kleiner Icon-Button **direkt rechts neben dem Umschalter** im `title` des `PageHeader`: `<a class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100">` mit `icon-[tabler--help]`, `aria-label` und `title` = „Hilfe zu …", Ziel mit Anker (`#status`). Nicht in `actions` und nicht im „⋯"-Menü; bewusst dezent, kein Primär-/Neutral-Button. Ohne Umschalter steht er ebenso hinter dem Titel.
 - Nicht für Unterseiten mit eigenen Zählern (dort Sidebar) und nicht für Filter (dort `FilterDialog`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
 
 ## Statistikkarten

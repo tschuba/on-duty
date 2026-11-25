@@ -63,6 +63,7 @@ function menuDefinition(user: AuthedUser, c: NavCounts): Group[] {
     { icon: "icon-[tabler--building]", label: t("common.nav.organisation"), items: [
       { label: t("common.nav.organisation"), href: "/organisation", show: any("org:read", "org:write", "org:tax-data:read", "org:tax-data:write"), dot: c.org },
     ] },
+    { icon: "icon-[tabler--help]", label: t("common.nav.help"), items: [{ label: t("common.nav.help"), href: "/help", show: true }] },
     { icon: "icon-[tabler--download]", label: t("common.nav.import"), items: [{ label: t("common.nav.import"), href: "/import", show: has("import:run") }] },
   ];
 }
