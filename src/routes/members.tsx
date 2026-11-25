@@ -186,7 +186,26 @@ function genderBreakdown(c: { m: number; w: number; o: number }) {
   return <>{c.m > 0 && <span>{c.m} ♂</span>}{c.w > 0 && <span>{c.w} ♀</span>}{c.o > 0 && <span>{c.o} o.A.</span>}</>;
 }
 
-export function StatsCards({ all, openRequests = null }: { all: MemberWithStatus[]; openRequests?: number | null }) {
+// Kachel-Filter (status/age) wie in den Links; Reihenfolge egal.
+const TILE_FILTERS = {
+  requested: { status: ["requested"], age: [] },
+  active: { status: ["active"], age: ["adult", "senior"] },
+  passive: { status: ["passive"], age: [] },
+  supporting: { status: ["supporting"], age: [] },
+  youth: { status: ["active"], age: ["youth"] },
+  children: { status: ["active"], age: ["children"] },
+  former: { status: ["left", "deceased"], age: [] },
+} as const;
+const sameSet = (a: readonly string[], b: readonly string[]) => new Set(a).size === new Set(b).size && a.every((x) => b.includes(x));
+
+// current: Roh-Filter der Liste (status = URL-Parameter); ohne Treffer oder bei Suche/Rolle keine Hervorhebung.
+export function StatsCards({ all, openRequests = null, current }: { all: MemberWithStatus[]; openRequests?: number | null; current?: { status: string[]; age: string[]; narrowed: boolean } }) {
+  const hits = current && !current.narrowed
+    ? (Object.keys(TILE_FILTERS) as (keyof typeof TILE_FILTERS)[]).filter((k) => sameSet(TILE_FILTERS[k].status, current.status) && sameSet(TILE_FILTERS[k].age, current.age))
+    : [];
+  const sel = hits.length === 1 ? hits[0] : undefined;
+  // Ausgewählte Kachel: Klick hebt den Filter auf.
+  const sx = (k: keyof typeof TILE_FILTERS) => (sel === k ? { selected: true, href: "/members" } : {});
   const counts = { active: 0, passive: 0, supporting: 0, children: 0, youth: 0, left: 0, deceased: 0 };
   const genderCount = (status: "active" | "children" | "youth") => {
     const subset = all.filter((m) => m.status === status);
@@ -198,25 +217,27 @@ export function StatsCards({ all, openRequests = null }: { all: MemberWithStatus
   };
 
   for (const m of all) counts[m.status]++;
+  // Nur klickbar, wenn die Kachel etwas zählt.
+  const link = (query: string, n: number) => (n > 0 ? { href: `/members?${query}`, link: "filter" as const } : {});
   const active = genderCount("active");
   const youth = genderCount("youth");
   const children = genderCount("children");
 
   return (
     <StatGrid id="members-stats" cols={openRequests ? 7 : 6} class={openRequests ? "pt-3" : undefined}>
-      {openRequests ? <StatCard label={t("members.stats.requested")} value={openRequests} tone="text-warning font-bold" href="/members?status=requested" link="filter" highlight /> : null}
-      <StatCard label={t("members.stats.active")} value={counts.active} tone="text-success" inline>
+      {openRequests ? <StatCard label={t("members.stats.requested")} value={openRequests} tone="text-warning font-bold" href="/members?status=requested" link="filter" highlight {...sx("requested")} /> : null}
+      <StatCard label={t("members.stats.active")} value={counts.active} tone="text-success" inline hint={t("members.stats.activeFrom", { age: env.YOUTH_AGE_LIMIT })} {...link("status=active&age=adult&age=senior", counts.active)} {...sx("active")}>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(active)}</div>
       </StatCard>
-      <StatCard label={t("members.stats.passive")} value={counts.passive} />
-      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-primary" />
-      <StatCard label={t("members.stats.youth")} value={counts.youth} tone="text-secondary" inline>
+      <StatCard label={t("members.stats.passive")} value={counts.passive} {...link("status=passive", counts.passive)} {...sx("passive")} />
+      <StatCard label={t("members.stats.supporting")} value={counts.supporting} tone="text-primary" {...link("status=supporting", counts.supporting)} {...sx("supporting")} />
+      <StatCard label={t("members.stats.youth")} value={counts.youth} tone="text-secondary" inline {...link("status=active&age=youth", counts.youth)} {...sx("youth")}>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(youth)}</div>
       </StatCard>
-      <StatCard label={t("members.stats.children")} value={counts.children} tone="text-info" inline>
+      <StatCard label={t("members.stats.children")} value={counts.children} tone="text-info" inline {...link("status=active&age=children", counts.children)} {...sx("children")}>
         <div class="stat-desc text-sm flex gap-x-2">{genderBreakdown(children)}</div>
       </StatCard>
-      <StatCard label={t("members.stats.former")} value={counts.left + counts.deceased} tone="text-base-content/40" inline>
+      <StatCard label={t("members.stats.former")} value={counts.left + counts.deceased} tone="text-base-content/40" inline {...link("status=left&status=deceased", counts.left + counts.deceased)} {...sx("former")}>
         <div class="stat-desc text-sm flex gap-x-2">
           {counts.left > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerLeft")}>{counts.left} <Icon name="icon-[tabler--logout]" class="w-3.5 h-3.5" /></span>}
           {counts.deceased > 0 && <span class="inline-flex items-center gap-1" title={t("members.stats.formerDeceased")}>{counts.deceased} <Icon name="icon-[tabler--cross]" class="w-3.5 h-3.5" /></span>}
@@ -1134,7 +1155,7 @@ memberRoutes.get("/", requireAuth(["members:read", "applications:read", "trainin
       </>} />
 
       {canReview && user.permissions.has("applications:manage") && <ApplicationFormSettings forms={forms} />}
-      {canMembers && <StatsCards all={all} openRequests={canReview ? await countOpenRequests() : null} />}
+      {canMembers && <StatsCards all={all} openRequests={canReview ? await countOpenRequests() : null} current={{ status: statusParams, age: ageFilter, narrowed: !!search || roleFilter.length > 0 }} />}
 
       <PageSearch label={t("members.title")} value={search}
         hidden={[["sort", sort], ["sort_dir", dir], ["pageSize", String(pageSize)], ...shownStatus.map((v) => ["status", v] as [string, string]), ...roleFilter.map((v) => ["role", v] as [string, string]), ...ageFilter.map((v) => ["age", v] as [string, string])]} />

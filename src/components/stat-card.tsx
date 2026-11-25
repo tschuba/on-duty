@@ -3,7 +3,9 @@ import { Icon } from "./icon.js";
 
 // Statistikkachel. Mit `href` klickbar: `funnel` = filtert die Liste, `arrow-right` = wechselt die Ansicht.
 // Doku: docs/style-guide.md → „Statistikkarten".
-export function StatCard({ label, value, tone, href, link, inline, highlight, children }: {
+export function StatCard({ label, value, tone, href, link, inline, highlight, selected, hint, children }: {
+  selected?: boolean; // Liste ist genau auf diese Karte gefiltert; Klick hebt den Filter auf
+  hint?: string; // kleine Zeile unter dem Label
   highlight?: boolean; // Aufmerksamkeit: Ring, Glow, getönter Hintergrund
   label: string;
   value: Child;
@@ -16,16 +18,16 @@ export function StatCard({ label, value, tone, href, link, inline, highlight, ch
   const num = <div class={`stat-value text-2xl @4xl:text-3xl${tone ? ` ${tone}` : ""}`}>{value}</div>;
   const body = (
     <>
-      {href && <Icon name={link === "view" ? "icon-[tabler--arrow-right]" : "icon-[tabler--filter]"} class="absolute top-2 right-2 w-4 h-4 opacity-50" />}
-      <div class="stat-title text-xs">{label}</div>
+      {href && <Icon name={selected ? "icon-[tabler--x]" : link === "view" ? "icon-[tabler--arrow-right]" : "icon-[tabler--filter]"} class="absolute top-2 right-2 w-4 h-4 opacity-50" />}
+      <div class="stat-title text-xs">{label}{hint && <span class="block opacity-60">{hint}</span>}</div>
       {inline
         ? <div class="flex flex-wrap items-baseline gap-x-2">{num}{children}</div>
         : <>{num}{children}</>}
     </>
   );
-  const cls = `stat ${highlight ? "bg-base-200 text-base-content" : "bg-base-200"} rounded-box px-3 py-2 @4xl:p-4 relative`;
+  const cls = `stat ${highlight ? "bg-base-200 text-base-content" : "bg-base-200"} rounded-box px-3 py-2 @4xl:p-4 relative${selected ? " ring-2 ring-primary" : ""}`;
   const card = href
-    ? <a href={href} class={`${cls} hover:bg-base-300 focus-visible:outline-2 focus-visible:outline-primary`}>{body}</a>
+    ? <a href={href} aria-current={selected ? "true" : undefined} class={`${cls} hover:bg-base-300 focus-visible:outline-2 focus-visible:outline-primary`}>{body}</a>
     : <div class={cls}>{body}</div>;
   // daisyUI-Aura: Wrapper mit rotierendem Lichtrand; Farbe über text-*
   return highlight ? <div class="aura aura-gold flex">{card}</div> : card;

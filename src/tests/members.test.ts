@@ -386,6 +386,17 @@ describe("StatsCards", () => {
     expect(html).toContain("o.A.");
   });
 
+  it("highlights only the tile exactly matching the filter", async () => {
+    const all = [{ ...makeMember(), status: "passive", gender: null }] as any;
+    const render = async (status: string[], age: string[], narrowed = false) =>
+      (await (await renderApp(StatsCards({ all, current: { status, age, narrowed } }))).text()).match(/aria-current="true"/g)?.length ?? 0;
+    expect(await render(["passive"], [])).toBe(1);
+    expect(await render(["active"], [])).toBe(0);
+    expect(await render(["active"], ["adult", "senior"])).toBe(1);
+    expect(await render(["passive", "supporting"], [])).toBe(0);
+    expect(await render(["passive"], [], true)).toBe(0);
+  });
+
   it("colors Fördernd and breaks down Ausgeschieden", async () => {
     const all = [
       { ...makeMember(), status: "supporting", gender: null },
