@@ -16,8 +16,9 @@ import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import { StatusBadge, STATUS_LABELS } from "../components/status-badge.js";
 import { ActionContent, DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
+import { StatusReasonPopover } from "../components/status-reason-popover.js";
 import { RolePopover } from "../components/role-popover.js";
-import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
+import { AGE_GROUPS, ageGroupOf, ageLimitDate, deriveMemberStatus, explainMemberStatus, isFormer, type AgeGroup, type MemberStatus } from "../lib/status.js";
 import { setFlash } from "../lib/flash.js";
 import { FilterDialog } from "../components/filter-dialog.js";
 import { PageSearch } from "../components/page-search.js";
@@ -1790,7 +1791,7 @@ memberRoutes.get("/:id", requireAuth("members:read"), async (c) => {
   const openRoles = m.assignments.filter((a) => !a.to);
   return c.html(
     <Layout title={`${m.firstName} ${m.lastName}`} user={user}>
-      <PageHeader title={<>{m.firstName} {m.lastName} <StatusBadge status={m.status} /> <a href="/help/members#matrix" class="align-middle opacity-60 hover:opacity-100" aria-label={t("help.members.aria.context")} title={t("help.members.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
+      <PageHeader title={<>{m.firstName} {m.lastName} <StatusReasonPopover status={m.status} reason={explainMemberStatus(m, m.assignments, env.CHILDREN_AGE_LIMIT, env.YOUTH_AGE_LIMIT, env.ACTIVE_AGE_LIMIT).reason} /> </>} backHref={backHref(c)} actions={<DetailActions editHref={isEditor || canWriteBank ? `/members/${m.id}/edit` : undefined} copyHref={isEditor ? `/members/new?copyFrom=${m.id}` : undefined} remove={canDelete && <DeleteMemberButton member={m} blockedBy={blockedBy} assignedItemsCount={assignedItemsCount} />} />} />
       <ViewGrid>
         <ViewField label={t("members.form.lastName")} value={m.lastName} />
         <ViewField label={t("members.form.firstName")} value={m.firstName} />

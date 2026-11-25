@@ -55,26 +55,49 @@ export function ageGroupOf(
   return "senior";
 }
 
-export function deriveMemberStatus(
+/** Warum ein Mitglied seinen Status hat (Diagnose, siehe members.statusReason.*). */
+export type StatusReason =
+  | { kind: "deceased"; date: string }
+  | { kind: "left"; date: string }
+  | { kind: "runningRole"; roleTitle: string; age: number }
+  | { kind: "passiveAtCutoff"; roleTitle: string; age: number; cutoff: string; limit: number }
+  | { kind: "noOpenRole" }
+  | { kind: "openRoleNotActive"; roleTitle: string }
+  | { kind: "noRoleAtCutoff"; cutoff: string; limit: number };
+
+/** Einzige Statuslogik: liefert Status und Grund. */
+export function explainMemberStatus(
   member: Pick<Member, "exitDate" | "deathDate" | "birthDate">,
   assignments: Assignment[],
   childrenAgeLimit: number,
   youthAgeLimit: number,
   activeAgeLimit = DEFAULT_ACTIVE_AGE_LIMIT,
   today = new Date()
-): MemberStatus {
-  if (member.deathDate) return "deceased";
-  if (member.exitDate) return "left";
+): { status: MemberStatus; reason: StatusReason } {
+  if (member.deathDate) return { status: "deceased", reason: { kind: "deceased", date: member.deathDate } };
+  if (member.exitDate) return { status: "left", reason: { kind: "left", date: member.exitDate } };
 
   const age = ageInYears(member.birthDate, today);
-  if (age < activeAgeLimit && assignments.some((a) => a.role.grantsActiveStatus && !a.to)) {
-    const group = ageGroupOf(member.birthDate, childrenAgeLimit, youthAgeLimit, activeAgeLimit, today);
-    return group === "children" ? "children" : group === "youth" ? "youth" : "active";
+  const running = assignments.find((a) => a.role.grantsActiveStatus && !a.to);
+  if (age < activeAgeLimit) {
+    if (running) {
+      const group = ageGroupOf(member.birthDate, childrenAgeLimit, youthAgeLimit, activeAgeLimit, today);
+      const status = group === "children" ? "children" : group === "youth" ? "youth" : "active";
+      return { status, reason: { kind: "runningRole", roleTitle: running.role.title, age } };
+    }
+    const open = assignments.find((a) => !a.to);
+    return { status: "supporting", reason: open ? { kind: "openRoleNotActive", roleTitle: open.role.title } : { kind: "noOpenRole" } };
   }
 
   const cutoff = ageLimitDate(member.birthDate, activeAgeLimit);
-  const wasActiveAtCutoff = assignments.some(
+  const atCutoff = assignments.find(
     (a) => a.role.grantsActiveStatus && (a.from == null || a.from <= cutoff) && (!a.to || a.to >= cutoff)
   );
-  return wasActiveAtCutoff ? "passive" : "supporting";
+  return atCutoff
+    ? { status: "passive", reason: { kind: "passiveAtCutoff", roleTitle: atCutoff.role.title, age, cutoff, limit: activeAgeLimit } }
+    : { status: "supporting", reason: { kind: "noRoleAtCutoff", cutoff, limit: activeAgeLimit } };
+}
+
+export function deriveMemberStatus(...args: Parameters<typeof explainMemberStatus>): MemberStatus {
+  return explainMemberStatus(...args).status;
 }

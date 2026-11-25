@@ -15,7 +15,8 @@ describe("Hilfe", () => {
   it("rendert Übersicht, Mitglieder und Tipps mit Ankern", async () => {
     expect((await app.request("/help")).status).toBe(200);
     const html = await (await app.request("/help/members")).text();
-    for (const id of ["status", "matrix", "trouble", "tips"]) expect(html).toContain(`id="${id}"`);
+    for (const id of ["status", "matrix", "trouble", "tips", ...[1, 2, 3, 4, 5, 6, 7].map((n) => `case-${n}`)]) expect(html).toContain(`id="${id}"`);
+    expect(html).toContain("hashchange"); // Fall klappt beim Sprung auf
     expect((await app.request("/help/tips")).status).toBe(200);
     expect(html).toContain("braucht eine laufende Funktion im aktiven Dienst"); // members.error.status.activeNoRole
   });

@@ -141,7 +141,7 @@ helpRoutes.get("/members", requireAuth(), (c) => {
         <Section id="trouble" title={t("help.members.trouble")} collapsible={false}>
           <div class="space-y-2">
             {cases.map((n) => (
-              <details class="collapse collapse-arrow border border-base-300 bg-base-100">
+              <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
                 <summary class="collapse-title font-semibold">{t(caseKey(n, "title"), p)}</summary>
                 <div class="collapse-content space-y-2">
                   {n === 1
@@ -156,6 +156,9 @@ helpRoutes.get("/members", requireAuth(), (c) => {
             ))}
           </div>
         </Section>
+
+        <script dangerouslySetInnerHTML={{ __html: `
+(function(){var o=function(){var e=location.hash&&document.querySelector('details'+location.hash.replace(/[^#\\w-]/g,''));if(e){e.open=true;e.scrollIntoView();}};o();addEventListener('hashchange',o);})();` }} />
 
         <Section id="tips" title={t("help.members.tips")} collapsible={false}>
           <TipCards tips={visibleTips(user.permissions, ["members"])} />
