@@ -946,7 +946,7 @@ function MembersExportModal() {
             var url=new URL(window.location.href);
             ['search','sort','sort_dir'].forEach(function(k){var v=url.searchParams.get(k);if(v)p.set(k,v);});
             ['status','role','age'].forEach(function(k){url.searchParams.getAll(k).forEach(function(v){p.append(k,v)});});
-            window.location='/members/export?'+p;
+            var fr=document.createElement('iframe');fr.hidden=true;fr.src='/members/export?'+p;document.body.appendChild(fr);setTimeout(function(){fr.remove()},60000);
             document.getElementById('members-export-modal').close();
           });
         })();
