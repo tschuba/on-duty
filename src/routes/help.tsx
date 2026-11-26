@@ -60,6 +60,32 @@ function ScopeBadges({ scope }: { scope: StatusScope }) {
 const OpenCaseOnHash = () => <script dangerouslySetInnerHTML={{ __html: `
 (function(){var o=function(){var e=location.hash&&document.querySelector('details'+location.hash.replace(/[^#\\w-]/g,''));if(e){e.open=true;e.scrollIntoView();}};o();addEventListener('hashchange',o);})();` }} />;
 
+// Markiert Linkwörter im i18n-Text als [Wort]; ohne Ziel (kein Recht) bleibt Klartext.
+export function linkify(text: string, href: string | null) {
+  return text.split(/\[([^\]]+)\]/).map((part, i) => i % 2 === 0 ? part : href ? <a href={href} class="link link-primary">{part}</a> : part);
+}
+
+type CasesProps = { prefix: "members" | "rights" | "cash"; count: number; params?: Record<string, number>; body?: (n: number) => unknown; fixExtra?: (n: number) => unknown };
+// Aufklappbare Fehlerfälle (Ursache/Lösung); `body` ersetzt den Standardinhalt eines Falls.
+function HelpCases({ prefix, count, params, body, fixExtra }: CasesProps) {
+  const k = (n: number, f: "title" | "cause" | "fix") => `help.${prefix}.case.${n}.${f}` as Parameters<typeof t>[0];
+  return (
+    <div class="space-y-2">
+      {Array.from({ length: count }, (_, i) => i + 1).map((n) => (
+        <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
+          <summary class="collapse-title font-semibold">{t(k(n, "title"), params)}</summary>
+          <div class="collapse-content space-y-2">
+            {(body?.(n) as never) ?? <>
+              <p><span class="font-semibold">{t("help.common.cause")}:</span> {t(k(n, "cause"), params)}</p>
+              <p><span class="font-semibold">{t("help.common.fix")}:</span> {t(k(n, "fix"), params)} {fixExtra?.(n) as never}</p>
+            </>}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
 function TipCards({ tips }: { tips: Tip[] }) {
   if (!tips.length) return <p class="opacity-70">{t("help.tips.empty")}</p>;
   return (
@@ -126,7 +152,6 @@ helpRoutes.get("/cash", requireAuth(cashPerms("report")), (c) => {
   const flow = [1, 2, 3, 4] as const;
   const entries = ["storno", "tags", "events", "donation", "lending"] as const;
   const cases = [1, 2, 3, 4, 5, 6] as const;
-  const caseKey = (n: number, k: "title" | "cause" | "fix") => `help.cash.case.${n}.${k}` as Parameters<typeof t>[0];
   // Sprunglink in die Kasse; nur sichtbar, wenn der Nutzer das Ziel auch öffnen darf.
   const go = (ok: boolean, href: string, label: string) => ok ? <a href={href} class="link link-primary inline-flex items-center gap-1 text-sm">{label}<Icon name="icon-[tabler--arrow-right]" class="h-4 w-4" /></a> : null;
   const manage = hasCash(user.permissions, "manage");
@@ -137,19 +162,16 @@ helpRoutes.get("/cash", requireAuth(cashPerms("report")), (c) => {
     3: go(manage, "/cash", t("cash.view.entries")),
     4: go(manage, "/cash?view=report", t("cash.view.report")),
   };
-  // Verlinkt die erste Fundstelle von `phrase` im Text; ohne Recht bleibt es Klartext.
-  const entryLink: Record<string, { phrase: string; href: string; ok: boolean }> = {
-    tags: { phrase: "Kategorien", href: "/cash?view=tags", ok: read },
-    events: { phrase: "Veranstaltung", href: "/cash?view=events", ok: read },
-    donation: { phrase: "Spende", href: "/donations", ok: user.permissions.has("donations:read") },
-    lending: { phrase: "Verleih-Zahlungen", href: "/lending", ok: user.permissions.has("lending:read") },
+  // Ziel je Eintrag; ohne Recht bleibt das [Wort] im Text Klartext.
+  const entryLink: Record<string, { href: string; ok: boolean }> = {
+    tags: { href: "/cash?view=tags", ok: read },
+    events: { href: "/cash?view=events", ok: read },
+    donation: { href: "/donations", ok: user.permissions.has("donations:read") },
+    lending: { href: "/lending", ok: user.permissions.has("lending:read") },
   };
   const entryText = (n: string) => {
-    const text = t(`help.cash.entries.${n}` as Parameters<typeof t>[0]);
     const l = entryLink[n];
-    const i = l?.ok ? text.indexOf(l.phrase) : -1;
-    if (i < 0) return text;
-    return <>{text.slice(0, i)}<a href={l.href} class="link link-primary">{l.phrase}</a>{text.slice(i + l.phrase.length)}</>;
+    return linkify(t(`help.cash.entries.${n}` as Parameters<typeof t>[0]), l?.ok ? l.href : null);
   };
   const caseGo: Record<number, ReturnType<typeof go>> = {
     1: go(manage, "/cash", t("cash.title")),
@@ -237,17 +259,7 @@ helpRoutes.get("/cash", requireAuth(cashPerms("report")), (c) => {
         </Section>
 
         <Section id="trouble" class="scroll-mt-48" title={t("help.cash.trouble")} collapsible={false}>
-          <div class="space-y-2">
-            {cases.map((n) => (
-              <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
-                <summary class="collapse-title font-semibold">{t(caseKey(n, "title"))}</summary>
-                <div class="collapse-content space-y-2">
-                  <p><span class="font-semibold">{t("help.members.cause")}:</span> {t(caseKey(n, "cause"))}</p>
-                  <p><span class="font-semibold">{t("help.members.fix")}:</span> {t(caseKey(n, "fix"))} {caseGo[n]}</p>
-                </div>
-              </details>
-            ))}
-          </div>
+          <HelpCases prefix="cash" count={cases.length} fixExtra={(n) => caseGo[n]} />
         </Section>
 
         <OpenCaseOnHash />
@@ -270,7 +282,6 @@ helpRoutes.get("/members", requireAuth(), (c) => {
   ];
   const timeline: MemberStatus[] = ["children", "youth", "active", "passive"];
   const cases = [1, 2, 3, 4, 5, 6, 7] as const;
-  const caseKey = (n: number, k: "title" | "cause" | "fix") => `help.members.case.${n}.${k}` as Parameters<typeof t>[0];
   return c.html(
     <Layout title={t("help.members.title")} user={user}>
       <div class="max-w-4xl mx-auto">
@@ -311,30 +322,19 @@ helpRoutes.get("/members", requireAuth(), (c) => {
           <div role="alert" class="alert alert-warning mt-4"><Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5" /><span>{t("help.members.endRole")}</span></div>
         </Section>
 
+        <Section id="tips" class="scroll-mt-48" title={t("help.members.tips")} collapsible={false}>
+          <TipCards tips={visibleTips(user.permissions, ["members"])} />
+        </Section>
+
         <Section id="trouble" class="scroll-mt-48" title={t("help.members.trouble")} collapsible={false}>
-          <div class="space-y-2">
-            {cases.map((n) => (
-              <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
-                <summary class="collapse-title font-semibold">{t(caseKey(n, "title"), p)}</summary>
-                <div class="collapse-content space-y-2">
-                  {n === 1
-                    // Gleicher Text wie die Fehlermeldung beim Anlegen, keine zweite Formulierung.
-                    ? <p>{t("members.error.status.activeNoRole", { name: t("members.form.thisMember") })}</p>
-                    : <>
-                      <p><span class="font-semibold">{t("help.members.cause")}:</span> {t(caseKey(n, "cause"), p)}</p>
-                      <p><span class="font-semibold">{t("help.members.fix")}:</span> {t(caseKey(n, "fix"), p)}</p>
-                    </>}
-                </div>
-              </details>
-            ))}
-          </div>
+          <HelpCases prefix="members" count={cases.length} params={p} body={(n) => n === 1
+            // Gleicher Text wie die Fehlermeldung beim Anlegen, keine zweite Formulierung.
+            ? <p>{t("members.error.status.activeNoRole", { name: t("members.form.thisMember") })}</p>
+            : undefined} />
         </Section>
 
         <OpenCaseOnHash />
 
-        <Section id="tips" class="scroll-mt-48" title={t("help.members.tips")} collapsible={false}>
-          <TipCards tips={visibleTips(user.permissions, ["members"])} />
-        </Section>
       </div>
     </Layout>
   );
@@ -347,14 +347,13 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
   const areas = rightsByArea(user.permissions);
   const scopes = (["read", "write", "delete"] as const).filter((k) => user.permissions.has(`members:${k}` as Permission));
   const cases = [1, 2, 3, 4, 5, 6, 7] as const;
-  const caseKey = (n: number, k: "title" | "cause" | "fix") => `help.rights.case.${n}.${k}` as Parameters<typeof t>[0];
   const isAdmin = user.permissions.has("system:admin");
   return c.html(
     <Layout title={t("help.rights.title")} user={user}>
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("help.rights.title")} {...backProps(helpFrom(c.req.query("from")))} subtitle={<>{t("help.rights.hero")}{HelpLink(helpFrom(c.req.query("from")))}</>} />
 
-        <Section id="begriffe" class="scroll-mt-48" title={t("help.rights.terms")} collapsible={false}>
+        <Section id="terms" class="scroll-mt-48" title={t("help.rights.terms")} collapsible={false}>
           <dl class="space-y-3">
             {(["right", "role", "function", "scope"] as const).map((k) => (
               <div><dt class="font-semibold">{t(`help.rights.term.${k}.title`)}</dt><dd>{t(`help.rights.term.${k}.text`)}</dd></div>
@@ -362,7 +361,7 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
           </dl>
         </Section>
 
-        <Section id="meine" class="scroll-mt-48" title={t("help.rights.mine")} collapsible={false}>
+        <Section id="mine" class="scroll-mt-48" title={t("help.rights.mine")} collapsible={false}>
           <h3 class="font-semibold mb-2">{t("help.rights.myRoles")}</h3>
           {roles.length
             ? <div class="flex flex-wrap gap-2 mb-4">{roles.map((r) => <span class="badge badge-primary">{r.name}</span>)}</div>
@@ -388,18 +387,8 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
           )}
         </Section>
 
-        <Section id="fragen" class="scroll-mt-48" title={t("help.rights.trouble")} collapsible={false}>
-          <div class="space-y-2">
-            {cases.map((n) => (
-              <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
-                <summary class="collapse-title font-semibold">{t(caseKey(n, "title"))}</summary>
-                <div class="collapse-content space-y-2">
-                  <p><span class="font-semibold">{t("help.members.cause")}:</span> {t(caseKey(n, "cause"))}</p>
-                  <p><span class="font-semibold">{t("help.members.fix")}:</span> {t(caseKey(n, "fix"))} {isAdmin ? <a class="link" href="/admin/permissions">{t("help.rights.adminLink")}</a> : t("help.rights.askAdmin")}</p>
-                </div>
-              </details>
-            ))}
-          </div>
+        <Section id="trouble" class="scroll-mt-48" title={t("help.rights.trouble")} collapsible={false}>
+          <HelpCases prefix="rights" count={cases.length} fixExtra={(n) => isAdmin ? <a class="link" href="/admin/permissions">{t("help.rights.adminLink")}</a> : t("help.rights.askAdmin")} />
         </Section>
 
         <OpenCaseOnHash />

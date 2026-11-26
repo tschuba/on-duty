@@ -9,7 +9,7 @@ vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => { c.set("user", { id: "u1", name: "T", permissions: perms, roleIds: new Set(["r1"]), memberScope, disabled: false }); await next(); },
 }));
 
-const { helpRoutes, statusMatrix, rightsByArea } = await import("../routes/help.js");
+const { helpRoutes, statusMatrix, rightsByArea, linkify } = await import("../routes/help.js");
 const { visibleTips } = await import("../lib/help-tips.js");
 const app = new Hono().route("/help", helpRoutes);
 
@@ -113,4 +113,11 @@ it("Unterseite mit from verlinkt weiter auf die Hilfe-Übersicht", async () => {
   const from = encodeURIComponent("/members");
   expect(await (await app.request(`/help/rights?from=${from}`)).text()).toContain(`href="/help?from=${from}"`);
   expect(await (await app.request("/help/rights")).text()).not.toContain('href="/help?from=');
+});
+
+describe("linkify", () => {
+  it("macht [Wort] zum Link, ohne Ziel zu Klartext", () => {
+    expect(String(linkify("Eine [Spende] hier", "/donations")[1])).toContain("/donations");
+    expect(linkify("Eine [Spende] hier", null)).toEqual(["Eine ", "Spende", " hier"]);
+  });
 });
