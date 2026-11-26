@@ -5,6 +5,7 @@ import { Field, RichTextField, ViewField, ViewGrid } from "../components/field.j
 import { and, asc, eq, gte, ilike, inArray, lte, isNull, max, or } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryTemplates, inventoryItemTags, inventoryItemNumbers, inventoryItemSerials, inventoryInspections, inventoryInspectionRecords, inventoryInspectionTemplates, inventoryItemAssignments, lendingItems, lendingLoans, members, persons } from "../db/schema/index.js";
+import { HelpLink } from "../components/help-link.js";
 import { Icon } from "../components/icon.js";
 import { LocationPicker } from "../components/location-picker.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
@@ -856,7 +857,7 @@ inventoryRoutes.get("/", requireAuth("inventory:read"), async (c) => {
 
   return c.html(
     <Layout title={t("inventory.title")} user={user}>
-      <PageHeader title={inventoryTitle("stock", canConfigure)} actions={<>
+      <PageHeader title={<span class="flex items-center [&_details]:min-w-0">{inventoryTitle("stock", canConfigure)}<HelpLink href="/help/inventory?from=/inventory#flow" label={t("help.inventory.aria.context")} /></span>} actions={<>
         <HeaderAction icon="icon-[tabler--map-2]" label={t("inventory.map.toMap")} href={buildListUrl("/inventory/map", { tag: tagFilter })} />
         {user.permissions.has("import:run") && <HeaderAction icon="icon-[tabler--upload]" label={t("import.action")} href="/import?kind=inventory" />}
         {user.permissions.has("inventory:manage") && <HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("inventory.newItem")} href="/inventory/new" class="btn-primary" />}

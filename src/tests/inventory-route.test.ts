@@ -169,6 +169,12 @@ function makeItem(overrides: Record<string, unknown> = {}) {
 
 // ── GET / (list) ─────────────────────────────────────────────────────────────
 
+describe("GET / help link", () => {
+  it("links to the inventory help from the title", async () => {
+    expect(await (await inventoryRoutes.request("/")).text()).toContain('href="/help/inventory?from=/inventory#flow"');
+  });
+});
+
 describe("GET / import button", () => {
   it("is shown only with import:run", async () => {
     expect(await (await inventoryRoutes.request("/")).text()).not.toContain("/import?kind=inventory");

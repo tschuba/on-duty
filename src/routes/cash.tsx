@@ -6,6 +6,7 @@ import { events, users } from "../db/schema/index.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { Section } from "../components/section.js";
 import { FormCard, FormSection } from "../components/public-form.js";
+import { HelpLink } from "../components/help-link.js";
 import { Icon } from "../components/icon.js";
 import { FilterDialog, navFilterLabels } from "../components/filter-dialog.js";
 import { PageSearch } from "../components/page-search.js";
@@ -716,7 +717,7 @@ cashRoutes.get("/", report, async (c) => {
     { active: eventsView, href: "/cash?view=events", label: t("cash.view.events"), icon: "icon-[tabler--calendar-dollar]" },
   ];
   const helpAnchor = reportView ? "report" : tagsView || eventsView ? "entries" : "flow";
-  const helpLink = (anchor: string) => <a href={`/help/cash#${anchor}`} class="shrink-0 btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100 @2xl:@max-[890px]:ml-4 @2xl:@max-[890px]:border @2xl:@max-[890px]:border-info/50 @2xl:@max-[890px]:text-info @2xl:@max-[890px]:opacity-100" aria-label={t("help.cash.aria.context")} title={t("help.cash.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a>;
+  const helpLink = (anchor: string) => <HelpLink href={`/help/cash#${anchor}`} label={t("help.cash.aria.context")} />;
   const title = <span class="flex items-center [&_details]:min-w-0"><TitleSwitch items={canRead ? views : views.slice(1, 2)} />{helpLink(helpAnchor)}</span>;
   const settingsDialog = canManage && (
     <dialog id="cash-settings-dialog" class="modal">
