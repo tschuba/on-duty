@@ -132,8 +132,21 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - `icon` je Eintrag ist **Pflicht** (Tabler-Icon, `TitleSwitchItem.icon`): In der Stufe „Icons" zeigen inaktive Ansichten nur das Icon (Label als `sr-only`). Jeder Link trägt das Label als `title` (Tooltip). Drei Stufen also: Text → Icons → Dropdown.
 - Ein Eintrag kann einen Zähler (`count`, `badge badge-sm badge-warning`) tragen; er erscheint nur, solange die Ansicht **nicht** aktiv ist
 - Ansichten mit eigenen Rechten (`/roles`): der Umschalter zeigt nur die lesbaren Ansichten; bleibt eine, entfällt er und es steht nur der Titel.
-- Hilfe-Link: Verweist die Seite auf eine Hilfeseite (z. B. `/help/members`), steht er als kleiner Icon-Button **direkt rechts neben dem Umschalter** im `title` des `PageHeader`: `<a class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100">` mit `icon-[tabler--help]`, `aria-label` und `title` = „Hilfe zu …", Ziel mit Anker (`#status`). Nicht in `actions` und nicht im „⋯"-Menü; bewusst dezent, kein Primär-/Neutral-Button. Ohne Umschalter steht er ebenso hinter dem Titel. Zeigt der Umschalter nur Icons (`@2xl:@max-[890px]:`), bekommt der Hilfe-Link zusätzlich einen Rahmen (`@2xl:@max-[890px]:border @2xl:@max-[890px]:border-info/50 @2xl:@max-[890px]:text-info @2xl:@max-[890px]:opacity-100`) und mehr Abstand, damit er nicht wie eine Ansicht wirkt.
+- Hilfe-Link: Verweist die Seite auf eine Hilfeseite (z. B. `/help/members`), steht er als kleiner Icon-Button **direkt rechts neben dem Umschalter** im `title` des `PageHeader`: `<a class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100">` mit `icon-[tabler--help]`, `aria-label` und `title` = „Hilfe zu …", Ziel mit Anker (`#status`); Aufbau der Hilfeseiten: [Hilfeseiten](#hilfeseiten). Nicht in `actions` und nicht im „⋯"-Menü; bewusst dezent, kein Primär-/Neutral-Button. Ohne Umschalter steht er ebenso hinter dem Titel. Zeigt der Umschalter nur Icons (`@2xl:@max-[890px]:`), bekommt der Hilfe-Link zusätzlich einen Rahmen (`@2xl:@max-[890px]:border @2xl:@max-[890px]:border-info/50 @2xl:@max-[890px]:text-info @2xl:@max-[890px]:opacity-100`) und mehr Abstand, damit er nicht wie eine Ansicht wirkt.
 - Nicht für Unterseiten mit eigenen Zählern (dort Sidebar) und nicht für Filter (dort `FilterDialog`). Ansichtsspezifische Filter und Aktionen (z. B. Quittungsfilter, „Neuer Spender") erscheinen nur in ihrer Ansicht.
+
+## Hilfeseiten
+
+`/help/<thema>` (`src/routes/help.tsx`); Texte unter `help.<thema>.*` in i18n.
+- Gerüst: `Layout` → `max-w-4xl mx-auto` → `PageHeader` mit `backProps(from)`; Untertitel = Hero-Text + `HelpLink(from)` (+ optional Sprunglink in die Fachseite). Die Themenkarte auf `/help` und die Route verlangen dasselbe Recht.
+- Abschnitte: `Section` mit `collapsible={false}`, `class="scroll-mt-48"` und stabiler englischer `id` (`status`, `rights`, `flow`, `tips`, `trouble` …), gleiche IDs auf allen Seiten. Reihenfolge: Erklärabschnitte, dann `tips`, zuletzt `trouble`.
+- Fehlerfälle: Komponente `HelpCases` (`<details id="case-N">`, „Ursache“/„Lösung“ aus `help.common.*`, `OpenCaseOnHash` öffnet per Anker). Fehlerfall-Titel zitieren die echte Meldung; vorhandene i18n-Keys der Meldung wiederverwenden statt neu zu formulieren.
+- Schritte: nummerierte Liste, runder `bg-primary`-Zähler (`h-7 w-7`), Überschrift fett, Text `opacity-80`.
+- Hinweise: `alert-info` für Merksätze, `alert-warning` für Fallstricke, keine weiteren Alert-Arten.
+- Kacheln: Erklärkarten `rounded-box border border-base-300 p-4` im `sm:grid-cols-2`-Raster; Themen und Tipps `card card-border bg-base-100 border-base-300`.
+- Rechte-Badges: `badge-primary` = Nutzer hat das Recht, `badge-ghost` = nicht. Textlinks `link link-primary`.
+- Links im Fließtext: Linkwort im i18n-Text als `[Wort]` markieren, per `linkify(text, href | null)` auflösen; kein Suchen nach Phrasen im Text. Ohne Recht auf das Ziel `null` übergeben (Klartext), nie einen toten Link zeigen.
+- Tipps: `src/lib/help-tips.ts` je Bereich (`area`) mit Titel, Text, Beispiel, `href` und `perms`.
 
 ## Statistikkarten
 

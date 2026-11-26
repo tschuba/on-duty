@@ -8,7 +8,7 @@ const { helpRoutes } = await import("../routes/help.js");
 const app = new Hono().route("/help", helpRoutes);
 
 describe("Hilfe ohne Login", () => {
-  it.each(["/help", "/help/members", "/help/tips", "/help/rights"])("%s leitet auf /login", async (p) => {
+  it.each(["/help", "/help/members", "/help/tips", "/help/rights", "/help/cash"])("%s leitet auf /login", async (p) => {
     const res = await app.request(p);
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("/login");
