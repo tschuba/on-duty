@@ -3,7 +3,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { Layout } from "../components/layout.js";
 import { PageHeader } from "../components/page-header.js";
 import { Section } from "../components/section.js";
-import { Icon } from "../components/icon.js";
+import { Icon, type IconName } from "../components/icon.js";
 import { StatusBadge } from "../components/status-badge.js";
 import { env } from "../env.js";
 import { t } from "../i18n/index.js";
@@ -14,6 +14,7 @@ import { db } from "../db/index.js";
 import { appRoles } from "../db/schema/index.js";
 import { PERMISSIONS, PERMISSION_AREAS, type Permission } from "../lib/roles.js";
 import { PERMISSION_LABELS } from "../components/permission-badges.js";
+import { cashPerms, hasCash } from "../lib/cash.js";
 import { MEMBER_STATUSES, type StatusScope } from "../lib/member-scope.js";
 
 export const helpRoutes = new Hono<{ Variables: Variables }>();
@@ -55,6 +56,10 @@ function ScopeBadges({ scope }: { scope: StatusScope }) {
   return <span class="flex flex-wrap gap-1">{MEMBER_STATUSES.filter((x) => scope.has(x)).map((x) => <StatusBadge status={x} />)}</span>;
 }
 
+// Öffnet das per #case-N verlinkte <details>.
+const OpenCaseOnHash = () => <script dangerouslySetInnerHTML={{ __html: `
+(function(){var o=function(){var e=location.hash&&document.querySelector('details'+location.hash.replace(/[^#\\w-]/g,''));if(e){e.open=true;e.scrollIntoView();}};o();addEventListener('hashchange',o);})();` }} />;
+
 function TipCards({ tips }: { tips: Tip[] }) {
   if (!tips.length) return <p class="opacity-70">{t("help.tips.empty")}</p>;
   return (
@@ -76,11 +81,12 @@ function TipCards({ tips }: { tips: Tip[] }) {
 helpRoutes.get("/", requireAuth(), (c) => {
   const user = c.get("user");
   const from = helpFrom(c.req.query("from"));
-  const topics = [
+  const topics: { href: string; icon: IconName; title: string; text: string }[] = [
     { href: "/help/members", icon: "icon-[tabler--users]" as const, title: t("help.members.title"), text: t("help.members.card") },
     { href: "/help/rights", icon: "icon-[tabler--shield-lock]" as const, title: t("help.rights.title"), text: t("help.rights.card") },
     { href: "/help/tips", icon: "icon-[tabler--bulb]" as const, title: t("help.tips.title"), text: t("help.tips.card") },
   ];
+  if (hasCash(user.permissions, "report")) topics.push({ href: "/help/cash", icon: "icon-[tabler--cash-register]" as const, title: t("help.cash.title"), text: t("help.cash.card") });
   return c.html(
     <Layout title={t("help.title")} user={user}>
       <div class="max-w-4xl mx-auto">
@@ -112,6 +118,145 @@ helpRoutes.get("/tips", requireAuth(), (c) => {
   );
 });
 
+helpRoutes.get("/cash", requireAuth(cashPerms("report")), (c) => {
+  const user = c.get("user");
+  const from = helpFrom(c.req.query("from"));
+  const levels = ["report", "read", "manage", "cancel", "lending", "reopen"] as const;
+  const key = (l: string) => `help.cash.right.${l}` as Parameters<typeof t>[0];
+  const flow = [1, 2, 3, 4] as const;
+  const entries = ["storno", "tags", "events", "donation", "lending"] as const;
+  const cases = [1, 2, 3, 4, 5, 6] as const;
+  const caseKey = (n: number, k: "title" | "cause" | "fix") => `help.cash.case.${n}.${k}` as Parameters<typeof t>[0];
+  // Sprunglink in die Kasse; nur sichtbar, wenn der Nutzer das Ziel auch öffnen darf.
+  const go = (ok: boolean, href: string, label: string) => ok ? <a href={href} class="link link-primary inline-flex items-center gap-1 text-sm">{label}<Icon name="icon-[tabler--arrow-right]" class="h-4 w-4" /></a> : null;
+  const manage = hasCash(user.permissions, "manage");
+  const read = hasCash(user.permissions, "read");
+  const flowGo: Record<number, ReturnType<typeof go>> = {
+    1: go(manage, "/cash", t("cash.title")),
+    2: go(manage, "/cash/new", t("cash.newEntry")),
+    3: go(manage, "/cash", t("cash.view.entries")),
+    4: go(manage, "/cash?view=report", t("cash.view.report")),
+  };
+  // Verlinkt die erste Fundstelle von `phrase` im Text; ohne Recht bleibt es Klartext.
+  const entryLink: Record<string, { phrase: string; href: string; ok: boolean }> = {
+    tags: { phrase: "Kategorien", href: "/cash?view=tags", ok: read },
+    events: { phrase: "Veranstaltung", href: "/cash?view=events", ok: read },
+    donation: { phrase: "Spende", href: "/donations", ok: user.permissions.has("donations:read") },
+    lending: { phrase: "Verleih-Zahlungen", href: "/lending", ok: user.permissions.has("lending:read") },
+  };
+  const entryText = (n: string) => {
+    const text = t(`help.cash.entries.${n}` as Parameters<typeof t>[0]);
+    const l = entryLink[n];
+    const i = l?.ok ? text.indexOf(l.phrase) : -1;
+    if (i < 0) return text;
+    return <>{text.slice(0, i)}<a href={l.href} class="link link-primary">{l.phrase}</a>{text.slice(i + l.phrase.length)}</>;
+  };
+  const caseGo: Record<number, ReturnType<typeof go>> = {
+    1: go(manage, "/cash", t("cash.title")),
+    2: go(manage, "/cash?view=report", t("cash.view.report")),
+    5: go(read, "/cash?view=tags", t("cash.view.tags")),
+  };
+  return c.html(
+    <Layout title={t("help.cash.title")} user={user}>
+      <div class="max-w-4xl mx-auto">
+        <PageHeader title={t("help.cash.title")} {...backProps(from)} subtitle={<>{t("help.cash.hero")}{HelpLink(from)} · {go(true, "/cash", t("cash.title"))}</>} />
+
+        <Section id="rights" class="scroll-mt-48" title={t("help.cash.rights")} collapsible={false}>
+          <p class="mb-4">{t("help.cash.rights.intro")}</p>
+          <ul class="space-y-3">
+            {levels.map((l) => {
+              const own = hasCash(user.permissions, l);
+              return (
+                <li class={`rounded-box border p-3 ${own ? "border-primary/50 bg-primary/5" : "border-base-300"}`}>
+                  <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <span class={`badge ${own ? "badge-primary" : "badge-ghost"}`}>{PERMISSION_LABELS[`cash:${l}` as Permission]}</span>
+                    {own && <span class="text-xs opacity-70">{t("help.cash.right.own")}</span>}
+                  </div>
+                  <p>{t(key(l))}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+
+        <Section id="flow" class="scroll-mt-48" title={t("help.cash.flow")} collapsible={false}>
+          <ol class="space-y-4">
+            {flow.map((n) => {
+              const [head, ...rest] = t(`help.cash.flow.${n}` as Parameters<typeof t>[0]).split(": ");
+              return (
+                <li class="flex items-start gap-3">
+                  <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-content text-sm font-bold" aria-hidden="true">{n}</span>
+                  <div><div class="font-semibold">{head}</div><p class="opacity-80">{rest.join(": ")}</p>{flowGo[n]}</div>
+                </li>
+              );
+            })}
+          </ol>
+        </Section>
+
+        <Section id="entries" class="scroll-mt-48" title={t("help.cash.entries")} collapsible={false}>
+          <div role="alert" class="alert alert-info mb-4"><Icon name="icon-[tabler--info-circle]" class="h-5 w-5" /><span>{t("help.cash.entries.storno")}</span></div>
+          <ul class="list-disc pl-6 space-y-2">{entries.filter((n) => n !== "storno").map((n) => <li>{entryText(n)}</li>)}</ul>
+        </Section>
+
+        <Section id="report" class="scroll-mt-48" title={t("help.cash.report")} collapsible={false}>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="rounded-box border border-base-300 p-4 space-y-2">
+              <div class="flex flex-wrap items-center gap-2"><Icon name="icon-[tabler--report]" class="h-5 w-5 text-primary" /><span class="font-semibold">{t("help.cash.report.summary.title")}</span><span class={`badge h-auto whitespace-normal py-0.5 text-left ${hasCash(user.permissions, "report") ? "badge-primary" : "badge-ghost"}`}>{PERMISSION_LABELS["cash:report"]}</span></div>
+              <p>{t("help.cash.report.summary")}</p>
+              {go(true, "/cash?view=report", t("cash.view.report"))}
+            </div>
+            <div class="rounded-box border border-base-300 p-4 space-y-2">
+              <div class="flex flex-wrap items-center gap-2"><Icon name="icon-[tabler--file-spreadsheet]" class="h-5 w-5 text-primary" /><span class="font-semibold">{t("help.cash.report.detail.title")}</span><span class={`badge h-auto whitespace-normal py-0.5 text-left ${read ? "badge-primary" : "badge-ghost"}`}>{PERMISSION_LABELS["cash:read"]}</span></div>
+              <p>{t("help.cash.report.detail")}</p>
+              <p>{t("help.cash.report.csv")}</p>
+              <div class="flex flex-wrap gap-1">{t("help.cash.report.csv.cols").split(",").map((c) => <span class="badge badge-outline">{c}</span>)}</div>
+            </div>
+          </div>
+          <div role="alert" class="alert alert-info mt-4"><Icon name="icon-[tabler--info-circle]" class="h-5 w-5" /><span>{t("help.cash.report.provisional")}</span></div>
+        </Section>
+
+        <Section id="settings" class="scroll-mt-48" title={t("help.cash.settings")} collapsible={false}>
+          <p class="mb-4 flex flex-wrap items-center gap-2">{t("help.cash.settings.need")}<span class={`badge h-auto whitespace-normal py-0.5 text-left ${manage ? "badge-primary" : "badge-ghost"}`}>{PERMISSION_LABELS["cash:manage"]}</span></p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="rounded-box border border-base-300 p-4 space-y-2">
+              <div class="flex items-center gap-2"><Icon name="icon-[tabler--calendar]" class="h-5 w-5 text-primary" /><span class="font-semibold">{t("help.cash.settings.mode.title")}</span></div>
+              <p class="opacity-80">{t("help.cash.settings.mode")}</p>
+              <ul class="space-y-1">{([1, 2, 3] as const).map((n) => <li class="flex gap-2"><Icon name="icon-[tabler--point]" class="h-5 w-5 shrink-0 text-primary" /><span class={n === 3 ? "font-mono" : ""}>{t(`help.cash.settings.mode.${n}` as Parameters<typeof t>[0])}</span></li>)}</ul>
+            </div>
+            <div class="rounded-box border border-base-300 p-4 space-y-2">
+              <div class="flex items-center gap-2"><Icon name="icon-[tabler--scale]" class="h-5 w-5 text-primary" /><span class="font-semibold">{t("help.cash.settings.basis.title")}</span></div>
+              <p class="opacity-80">{t("help.cash.settings.basis")}</p>
+              <dl class="space-y-1">{([1, 2] as const).map((n) => <div><dt class="font-medium">{t(`help.cash.settings.basis.${n}` as Parameters<typeof t>[0])}</dt><dd class="opacity-80">{t(`help.cash.settings.basis.${n}.text` as Parameters<typeof t>[0])}</dd></div>)}</dl>
+            </div>
+          </div>
+          <div role="alert" class="alert alert-warning mt-4"><Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5" /><span>{t("help.cash.settings.apply")}</span></div>
+        </Section>
+
+        <Section id="tips" class="scroll-mt-48" title={t("help.cash.tips")} collapsible={false}>
+          <TipCards tips={visibleTips(user.permissions, ["cash"])} />
+        </Section>
+
+        <Section id="trouble" class="scroll-mt-48" title={t("help.cash.trouble")} collapsible={false}>
+          <div class="space-y-2">
+            {cases.map((n) => (
+              <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
+                <summary class="collapse-title font-semibold">{t(caseKey(n, "title"))}</summary>
+                <div class="collapse-content space-y-2">
+                  <p><span class="font-semibold">{t("help.members.cause")}:</span> {t(caseKey(n, "cause"))}</p>
+                  <p><span class="font-semibold">{t("help.members.fix")}:</span> {t(caseKey(n, "fix"))} {caseGo[n]}</p>
+                </div>
+              </details>
+            ))}
+          </div>
+        </Section>
+
+        <OpenCaseOnHash />
+
+      </div>
+    </Layout>
+  );
+});
+
 helpRoutes.get("/members", requireAuth(), (c) => {
   const user = c.get("user");
   const l = LIMITS();
@@ -131,7 +276,7 @@ helpRoutes.get("/members", requireAuth(), (c) => {
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("help.members.title")} {...backProps(helpFrom(c.req.query("from")))} subtitle={<>{t("help.members.hero")}{HelpLink(helpFrom(c.req.query("from")))}</>} />
 
-        <Section id="status" title={t("help.members.steps")} collapsible={false}>
+        <Section id="status" class="scroll-mt-48" title={t("help.members.steps")} collapsible={false}>
           <p class="mb-4 opacity-70">{t("help.members.stepsHint")}</p>
           <ol class="space-y-3">
             {steps.map((s, i) => (
@@ -143,7 +288,7 @@ helpRoutes.get("/members", requireAuth(), (c) => {
           </ol>
         </Section>
 
-        <Section id="matrix" title={t("help.members.relation")} collapsible={false}>
+        <Section id="matrix" class="scroll-mt-48" title={t("help.members.relation")} collapsible={false}>
           <ul class="flex flex-wrap items-center gap-2 mb-4" aria-label={t("help.members.timeline")}>
             {timeline.map((s, i) => <li class="flex items-center gap-2">{i > 0 && <Icon name="icon-[tabler--arrow-right]" class="h-4 w-4 opacity-60" />}<StatusBadge status={s} /></li>)}
           </ul>
@@ -166,7 +311,7 @@ helpRoutes.get("/members", requireAuth(), (c) => {
           <div role="alert" class="alert alert-warning mt-4"><Icon name="icon-[tabler--alert-triangle]" class="h-5 w-5" /><span>{t("help.members.endRole")}</span></div>
         </Section>
 
-        <Section id="trouble" title={t("help.members.trouble")} collapsible={false}>
+        <Section id="trouble" class="scroll-mt-48" title={t("help.members.trouble")} collapsible={false}>
           <div class="space-y-2">
             {cases.map((n) => (
               <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
@@ -185,10 +330,9 @@ helpRoutes.get("/members", requireAuth(), (c) => {
           </div>
         </Section>
 
-        <script dangerouslySetInnerHTML={{ __html: `
-(function(){var o=function(){var e=location.hash&&document.querySelector('details'+location.hash.replace(/[^#\\w-]/g,''));if(e){e.open=true;e.scrollIntoView();}};o();addEventListener('hashchange',o);})();` }} />
+        <OpenCaseOnHash />
 
-        <Section id="tips" title={t("help.members.tips")} collapsible={false}>
+        <Section id="tips" class="scroll-mt-48" title={t("help.members.tips")} collapsible={false}>
           <TipCards tips={visibleTips(user.permissions, ["members"])} />
         </Section>
       </div>
@@ -210,7 +354,7 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("help.rights.title")} {...backProps(helpFrom(c.req.query("from")))} subtitle={<>{t("help.rights.hero")}{HelpLink(helpFrom(c.req.query("from")))}</>} />
 
-        <Section id="begriffe" title={t("help.rights.terms")} collapsible={false}>
+        <Section id="begriffe" class="scroll-mt-48" title={t("help.rights.terms")} collapsible={false}>
           <dl class="space-y-3">
             {(["right", "role", "function", "scope"] as const).map((k) => (
               <div><dt class="font-semibold">{t(`help.rights.term.${k}.title`)}</dt><dd>{t(`help.rights.term.${k}.text`)}</dd></div>
@@ -218,7 +362,7 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
           </dl>
         </Section>
 
-        <Section id="meine" title={t("help.rights.mine")} collapsible={false}>
+        <Section id="meine" class="scroll-mt-48" title={t("help.rights.mine")} collapsible={false}>
           <h3 class="font-semibold mb-2">{t("help.rights.myRoles")}</h3>
           {roles.length
             ? <div class="flex flex-wrap gap-2 mb-4">{roles.map((r) => <span class="badge badge-primary">{r.name}</span>)}</div>
@@ -244,7 +388,7 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
           )}
         </Section>
 
-        <Section id="fragen" title={t("help.rights.trouble")} collapsible={false}>
+        <Section id="fragen" class="scroll-mt-48" title={t("help.rights.trouble")} collapsible={false}>
           <div class="space-y-2">
             {cases.map((n) => (
               <details id={`case-${n}`} class="scroll-mt-48 collapse collapse-arrow border border-base-300 bg-base-100">
@@ -258,8 +402,7 @@ helpRoutes.get("/rights", requireAuth(), async (c) => {
           </div>
         </Section>
 
-        <script dangerouslySetInnerHTML={{ __html: `
-(function(){var o=function(){var e=location.hash&&document.querySelector('details'+location.hash.replace(/[^#\\w-]/g,''));if(e){e.open=true;e.scrollIntoView();}};o();addEventListener('hashchange',o);})();` }} />
+        <OpenCaseOnHash />
       </div>
     </Layout>
   );

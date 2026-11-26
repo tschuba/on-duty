@@ -13,6 +13,19 @@ const { helpRoutes, statusMatrix, rightsByArea } = await import("../routes/help.
 const { visibleTips } = await import("../lib/help-tips.js");
 const app = new Hono().route("/help", helpRoutes);
 
+describe("Hilfe Kasse", () => {
+  it("Seite und Karte nur mit Kassenrecht", async () => {
+    perms = new Set(["members:read"]);
+    expect(await (await app.request("/help")).text()).not.toContain("/help/cash");
+    perms = new Set(["cash:report"]);
+    expect(await (await app.request("/help")).text()).toContain("/help/cash");
+    const html = await (await app.request("/help/cash")).text();
+    for (const id of ["rights", "flow", "entries", "report", "settings", "trouble", "tips", "case-6"]) expect(html).toContain(`id="${id}"`);
+    expect(visibleTips(new Set(["cash:report"]), ["cash"]).map((x) => x.id)).toEqual(["cash-print"]);
+    perms = new Set(["members:read"]);
+  });
+});
+
 describe("Hilfe", () => {
   it("rendert Übersicht, Mitglieder und Tipps mit Ankern", async () => {
     expect((await app.request("/help")).status).toBe(200);
