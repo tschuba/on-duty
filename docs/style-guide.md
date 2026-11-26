@@ -143,7 +143,7 @@ Wenn eine Seite zwei bis drei gleichwertige Ansichten derselben Daten hat (z. B.
 - Fehlerfälle: Komponente `HelpCases` (`<details id="case-N">`, „Ursache“/„Lösung“ aus `help.common.*`, `OpenCaseOnHash` öffnet per Anker). Fehlerfall-Titel zitieren die echte Meldung; vorhandene i18n-Keys der Meldung wiederverwenden statt neu zu formulieren.
 - Schritte: nummerierte Liste, runder `bg-primary`-Zähler (`h-7 w-7`), Überschrift fett, Text `opacity-80`.
 - Hinweise: `alert-info` für Merksätze, `alert-warning` für Fallstricke, keine weiteren Alert-Arten.
-- Kacheln: Erklärkarten `rounded-box border border-base-300 p-4` im `sm:grid-cols-2`-Raster; Themen und Tipps `card card-border bg-base-100 border-base-300`.
+- Kacheln: Erklärkarten `rounded-box border border-base-300 p-4` im `sm:grid-cols-2`-Raster; Themen `card card-border bg-base-100 border-base-300`. Tipps („Wusstest du schon?“) heben sich bewusst ab: `card bg-base-200` ohne Rahmen, Badge „Tipp“ (`badge badge-sm badge-ghost`). Auf `/help` steht die Tipps-Karte als Banner unter der Überschrift „Entdecken“, getrennt von den Themenkarten („Funktionen erklärt“). Auf Fachhilfeseiten höchstens zwei Tipps (`TipCards max`) plus Link „Alle Tipps ansehen“ nach `/help/tips`; Abschnittstitel „Tipps zu …“, der Name „Wusstest du schon?“ gehört nur zu `/help/tips`.
 - Rechte-Badges: `badge-primary` = Nutzer hat das Recht, `badge-ghost` = nicht. Textlinks `link link-primary`.
 - Links im Fließtext: Linkwort im i18n-Text als `[Wort]` markieren, per `linkify(text, href | null)` auflösen; kein Suchen nach Phrasen im Text. Ohne Recht auf das Ziel `null` übergeben (Klartext), nie einen toten Link zeigen.
 - Tipps: `src/lib/help-tips.ts` je Bereich (`area`) mit Titel, Text, Beispiel, `href` und `perms`.

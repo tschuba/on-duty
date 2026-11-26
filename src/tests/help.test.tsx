@@ -3,6 +3,8 @@ import { Hono } from "hono";
 
 vi.mock("../db/index.js", () => ({ db: { select: () => ({ from: () => ({ where: () => ({ orderBy: async () => [{ name: "Bearbeiter" }] }) }) }) } }));
 vi.mock("../lib/registration.js", () => ({ countPendingUsers: async () => 0 }));
+vi.mock("../lib/inventory.js", () => ({ countOverdueInspections: async () => 0 }));
+vi.mock("../lib/lending.js", () => ({ countOpenLoanRequests: async () => 0, countOverdueLoans: async () => 0 }));
 let perms = new Set<string>(["members:read"]);
 let memberScope: any = { read: "all", write: "all", delete: "all" };
 vi.mock("../middleware/auth.js", () => ({
@@ -22,6 +24,22 @@ describe("Hilfe Kasse", () => {
     const html = await (await app.request("/help/cash")).text();
     for (const id of ["rights", "flow", "entries", "report", "settings", "trouble", "tips", "case-6"]) expect(html).toContain(`id="${id}"`);
     expect(visibleTips(new Set(["cash:report"]), ["cash"]).map((x) => x.id)).toEqual(["cash-print"]);
+    perms = new Set(["members:read"]);
+  });
+});
+
+describe("Hilfe Inventar und Verleih", () => {
+  it("Karten und Seiten mit Anker, nur mit Recht", async () => {
+    perms = new Set(["members:read"]);
+    expect(await (await app.request("/help")).text()).not.toContain("/help/inventory");
+    perms = new Set(["inventory:read", "lending:read"]);
+    const home = await (await app.request("/help")).text();
+    expect(home).toContain("/help/inventory");
+    expect(home).toContain("/help/lending");
+    for (const [p, ids] of [["inventory", ["rights", "flow", "status", "trouble", "case-6"]], ["lending", ["rights", "flow", "status", "public", "trouble", "case-6"]]] as const) {
+      const html = await (await app.request(`/help/${p}`)).text();
+      for (const id of ids) expect(html).toContain(`id="${id}"`);
+    }
     perms = new Set(["members:read"]);
   });
 });

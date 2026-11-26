@@ -65,7 +65,7 @@ export function linkify(text: string, href: string | null) {
   return text.split(/\[([^\]]+)\]/).map((part, i) => i % 2 === 0 ? part : href ? <a href={href} class="link link-primary">{part}</a> : part);
 }
 
-type CasesProps = { prefix: "members" | "rights" | "cash"; count: number; params?: Record<string, number>; body?: (n: number) => unknown; fixExtra?: (n: number) => unknown };
+type CasesProps = { prefix: "members" | "rights" | "cash" | "inventory" | "lending"; count: number; params?: Record<string, number>; body?: (n: number) => unknown; fixExtra?: (n: number) => unknown };
 // Aufklappbare Fehlerfälle (Ursache/Lösung); `body` ersetzt den Standardinhalt eines Falls.
 function HelpCases({ prefix, count, params, body, fixExtra }: CasesProps) {
   const k = (n: number, f: "title" | "cause" | "fix") => `help.${prefix}.case.${n}.${f}` as Parameters<typeof t>[0];
@@ -86,14 +86,16 @@ function HelpCases({ prefix, count, params, body, fixExtra }: CasesProps) {
   );
 }
 
-function TipCards({ tips }: { tips: Tip[] }) {
+function TipCards({ tips, max }: { tips: Tip[]; max?: number }) {
   if (!tips.length) return <p class="opacity-70">{t("help.tips.empty")}</p>;
+  const shown = max ? tips.slice(0, max) : tips;
   return (
+    <>
     <div class="grid gap-4 sm:grid-cols-2">
-      {tips.map((x) => (
-        <article class="card card-border bg-base-100 border-base-300">
+      {shown.map((x) => (
+        <article class="card bg-base-200">
           <div class="card-body gap-2">
-            <h3 class="card-title text-base"><Icon name={x.icon} class="h-5 w-5 text-primary" />{t(x.title)}</h3>
+            <h3 class="card-title text-base"><Icon name={x.icon} class="h-5 w-5 text-primary" />{t(x.title)}<span class="badge badge-sm badge-ghost ml-auto">{t("help.tips.badge")}</span></h3>
             <p>{t(x.text)}</p>
             <p class="text-sm opacity-70"><span class="font-semibold">{t("help.tips.example")}:</span> {t(x.example)}</p>
             <div class="card-actions justify-end"><a href={x.href} class="btn btn-sm btn-outline btn-primary">{t("help.tips.open")}<Icon name="icon-[tabler--arrow-right]" class="h-4 w-4" /></a></div>
@@ -101,6 +103,8 @@ function TipCards({ tips }: { tips: Tip[] }) {
         </article>
       ))}
     </div>
+    {max && <p class="mt-3 text-right"><a href="/help/tips" class="link link-primary">{t("help.tips.all")}</a></p>}
+    </>
   );
 }
 
@@ -110,13 +114,15 @@ helpRoutes.get("/", requireAuth(), (c) => {
   const topics: { href: string; icon: IconName; title: string; text: string }[] = [
     { href: "/help/members", icon: "icon-[tabler--users]" as const, title: t("help.members.title"), text: t("help.members.card") },
     { href: "/help/rights", icon: "icon-[tabler--shield-lock]" as const, title: t("help.rights.title"), text: t("help.rights.card") },
-    { href: "/help/tips", icon: "icon-[tabler--bulb]" as const, title: t("help.tips.title"), text: t("help.tips.card") },
   ];
+  if (user.permissions.has("inventory:read")) topics.push({ href: "/help/inventory", icon: "icon-[tabler--building-warehouse]" as const, title: t("help.inventory.title"), text: t("help.inventory.card") });
+  if (user.permissions.has("lending:read")) topics.push({ href: "/help/lending", icon: "icon-[tabler--arrows-exchange]" as const, title: t("help.lending.title"), text: t("help.lending.card") });
   if (hasCash(user.permissions, "report")) topics.push({ href: "/help/cash", icon: "icon-[tabler--cash-register]" as const, title: t("help.cash.title"), text: t("help.cash.card") });
   return c.html(
     <Layout title={t("help.title")} user={user}>
       <div class="max-w-4xl mx-auto">
         <PageHeader title={t("help.title")} subtitle={t("help.intro")} {...(from ? { backHref: from, backLabel: t("help.backToOrigin") } : {})} />
+        <h2 class="text-sm font-semibold uppercase tracking-wide opacity-70 mb-3">{t("help.group.explained")}</h2>
         <div class="grid gap-4 sm:grid-cols-2">
           {topics.map((x) => (
             <a href={withFrom(x.href, from)} class="card card-border bg-base-100 border-base-300 hover:border-primary focus-visible:outline-2">
@@ -127,6 +133,13 @@ helpRoutes.get("/", requireAuth(), (c) => {
             </a>
           ))}
         </div>
+        <h2 class="text-sm font-semibold uppercase tracking-wide opacity-70 mt-8 mb-3">{t("help.group.discover")}</h2>
+        <a href={withFrom("/help/tips", from)} class="card bg-base-200 hover:bg-base-300 focus-visible:outline-2">
+          <div class="card-body gap-1">
+            <h3 class="card-title"><Icon name="icon-[tabler--bulb]" class="h-6 w-6 text-primary" />{t("help.tips.title")}</h3>
+            <p>{t("help.tips.card")}</p>
+          </div>
+        </a>
       </div>
     </Layout>
   );
@@ -255,7 +268,7 @@ helpRoutes.get("/cash", requireAuth(cashPerms("report")), (c) => {
         </Section>
 
         <Section id="tips" class="scroll-mt-48" title={t("help.cash.tips")} collapsible={false}>
-          <TipCards tips={visibleTips(user.permissions, ["cash"])} />
+          <TipCards tips={visibleTips(user.permissions, ["cash"])} max={2} />
         </Section>
 
         <Section id="trouble" class="scroll-mt-48" title={t("help.cash.trouble")} collapsible={false}>
@@ -264,6 +277,147 @@ helpRoutes.get("/cash", requireAuth(cashPerms("report")), (c) => {
 
         <OpenCaseOnHash />
 
+      </div>
+    </Layout>
+  );
+});
+
+type Key = Parameters<typeof t>[0];
+const goLink = (ok: boolean, href: string, label: string) => ok ? <a href={href} class="link link-primary inline-flex items-center gap-1 text-sm">{label}<Icon name="icon-[tabler--arrow-right]" class="h-4 w-4" /></a> : null;
+
+// Rechte-Liste: eigene Rechte hervorgehoben.
+function RightsList({ items }: { items: { perm: Permission; own: boolean; text: string }[] }) {
+  return (
+    <ul class="space-y-3">
+      {items.map((r) => (
+        <li class={`rounded-box border p-3 ${r.own ? "border-primary/50 bg-primary/5" : "border-base-300"}`}>
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <span class={`badge h-auto whitespace-normal py-0.5 text-left ${r.own ? "badge-primary" : "badge-ghost"}`}>{PERMISSION_LABELS[r.perm]}</span>
+            {r.own && <span class="text-xs opacity-70">{t("help.cash.right.own")}</span>}
+          </div>
+          <p>{r.text}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Nummerierter Ablauf; Text „Kopf: Erklärung“, optional Sprunglink je Schritt.
+function FlowSteps({ prefix, count, go }: { prefix: "inventory" | "lending"; count: number; go?: Record<number, unknown> }) {
+  return (
+    <ol class="space-y-4">
+      {Array.from({ length: count }, (_, i) => i + 1).map((n) => {
+        const [head, ...rest] = t(`help.${prefix}.flow.${n}` as Key).split(": ");
+        return (
+          <li class="flex items-start gap-3">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-content text-sm font-bold" aria-hidden="true">{n}</span>
+            <div><div class="font-semibold">{head}</div><p class="opacity-80">{rest.join(": ")}</p>{go?.[n] as never}</div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// Status-Legende: Badge links, Erklärung rechts.
+function BadgeLegend({ items }: { items: { badge: string; label: string; text: string }[] }) {
+  return (
+    <dl class="grid gap-x-4 gap-y-3 sm:grid-cols-[max-content_1fr] items-center">
+      {items.map((x) => <><dt><span class={`badge ${x.badge}`}>{x.label}</span></dt><dd>{x.text}</dd></>)}
+    </dl>
+  );
+}
+
+helpRoutes.get("/inventory", requireAuth("inventory:read"), (c) => {
+  const user = c.get("user");
+  const from = helpFrom(c.req.query("from"));
+  const has = (p: Permission) => user.permissions.has(p);
+  const rights: [Permission, string][] = [
+    ["inventory:read", "read"], ["inventory:manage", "manage"], ["inventory:configure", "configure"], ["inventory:inspect", "inspect"], ["inventory:inspection:delete", "inspectionDelete"],
+  ];
+  const due = [["badge-success", "ok"], ["badge-warning", "soon"], ["badge-error", "overdue"], ["badge-ghost", "none"]] as const;
+  return c.html(
+    <Layout title={t("help.inventory.title")} user={user}>
+      <div class="max-w-4xl mx-auto">
+        <PageHeader title={t("help.inventory.title")} {...backProps(from)} subtitle={<>{t("help.inventory.hero")}{HelpLink(from)} · {goLink(true, "/inventory", t("inventory.title"))}</>} />
+
+        <Section id="rights" class="scroll-mt-48" title={t("help.inventory.rights")} collapsible={false}>
+          <p class="mb-4">{t("help.inventory.rights.intro")}</p>
+          <RightsList items={rights.map(([perm, k]) => ({ perm, own: has(perm), text: t(`help.inventory.right.${k}` as Key) }))} />
+        </Section>
+
+        <Section id="flow" class="scroll-mt-48" title={t("help.inventory.flow")} collapsible={false}>
+          <FlowSteps prefix="inventory" count={4} go={{
+            1: goLink(has("inventory:manage"), "/inventory/new", t("inventory.newItem")),
+            2: goLink(has("inventory:configure"), "/inventory/inspections?view=templates", t("inventory.tabs.inspectionTemplates")),
+            3: goLink(true, "/inventory/inspections", t("inventory.tabs.inspections")),
+          }} />
+        </Section>
+
+        <Section id="status" class="scroll-mt-48" title={t("help.inventory.status")} collapsible={false}>
+          <p class="mb-4 opacity-70">{t("help.inventory.status.intro")}</p>
+          <BadgeLegend items={[
+            { badge: "badge-success", label: t("inventory.status.active"), text: t("help.inventory.status.active") },
+            { badge: "badge-info", label: t("inventory.status.lendable"), text: t("help.inventory.status.lendable") },
+            { badge: "badge-neutral", label: t("inventory.status.retired"), text: t("help.inventory.status.retired") },
+          ]} />
+          <h3 class="font-semibold mt-6 mb-3">{t("inventory.table.dueDate")}</h3>
+          <BadgeLegend items={due.map(([badge, k]) => ({ badge, label: t(`inventory.map.legend.${k}` as Key), text: t(`help.inventory.due.${k}` as Key) }))} />
+        </Section>
+
+        <Section id="trouble" class="scroll-mt-48" title={t("help.inventory.trouble")} collapsible={false}>
+          <HelpCases prefix="inventory" count={6} />
+        </Section>
+
+        <OpenCaseOnHash />
+      </div>
+    </Layout>
+  );
+});
+
+helpRoutes.get("/lending", requireAuth("lending:read"), (c) => {
+  const user = c.get("user");
+  const from = helpFrom(c.req.query("from"));
+  const manage = user.permissions.has("lending:manage");
+  const states = [
+    ["badge-warning", t("lending.overview.status.requested"), "requested"], ["badge-ghost", t("lending.overview.status.planned"), "planned"],
+    ["badge-info", t("lending.overview.status.active"), "active"], ["badge-error", t("lending.overview.status.overdue"), "overdue"],
+    ["badge-success", t("lending.overview.status.returned"), "returned"], ["badge-ghost", t("lending.overview.status.rejected"), "rejected"],
+  ] as const;
+  const caseGo: Record<number, ReturnType<typeof goLink>> = { 1: goLink(true, "/inventory/lending", t("lending.title")), 6: goLink(true, "/inventory/lending", t("lending.title")) };
+  return c.html(
+    <Layout title={t("help.lending.title")} user={user}>
+      <div class="max-w-4xl mx-auto">
+        <PageHeader title={t("help.lending.title")} {...backProps(from)} subtitle={<>{t("help.lending.hero")}{HelpLink(from)} · {goLink(true, "/inventory/lending", t("lending.title"))}</>} />
+
+        <Section id="rights" class="scroll-mt-48" title={t("help.lending.rights")} collapsible={false}>
+          <p class="mb-4">{t("help.lending.rights.intro")}</p>
+          <RightsList items={([["lending:read", "read"], ["lending:manage", "manage"]] as const).map(([perm, k]) => ({ perm, own: user.permissions.has(perm), text: t(`help.lending.right.${k}` as Key) }))} />
+        </Section>
+
+        <Section id="flow" class="scroll-mt-48" title={t("help.lending.flow")} collapsible={false}>
+          <FlowSteps prefix="lending" count={4} go={{
+            2: goLink(manage, "/inventory/lending?status=requested", t("lending.overview.status.requested")),
+            3: goLink(manage, "/inventory/lending/loans/new", t("lending.newLoan")),
+          }} />
+        </Section>
+
+        <Section id="status" class="scroll-mt-48" title={t("help.lending.status")} collapsible={false}>
+          <BadgeLegend items={states.map(([badge, label, k]) => ({ badge, label, text: t(`help.lending.status.${k}` as Key) }))} />
+        </Section>
+
+        <Section id="public" class="scroll-mt-48" title={t("help.lending.public")} collapsible={false}>
+          <ul class="space-y-2">
+            {([1, 2, 3] as const).map((n) => <li class="flex gap-2"><Icon name="icon-[tabler--point]" class="h-5 w-5 shrink-0 text-primary" /><span>{t(`help.lending.public.${n}` as Key)}</span></li>)}
+          </ul>
+          <div role="alert" class="alert alert-info mt-4"><Icon name="icon-[tabler--info-circle]" class="h-5 w-5" /><span>{t("help.lending.public.where")}</span></div>
+        </Section>
+
+        <Section id="trouble" class="scroll-mt-48" title={t("help.lending.trouble")} collapsible={false}>
+          <HelpCases prefix="lending" count={6} fixExtra={(n) => caseGo[n]} />
+        </Section>
+
+        <OpenCaseOnHash />
       </div>
     </Layout>
   );
@@ -323,7 +477,7 @@ helpRoutes.get("/members", requireAuth(), (c) => {
         </Section>
 
         <Section id="tips" class="scroll-mt-48" title={t("help.members.tips")} collapsible={false}>
-          <TipCards tips={visibleTips(user.permissions, ["members"])} />
+          <TipCards tips={visibleTips(user.permissions, ["members"])} max={2} />
         </Section>
 
         <Section id="trouble" class="scroll-mt-48" title={t("help.members.trouble")} collapsible={false}>

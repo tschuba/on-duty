@@ -147,6 +147,10 @@ describe("GET /inventory/lending", () => {
     };
   }
 
+  it("links to the lending help from the title", async () => {
+    expect(await (await lendingRoutes.request("/")).text()).toContain('href="/help/lending?from=/inventory/lending#flow"');
+  });
+
   it("shows loans grouped by month, newest default window", async () => {
     lendingLoansFindManyResult = [makeLoan()];
     const res = await lendingRoutes.request("/?start=&end=");

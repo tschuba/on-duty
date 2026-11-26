@@ -4,6 +4,7 @@ import { EmailField, Field, PhoneField, PublicDescription, ViewField, ViewGrid }
 import { db } from "../db/index.js";
 import { inventoryItems, inventoryItemNumbers, inventoryItemTags, lendingItems, lendingLoans, loanRequests, members, persons } from "../db/schema/index.js";
 import { DeleteDialog } from "../components/delete-dialog.js";
+import { HelpLink } from "../components/help-link.js";
 import { Icon } from "../components/icon.js";
 import { EntityPicker, PickerOptions } from "../components/entity-picker.js";
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
@@ -272,7 +273,7 @@ lendingRoutes.get("/", requireAuth("lending:read"), async (c) => {
 
   return c.html(
     <Layout title={t("lending.title")} user={user}>
-      <PageHeader title={t("lending.title")} actions={<>
+      <PageHeader title={<span class="flex items-center">{t("lending.title")}<HelpLink href="/help/lending?from=/inventory/lending#flow" label={t("help.lending.aria.context")} /></span>} actions={<>
         <label class="flex items-center gap-2 cursor-pointer" title={t("lending.stats.toggle")}>
           <Icon name="icon-[tabler--chart-bar]" class="w-5 h-5" />
           <span class="@max-xl:hidden">{t("lending.stats.toggle")}</span>
