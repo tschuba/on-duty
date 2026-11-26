@@ -99,7 +99,11 @@ describe.skipIf(!url)("cash (real DB)", () => {
 
   it("open entries: edit, pay, cancel, no double booking per donation", async () => {
     const id = await c.createEntry({ direction: "expense", bookingDate: today, paid: false, items: [{ amount: 10, tagIds: [freeOut] }] });
-    expect((await c.openReceivablesAt(today)).count).toBe(1);
+    expect((await c.openReceivablesAt(today)).expense).toEqual({ count: 1, total: 10 });
+    const rec = await c.createEntry({ direction: "income", bookingDate: today, paid: false, items: [{ amount: 7, tagIds: [free] }] });
+    expect((await c.openReceivablesAt(today)).income).toEqual({ count: 1, total: 7 });
+    await c.cancelEntry(rec);
+    expect((await c.openReceivablesAt(today)).income.count).toBe(0);
     await c.updateOpenEntry(id, { direction: "expense", bookingDate: today, items: [{ amount: 12, tagIds: [freeOut] }] });
     await rejects(c.payEntry(id, `${year + 1}-12-31`), "future");
     await c.payEntry(id);

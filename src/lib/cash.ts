@@ -340,16 +340,19 @@ export async function balanceAt(asOf: string = todayStr(), exec: Exec = db): Pro
   return money(r.v);
 }
 
-export type OpenReceivables = { count: number; total: number };
+export type OpenSide = { count: number; total: number };
+export type OpenReceivables = { income: OpenSide; expense: OpenSide };
 
-// Offene Forderungen zum Stichtag; abgeschlossene Jahre liefern ihre eingefrorenen Werte (siehe closeYear).
+// Offene Posten zum Stichtag, getrennt nach Forderung (income) und Zahlung (expense); abgeschlossene Jahre liefern ihre eingefrorenen Werte (siehe closeYear).
 export async function openReceivablesAt(asOf: string, exec: Exec = db): Promise<OpenReceivables> {
-  const [r] = await exec.select({ n: sql<number>`COUNT(*)::int`, v: sql<string>`COALESCE(SUM(${cashEntries.total}), 0)` }).from(cashEntries)
+  const rows = await exec.select({ dir: cashEntries.direction, n: sql<number>`COUNT(*)::int`, v: sql<string>`COALESCE(SUM(${cashEntries.total}), 0)` }).from(cashEntries)
     .where(sql`${cashEntries.reversesEntryId} IS NULL
       AND COALESCE(${cashEntries.originalBookingDate}, ${cashEntries.bookingDate}) <= ${asOf}
       AND (${cashEntries.paidDate} IS NULL OR ${cashEntries.paidDate} > ${asOf})
-      AND (${cashEntries.cancelledAt} IS NULL OR (${cashEntries.cancelledAt} AT TIME ZONE ${resolveTimezone()})::date > ${asOf})`);
-  return { count: r.n, total: money(r.v) };
+      AND (${cashEntries.cancelledAt} IS NULL OR (${cashEntries.cancelledAt} AT TIME ZONE ${resolveTimezone()})::date > ${asOf})`)
+    .groupBy(cashEntries.direction);
+  const side = (d: Direction): OpenSide => { const r = rows.find((x) => x.dir === d); return { count: r?.n ?? 0, total: money(r?.v ?? 0) }; };
+  return { income: side("income"), expense: side("expense") };
 }
 
 export type YearResult = { income: number; expense: number; result: number; opening: number; deposit: number };
@@ -396,10 +399,10 @@ export function closeYear(yearId: string, opts: { userId?: string | null; carryO
     }
     const endBalance = await balanceAt(y.endDate, x);
     const open = await openReceivablesAt(y.endDate, x);
-    const frozen = { endBalance: endBalance.toFixed(2), openCount: open.count, openTotal: open.total.toFixed(2) };
+    const frozen = { endBalance: endBalance.toFixed(2), openIncomeCount: open.income.count, openIncomeTotal: open.income.total.toFixed(2), openExpenseCount: open.expense.count, openExpenseTotal: open.expense.total.toFixed(2) };
     await x.update(cashFiscalYears).set({ ...frozen, closedAt: new Date() }).where(eq(cashFiscalYears.id, yearId));
     await x.insert(cashYearLog).values({ yearId, action: "close", by: opts.userId ?? null, carriedCount: carried, ...frozen });
-    return { endBalance, ...open, carried };
+    return { endBalance, ...open, carried, openCount: open.income.count + open.expense.count };
   });
 }
 
@@ -413,9 +416,10 @@ export function reopenYear(yearId: string, reason: string, userId?: string | nul
     if (next?.closedAt) throw new CashError("nextClosed", { label: next.label });
     await x.insert(cashYearLog).values({
       yearId, action: "reopen", by: userId ?? null, reason: reason.trim(),
-      endBalance: y.endBalance, openCount: y.openCount, openTotal: y.openTotal,
+      endBalance: y.endBalance, openIncomeCount: y.openIncomeCount, openIncomeTotal: y.openIncomeTotal,
+      openExpenseCount: y.openExpenseCount, openExpenseTotal: y.openExpenseTotal,
     });
-    await x.update(cashFiscalYears).set({ closedAt: null, endBalance: null, openCount: null, openTotal: null }).where(eq(cashFiscalYears.id, yearId));
+    await x.update(cashFiscalYears).set({ closedAt: null, endBalance: null, openIncomeCount: null, openIncomeTotal: null, openExpenseCount: null, openExpenseTotal: null }).where(eq(cashFiscalYears.id, yearId));
   });
 }
 
@@ -637,7 +641,9 @@ export async function yearReport(yearId: string, exec: Exec = db): Promise<YearR
   const closed = !!year.closedAt;
   const start = (await exec.select({ n: sql<number>`COUNT(*)::int` }).from(cashFiscalYears).where(sql`${cashFiscalYears.endDate} < ${year.startDate}`))[0].n ? await balanceAt(dayBefore, exec) : 0;
   const end = closed ? money(year.endBalance) : await balanceAt(year.endDate < todayStr() ? year.endDate : todayStr(), exec);
-  const open = closed ? { count: year.openCount ?? 0, total: money(year.openTotal) } : await openReceivablesAt(year.endDate < todayStr() ? year.endDate : todayStr(), exec);
+  const open = closed ? {
+    income: { count: year.openIncomeCount ?? 0, total: money(year.openIncomeTotal) }, expense: { count: year.openExpenseCount ?? 0, total: money(year.openExpenseTotal) },
+  } : await openReceivablesAt(year.endDate < todayStr() ? year.endDate : todayStr(), exec);
   return {
     year, closed, start, opening: money(opening), income: money(income), expense: money(expense), result: money(income - expense), deposits: money(deposits), end, open,
     corrections: hasCorr ? money(corr) : null,
