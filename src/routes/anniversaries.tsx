@@ -190,7 +190,7 @@ function AnniversariesExportModal() {
             url.searchParams.getAll('mod').forEach(function(m){p.append('mod',m)});
             if(document.getElementById('exp-ann-contact').checked)p.set('contact','1');
             if(document.getElementById('exp-ann-addr').checked)p.set('addr','1');
-            window.location='/anniversaries/export?'+p;
+            var fr=document.createElement('iframe');fr.hidden=true;fr.src='/anniversaries/export?'+p;document.body.appendChild(fr);setTimeout(function(){fr.remove()},60000);
             document.getElementById('ann-export-modal').close();
           });
         })();
