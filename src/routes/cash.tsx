@@ -22,6 +22,7 @@ import { requireAuth, type Variables } from "../middleware/auth.js";
 import { t } from "../i18n/index.js";
 import { setFlash } from "../lib/flash.js";
 import { formatDate } from "../lib/format.js";
+import { loadOrgConfig } from "../lib/org-config.js";
 import { trimmed } from "../lib/forms.js";
 import { safeReturnTo } from "../lib/return-to.js";
 import { buildListUrl, parsePagination, PAGE_SIZE_OPTIONS } from "../lib/list-query.js";
@@ -595,16 +596,25 @@ function TagsView({ tags, usage }: { tags: TagRow[]; usage: Awaited<ReturnType<t
 
 // ── Liste ───────────────────────────────────────────────────────────────────
 
-function ReportView({ rep, full, by, prevLabel }: { rep: YearReport; full: boolean; by?: string; prevLabel?: string }) {
+function ReportView({ rep, full, by, prevLabel, org }: { rep: YearReport; full: boolean; by?: string; prevLabel?: string; org: Record<string, string> }) {
   const y = rep.year;
-  const row = (label: string, v: number | string, bold = false) => <tr class={bold ? "font-bold" : ""}><td>{label}</td><td class="text-right whitespace-nowrap">{typeof v === "number" ? eur(v) : v}</td></tr>;
+  const row = (label: string, v: number | string, bold = false, cls = "") => <tr class={`${bold ? "font-bold" : ""} ${cls}`}><td>{label}</td><td class="text-right whitespace-nowrap">{typeof v === "number" ? eur(v) : v}</td></tr>;
+  const openDate = formatDate(y.endDate < todayStr() ? y.endDate : todayStr());
+  const openRow = (dir: "income" | "expense", o: { count: number; total: number }) => o.count > 0 && row(
+    t(`cash.report.open.${y.basis as "paid" | "booked"}.${dir}`, { date: openDate }), `${o.count} · ${eur(o.total)}`, false, "rpt-open");
+  const addr = [[org.orgStreet, org.orgHouseNumber].filter(Boolean).join(" "), [org.orgZip, org.orgCity].filter(Boolean).join(" ")].filter(Boolean).join(" · ");
+  const tax = [
+    org.taxExemptionDate && `${t("admin.orgConfig.field.taxExemptionDate")}: ${formatDate(org.taxExemptionDate)}`,
+    org.taxOffice && `${t("admin.orgConfig.field.taxOffice")}: ${org.taxOffice}`,
+  ].filter(Boolean).join(" · ");
   return (
-    <div class="print-page max-w-4xl">
+    <div class="print-page max-w-4xl tabular-nums">
+      <div class="print-only rpt-org"><strong>{org.orgName}</strong>{addr && <span>{addr}</span>}</div>
       <section class="mb-6">
         <h2 class="text-xl font-semibold mb-1" style="font-family: var(--font-heading)">{t("cash.view.report")} {y.label}{!rep.closed && ` (${t("cash.report.provisional")})`}</h2>
-        <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <p class="rpt-meta flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
           <span class="badge badge-ghost">{t("cash.report.period")}: {formatDate(y.startDate)} – {formatDate(y.endDate)}</span>
-          <span class="opacity-70">{t(`cash.report.basis.${y.basis as "paid" | "booked"}`)}</span>
+          <span class="opacity-70 no-print">{t(`cash.report.basis.${y.basis as "paid" | "booked"}`)}</span>
         </p>
         {rep.closed && y.closedAt && <p class="text-sm opacity-70 mt-1">{t("cash.report.closedInfo", { date: formatDate(cashDate(y.closedAt)), by: by ?? "–" })}</p>}
         <p class="print-only text-sm">{t("cash.report.printed")} {formatDate(todayStr())}</p>
@@ -615,23 +625,31 @@ function ReportView({ rep, full, by, prevLabel }: { rep: YearReport; full: boole
           {rep.opening !== 0 && row(t("cash.report.opening"), rep.opening)}
           {row(t("cash.report.income"), rep.income)}
           {row(t("cash.report.expense"), rep.expense === 0 ? 0 : -rep.expense)}
-          {row(t("cash.report.result"), rep.result, true)}
+          {row(t("cash.report.result"), rep.result, true, "rpt-sub border-t border-base-content/40")}
           {rep.deposits !== 0 && row(t("cash.report.deposits"), rep.deposits)}
           {rep.corrections !== null && row(`${t("cash.report.corrections")}${prevLabel ? ` (${prevLabel})` : ""}`, rep.corrections)}
-          {row(t("cash.report.end"), rep.end, true)}
-          {row(t("cash.report.open", { date: formatDate(y.endDate < todayStr() ? y.endDate : todayStr()) }), `${rep.open.count} · ${eur(rep.open.total)}`)}
+          {row(t("cash.report.end"), rep.end, true, "rpt-total border-t-2 border-base-content/60 text-lg")}
         </tbody>
       </table>
+      {(rep.open.income.count > 0 || rep.open.expense.count > 0) && (<>
+        <h3 class="font-semibold mb-1 rpt-h">{t(`cash.report.memo.${y.basis as "paid" | "booked"}`)}</h3>
+        <table class="table w-full mb-6"><tbody>
+          {openRow("income", rep.open.income)}
+          {openRow("expense", rep.open.expense)}
+        </tbody></table>
+      </>)}
+      <p class="print-only text-xs mb-6">{t(`cash.report.basis.${y.basis as "paid" | "booked"}`)}</p>
       {rep.lines.length > 0 && (<>
-        <h3 class="font-semibold mb-1">{t("cash.report.byTag")}</h3>
+        <h3 class="font-semibold mb-1 rpt-h">{t("cash.report.byTag")}</h3>
         <table class="table w-full mb-1">
           <thead><tr><th>{t("cash.tags.name")}</th><th class="text-right">{t("cash.report.income")}</th><th class="text-right">{t("cash.report.expense")}</th></tr></thead>
-          <tbody>{rep.lines.map((l) => <tr><td>{l.name}</td><td class="text-right whitespace-nowrap">{l.income ? eur(l.income) : ""}</td><td class="text-right whitespace-nowrap">{l.expense ? eur(l.expense) : ""}</td></tr>)}</tbody>
+          <tbody>{rep.lines.map((l) => <tr><td>{l.name}</td><td class="text-right whitespace-nowrap">{l.income ? eur(l.income) : "–"}</td><td class="text-right whitespace-nowrap">{l.expense ? eur(l.expense) : "–"}</td></tr>)}</tbody>
+          <tfoot><tr class="font-bold border-t border-base-content/40"><td>{t("cash.report.sum")}</td><td class="text-right whitespace-nowrap">{eur(rep.income)}</td><td class="text-right whitespace-nowrap">{eur(rep.expense)}</td></tr></tfoot>
         </table>
         <p class="text-xs opacity-60 mb-6">{t("cash.report.byTagHint")}</p>
       </>)}
       {full && rep.entries.length > 0 && (<>
-        <h3 class="font-semibold mb-1">{t("cash.report.entries")}</h3>
+        <h3 class="font-semibold mb-1 rpt-h">{t("cash.report.entries")}</h3>
         <table class="table w-full mb-6">
           <thead><tr><th>{t("cash.table.date")}</th><th>{t("cash.table.description")}</th><th>{t("cash.table.tags")}</th><th class="text-right">{t("cash.table.amount")}</th></tr></thead>
           <tbody>{rep.entries.map((e) => (
@@ -650,6 +668,7 @@ function ReportView({ rep, full, by, prevLabel }: { rep: YearReport; full: boole
           ))}</tbody>
         </table>
       </>)}
+      {tax && <p class="print-only text-xs rpt-tax">{tax}</p>}
       <div class="print-only print-sign"><div>{t("cash.report.signCashier")}</div><div>{t("cash.report.signAuditors")}</div></div>
     </div>
   );
@@ -721,6 +740,7 @@ cashRoutes.get("/", report, async (c) => {
     const yid = years.some((y) => y.id === q.year) ? q.year : cur!.id;
     const rep = await yearReport(yid);
     const full = canRead && q.detail === "1";
+    const org = await loadOrgConfig();
     const last = rep.closed ? (await yearLog(yid)).find((l) => l.action === "close") : undefined;
     const by = last?.by ? (await db.select({ name: users.name }).from(users).where(eq(users.id, last.by)))[0]?.name : undefined;
     const carry = hasCash(perms, "manage") && !rep.closed ? await carryPreview(yid) : { count: 0, total: 0 };
@@ -740,22 +760,22 @@ cashRoutes.get("/", report, async (c) => {
         <div class="no-print bg-base-200 rounded-box p-3 mb-4 mt-3">
           <form method="get" class="flex flex-wrap items-end gap-3">
             <input type="hidden" name="view" value="report" />
-            <Field label={t("cash.report.year")} class="w-48">
+            <Field label={t("cash.report.year")} class="w-full sm:w-48">
               <select name="year" class="select w-full" onchange="this.form.submit()">
                 {[...years].reverse().map((y) => <option value={y.id} selected={y.id === yid}>{y.label}{y.closedAt ? "" : ` (${t("cash.report.provisional")})`}</option>)}
               </select>
             </Field>
             {canRead && (
-              <div class="ml-auto join">
-                <a title={t("cash.report.summaryOnly")} class={`btn join-item pointer-coarse:min-h-11 ${full ? "" : "btn-active btn-primary"}`} aria-current={full ? undefined : "true"} href={`?view=report&year=${yid}`}><span class="icon-[tabler--chart-pie] size-4" /><span class="max-md:sr-only">{t("cash.report.summaryOnly")}</span></a>
-                <a title={t("cash.report.withEntries")} class={`btn join-item pointer-coarse:min-h-11 ${full ? "btn-active btn-primary" : ""}`} aria-current={full ? "true" : undefined} href={`?view=report&year=${yid}&detail=1`}><span class="icon-[tabler--list-details] size-4" /><span class="max-md:sr-only">{t("cash.report.withEntries")}</span></a>
-              </div>
+              <label class="flex h-10 w-full cursor-pointer items-center gap-2 pointer-coarse:h-11 sm:ml-auto sm:w-auto" title={t("cash.report.detailHint")}>
+                <input type="checkbox" name="detail" value="1" class="toggle toggle-primary" checked={full}
+                  hx-get={`?view=report&year=${yid}`} hx-target="#report-body" hx-select="#report-body" hx-swap="outerHTML" hx-push-url="true" />
+                <span>{t("cash.report.showEntries")}</span>
+              </label>
             )}
           </form>
-          {canRead && <p class="text-xs opacity-70 mt-2">{t("cash.report.detailHint")}</p>}
         </div>
         {!rep.closed && <div class="alert alert-info mb-4 no-print">{t("cash.report.bannerProvisional")}</div>}
-        <ReportView rep={rep} full={full} by={by} prevLabel={prev?.label} />
+        <div id="report-body"><ReportView rep={rep} full={full} by={by} prevLabel={prev?.label} org={org} /></div>
         {canManage && !rep.closed && (
           <dialog id="cash-close" class="modal"><div class="modal-box">
             <h3 class="font-bold text-lg">{t("cash.report.closeTitle")}</h3>
@@ -846,8 +866,8 @@ cashRoutes.get("/", report, async (c) => {
       <StatGrid id="cash-stats" cols={canManage ? 4 : 3}>
         <StatCard label={t("cash.stats.balance")} value={eur(balance)} />
         <StatCard label={t("cash.stats.result", { label: cur?.label ?? "" })} value={res ? eur(res.result) : "–"} />
-        <StatCard label={t("cash.stats.open")} value={openRec.count} tone="text-warning" href={buildListUrl("/cash", { status: "open" })} link="filter">
-          <div class="stat-desc text-sm">{eur(openRec.total)}</div>
+        <StatCard label={t("cash.stats.open")} value={openRec.income.count + openRec.expense.count} tone="text-warning" href={buildListUrl("/cash", { status: "open" })} link="filter">
+          <div class="stat-desc text-sm">{t("cash.stats.openSplit", { income: eur(openRec.income.total), expense: eur(openRec.expense.total) })}</div>
         </StatCard>
         {canManage && <StatCard label={t("cash.stats.unbooked")} value={unbooked} tone={unbooked ? "text-warning" : undefined} href="/donations" link="view" />}
       </StatGrid>

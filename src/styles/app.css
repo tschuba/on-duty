@@ -362,8 +362,23 @@ input[data-combo]::-webkit-calendar-picker-indicator { display: none !important;
   .print-page tr { break-inside: avoid; }
   .print-page .print-only.print-sign { margin-top: 3rem; display: flex; gap: 3rem; }
   .print-page .print-sign > div { flex: 1; border-top: 1px solid #000; padding-top: 0.25rem; font-size: 9pt; }
-  @page { margin: 15mm; @bottom-right { content: "Seite " counter(page) " / " counter(pages); font-size: 9pt; } }
+  .print-page .print-only.rpt-org { display: flex; justify-content: space-between; align-items: baseline; font-size: 9pt; color: #444; margin-bottom: 0.6rem; }
+  .print-page .rpt-org strong { font-size: 11pt; color: #000; }
+  .print-page .rpt-tax { color: #444; margin-top: 1.5rem; }
+  .print-page h2 { font-family: var(--font-heading); font-size: 20pt; border-bottom: 1.5px solid #000; padding-bottom: 0.3rem; margin-bottom: 0.5rem; }
+  .print-page .rpt-meta { font-size: 9pt; color: #444; }
+  .print-page .badge { border: 0; background: none; padding: 0; height: auto; font-size: inherit; }
+  .print-page .rpt-h { font-family: var(--font-heading); font-size: 13pt; margin-top: 1rem; }
+  .print-page table { font-variant-numeric: tabular-nums; }
+  .print-page td, .print-page th { padding-block: 0.3rem; }
+  .print-page tr.rpt-sub td { border-top: 1px solid #000; }
+  .print-page tr.rpt-total td { border-top: 3px double #000; font-size: 13pt; }
+  .print-page tr.rpt-open td { font-style: italic; color: #444; padding-top: 0.8rem; }
+  .print-page .print-only.print-sign { margin-top: 4rem; break-inside: avoid; }
 }
+
+/* @page muss auf oberster Ebene stehen, innerhalb von @media wird es ignoriert. */
+@page { margin: 20mm 18mm 22mm 25mm; @bottom-right { content: "Seite " counter(page) " / " counter(pages); font-size: 9pt; } }
 
 /* Kontrast im Dark Mode: base-300 ist dunkler als die Seite, daher Ränder aus base-content ableiten. */
 .input, .select, .textarea { border-color: color-mix(in oklab, var(--color-base-content) 30%, transparent); }

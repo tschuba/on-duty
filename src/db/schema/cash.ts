@@ -23,8 +23,10 @@ export const cashFiscalYears = pgTable("cash_fiscal_years", {
   basis: cashBasisEnum("basis").notNull().default("paid"),
   // Set on close, NULL again on reopen (the log keeps the values).
   endBalance: numeric("end_balance", { precision: 12, scale: 2 }),
-  openCount: integer("open_count"),
-  openTotal: numeric("open_total", { precision: 12, scale: 2 }),
+  openIncomeCount: integer("open_income_count"),
+  openIncomeTotal: numeric("open_income_total", { precision: 12, scale: 2 }),
+  openExpenseCount: integer("open_expense_count"),
+  openExpenseTotal: numeric("open_expense_total", { precision: 12, scale: 2 }),
   closedAt: timestamp("closed_at", { withTimezone: true }),
 }, (t) => [check("cash_fiscal_years_range_check", sql`${t.endDate} >= ${t.startDate}`)]);
 
@@ -37,8 +39,10 @@ export const cashYearLog = pgTable("cash_year_log", {
   reason: text("reason"),
   carriedCount: integer("carried_count"),
   endBalance: numeric("end_balance", { precision: 12, scale: 2 }),
-  openCount: integer("open_count"),
-  openTotal: numeric("open_total", { precision: 12, scale: 2 }),
+  openIncomeCount: integer("open_income_count"),
+  openIncomeTotal: numeric("open_income_total", { precision: 12, scale: 2 }),
+  openExpenseCount: integer("open_expense_count"),
+  openExpenseTotal: numeric("open_expense_total", { precision: 12, scale: 2 }),
 });
 
 // Veranstaltung der Kasse. Mit Termin (event_id) kommen Name und Zeitraum live vom Termin, sonst stehen sie hier.
