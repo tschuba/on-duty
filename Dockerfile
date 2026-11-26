@@ -11,11 +11,21 @@ FROM base AS deps
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod --ignore-scripts
 
-FROM base AS build
+# Build-Artefakte (dist, public) sind plattformunabhängig: auf der Build-Plattform laufen lassen, damit
+# bei Multi-Arch kein QEMU-Emulation nötig ist. Nur deps (Prod-node_modules) braucht die Zielplattform.
+FROM --platform=$BUILDPLATFORM node:24-alpine AS build
+WORKDIR /app
+RUN corepack enable
+ENV PNPM_STORE_DIR=/pnpm/store
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile --ignore-scripts
+# Kopier-Skripte brauchen nur node_modules; vor COPY . . bleibt der Layer bei Code-Änderungen gecacht.
+# (build-browser-sentry braucht src/ und läuft in `pnpm build`.)
+COPY scripts ./scripts
+RUN for s in fonts htmx calendar trix leaflet cap; do node scripts/copy-$s.mjs; done
 COPY . .
-RUN pnpm run postinstall && pnpm build
+RUN pnpm build
 
 FROM node:24-alpine AS runtime
 WORKDIR /app
