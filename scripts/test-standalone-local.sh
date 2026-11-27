@@ -56,7 +56,7 @@ ensure_standalone_env
 echo "Baue App-Image aus lokalem Dockerfile..."
 "${COMPOSE[@]}" build app
 
-echo "Starte kompletten Stack (ohne backup — für den lokalen Test irrelevant)..."
+echo "Starte kompletten Stack..."
 # On the very first Zitadel setup, zitadel-init creates project + OIDC app and writes
 # client id/secret to the bootstrap volume; app reads them from there.
 SERVICES=(db zitadel zitadel-login zitadel-init caddy app zitadel-init-hooks mailpit)

@@ -77,9 +77,6 @@ export const env = {
   // Feste Zone der Wehr für Termine (IANA-Name), siehe lib/datetime.ts
   APP_TIMEZONE: process.env.APP_TIMEZONE ?? "Europe/Berlin",
   EVENTS_PUBLIC_INDEXING: process.env.EVENTS_PUBLIC_INDEXING === "true",
-  // Pfad zur status.json des Backup-Containers; leer = Überwachung aus
-  BACKUP_STATUS_FILE: process.env.BACKUP_STATUS_FILE,
-  BACKUP_STATUS_MAX_AGE_HOURS: Number(process.env.BACKUP_STATUS_MAX_AGE_HOURS ?? "26"),
   // Cap-Captcha für öffentliche Formulare (opt-in); leer = Schutz aus
   CAP_API_ENDPOINT: process.env.CAP_API_ENDPOINT,
   CAP_SECRET: process.env.CAP_SECRET,
@@ -112,8 +109,6 @@ export const ENV_META: { key: keyof typeof env; value: string | number | undefin
   { key: "EVENTS_PUBLIC_INDEXING",    value: String(env.EVENTS_PUBLIC_INDEXING) },
   { key: "SESSION_LIFETIME",          value: env.SESSION_LIFETIME },
   { key: "ADMIN_PASSWORD_MIN_LENGTH", value: env.ADMIN_PASSWORD_MIN_LENGTH },
-  { key: "BACKUP_STATUS_FILE",       value: env.BACKUP_STATUS_FILE },
-  { key: "BACKUP_STATUS_MAX_AGE_HOURS", value: env.BACKUP_STATUS_MAX_AGE_HOURS },
   { key: "CAP_API_ENDPOINT",          value: env.CAP_API_ENDPOINT },
   { key: "CAP_SECRET",                value: env.CAP_SECRET ? "••••••••" : undefined },
   { key: "SMTP_HOST",                 value: env.SMTP_HOST },

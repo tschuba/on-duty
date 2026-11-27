@@ -44,11 +44,6 @@ Vor jedem Produktions-Deploy manuell durchlaufen.
 - [ ] Mitglieder-Export: `.xlsx` mit zwei Blättern (Mitglieder + Funktionszuweisungen)
 - [ ] Jubiläen-Export: Modal mit Kontakt-/Adress-Checkboxen; Datei enthält nur angezeigte Zeilen
 
-## Backup
-
-- [ ] Backup im Container auslösen (`docker compose exec backup /backup.sh`)
-- [ ] Status „Backup aktuell“ in `/admin/backup` sichtbar
-- [ ] `status.json` auf `failed` setzen oder Container stoppen/alt werden lassen → Warn-Banner in Admin-Bereich sichtbar
 
 ## Pager (Mitglieder, Spender)
 

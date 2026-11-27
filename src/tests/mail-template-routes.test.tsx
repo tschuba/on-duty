@@ -9,7 +9,6 @@ vi.mock("../middleware/auth.js", () => ({
   requireAuth: () => async (c: any, next: any) => { c.set("user", { id: "u1", permissions: perms }); await next(); },
 }));
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
-vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve({ state: "unconfigured", timestamp: null, lastSuccess: null }) }));
 const dbAccess = vi.fn();
 vi.mock("../db/index.js", () => ({ db: new Proxy({}, { get: (_t, k) => { dbAccess(String(k)); return () => { throw new Error("db used"); }; } }) }));
 

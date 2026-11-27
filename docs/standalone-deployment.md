@@ -97,22 +97,11 @@ Zitadels Issuer folgt `ZITADEL_EXTERNALDOMAIN` beim Start von selbst. `OIDC_CLIE
 ## Upgrade
 
 ```bash
-# Neue Versionen in .env.standalone eintragen (APP_VERSION; für Zitadel/Caddy/Postgres/Backup
+# Neue Versionen in .env.standalone eintragen (APP_VERSION; für Zitadel/Caddy/Postgres
 # die exakten Image-Tags direkt in docker-compose.standalone.yml anpassen — bewusst kein
 # Moving-Tag), dann:
 docker compose --file docker-compose.standalone.yml --env-file .env.standalone pull
 docker compose --file docker-compose.standalone.yml --env-file .env.standalone up -d
-```
-
-## Backup
-
-Der dedizierte `backup`-Service (`prodrigestivill/postgres-backup-local`) sichert **beide** Datenbanken (`onduty` und `zitadel`) täglich nach `./data/backups`, Retention 7 Tage / 4 Wochen / 6 Monate. Nach jedem Lauf schreibt ein Hook den Status in das Volume `backup-status`; on-duty zeigt ihn unter `/admin/backup` an und warnt per Banner (siehe [backup.md](backup.md)).
-
-Dateien landen als gzip-komprimierte SQL-Dumps unter `data/backups/daily|weekly|monthly/<db>-<datum>.sql.gz`. Wiederherstellen (Beispiel `onduty`-DB, über den laufenden `backup`-Container):
-
-```bash
-docker compose --file docker-compose.standalone.yml exec --tty --interactive backup \
-  /bin/sh -c "zcat /backups/daily/onduty-<datum>.sql.gz | psql --host=db --username=onduty --dbname=onduty -W"
 ```
 
 ## Lokal testen
@@ -140,8 +129,7 @@ Das Skript:
 - startet `db`, `zitadel`, `zitadel-login`, `caddy`. Caddy nutzt lokal `tls
   internal` (Caddyfile.standalone.local) statt echtem Let's Encrypt —
   Zertifikatswarnungen im Browser sind normal und können akzeptiert werden
-- startet den kompletten Stack — ohne den `backup`-Service, der für den
-  lokalen Test keine Rolle spielt. `zitadel-init` legt beim ersten Lauf
+- startet den kompletten Stack. `zitadel-init` legt beim ersten Lauf
   Projekt + OIDC-Application automatisch an (siehe oben), es ist kein
   manueller Zitadel-Schritt nötig
 - druckt am Ende Zugangsdaten (App-Admin, Zitadel-Console)

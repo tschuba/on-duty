@@ -15,7 +15,6 @@ export type NavCounts = {
   events: number;
   org: boolean;
   pendingUsers: number;
-  backupProblem: boolean;
 };
 
 type Tone = "badge-warning" | "badge-primary" | "badge-error";
@@ -73,13 +72,12 @@ function adminItems(user: AuthedUser, c: NavCounts): Leaf[] {
   const items: Leaf[] = [
       { icon: "icon-[tabler--user-shield]", label: t("admin.tabs.usersPermissions"), href: "/admin/users", show: has("system:admin"), count: c.pendingUsers },
       { icon: "icon-[tabler--adjustments]", label: t("admin.tabs.config"), href: "/admin/config", show: has("system:admin") },
-      { icon: "icon-[tabler--database-export]", label: t("admin.tabs.backup"), href: "/admin/backup", show: has("system:admin"), alert: c.backupProblem },
       { icon: "icon-[tabler--bug]", label: t("admin.tabs.errorTracker"), href: env.ERROR_TRACKER_URL ?? "", show: has("system:admin") && Boolean(env.ERROR_TRACKER_URL), external: true },
     ];
   return items.filter((i) => i.show);
 }
 
-const NO_COUNTS: NavCounts = { applications: 0, receipts: 0, cash: 0, inspections: 0, loans: 0, loanRequests: 0, events: 0, org: false, pendingUsers: 0, backupProblem: false };
+const NO_COUNTS: NavCounts = { applications: 0, receipts: 0, cash: 0, inspections: 0, loans: 0, loanRequests: 0, events: 0, org: false, pendingUsers: 0 };
 
 // Schnellaktionen "Anlegen" für die globale Suche, Reihenfolge wie im Drawer.
 export function createLinks(user: AuthedUser): { label: string; href: string; icon: IconName; key: string }[] {
@@ -133,7 +131,7 @@ export function menuLinks(user: AuthedUser): { label: string; href: string; pare
 
 export function adminAlert(user: AuthedUser, c: NavCounts): "error" | "warning" | null {
   if (!adminItems(user, c).length) return null;
-  return c.backupProblem ? "error" : c.pendingUsers > 0 ? "warning" : null;
+  return c.pendingUsers > 0 ? "warning" : null;
 }
 
 // Offene Punkte für das Aufgaben-Menü der Navbar (nur Einträge mit Zähler > 0; Rechte stecken schon in den Zählern).
@@ -146,7 +144,6 @@ export function attentionItems(c: NavCounts): { icon: IconName; label: string; h
     { icon: "icon-[tabler--clipboard-check]", label: t("inventory.tabs.inspections"), href: "/inventory/inspections", count: c.inspections, tone: "badge-primary" },
     { icon: "icon-[tabler--arrows-exchange]", label: t("inventory.tabs.lending"), href: "/inventory/lending", count: c.loans + c.loanRequests, tone: c.loans > 0 ? "badge-error" : "badge-primary" },
     { icon: "icon-[tabler--user-shield]", label: t("admin.tabs.usersPermissions"), href: "/admin/users", count: c.pendingUsers, tone: "badge-warning" },
-    { icon: "icon-[tabler--database-export]", label: t("admin.tabs.backup"), href: "/admin/backup", count: c.backupProblem ? 1 : 0, tone: "badge-error" },
   ];
   return all.filter((i) => i.count > 0);
 }

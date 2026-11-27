@@ -27,7 +27,6 @@ import { TitleSwitch, type TitleSwitchItem } from "../components/title-switch.js
 import { DetailActions, FormActions, HeaderAction, PageHeader } from "../components/page-header.js";
 import { env, ENV_META } from "../env.js";
 import { logger } from "../lib/logger.js";
-import { getBackupStatus, type BackupStatus } from "../lib/backup.js";
 import { t } from "../i18n/index.js";
 import { MEMBER_STATUSES, parseStatuses } from "../lib/member-scope.js";
 import { STATUS_BADGE_CLASS, STATUS_LABELS, StatusBadge } from "../components/status-badge.js";
@@ -35,7 +34,7 @@ import type { MemberStatus } from "../lib/status.js";
 import { PERMISSIONS, PERMISSION_AREAS, type Permission } from "../lib/roles.js";
 import { formatDate } from "../lib/format.js";
 import { setFlash } from "../lib/flash.js";
-import { LOCAL_ADMIN_EMAIL, HTTP_STATUS, SOURCE_REPO_URL } from "../lib/constants.js";
+import { LOCAL_ADMIN_EMAIL, HTTP_STATUS } from "../lib/constants.js";
 import { isPendingUser } from "../lib/registration.js";
 import { SETTINGS, checkRole, clearDefaultRoleIfDeleted, getSettings, parseSettingsForm, setSetting } from "../lib/settings.js";
 
@@ -53,34 +52,6 @@ export function permissionSearchText(perms: readonly Permission[]): string {
 // system:admin is reserved for the built-in protected `admin` role — never offered
 // as a checkbox when composing a custom role in the "Berechtigungen" UI.
 const ASSIGNABLE_PERMISSIONS = PERMISSIONS.filter((p) => p !== "system:admin");
-
-const fmtBackupDate = (d: Date) =>
-  d.toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-
-function agoHours(d: Date): string {
-  const h = Math.floor((Date.now() - d.getTime()) / 3600_000);
-  return h < 1 ? t("admin.backup.agoLess") : t("admin.backup.ago", { hours: h });
-}
-
-function BackupWarnBanner({ status, details = true }: { status: BackupStatus; details?: boolean }) {
-  const { state, timestamp, lastSuccess } = status;
-  if (state !== "failed" && state !== "stale") return null;
-  const text = state === "failed"
-    ? t("admin.backup.warnFailed", { time: timestamp ? fmtBackupDate(timestamp) : "—" })
-    : t("admin.backup.warnStale", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS, last: lastSuccess ? fmtBackupDate(lastSuccess) : "—" });
-  return (
-    <div class="alert alert-error mb-4">
-      <span>
-        {text}{" "}
-        {details && <a href="/admin/backup" class="link">{t("admin.backup.warnDetails")}</a>}
-      </span>
-    </div>
-  );
-}
-
-export async function backupWarnProps() {
-  return { status: await getBackupStatus() };
-}
 
 export function ModalScaffold() {
   return (
@@ -115,13 +86,12 @@ adminRoutes.get("/", guard, (c) => c.redirect("/admin/users"));
 // ── /admin/users ──────────────────────────────────────────────────────────────
 adminRoutes.get("/users", guard, async (c) => {
   const user = c.get("user");
-  const [allUsers, roleAssignments, warn] = await Promise.all([
+  const [allUsers, roleAssignments] = await Promise.all([
     db.select().from(users).orderBy(asc(users.name)),
     db
       .select({ userId: userAppRoles.userId, roleName: appRoles.name })
       .from(userAppRoles)
       .innerJoin(appRoles, eq(appRoles.id, userAppRoles.roleId)),
-    backupWarnProps(),
   ]);
   const rolesByUser = new Map<string, string[]>();
   for (const r of roleAssignments) {
@@ -134,7 +104,6 @@ adminRoutes.get("/users", guard, async (c) => {
 
   return c.html(
     <Layout title={t("admin.users.title")} user={user}>
-      <BackupWarnBanner {...warn} />
       <PageHeader title={<TitleSwitch items={adminViews(true)} />} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.users.newUser")} href="/admin/users/new" class="btn-primary" />} />
 
       {pendingCount > 0 && (
@@ -671,11 +640,10 @@ adminRoutes.post("/users/:id/delete", guard, async (c) => {
 adminRoutes.get("/permissions", guard, async (c) => {
   const user = c.get("user");
 
-  const [roles, permRows, assignmentCounts, warn, scopeRows] = await Promise.all([
+  const [roles, permRows, assignmentCounts, scopeRows] = await Promise.all([
     db.select().from(appRoles).orderBy(asc(appRoles.name)),
     db.select({ roleId: appRolePermissions.roleId, permission: appRolePermissions.permission }).from(appRolePermissions),
     db.select({ roleId: userAppRoles.roleId, cnt: count() }).from(userAppRoles).groupBy(userAppRoles.roleId),
-    backupWarnProps(),
     db.select().from(appRoleMemberScopes),
   ]);
   const scopeByRole = new Map(scopeRows.map((r) => [r.roleId, r.statuses as MemberStatus[]]));
@@ -686,7 +654,6 @@ adminRoutes.get("/permissions", guard, async (c) => {
 
   return c.html(
     <Layout title={t("admin.permissions.title")} user={user}>
-      <BackupWarnBanner {...warn} />
 
       <div class="max-w-4xl mx-auto">
       <PageHeader title={<><TitleSwitch items={adminViews(false)} /><a href="/help/rights" class="btn btn-ghost btn-circle btn-sm ml-2 align-middle opacity-60 hover:opacity-100 @2xl:@max-[890px]:ml-4 @2xl:@max-[890px]:border @2xl:@max-[890px]:border-info/50 @2xl:@max-[890px]:text-info @2xl:@max-[890px]:opacity-100" aria-label={t("help.rights.aria.context")} title={t("help.rights.aria.context")}><Icon name="icon-[tabler--help]" class="h-5 w-5" /></a></>} actions={<HeaderAction variant="primary" icon="icon-[tabler--plus]" label={t("admin.permissions.newRole")} href="/admin/permissions/new" class="btn-primary" />} />
@@ -1070,14 +1037,11 @@ const CONFIG_DESCRIPTIONS: Record<string, string> = {
   EVENTS_PUBLIC_INDEXING: t("admin.config.desc.EVENTS_PUBLIC_INDEXING"),
   SESSION_LIFETIME: t("admin.config.desc.SESSION_LIFETIME"),
   ADMIN_PASSWORD_MIN_LENGTH: t("admin.config.desc.ADMIN_PASSWORD_MIN_LENGTH"),
-  BACKUP_STATUS_FILE: t("admin.config.desc.BACKUP_STATUS_FILE"),
-  BACKUP_STATUS_MAX_AGE_HOURS: t("admin.config.desc.BACKUP_STATUS_MAX_AGE_HOURS"),
 };
 
 adminRoutes.get("/config", guard, async (c) => {
   const user = c.get("user");
-  const [warn, settings, roles] = await Promise.all([
-    backupWarnProps(),
+  const [settings, roles] = await Promise.all([
     getSettings(),
     db.select({ id: appRoles.id, name: appRoles.name }).from(appRoles).orderBy(asc(appRoles.name)),
   ]);
@@ -1087,7 +1051,6 @@ adminRoutes.get("/config", guard, async (c) => {
   ];
   return c.html(
     <Layout title={t("admin.config.title")} user={user}>
-      <BackupWarnBanner {...warn} />
       <div class="max-w-4xl mx-auto">
       <PageHeader title={t("admin.config.title")} actions={<HeaderAction variant="primary" icon="icon-[tabler--check]" label={t("admin.config.save")} form="config-form" class="btn-primary" attrs={{ id: "config-save", disabled: "" }} />} />
       <form method="post" action="/admin/config" id="config-form">
@@ -1182,60 +1145,4 @@ adminRoutes.post("/config", guard, async (c) => {
   for (const s of SETTINGS) await setSetting(s.key, result.values[s.key]);
   setFlash(c, t("admin.config.flash.saved"), "success");
   return c.redirect("/admin/config");
-});
-
-const BACKUP_STATE_STYLE = {
-  ok: { icon: "icon-[tabler--check]" as const, color: "text-success", stat: "bg-success/10" },
-  failed: { icon: "icon-[tabler--alert-triangle]" as const, color: "text-error", stat: "bg-error/10" },
-  stale: { icon: "icon-[tabler--clock]" as const, color: "text-error", stat: "bg-error/10" },
-  unknown: { icon: "icon-[tabler--settings]" as const, color: "text-base-content/50", stat: "bg-base-200" },
-  unconfigured: { icon: "icon-[tabler--settings]" as const, color: "text-base-content/50", stat: "bg-base-200" },
-};
-
-// ── /admin/backup ──────────────────────────────────────────────────────────────
-adminRoutes.get("/backup", guard, async (c) => {
-  const user = c.get("user");
-  const status = await getBackupStatus();
-  const { state, timestamp, lastSuccess } = status;
-  const style = BACKUP_STATE_STYLE[state];
-  const docs = <a href={`${SOURCE_REPO_URL}/blob/master/docs/backup.md`} class="link" target="_blank" rel="noopener">{t("admin.backup.docsLink")}</a>;
-
-  const title = t(`admin.backup.title.${state}`);
-  const agoEl = state === "ok" && lastSuccess && (
-    <span class="underline decoration-dotted cursor-help" title={fmtBackupDate(lastSuccess)}>{agoHours(lastSuccess)}</span>
-  );
-  const desc =
-    state === "ok" ? t("admin.backup.desc.ok", { ago: "{ago}" })
-    : state === "failed" ? t("admin.backup.desc.failed", { time: timestamp ? fmtBackupDate(timestamp) : "—" })
-    : state === "stale" ? t("admin.backup.desc.stale", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS, last: lastSuccess ? fmtBackupDate(lastSuccess) : "—" })
-    : state === "unknown" ? t("admin.backup.desc.unknown")
-    : t("admin.backup.desc.unconfigured");
-  const [descPre, descPost] = desc.split("{ago}");
-
-  return c.html(
-    <Layout title="Backup" user={user}>
-      <PageHeader title="Backup" />
-      <BackupWarnBanner status={status} details={false} />
-      <div class="max-w-2xl">
-        <div class={`stats stats-vertical sm:stats-horizontal w-full ${style.stat} rounded-box mb-4`}><div class="stat p-4">
-          <div class="stat-figure"><Icon name={style.icon} class={`h-8 w-8 ${style.color}`} /></div>
-          <div class={`stat-title ${style.color} font-medium`}>{title}</div>
-          <div class="stat-desc text-base-content text-sm mt-1 whitespace-normal">
-            {state === "ok" ? <>{descPre}{agoEl}{descPost}</> : desc} {(state === "unknown" || state === "unconfigured") && docs}
-          </div>
-        </div></div>
-        {(state === "failed" || state === "stale") && <p class="text-sm mb-4">{t("admin.backup.hintContact")}</p>}
-        <details class="text-sm text-base-content/60">
-          <summary class="cursor-pointer">{t("admin.backup.opsTitle")}</summary>
-          <ul class="mt-2 space-y-1">
-            {state === "ok" && lastSuccess && <li>{t("admin.backup.opsTimestamp")} {fmtBackupDate(lastSuccess)}</li>}
-            <li>{t("admin.backup.opsFile")} <code class="font-mono">{env.BACKUP_STATUS_FILE ?? "—"}</code></li>
-            <li>{t("admin.backup.opsMaxAge", { hours: env.BACKUP_STATUS_MAX_AGE_HOURS })}</li>
-            {state === "failed" && <li>{t("admin.backup.opsLogs")} <code class="font-mono">docker compose logs backup</code></li>}
-            <li>{docs}</li>
-          </ul>
-        </details>
-      </div>
-    </Layout>,
-  );
 });
