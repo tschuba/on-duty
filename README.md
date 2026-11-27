@@ -116,6 +116,7 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `YOUTH_AGE_LIMIT` | — | `18` | Altersgrenze Jugendfeuerwehr (Jahre) |
 | `ANNIVERSARY_CUTOFF` | — | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
 | `TILE_CACHE_DIR` | — | `./tile-cache` | Cache für Kartenkacheln (höchstens 500 MB) |
+| `UPLOAD_PATH` | — | `./uploads` | Ablage für hochgeladene Dateien (Zuwendungsbestätigungen); nicht im DB-Backup enthalten |
 | `TILE_UPSTREAM_HOST` | — | `tile.openstreetmap.org` | Kachelserver der Inventarkarte |
 | `SMTP_HOST` | — | — | SMTP-Server für E-Mail-Benachrichtigungen |
 | `SMTP_PORT` | — | `587` | SMTP-Port |

@@ -33,6 +33,7 @@ services:
       # Link zum Fehler-Tracker-Dashboard, erscheint unter Admin → Konfiguration. Leer = kein Link.
       ERROR_TRACKER_URL: ${ERROR_TRACKER_URL:-}
       TILE_CACHE_DIR: /tile-cache
+      UPLOAD_PATH: /uploads
       TILE_UPSTREAM_HOST: ${TILE_UPSTREAM_HOST:-tile.openstreetmap.org}
     ports:
       - "3000:3000"
@@ -41,6 +42,7 @@ services:
         condition: service_healthy
     volumes:
       - tile-cache:/tile-cache
+      - uploads:/uploads
 
   db:
     image: postgres:17-alpine
@@ -61,3 +63,4 @@ services:
 volumes:
   pgdata:
   tile-cache:
+  uploads:
