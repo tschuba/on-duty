@@ -130,14 +130,12 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
-let backupStatus: any = { state: "unconfigured", timestamp: null, lastSuccess: null };
 
 // Layout badge count is a separate DB query; keep it out of the per-route select-call assertions.
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
 
-vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve(backupStatus) }));
 
-const { adminRoutes, backupWarnProps } = await import("../routes/admin.js");
+const { adminRoutes } = await import("../routes/admin.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -156,7 +154,6 @@ beforeEach(() => {
   orgConfigFixture = [];
   personsFixture = [];
   currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
-  backupStatus = { state: "unconfigured", timestamp: null, lastSuccess: null };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -194,12 +191,6 @@ function makeAppRole(overrides: Record<string, unknown> = {}) {
 function makeYear(overrides: Record<string, unknown> = {}) {
   return { kind: "service", year: 10, title: "Zehnjähriges", ...overrides };
 }
-
-describe("backupWarnProps", () => {
-  it("returns the current backup status", async () => {
-    expect(await backupWarnProps()).toEqual({ status: backupStatus });
-  });
-});
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
@@ -841,56 +832,6 @@ describe("GET /config", () => {
     expect(html).toContain('form="config-form"');
   });
 
-  it("shows no backup warning when healthy", async () => {
-    backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
-    const html = await (await adminRoutes.request("/config")).text();
-    expect(html).not.toContain("Sicherung der Datenbank");
-  });
-
-  it("shows the failed backup warning", async () => {
-    backupStatus = { state: "failed", timestamp: new Date("2024-01-01T01:00:00Z"), lastSuccess: null };
-    const html = await (await adminRoutes.request("/config")).text();
-    expect(html).toContain("Sicherung der Datenbank ist fehlgeschlagen");
-  });
-});
-
-describe("GET /backup", () => {
-  const ts = new Date("2024-01-01T01:00:00Z");
-
-  it("shows the not-configured card without banner", async () => {
-    const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("Backup-Überwachung nicht eingerichtet");
-    expect(html).not.toContain(`alert alert-error`);
-  });
-
-  it("shows the unknown card without banner", async () => {
-    backupStatus = { state: "unknown", timestamp: null, lastSuccess: null };
-    const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("Noch kein Backup-Status");
-    expect(html).not.toContain(`alert alert-error`);
-  });
-
-  it("shows ok without banner", async () => {
-    backupStatus = { state: "ok", timestamp: new Date(), lastSuccess: new Date() };
-    const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("Backup aktuell");
-    expect(html).not.toContain(`alert alert-error`);
-  });
-
-  it("shows a banner when failed", async () => {
-    backupStatus = { state: "failed", timestamp: ts, lastSuccess: null };
-    const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("fehlgeschlagen");
-    expect(html).toContain("Sicherung der Datenbank ist fehlgeschlagen");
-    expect(html).toContain("Server betreibt");
-  });
-
-  it("shows a banner when stale", async () => {
-    backupStatus = { state: "stale", timestamp: ts, lastSuccess: ts };
-    const html = await (await adminRoutes.request("/backup")).text();
-    expect(html).toContain("keine erfolgreiche Sicherung");
-    expect(html).toContain("Server betreibt");
-  });
 });
 
 describe("PERMISSION_AREAS", () => {

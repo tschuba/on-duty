@@ -127,12 +127,10 @@ vi.mock("../middleware/auth.js", () => ({
   },
 }));
 
-let backupStatus: any = { state: "unconfigured", timestamp: null, lastSuccess: null };
 
 // Layout badge count is a separate DB query; keep it out of the per-route select-call assertions.
 vi.mock("../lib/registration.js", async (orig) => ({ ...(await orig<typeof import("../lib/registration.js")>()), countPendingUsers: async () => 0 }));
 
-vi.mock("../lib/backup.js", () => ({ getBackupStatus: () => Promise.resolve(backupStatus) }));
 
 const { roleRoutes, rolesPage } = await import("../routes/roles.js");
 const { Hono } = await import("hono");
@@ -155,7 +153,6 @@ beforeEach(() => {
   userAppRolesFixture = [];
   orgConfigFixture = [];
   currentUser = { id: "u1", disabled: false, permissions: new Set(["system:admin", "member-roles:read", "member-roles:write", "member-roles:delete", "member-role-types:read", "member-role-types:write", "member-role-types:delete", "anniversary-years:read", "anniversary-years:write", "anniversary-years:delete"]) };
-  backupStatus = { state: "unconfigured", timestamp: null, lastSuccess: null };
 });
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────

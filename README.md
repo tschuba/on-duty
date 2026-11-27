@@ -18,7 +18,6 @@ Entstanden bei und im Einsatz für die Freiwillige Feuerwehr Altenhammer.
 ## Konfiguration
 
 - [OIDC-Provider konfigurieren](docs/oidc.md)
-- [Backup-Überwachung](docs/backup.md)
 - [Anmeldung zu Terminen](docs/termin-anmeldung.md)
 - [Standalone-Deployment (App + DB + OIDC, ohne Coolify)](docs/standalone-deployment.md)
 - [GitHub-Repository konfigurieren](docs/github-setup.md)
@@ -50,8 +49,6 @@ docker compose -f docker-compose.prod.yml exec app \
 ```
 
 > **Migrationen:** Da `drizzle-kit` ein Dev-Tool ist, empfiehlt sich das einmalige Ausführen von `pnpm db:migrate` lokal gegen die Produktionsdatenbank (via `DATABASE_URL`) oder ein separater Init-Container.
-
-> **Backup:** `docker-compose.prod.yml` enthält einen `backup`-Service; on-duty zeigt dessen Status unter `/admin/backup` ([Details](docs/backup.md)).
 
 ---
 
@@ -120,8 +117,6 @@ Alle Variablen in `.env` (Vorlage: `.env.example`).
 | `ANNIVERSARY_CUTOFF` | — | `01-06` | Ehrungstermin für Jubiläen (MM-DD) |
 | `TILE_CACHE_DIR` | — | `./tile-cache` | Cache für Kartenkacheln (höchstens 500 MB) |
 | `TILE_UPSTREAM_HOST` | — | `tile.openstreetmap.org` | Kachelserver der Inventarkarte |
-| `BACKUP_STATUS_FILE` | — | — | Pfad zur `status.json` des Backup-Containers (leer = Überwachung aus) |
-| `BACKUP_STATUS_MAX_AGE_HOURS` | — | `26` | Nach so vielen Stunden ohne erfolgreiches Backup wird gewarnt |
 | `SMTP_HOST` | — | — | SMTP-Server für E-Mail-Benachrichtigungen |
 | `SMTP_PORT` | — | `587` | SMTP-Port |
 | `SMTP_USER` | — | — | SMTP-Benutzername |

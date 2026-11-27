@@ -13,7 +13,6 @@ import { countPendingUsers } from "../lib/registration.js";
 import { SOURCE_REPO_URL } from "../lib/constants.js";
 import { Icon } from "./icon.js";
 import { getContext } from "hono/context-storage";
-import { getBackupStatus } from "../lib/backup.js";
 import { countCashAttention } from "../lib/cash.js";
 import { GlobalSearch, GLOBAL_SEARCH_SCRIPT } from "./global-search.js";
 import { AdminMenuItems, attentionItems, CountBadge, NavMenu, type NavCounts, NAV_SCRIPT, NAV_STATE_SCRIPT } from "./nav-menu.js";
@@ -62,7 +61,6 @@ export const Layout = async ({ title, children, user, path }: Props) => {
       events: await countPendingRsvps(user.id).catch(() => 0), // Badge darf die Seite nie brechen
       org,
       pendingUsers: has("system:admin") ? await countPendingUsers() : 0,
-      backupProblem: has("system:admin") ? ["failed", "stale"].includes((await getBackupStatus()).state) : false,
     };
   }
 

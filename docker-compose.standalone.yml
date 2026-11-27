@@ -50,10 +50,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      BACKUP_STATUS_FILE: /backup-status/status.json
       TILE_CACHE_DIR: /tile-cache
       TILE_UPSTREAM_HOST: ${TILE_UPSTREAM_HOST:-tile.openstreetmap.org}
-      BACKUP_STATUS_MAX_AGE_HOURS: ${BACKUP_STATUS_MAX_AGE_HOURS:-26}
       # One-time start values for the registration settings (only applied while unset in the DB).
       # Role ID = built-in role "Leser" (src/db/seed.ts).
       REGISTRATION_ENABLED: "true"
@@ -66,7 +64,6 @@ services:
     volumes:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
       - bugsink-bootstrap:/bugsink:ro
-      - backup-status:/backup-status:ro
       - tile-cache:/tile-cache
     depends_on:
       db:
@@ -361,36 +358,8 @@ services:
       app:
         condition: service_healthy
 
-  backup:
-    image: prodrigestivill/postgres-backup-local:17-alpine-d257e5d
-    restart: unless-stopped
-    environment:
-      POSTGRES_HOST: db
-      # onduty is the Postgres superuser (bootstrap user of the official
-      # image) and thus can read both databases — the backup container needs
-      # a single role with access to all DBs listed in POSTGRES_DB, not the
-      # restricted Zitadel user.
-      POSTGRES_USER: ${POSTGRES_USER:-onduty}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      POSTGRES_DB: ${POSTGRES_DB:-onduty},${ZITADEL_DB_NAME:-zitadel}
-      SCHEDULE: "@daily"
-      BACKUP_KEEP_DAYS: 7
-      BACKUP_KEEP_WEEKS: 4
-      BACKUP_KEEP_MONTHS: 6
-    volumes:
-      - ./data/backups:/backups
-      - backup-status:/status
-    configs:
-      - source: backup-status-hook
-        target: /hooks/10-status
-        mode: 0755
-    depends_on:
-      db:
-        condition: service_healthy
-
 volumes:
   openobserve-data:
-  backup-status:
   tile-cache:
   bugsink-data:
   bugsink-bootstrap:
@@ -399,19 +368,6 @@ volumes:
   zitadel-admin:
 
 configs:
-  backup-status-hook:
-    content: |
-      #!/bin/sh
-      # Schreibt nach jedem Lauf den Status für on-duty (/admin/backup).
-      f=/status/status.json
-      now=$$(date -u +%Y-%m-%dT%H:%M:%SZ)
-      case "$$1" in
-        post-backup) s=success; ls=$$now ;;
-        error) s=failed; ls=$$(sed -n 's/.*"lastSuccess":"\([^"]*\)".*/\1/p' "$$f" 2>/dev/null) ;;
-        *) exit 0 ;;
-      esac
-      if [ -n "$$ls" ]; then lsj="\"$$ls\""; else lsj=null; fi
-      printf '{"timestamp":"%s","status":"%s","lastSuccess":%s}\n' "$$now" "$$s" "$$lsj" > "$$f.tmp" && mv "$$f.tmp" "$$f"
   init-zitadel-db:
     content: |
       #!/bin/sh
