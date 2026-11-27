@@ -40,6 +40,7 @@ import { loanRequestRoutes } from "./routes/loan-requests.js";
 import { importRoutes } from "./routes/import.js";
 import { requireAuth, type Variables } from "./middleware/auth.js";
 import { sentryTunnelRoutes } from "./routes/sentry-tunnel.js";
+import { ensureUploadDir } from "./lib/receipt-files.js";
 import { tilesRoutes, startTilePruning } from "./routes/tiles.js";
 import { readDsn } from "./lib/sentry.js";
 import { healthRoutes } from "./routes/health.js";
@@ -189,6 +190,7 @@ app.onError(async (err, c) => {
 });
 
 startTilePruning();
+ensureUploadDir().catch((e) => logger.error({ err: e instanceof Error ? e.message : "unknown" }, "UPLOAD_PATH not writable"));
 serve({ fetch: app.fetch, port: 3000 }, () => {
   logger.info({ org: env.ORG_NAME }, "listening on http://localhost:3000");
 });

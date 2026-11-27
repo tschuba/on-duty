@@ -65,7 +65,7 @@ export function linkify(text: string, href: string | null) {
   return text.split(/\[([^\]]+)\]/).map((part, i) => i % 2 === 0 ? part : href ? <a href={href} class="link link-primary">{part}</a> : part);
 }
 
-type CasesProps = { prefix: "members" | "rights" | "cash" | "inventory" | "lending"; count: number; params?: Record<string, number>; body?: (n: number) => unknown; fixExtra?: (n: number) => unknown };
+type CasesProps = { prefix: "members" | "rights" | "cash" | "inventory" | "lending" | "donations"; count: number; params?: Record<string, number>; body?: (n: number) => unknown; fixExtra?: (n: number) => unknown };
 // Aufklappbare Fehlerfälle (Ursache/Lösung); `body` ersetzt den Standardinhalt eines Falls.
 function HelpCases({ prefix, count, params, body, fixExtra }: CasesProps) {
   const k = (n: number, f: "title" | "cause" | "fix") => `help.${prefix}.case.${n}.${f}` as Parameters<typeof t>[0];
@@ -117,6 +117,7 @@ helpRoutes.get("/", requireAuth(), (c) => {
   ];
   if (user.permissions.has("inventory:read")) topics.push({ href: "/help/inventory", icon: "icon-[tabler--building-warehouse]" as const, title: t("help.inventory.title"), text: t("help.inventory.card") });
   if (user.permissions.has("lending:read")) topics.push({ href: "/help/lending", icon: "icon-[tabler--arrows-exchange]" as const, title: t("help.lending.title"), text: t("help.lending.card") });
+  if (user.permissions.has("donations:read")) topics.push({ href: "/help/donations", icon: "icon-[tabler--heart-handshake]" as const, title: t("help.donations.title"), text: t("help.donations.card") });
   if (hasCash(user.permissions, "report")) topics.push({ href: "/help/cash", icon: "icon-[tabler--cash-register]" as const, title: t("help.cash.title"), text: t("help.cash.card") });
   return c.html(
     <Layout title={t("help.title")} user={user}>
@@ -303,7 +304,7 @@ function RightsList({ items }: { items: { perm: Permission; own: boolean; text: 
 }
 
 // Nummerierter Ablauf; Text „Kopf: Erklärung“, optional Sprunglink je Schritt.
-function FlowSteps({ prefix, count, go }: { prefix: "inventory" | "lending"; count: number; go?: Record<number, unknown> }) {
+function FlowSteps({ prefix, count, go }: { prefix: "inventory" | "lending" | "donations"; count: number; go?: Record<number, unknown> }) {
   return (
     <ol class="space-y-4">
       {Array.from({ length: count }, (_, i) => i + 1).map((n) => {
@@ -415,6 +416,39 @@ helpRoutes.get("/lending", requireAuth("lending:read"), (c) => {
 
         <Section id="trouble" class="scroll-mt-48" title={t("help.lending.trouble")} collapsible={false}>
           <HelpCases prefix="lending" count={6} fixExtra={(n) => caseGo[n]} />
+        </Section>
+
+        <OpenCaseOnHash />
+      </div>
+    </Layout>
+  );
+});
+
+helpRoutes.get("/donations", requireAuth("donations:read"), (c) => {
+  const user = c.get("user");
+  const from = helpFrom(c.req.query("from"));
+  const issue = user.permissions.has("donations:issue-receipts");
+  const states = [["badge-warning", "receiptOpen", "open"], ["badge-success", "receiptIssued", "issued"], ["badge-ghost", "receiptNotRequired", "not_required"]] as const;
+  const go = goLink(true, "/donations", t("donations.title"));
+  return c.html(
+    <Layout title={t("help.donations.title")} user={user}>
+      <div class="max-w-4xl mx-auto">
+        <PageHeader title={t("help.donations.title")} {...backProps(from)} subtitle={<>{t("help.donations.hero")}{HelpLink(from)} · {go}</>} />
+
+        <Section id="rights" class="scroll-mt-48" title={t("help.donations.rights")} collapsible={false}>
+          <RightsList items={(["read", "record", "issue-receipts", "delete"] as const).map((k) => ({ perm: `donations:${k}`, own: user.permissions.has(`donations:${k}`), text: t(`help.donations.right.${k}` as Key) }))} />
+        </Section>
+
+        <Section id="flow" class="scroll-mt-48" title={t("help.donations.flow")} collapsible={false}>
+          <FlowSteps prefix="donations" count={4} go={{ 1: goLink(user.permissions.has("donations:record"), "/donations/new", t("donations.newDonation")) }} />
+        </Section>
+
+        <Section id="status" class="scroll-mt-48" title={t("help.donations.status")} collapsible={false}>
+          <BadgeLegend items={states.map(([badge, label, k]) => ({ badge, label: t(`donations.table.${label}` as Key), text: t(`help.donations.status.${k}` as Key) }))} />
+        </Section>
+
+        <Section id="trouble" class="scroll-mt-48" title={t("help.donations.trouble")} collapsible={false}>
+          <HelpCases prefix="donations" count={issue ? 4 : 1} />
         </Section>
 
         <OpenCaseOnHash />

@@ -51,6 +51,7 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
       TILE_CACHE_DIR: /tile-cache
+      UPLOAD_PATH: /uploads
       TILE_UPSTREAM_HOST: ${TILE_UPSTREAM_HOST:-tile.openstreetmap.org}
       # One-time start values for the registration settings (only applied while unset in the DB).
       # Role ID = built-in role "Leser" (src/db/seed.ts).
@@ -65,6 +66,7 @@ services:
       - zitadel-bootstrap:/zitadel/bootstrap:ro
       - bugsink-bootstrap:/bugsink:ro
       - tile-cache:/tile-cache
+      - uploads:/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -361,6 +363,7 @@ services:
 volumes:
   openobserve-data:
   tile-cache:
+  uploads:
   bugsink-data:
   bugsink-bootstrap:
   pgdata:

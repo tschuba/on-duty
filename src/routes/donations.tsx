@@ -1,10 +1,15 @@
 import { Hono } from "hono";
 import { Address } from "../components/address.js";
 import { eq } from "drizzle-orm";
+import { csrf } from "hono/csrf";
+import { bodyLimit } from "hono/body-limit";
+import { env } from "../env.js";
+import { MAX_RECEIPT_BYTES, RECEIPT_EXT, detectReceiptType, readReceiptFile, removeReceiptFile, writeReceiptFile } from "../lib/receipt-files.js";
+import { logger } from "../lib/logger.js";
 import { Field, ViewField, ViewGrid } from "../components/field.js";
 import { toCurrency } from "n2words/de-DE";
 import { db } from "../db/index.js";
-import { persons, donors, donations, users } from "../db/schema/index.js";
+import { persons, donors, donations, donationReceiptFiles, users } from "../db/schema/index.js";
 import { Section } from "../components/section.js";
 import { Icon } from "../components/icon.js";
 import type { IconName } from "../components/icon.js";
@@ -90,6 +95,8 @@ type DonationRow = typeof donations.$inferSelect;
 type Issuer = typeof users.$inferSelect;
 type DonationWithDonor = DonationRow & { donor: DonorRow & { person: Person & { member: { id: string } | null } }; issuer: Issuer | null };
 
+type ReceiptFile = typeof donationReceiptFiles.$inferSelect;
+
 type DonationType = "cash" | "transfer";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -115,7 +122,7 @@ function xmlEl(id: string, value: string): string {
 
 const UMLAUTS: Record<string, string> = { ä: "ae", ö: "oe", ü: "ue", ß: "ss", Ä: "Ae", Ö: "Oe", Ü: "Ue" };
 
-function receiptFilename(d: DonationWithDonor): string {
+function receiptFilename(d: DonationWithDonor, ext = "xml"): string {
   const slug = (s: string) =>
     s
       .replace(/[äöüßÄÖÜ]/g, (c) => UMLAUTS[c])
@@ -123,7 +130,7 @@ function receiptFilename(d: DonationWithDonor): string {
       .replace(/[^a-zA-Z0-9_-]/g, "");
   const p = d.donor.person;
   const who = p.companyName ? slug(p.companyName) : `${slug(p.lastName)}_${slug(p.firstName)}`;
-  return `Zuwendungsbestaetigung_${who}_${d.date}_${d.id.slice(0, 8)}.xml`;
+  return `Zuwendungsbestaetigung_${who}_${d.date}_${d.id.slice(0, 8)}.${ext}`;
 }
 
 // Builds the FFW xml-data import file for the official Muster 034122 form
@@ -259,6 +266,64 @@ function DonationFormFields({ values, errors, showTodayButton }: { values?: Part
   );
 }
 
+const fileSize = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+// Attached file as a card: type icon, name, size/date, "view" and (edit page) "remove".
+function ReceiptFileCard({ d, file, editable }: { d: DonationRow; file: ReceiptFile; editable?: boolean }) {
+  const pdf = file.contentType === "application/pdf";
+  return (
+    <div class="flex flex-wrap items-center gap-3 rounded-box border border-base-300 p-3">
+      <Icon name={pdf ? "icon-[tabler--file-type-pdf]" : "icon-[tabler--photo]"} class="h-8 w-8 shrink-0 text-primary" />
+      <div class="min-w-0 flex-1">
+        <div class="font-medium">{t("donations.file.name")}{RECEIPT_EXT[file.contentType]}</div>
+        <div class="text-sm opacity-70">{t("donations.file.info", { size: fileSize(file.size), date: formatDateObj(file.uploadedAt) })}</div>
+      </div>
+      <a href={`/donations/${d.id}/receipt-file`} target="_blank" class="btn btn-outline btn-sm"><ActionContent icon="icon-[tabler--eye]" label={t("donations.file.download")} /></a>
+      {editable && (
+        <form method="post" action={`/donations/${d.id}/receipt-file/delete`} onsubmit={`return confirm(${JSON.stringify(t("donations.file.removeConfirm"))})`}>
+          <button type="submit" class="btn btn-outline btn-error btn-sm"><ActionContent icon="icon-[tabler--trash]" label={t("donations.file.remove")} /></button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// Detail page: read-only view of the attachment, with a pointer to the edit page when empty.
+function ReceiptFileSection({ d, file, canEdit }: { d: DonationRow; file?: ReceiptFile; canEdit: boolean }) {
+  return (
+    <Section title={t("donations.file.title")} collapsible={false} class="mt-6">
+      {file ? <ReceiptFileCard d={d} file={file} /> : (
+        <p class="opacity-70">{t("donations.file.empty")} {canEdit && <a href={`/donations/${d.id}/edit`} class="link link-primary">{t("donations.file.addLink")}</a>}</p>
+      )}
+    </Section>
+  );
+}
+
+// Edit page: upload/replace/remove. Own multipart form, saved immediately and independent of the donation form above.
+function ReceiptFileForm({ d, file }: { d: DonationRow; file?: ReceiptFile }) {
+  const pick = "var f=this.files[0],l=this.form.querySelector('[data-name]');l.textContent=f?f.name+' ('+Math.max(1,Math.round(f.size/1024))+' KB)':'';this.form.querySelector('button').disabled=!f";
+  return (
+    <div class="max-w-xl">
+      <div class="divider" />
+      <h2 class="font-semibold mb-3">{t("donations.file.title")}</h2>
+      {file && <div class="mb-3"><ReceiptFileCard d={d} file={file} editable /></div>}
+      <form method="post" action={`/donations/${d.id}/receipt-file`} enctype="multipart/form-data" class="space-y-2">
+        <label class="relative flex flex-col items-center gap-1 rounded-box border-2 border-dashed border-base-300 p-6 text-center hover:border-primary focus-within:border-primary">
+          <Icon name="icon-[tabler--cloud-upload]" class="h-8 w-8 opacity-60" />
+          <span class="font-medium">{t("donations.file.drop")}</span>
+          <span class="text-sm opacity-70">{t("donations.file.hint")}</span>
+          <span data-name class="text-sm font-medium text-primary" />
+          <input type="file" name="file" required accept="application/pdf,image/jpeg,image/png" class="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={t("donations.file.drop")} onchange={pick} />
+        </label>
+        <div class="flex flex-wrap items-center gap-3">
+          <button type="submit" class="btn btn-primary btn-sm" disabled>{t(file ? "donations.file.replace" : "donations.file.upload")}</button>
+          <span class="text-sm opacity-70">{t("donations.file.immediate")}</span>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // Receipt preview + XML button for the donation detail page (open/issued only).
 function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnType<typeof fetchDonation>>>; config: Record<string, string>; perms: Set<string> }) {
   const orgComplete = isOrgConfigCompleteForReceipts(config);
@@ -322,6 +387,7 @@ function ReceiptSection({ d, config, perms }: { d: NonNullable<Awaited<ReturnTyp
 
       <p class="text-sm opacity-80 mb-2 max-w-2xl">{t("donations.receipt.explanation")}</p>
       <a href="https://www.formulare-bfinv.de/ffw/action/invoke.do?id=034122" target="_blank" rel="noopener" class="link text-sm">{t("donations.receipt.officialFormLink")}</a>
+
     </Section>
   );
 }
@@ -380,6 +446,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
   const receipt = donorView ? [] : parseMulti(c.req.queries("receipt"), RECEIPT_STATUSES);
 
   const all = await fetchDonations();
+  const withFile = new Set((await db.select({ id: donationReceiptFiles.donationId }).from(donationReceiptFiles)).map((r) => r.id));
   const needle = search.toLowerCase();
   const inRange = (d: { date: string }) => !(from && d.date < from) && !(to && d.date > to);
   const matchesName = (p: { firstName: string; lastName: string; companyName?: string | null }) => !search || `${p.companyName ?? ""} ${p.firstName} ${p.lastName}`.toLowerCase().includes(needle);
@@ -492,14 +559,15 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
             {th("amount", t("donations.table.amount"), "text-right")}
             <th>{t("donations.table.purpose")}</th>
             <th>{t("donations.table.receipt")}</th>
+            <th class="w-6"><span class="sr-only">{t("donations.file.attached")}</span></th>
           </tr>
         </thead>
         <tbody>
           {pageRows.length === 0 ? (
-            <tr><td colspan={5} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
+            <tr><td colspan={6} class="text-center opacity-50 py-8">{t("donations.table.empty")}</td></tr>
           ) : pageRows.map((d) => (
             <tr key={d.id} class="cursor-pointer hover max-md:grid-cols-[1fr_auto]" onclick={`window.location='/donations/${d.id}'`}>
-              <td class="max-md:col-start-1 max-md:row-start-2 max-md:text-sm max-md:opacity-60">{formatDate(d.date)}</td>
+              <td class="max-md:col-start-1 max-md:row-start-2 max-md:text-sm max-md:opacity-60">{formatDate(d.date)}{withFile.has(d.id) && <span class="md:hidden ml-2" title={t("donations.file.attached")}><Icon name="icon-[tabler--paperclip]" class="w-4 h-4 align-text-bottom" /></span>}</td>
               <td class="max-md:col-start-1 max-md:row-start-1 max-md:font-semibold"><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} /></td>
               <td class="text-right whitespace-nowrap max-md:col-start-2 max-md:row-start-1">{formatAmount(d.amount)}</td>
               <td data-empty={!d.purpose || undefined} class="max-md:col-span-2 max-md:row-start-3 max-md:text-sm">{d.purpose ?? "—"}</td>
@@ -510,6 +578,7 @@ donationRoutes.get("/", requireAuth(["donations:read", "donations:record", "dona
                     ? <span class="badge badge-ghost badge-sm">{t("donations.table.receiptNotRequired")}</span>
                     : <span class="badge badge-warning badge-sm">{t("donations.table.receiptOpen")}</span>}
               </td>
+              <td class="max-md:hidden!">{withFile.has(d.id) && <span title={t("donations.file.attached")}><Icon name="icon-[tabler--paperclip]" class="w-4 h-4 opacity-60" /></span>}</td>
             </tr>
           ))}
         </tbody>
@@ -605,6 +674,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
   const canIssue = user.permissions.has("donations:issue-receipts");
   const showReceipt = canIssue && d.receiptStatus !== "not_required";
   const config = showReceipt ? await loadOrgConfig() : {};
+  const file = canIssue ? (await db.select().from(donationReceiptFiles).where(eq(donationReceiptFiles.donationId, d.id)))[0] : undefined;
   const canCashRead = hasCash(user.permissions, "read");
   const canCashBook = hasCash(user.permissions, "manage");
   const cashEntryId = canCashRead || canCashBook ? (await donationEntries([d.id])).get(d.id) : undefined;
@@ -615,7 +685,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
     <Layout title={t("donations.title")} user={user}>
       <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" actions={<>
         {suggest && <HeaderAction icon="icon-[tabler--wallet]" label={t("cash.donation.book")} class="btn-outline btn-primary" onclick="document.getElementById('cash-book').showModal()" />}
-        <DetailActions editHref={canRecord ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} /></>} />
+        <DetailActions editHref={canRecord || canIssue ? `/donations/${d.id}/edit` : undefined} remove={canDelete(user, d) && <form id="donation-delete-form" method="post" action={`/donations/${d.id}/delete`} onsubmit={`return confirm(\'${t("donations.confirmDelete")}\')`}><HeaderAction icon="icon-[tabler--trash]" label={t("common.delete")} form="donation-delete-form" class="btn-outline btn-error" /></form>} /></>} />
       {cashEntryId && canCashRead && <p class="mb-4"><a href={`/cash?status=booked`} class="badge badge-ghost gap-1"><Icon name="icon-[tabler--wallet]" class="w-3 h-3" />{t("cash.donation.inCash")}</a></p>}
       {suggest && (
         <dialog id="cash-book" class="modal"><div class="modal-box">
@@ -640,6 +710,7 @@ donationRoutes.get("/:id", requireAuth(["donations:read", "donations:record", "d
       </ViewGrid>
       {showReceipt && c.req.query("download") === "1" && <iframe src={`/donations/${d.id}/receipt.xml`} class="hidden" title={t("donations.receipt.title")} />}
       {showReceipt && <ReceiptSection d={d} config={config} perms={user.permissions} />}
+      {canIssue && <ReceiptFileSection d={d} file={file} canEdit />}
     </Layout>
   );
 });
@@ -649,17 +720,21 @@ donationRoutes.get("/:id/edit", requireAuth(["donations:read", "donations:record
   const user = c.get("user");
   const d = await fetchDonation(c.req.param("id"));
   if (!d) return c.notFound();
-  if (!user.permissions.has("donations:record")) return c.redirect(`/donations/${d.id}`);
+  const canRecord = user.permissions.has("donations:record");
+  const canIssue = user.permissions.has("donations:issue-receipts");
+  if (!canRecord && !canIssue) return c.redirect(`/donations/${d.id}`);
+  const file = canIssue ? (await db.select().from(donationReceiptFiles).where(eq(donationReceiptFiles.donationId, d.id)))[0] : undefined;
   const canLink = user.permissions.has("members:read") && (await readableMemberIds(user.memberScope?.read));
 
   return c.html(
     <Layout title={t("donations.title")} user={user}>
-      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={<FormActions formId="donation-edit-form" cancelHref={`/donations/${d.id}`} />} />
+      <PageHeader title={<><MemberLink memberId={d.donor.person.member?.id} canLink={canLink}>{recipientName(d.donor.person)}</MemberLink><MemberMark memberId={d.donor.person.member?.id} canLink={canLink} class="w-6 h-6" /></>} backHref="/donations" subtitle={t("common.requiredLegend")} actions={canRecord ? <FormActions formId="donation-edit-form" cancelHref={`/donations/${d.id}`} /> : <HeaderAction icon="icon-[tabler--arrow-left]" label={t("common.cancel")} href={`/donations/${d.id}`} class="btn-outline" />} />
       {d.receiptStatus === "issued" && <div class="alert alert-info max-w-xl mb-4">{t("donations.warn.receiptIssued")}</div>}
-      <ReceiptStatusActions d={d} canIssue={user.permissions.has("donations:issue-receipts")} />
-      <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
+      <ReceiptStatusActions d={d} canIssue={canIssue} />
+      {canRecord && <form id="donation-edit-form" method="post" action={`/donations/${d.id}/edit`} class="space-y-4 max-w-xl">
         <DonationFormFields values={{ amount: Number(d.amount).toFixed(2).replace(".", ","), date: d.date, type: d.type ?? "", purpose: d.purpose ?? "" }} />
-      </form>
+      </form>}
+      {canIssue && <ReceiptFileForm d={d} file={file} />}
     </Layout>
   );
 });
@@ -707,6 +782,7 @@ donationRoutes.post("/:id/delete", requireAuth("donations:delete"), async (c) =>
     setFlash(c, t("donations.flash.deleteBlocked"), "error");
     return c.redirect(`/donations/${id}`);
   }
+  await removeReceiptFile(id); // cascade only covers the DB row
   await db.delete(donations).where(eq(donations.id, id));
   setFlash(c, t("donations.flash.deleted"), "success");
   return c.redirect("/donations");
@@ -759,4 +835,63 @@ donationRoutes.post("/:id/receipt-status", requireAuth("donations:issue-receipts
   await db.update(donations).set(next === "open" ? { receiptStatus: next, receiptIssuedAt: null, issuedBy: null } : { receiptStatus: next }).where(eq(donations.id, id));
   setFlash(c, t("donations.flash.statusChanged"), "success");
   return c.redirect(`/donations/${id}`);
+});
+
+// ── Receipt file (optional PDF/JPEG/PNG attachment, one per donation) ────────
+
+const fileCsrf = csrf({ origin: env.OIDC_APP_URL });
+const fileFail = (c: any, id: string, key: Parameters<typeof t>[0]) => {
+  setFlash(c, t(key), "error");
+  return c.redirect(`/donations/${id}/edit`);
+};
+
+donationRoutes.post(
+  "/:id/receipt-file",
+  requireAuth("donations:issue-receipts"),
+  fileCsrf,
+  bodyLimit({ maxSize: MAX_RECEIPT_BYTES + 512 * 1024, onError: (c) => fileFail(c, c.req.param("id")!, "donations.file.tooLarge") }),
+  async (c) => {
+    const id = c.req.param("id");
+    const user = c.get("user");
+    if (!(await fetchDonation(id))) return c.notFound();
+    const f = (await c.req.parseBody()).file;
+    if (!(f instanceof File) || f.size === 0) return fileFail(c, id, "donations.file.missing");
+    if (f.size > MAX_RECEIPT_BYTES) return fileFail(c, id, "donations.file.tooLarge");
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const contentType = detectReceiptType(bytes);
+    if (!contentType) return fileFail(c, id, "donations.file.invalidType");
+    await writeReceiptFile(id, bytes);
+    const row = { contentType, size: bytes.length, uploadedAt: new Date(), uploadedBy: user.id };
+    try {
+      await db.insert(donationReceiptFiles).values({ donationId: id, ...row }).onConflictDoUpdate({ target: donationReceiptFiles.donationId, set: row });
+    } catch (e) {
+      await removeReceiptFile(id).catch(() => {});
+      logger.error({ err: e instanceof Error ? e.message : "unknown", donationId: id }, "receipt file metadata failed");
+      return fileFail(c, id, "donations.file.failed");
+    }
+    setFlash(c, t("donations.file.saved"), "success");
+    return c.redirect(`/donations/${id}/edit`);
+  },
+);
+
+donationRoutes.get("/:id/receipt-file", requireAuth("donations:issue-receipts"), async (c) => {
+  const id = c.req.param("id");
+  const d = await fetchDonation(id);
+  const [meta] = d ? await db.select().from(donationReceiptFiles).where(eq(donationReceiptFiles.donationId, id)) : [];
+  if (!d || !meta) return c.notFound();
+  let body: Buffer;
+  try { body = await readReceiptFile(id); } catch { return c.notFound(); }
+  c.header("Content-Type", meta.contentType);
+  c.header("Content-Disposition", `inline; filename="${receiptFilename(d, RECEIPT_EXT[meta.contentType].slice(1))}"`);
+  c.header("X-Content-Type-Options", "nosniff");
+  return c.body(body as unknown as ArrayBuffer);
+});
+
+donationRoutes.post("/:id/receipt-file/delete", requireAuth("donations:issue-receipts"), fileCsrf, async (c) => {
+  const id = c.req.param("id");
+  if (!(await fetchDonation(id))) return c.notFound();
+  await db.delete(donationReceiptFiles).where(eq(donationReceiptFiles.donationId, id));
+  await removeReceiptFile(id);
+  setFlash(c, t("donations.file.removed"), "success");
+  return c.redirect(`/donations/${id}/edit`);
 });

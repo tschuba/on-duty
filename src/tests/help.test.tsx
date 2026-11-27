@@ -44,6 +44,22 @@ describe("Hilfe Inventar und Verleih", () => {
   });
 });
 
+describe("Hilfe Spenden", () => {
+  it("Karte und Seite nur mit Recht, Fälle nur für Aussteller", async () => {
+    perms = new Set(["members:read"]);
+    expect(await (await app.request("/help")).text()).not.toContain("/help/donations");
+    perms = new Set(["donations:read"]);
+    expect(await (await app.request("/help")).text()).toContain("/help/donations");
+    let html = await (await app.request("/help/donations")).text();
+    for (const id of ["rights", "flow", "status", "trouble", "case-1"]) expect(html).toContain(`id="${id}"`);
+    expect(html).not.toContain('id="case-2"');
+    perms = new Set(["donations:read", "donations:issue-receipts"]);
+    html = await (await app.request("/help/donations")).text();
+    expect(html).toContain('id="case-4"');
+    perms = new Set(["members:read"]);
+  });
+});
+
 describe("Hilfe", () => {
   it("rendert Übersicht, Mitglieder und Tipps mit Ankern", async () => {
     expect((await app.request("/help")).status).toBe(200);

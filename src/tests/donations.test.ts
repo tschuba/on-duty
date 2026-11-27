@@ -441,8 +441,9 @@ describe("POST /:id/mark-issued", () => {
 
 describe("POST /:id/delete", () => {
   it("deletes the donation and redirects to the list", async () => {
-    donationsFindFirstResult = makeDonation({ id: "don1" });
-    const res = await donationRoutes.request("/don1/delete", { method: "POST" });
+    const id = "11111111-1111-4111-8111-111111111111";
+    donationsFindFirstResult = makeDonation({ id });
+    const res = await donationRoutes.request(`/${id}/delete`, { method: "POST" });
     expect(res.status).toBe(302);
     expect(deleteCalls.some((c) => c.table === donations)).toBe(true);
   });

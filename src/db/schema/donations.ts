@@ -1,4 +1,5 @@
-import { pgEnum, pgTable, numeric, date, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, integer, pgEnum, pgTable, numeric, date, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { persons } from "./persons";
 import { users } from "./auth";
 
@@ -29,4 +30,13 @@ export const donations = pgTable("donations", {
   receiptIssuedAt: timestamp("receipt_issued_at"),
   issuedBy: text("issued_by").references(() => users.id, { onDelete: "set null" }),
 });
+
+// One optional receipt file per donation; bytes live on disk (UPLOAD_PATH/donations/<id>), only metadata here.
+export const donationReceiptFiles = pgTable("donation_receipt_files", {
+  donationId: uuid("donation_id").primaryKey().references(() => donations.id, { onDelete: "cascade" }),
+  contentType: text("content_type").notNull(),
+  size: integer("size").notNull(),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  uploadedBy: text("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+}, (t) => [check("donation_receipt_files_content_type_check", sql`${t.contentType} IN ('application/pdf','image/jpeg','image/png')`)]);
 /* v8 ignore stop */
